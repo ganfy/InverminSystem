@@ -24,6 +24,14 @@
 from datetime import timedelta
 
 from app.models.base import AuditMixin, Base, SoftDeleteMixin
+from app.models.enums import (
+    EstadoCampana,
+    EstadoLiquidacion,
+    EstadoLote,
+    EstadoRuma,
+    EstadoSesion,
+    OrigenDatos,
+)
 from sqlalchemy import (
     Boolean,
     Column,
@@ -288,8 +296,7 @@ class SesionDescarga(AuditMixin, Base):
     razon_social = Column(String(200))
     guia_remision = Column(String(50))
     guia_transporte = Column(String(50))
-    estado = Column(String(20), nullable=False, default="EN_PROCESO")
-    # EN_PROCESO | COMPLETO | PAUSADO
+    estado = Column(String(20), nullable=False, default=EstadoSesion.EN_PROCESO)
 
     provacop = relationship("ProveedorAcopiador", back_populates="sesiones")
     lotes = relationship("Lote", back_populates="sesion")
@@ -327,7 +334,7 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
     numero_lote = Column(Integer, nullable=False)
     tipo_material = Column(String(20))  # Mineral | Llampo | M.Llampo
     ruma_id = Column(Integer, ForeignKey("rumas.id"))
-    estado = Column(String(30), nullable=False, default="RECEPCIONADO")
+    estado = Column(String(30), nullable=False, default=EstadoLote.RECEPCIONADO)
     # Flags de negocio
     volado = Column(Boolean, default=False)  # ley muy baja
     dirimencia = Column(Boolean, default=False)  # tuvo análisis de dirimencia
@@ -537,14 +544,14 @@ class AnalisisLey(AuditMixin, Base):
     lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
     laboratorio = Column(String(50), nullable=False)
-    tipo_analisis = Column(String(20), nullable=False)
+    tipo_analisis = Column(String(20), nullable=False)  # sin default — siempre explícito
     material = Column(String(10), default="Au")
     ley_fino = Column(Numeric(10, 4))
     ley_grueso = Column(Numeric(10, 4))
     ley_final = Column(Numeric(10, 4))
     # TO DO: calcular en service y guardar aquí ley_fino + ley_grueso
     ley_gr_tm = Column(Numeric(10, 3))  # Oz/TC × 34.2857, calculado en service
-    origen_datos = Column(String(20), default="manual")
+    origen_datos = Column(String(20), default=OrigenDatos.MANUAL)
     fecha_analisis = Column(Date)
     certificado_url = Column(Text)
     vigente = Column(Boolean, default=True)
@@ -574,7 +581,7 @@ class AnalisisDetalle(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     analisis_id = Column(Integer, ForeignKey("analisis_ley.id"))
     recuperacion_id = Column(Integer, ForeignKey("analisis_recuperacion.id"))
-    origen = Column(Integer, nullable=False)
+    origen = Column(String(20), nullable=False)
     peso = Column(Numeric(10, 4))
     ley = Column(Numeric(10, 4))
     numero_ensayo = Column(Integer, default=1)
@@ -611,7 +618,7 @@ class AnalisisRecuperacion(AuditMixin, Base):
         Numeric(5, 2),
         Computed("((ley_cabeza - ley_cola) / ley_cabeza) * 100", persisted=True),
     )
-    origen_datos = Column(String(20), default="manual")
+    origen_datos = Column(String(20), default=OrigenDatos.MANUAL)
     fecha_analisis = Column(Date)
     certificado_url = Column(Text)
     vigente = Column(Boolean, default=True)
@@ -686,7 +693,7 @@ class Campana(AuditMixin, Base):
     meta_oro_fino = Column(Numeric(10, 2), default=5000.00)  # gramos
     fecha_inicio = Column(Date, nullable=False)
     fecha_cierre = Column(Date)
-    estado = Column(String(20), default="ACTIVA")  # ACTIVA | CERRADA
+    estado = Column(String(20), default=EstadoCampana.ACTIVA)  # ACTIVA | CERRADA
     oro_fino_acumulado = Column(Numeric(10, 2), default=0)
     total_lotes = Column(Integer, default=0)
     total_toneladas = Column(Numeric(10, 2), default=0)
@@ -728,7 +735,7 @@ class Ruma(AuditMixin, Base):
     codigo = Column(String(20), unique=True, nullable=False)  # CAMP2026-01-001
     codigo_ant = Column(String(20), unique=True)  # vínculo con campaña previa
     fecha_creacion = Column(Date, server_default=func.current_date())
-    estado = Column(String(20), default="ABIERTA")  # ABIERTA | CERRADA
+    estado = Column(String(20), default=EstadoRuma.ABIERTA)  # ABIERTA | CERRADA
 
     lotes = relationship("Lote", back_populates="ruma")
     rumas_campana = relationship("RumaCampana", back_populates="ruma")
@@ -778,7 +785,7 @@ class Liquidacion(AuditMixin, Base):
     provacop_id = Column(Integer, ForeignKey("proveedor_acopiador.id"), nullable=False)
     precio_oro_usd = Column(Numeric(10, 2))  # scraping o entrada manual (RF-LIQ-005)
     valor_total_usd = Column(Numeric(12, 2))  # calculado en service
-    estado = Column(String(20), default="GENERADA")
+    estado = Column(String(20), default=EstadoLiquidacion.GENERADA)
     cerrado_por = Column(Integer, ForeignKey("usuarios.id"))
     fecha_cierre = Column(DateTime)
     pdf_url = Column(Text)

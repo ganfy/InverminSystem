@@ -175,7 +175,38 @@ PERMISOS = [
     ("Gerencia", "ADMINISTRACION", "VIEW", True),
 ]
 
-
+CONFIGURACIONES = [
+    # Muestreo
+    {
+        "clave": "MUESTREO_MAX_INTENTOS",
+        "valor": "3",
+        "descripcion": "Máximo de intentos de muestreo por lote",
+    },
+    {
+        "clave": "MUESTREO_HUMEDAD_MAX_PCT",
+        "valor": "50",
+        "descripcion": "% humedad máximo antes de error",
+    },
+    {"clave": "MUESTREO_MALLA_MIN_PCT", "valor": "88", "descripcion": "% malla mínimo aceptable"},
+    {"clave": "MUESTREO_MALLA_MAX_PCT", "valor": "94", "descripcion": "% malla máximo aceptable"},
+    # Laboratorio
+    {
+        "clave": "LAB_DIFERENCIA_MAX_PCT",
+        "valor": "5",
+        "descripcion": "% diferencia máxima entre labs antes de alerta",
+    },
+    {
+        "clave": "LAB_DIFERENCIA_PLANTA_MINERO",
+        "valor": "0.10",
+        "descripcion": "Diferencia máxima ley planta vs minero antes de dirimencia",
+    },
+    # Campaña
+    {
+        "clave": "CAMPANA_META_ORO_FINO_DEFAULT",
+        "valor": "5000",
+        "descripcion": "Meta default de oro fino en gramos por campaña",
+    },
+]
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 
@@ -271,6 +302,18 @@ def seed():
                 print(" CAMBIAR PASSWORD EN PRODUCCIÓN")
             else:
                 print("usuario admin ya existe")
+
+        # Configuraciones
+        configs_creadas = 0
+        for c in CONFIGURACIONES:
+            existing = db.query(app.models.models.Configuracion).filter_by(clave=c["clave"]).first()
+            if not existing:
+                obj = app.models.models.Configuracion(**c)
+                db.add(obj)
+                print(f"Configuración: {c['clave']}")
+                configs_creadas += 1
+        db.commit()
+        print(f"{configs_creadas} configuraciones creadas")
 
         print("\nSeed completado exitosamente")
 

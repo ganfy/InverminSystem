@@ -10,13 +10,16 @@ Uso típico:
         ...
 """
 
-from alembic.util import err
+import logging
+
 from app.core.database import get_db
 from app.core.security import decode_token, is_token_revoked
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 # Extrae el token del header Authorization: Bearer <token>
 bearer_scheme = HTTPBearer()
@@ -38,8 +41,8 @@ def get_current_user(
 
     try:
         payload = decode_token(credentials.credentials)
-    except JWTError:
-        raise credentials_exception from err
+    except JWTError as exc:
+        raise credentials_exception from exc
 
     # Solo access tokens son válidos para endpoints normales
     if payload.get("type") != "access":
@@ -82,11 +85,11 @@ def get_current_user_payload(
     """
     try:
         payload = decode_token(credentials.credentials)
-    except JWTError:
+    except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido",
-        ) from err
+        ) from exc
 
     jti = payload.get("jti")
     if not jti or is_token_revoked(jti, db):
@@ -103,7 +106,8 @@ def get_current_user_payload(
 def require_roles(*roles: str):
     """
     Dependency factory que exige que el usuario tenga uno de los roles
-    indicados.
+    indicados. Usar para casos simples donde no se necesita la matriz
+    completa de permisos.
 
     Uso:
         @router.delete("/lotes/{id}")
@@ -115,9 +119,14 @@ def require_roles(*roles: str):
     """
 
     def _check(current_user=Depends(get_current_user)):
-        # Acceder al rol del usuario a través de la relación
         rol_codigo = current_user.rol.codigo if current_user.rol else None
         if rol_codigo not in roles:
+            logger.warning(
+                "ACCESO_DENEGADO usuario=%s rol=%s roles_requeridos=%s",
+                current_user.username,
+                rol_codigo,
+                roles,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Acción restringida. Roles permitidos: {', '.join(roles)}",
@@ -132,6 +141,9 @@ def check_permiso(modulo: str, operacion: str):
     Dependency factory que verifica la tabla permisos (RBAC granular).
     Consulta la matriz rol x módulo x operación.
 
+    Admin tiene acceso total y omite la consulta a la tabla.
+    Los intentos denegados se registran en el log de auditoría (RF-SYS-001).
+
     Uso:
         @router.post("/sesiones")
         def crear_sesion(
@@ -145,7 +157,14 @@ def check_permiso(modulo: str, operacion: str):
         current_user=Depends(get_current_user),
         db: Session = Depends(get_db),
     ):
+        from app.models.enums import RolSistema
         from app.models.models import Modulo, Operacion, Permiso
+
+        rol_codigo = current_user.rol.codigo if current_user.rol else None
+
+        # Admin tiene acceso total — no consultar la tabla
+        if rol_codigo == RolSistema.ADMIN:
+            return current_user
 
         tiene_permiso = (
             db.query(Permiso)
@@ -159,11 +178,21 @@ def check_permiso(modulo: str, operacion: str):
             )
             .first()
         )
+
         if not tiene_permiso:
+            # RF-SYS-001: registrar intento no autorizado en log de auditoría
+            logger.warning(
+                "ACCESO_DENEGADO usuario=%s rol=%s modulo=%s operacion=%s",
+                current_user.username,
+                rol_codigo,
+                modulo,
+                operacion,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tiene permisos para realizar esta acción",
             )
+
         return current_user
 
     return _check

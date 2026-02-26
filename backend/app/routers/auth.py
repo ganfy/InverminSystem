@@ -5,7 +5,6 @@ Endpoints: POST /auth/login, POST /auth/logout, POST /auth/refresh, GET /auth/me
 
 from datetime import UTC, datetime
 
-from alembic.util import err
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -24,8 +23,11 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
-settings = get_settings()
 bearer_scheme = HTTPBearer()
+
+
+def _get_settings():
+    return get_settings()
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -36,7 +38,14 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     """
     from app.models.models import Usuario
 
-    user = db.query(Usuario).filter(Usuario.username == data.username, Usuario.activo).first()
+    user = (
+        db.query(Usuario)
+        .filter(
+            Usuario.username == data.username,
+            Usuario.activo,
+        )
+        .first()
+    )
 
     if not user or not verify_password(data.password, user.password_hash):
         # Mismo mensaje para no revelar si el usuario existe
@@ -46,6 +55,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         )
 
     rol_codigo = user.rol.codigo if user.rol else "SIN_ROL"
+    settings = _get_settings()
 
     access_token, _, _ = create_access_token(user.id, rol_codigo)
     refresh_token, _, _ = create_refresh_token(user.id, rol_codigo)
@@ -66,7 +76,11 @@ def refresh(
 ):
     """
     Renovar access_token usando el refresh_token.
-    El refresh_token debe ser válido y no estar revocado.
+
+    Implementa rotación de tokens:
+    - El refresh_token usado se revoca inmediatamente.
+    - Se emiten un nuevo access_token y un nuevo refresh_token.
+    - Si el mismo refresh_token se usa dos veces → 401 (ya está revocado).
     """
     invalid_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -75,17 +89,20 @@ def refresh(
 
     try:
         payload = decode_token(data.refresh_token)
-    except JWTError:
-        raise invalid_exc from err
+    except JWTError as exc:
+        raise invalid_exc from exc
 
     if payload.get("type") != "refresh":
-        raise invalid_exc from err
+        raise invalid_exc
 
     jti = payload.get("jti")
     if not jti or is_token_revoked(jti, db):
-        raise invalid_exc from err
+        raise invalid_exc
 
     user_id = payload.get("sub")
+    if not user_id:
+        raise invalid_exc
+
     from app.models.models import Usuario
 
     user = (
@@ -100,7 +117,14 @@ def refresh(
     if not user:
         raise invalid_exc
 
+    # Revocar el refresh token usado — evita reutilización
+    expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
+    revoke_token(jti, expires_at, db)
+
+    # Emitir nuevos tokens
     rol_codigo = user.rol.codigo if user.rol else "SIN_ROL"
+    settings = _get_settings()
+
     access_token, _, _ = create_access_token(user.id, rol_codigo)
     new_refresh_token, _, _ = create_refresh_token(user.id, rol_codigo)
 
@@ -120,7 +144,7 @@ def logout(
     db: Session = Depends(get_db),
 ):
     """
-    Invalida el access_token actual agregando su jti a la blacklist.
+    Invalida el access_token actual agregándolo a la blacklist.
     El frontend debe eliminar ambos tokens (access y refresh) localmente.
     """
     try:
