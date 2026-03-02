@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from app.core.config import get_settings
 from app.core.database import SessionLocal, check_db_connection
 from app.core.security import cleanup_expired_tokens
-from app.routers import auth
+from app.routers import auth, entidades, usuarios
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -65,6 +65,10 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api/v1")
+
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(usuarios.router, prefix="/api/v1")
+app.include_router(entidades.router, prefix="/api/v1")
 
 # A medida que se agreguen módulos:
 # app.include_router(balanza.router, prefix="/api/v1")

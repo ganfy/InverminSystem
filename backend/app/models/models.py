@@ -180,7 +180,7 @@ class Entidad(AuditMixin, Base):
     __tablename__ = "entidades"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    ruc = Column(String(11), unique=True, nullable=False)
+    ruc = Column(String(11), unique=True, nullable=True)
     razon_social = Column(String(200), nullable=False)
     referencia = Column(Text)
     tipo = Column(String(30), nullable=False)  # EMPRESA | EMPLEADO | PERSONA_NATURAL
@@ -190,11 +190,11 @@ class Entidad(AuditMixin, Base):
     activo = Column(Boolean, default=True)
 
     entidades_roles = relationship("EntidadRol", back_populates="entidad")
-    parametros = relationship(
-        "ParametrosComerciales",
-        back_populates="acopiador",
-        uselist=False,
-    )
+    # parametros = relationship(
+    #     "ParametrosComerciales",
+    #     back_populates="acopiador",
+    #     uselist=False,
+    # ) # relación a través de ProveedorAcopiador por flexibilidad
 
 
 class EntidadRol(AuditMixin, Base):
@@ -238,6 +238,7 @@ class ProveedorAcopiador(Base):
     __table_args__ = (
         UniqueConstraint("proveedor_id", "acopiador_id", name="uq_proveedor_acopiador"),
     )
+    parametros = relationship("ParametrosComerciales", back_populates="provacop", uselist=False)
 
 
 class ParametrosComerciales(AuditMixin, Base):
@@ -250,15 +251,10 @@ class ParametrosComerciales(AuditMixin, Base):
     __tablename__ = "parametros_comerciales"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    acopiador_id = Column(
-        Integer,
-        ForeignKey("entidades.id"),
-        nullable=False,
-        unique=True,
-    )
+    provacop_id = Column(Integer, ForeignKey("proveedor_acopiador.id"), nullable=False, unique=True)
     umbral_recup_bajo = Column(Numeric(5, 2))
     umbral_recup_medio = Column(Numeric(5, 2))
-    umbral_recup_alto = Column(Numeric(5, 2))
+    riesgo_comercial = Column(Numeric(5, 2))
     lim_ley_comercial = Column(Numeric(5, 3))
     dscto_ley_comercial = Column(Numeric(5, 3))
     porcentaje_ley_comercial = Column(Numeric(5, 3))
@@ -269,7 +265,7 @@ class ParametrosComerciales(AuditMixin, Base):
     maquila = Column(Numeric(5, 2))  # %
     comision = Column(Numeric(5, 2))  # %
 
-    acopiador = relationship("Entidad", back_populates="parametros")
+    provacop = relationship("ProveedorAcopiador", back_populates="parametros")
 
 
 # =============================================================================
@@ -824,6 +820,9 @@ class LiquidacionLote(AuditMixin, Base):
     porcentaje_rec_liquido = Column(Numeric(5, 2))
     porcentaje_rec_planta = Column(Numeric(5, 2))
     fino_recuperable = Column(Numeric(10, 4))
+    gasto_acopio_liquidacion = Column(Numeric(10, 2))
+    bono = Column(Numeric(10, 2))
+    insumos_liquidacion = Column(Numeric(10, 2))
 
     liquidacion = relationship("Liquidacion", back_populates="liquidacion_lotes")
     lote = relationship("Lote", back_populates="liquidaciones_lotes")

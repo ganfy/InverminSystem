@@ -10,6 +10,7 @@ from app.core.database import engine
 from app.models import (
     models,  # noqa: F401
 )
+from app.models.auth import TokenRevocado
 from app.models.base import Base
 
 config = context.config

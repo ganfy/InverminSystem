@@ -26,4 +26,4 @@
 #             "definida_en": lote.ley_definida_en,
 #         }
 #     except ValueError as e:
-#         raise HTTPException(400, detail=str(e))
+#         raise HTTPException(400,  detail=str(e)) from e

@@ -18,6 +18,8 @@ NUNCA correr en producción.
 import sys
 from pathlib import Path
 
+from sqlalchemy import text
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
@@ -96,7 +98,8 @@ RELACIONES_PROVACOP = [
 # (ruc_acopiador, dict_parametros)
 PARAMETROS_PRUEBA = [
     (
-        "10111222333",
+        "20123456789",
+        "10111222333",  # Andes Gold → Mamani
         {
             "umbral_recup_bajo": 75.00,
             "umbral_recup_medio": 85.00,
@@ -113,7 +116,8 @@ PARAMETROS_PRUEBA = [
         },
     ),
     (
-        "10444555666",
+        "20987654321",
+        "10444555666",  # Coop Puno  → Flores
         {
             "umbral_recup_bajo": 72.00,
             "umbral_recup_medio": 83.00,
@@ -131,6 +135,7 @@ PARAMETROS_PRUEBA = [
     ),
     (
         "20555666777",
+        "20555666777",  # Directa    → sí misma (auto-acopiador)
         {  # auto-acopiador
             "umbral_recup_bajo": 80.00,
             "umbral_recup_medio": 88.00,
@@ -268,37 +273,16 @@ def reset_dev_data(db):
     """
     print("Reseteando datos de prueba...")
 
-    rucs = [e["ruc"] for e in ENTIDADES_PRUEBA]
+    db.execute(text("TRUNCATE parametros_comerciales CASCADE"))
+    db.execute(text("TRUNCATE proveedor_acopiador CASCADE"))
+    db.execute(text("TRUNCATE entidades_roles CASCADE"))
+
+    # Usuarios de prueba — solo los del seed, no admin
     usernames = [u["username"] for u in USUARIOS_PRUEBA]
+    rucs = [e["ruc"] for e in ENTIDADES_PRUEBA]
 
-    # Usuarios de prueba
     db.query(Usuario).filter(Usuario.username.in_(usernames)).delete(synchronize_session=False)
-
-    # Entidades y sus dependencias (CASCADE debería manejar esto,
-    # pero siendo explícitos por seguridad)
-    entidades = db.query(Entidad).filter(Entidad.ruc.in_(rucs)).all()
-    entidad_ids = [e.id for e in entidades]
-
-    if entidad_ids:
-        # ParametrosComerciales
-        db.query(ParametrosComerciales).filter(
-            ParametrosComerciales.acopiador_id.in_(entidad_ids)
-        ).delete(synchronize_session=False)
-
-        # ProveedorAcopiador
-        db.query(ProveedorAcopiador).filter(
-            ProveedorAcopiador.proveedor_id.in_(entidad_ids)
-            | ProveedorAcopiador.acopiador_id.in_(entidad_ids)
-        ).delete(synchronize_session=False)
-
-        # EntidadesRoles
-        db.query(EntidadRol).filter(EntidadRol.entidad_id.in_(entidad_ids)).delete(
-            synchronize_session=False
-        )
-
-        # Entidades
-        db.query(Entidad).filter(Entidad.id.in_(entidad_ids)).delete(synchronize_session=False)
-
+    db.query(Entidad).filter(Entidad.ruc.in_(rucs)).delete(synchronize_session=False)
     db.commit()
     print("Reset completado\n")
 
@@ -363,14 +347,20 @@ def seed_dev():
         db.commit()
 
         print("\nCreando parámetros comerciales...")
-        for ruc_acop, params in PARAMETROS_PRUEBA:
-            entidad = entidad_map[ruc_acop]
-            existing = db.query(ParametrosComerciales).filter_by(acopiador_id=entidad.id).first()
+        # for ruc_acop, params in PARAMETROS_PRUEBA:
+        #     entidad = entidad_map[ruc_acop]
+        #     existing = db.query(ParametrosComerciales).filter_by(acopiador_id=entidad.id).first()
+        #     if not existing:
+        #         pc = ParametrosComerciales(acopiador_id=entidad.id, **params)
+        #         db.add(pc)
+        #         print(f"Parámetros para {entidad.razon_social}")
+        # db.commit()
+        for ruc_prov, ruc_acop, params in PARAMETROS_PRUEBA:
+            pa = provacop_map[(ruc_prov, ruc_acop)]
+            existing = db.query(ParametrosComerciales).filter_by(provacop_id=pa.id).first()
             if not existing:
-                pc = ParametrosComerciales(acopiador_id=entidad.id, **params)
+                pc = ParametrosComerciales(provacop_id=pa.id, **params)
                 db.add(pc)
-                print(f"Parámetros para {entidad.razon_social}")
-        db.commit()
 
         print("\nCreando usuarios de prueba...")
         for datos in USUARIOS_PRUEBA:
