@@ -296,6 +296,33 @@ class SesionDescarga(AuditMixin, Base):
 
     provacop = relationship("ProveedorAcopiador", back_populates="sesiones")
     lotes = relationship("Lote", back_populates="sesion")
+    documentos = relationship("SesionDocumento", back_populates="sesion")
+
+
+class SesionDocumento(AuditMixin, Base):
+    """
+    Documentos adjuntos a una sesión de descarga.
+    Almacenados en disco local del servidor (/storage/sesiones/...).
+    Tipos: GUIA_REMISION, GUIA_TRANSPORTE, LICENCIA_CONDUCIR, OTRO.
+    Cualquier rol con acceso a Balanza puede subir (Admin, OperadorBalanza).
+    Upload implementado en módulo Balanza (RF-BAL-001).
+    """
+
+    __tablename__ = "sesion_documentos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sesion_id = Column(Integer, ForeignKey("sesiones_descarga.id"), nullable=False)
+    tipo_documento = Column(
+        String(30), nullable=False
+    )  # Valores: GUIA_REMISION, GUIA_TRANSPORTE, LICENCIA_CONDUCIR, OTRO
+    nombre_original = Column(
+        String(255), nullable=False
+    )  # Nombre del archivo tal como lo subió el usuario
+    ruta_archivo = Column(
+        String(500), nullable=False
+    )  # Ruta relativa en servidor: /storage/sesiones/{año}/{mes}/{sesion_id}/{archivo}
+
+    sesion = relationship("SesionDescarga", back_populates="documentos")
 
 
 class Lote(AuditMixin, SoftDeleteMixin, Base):
