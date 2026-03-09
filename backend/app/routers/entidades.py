@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.schemas.entidades import (
     AcopiadorDropdown,
+    CambiarAcopiadorPayload,
     ParametrosRespuesta,
     TerceroCrear,
     TerceroEditar,
@@ -72,6 +73,19 @@ def obtener_parametros_acopiador(
     return svc.obtener_parametros_acopiador(db, acopiador_id)
 
 
+@router.get("/buscar-ruc/{ruc}", response_model=TerceroRespuesta | None)
+def buscar_por_ruc(
+    ruc: str,
+    current_user=Depends(check_permiso("TERCEROS", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Busca un proveedor por RUC para auto-completar el formulario.
+    Retorna null si no existe — no es un error.
+    """
+    return svc.buscar_por_ruc(db, ruc)
+
+
 @router.get("/{entidad_id}", response_model=TerceroRespuesta)
 def obtener_tercero(
     entidad_id: int,
@@ -126,3 +140,42 @@ def desactivar_tercero(
         return svc.cambiar_estado(db, entidad_id, activo=False, usuario_id=current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+@router.patch("/{entidad_id}/acopiador", response_model=TerceroRespuesta)
+def cambiar_acopiador(
+    entidad_id: int,
+    datos: CambiarAcopiadorPayload,
+    current_user=Depends(check_permiso("TERCEROS", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Cambia el acopiador de un proveedor.
+    Bloqueado si ya existen sesiones de balanza para esta relación.
+    Solo Admin y Gerencia (TERCEROS UPDATE).
+    """
+    try:
+        return svc.cambiar_acopiador(
+            db,
+            entidad_id,
+            datos.acopiador_id,
+            usuario_id=current_user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+
+
+@router.delete("/{entidad_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_tercero(
+    entidad_id: int,
+    current_user=Depends(check_permiso("TERCEROS", "DELETE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Elimina permanentemente un tercero sin sesiones en balanza.
+    Solo Admin (TERCEROS DELETE según RBAC).
+    """
+    try:
+        svc.eliminar_tercero(db, entidad_id, usuario_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e

@@ -89,14 +89,13 @@ class TerceroRespuesta(BaseModel):
 
 
 class TerceroLista(BaseModel):
-    """Schema resumido para el listado de terceros."""
-
     id: int
+    provacop_id: int
     razon_social: str
     ruc: str | None = None
     referencia: str | None = None
     activo: bool
-    acopiador: str | None = None  # razon_social del acopiador
+    acopiador: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -183,3 +182,9 @@ class TerceroEditar(BaseModel):
     telefono: str | None = None
     email: EmailStr | None = None
     parametros: ParametrosSchema | None = None
+
+
+class CambiarAcopiadorPayload(BaseModel):
+    """Payload para cambiar el acopiador de un proveedor (sin sesiones)."""
+
+    acopiador_id: int

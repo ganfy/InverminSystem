@@ -255,11 +255,11 @@ class ParametrosComerciales(AuditMixin, Base):
     umbral_recup_bajo = Column(Numeric(5, 2))
     umbral_recup_medio = Column(Numeric(5, 2))
     riesgo_comercial = Column(Numeric(5, 2))
-    lim_ley_comercial = Column(Numeric(5, 3))
-    dscto_ley_comercial = Column(Numeric(5, 3))
-    porcentaje_ley_comercial = Column(Numeric(5, 3))
-    lim_ley_inferior = Column(Numeric(5, 3))
-    lim_ley_superior = Column(Numeric(5, 3))
+    lim_ley_comercial = Column(Numeric(8, 3))
+    dscto_ley_comercial = Column(Numeric(8, 3))
+    porcentaje_ley_comercial = Column(Numeric(8, 3))
+    lim_ley_inferior = Column(Numeric(8, 3))
+    lim_ley_superior = Column(Numeric(8, 3))
     gasto_acopio = Column(Numeric(10, 2))  # USD
     gasto_consumo = Column(Numeric(10, 2))  # USD
     maquila = Column(Numeric(5, 2))  # %

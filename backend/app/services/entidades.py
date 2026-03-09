@@ -12,6 +12,7 @@ from app.models.models import (
     ParametrosComerciales,
     ProveedorAcopiador,
     Rol,
+    SesionDescarga,
 )
 from app.schemas.entidades import (
     ParametrosSchema,
@@ -197,27 +198,32 @@ def listar_terceros(
     db: Session,
     activo: bool | None = None,
 ) -> list[dict]:
-    """Lista proveedores con datos básicos de su acopiador."""
+    """
+    Lista UNA FILA POR PROVACOP.
+    Un proveedor con 2 acopiadores aparece 2 veces.
+    """
     query = (
-        db.query(Entidad)
+        db.query(Entidad, ProveedorAcopiador)
         .join(EntidadRol, EntidadRol.entidad_id == Entidad.id)
         .join(Rol, Rol.id == EntidadRol.rol_id)
+        .join(
+            ProveedorAcopiador,
+            ProveedorAcopiador.proveedor_id == Entidad.id,
+        )
         .filter(Rol.codigo == RolEntidad.PROVEEDOR)
     )
     if activo is not None:
         query = query.filter(Entidad.activo == activo)
 
-    entidades = query.order_by(Entidad.razon_social).all()
+    filas = query.order_by(Entidad.razon_social).all()
 
     resultado = []
-    for entidad in entidades:
-        provacop = _get_provacop_de_entidad(db, entidad.id)
-        acopiador_nombre = None
-        if provacop:
-            acopiador_nombre = provacop.acopiador.razon_social
+    for entidad, provacop in filas:
+        acopiador_nombre = provacop.acopiador.razon_social if provacop.acopiador else None
         resultado.append(
             {
                 "id": entidad.id,
+                "provacop_id": provacop.id,
                 "razon_social": entidad.razon_social,
                 "ruc": entidad.ruc,
                 "referencia": entidad.referencia,
@@ -241,68 +247,72 @@ def crear_tercero(
     datos: TerceroCrear,
     usuario_id: int,
 ) -> dict:
-    # Verificar unicidad de RUC
-    if db.query(Entidad).filter_by(ruc=datos.ruc).first():
-        raise ValueError(f"Ya existe una entidad con RUC {datos.ruc}")
+    # ── Buscar si ya existe entidad con ese RUC
+    proveedor = db.query(Entidad).filter_by(ruc=datos.ruc).first() if datos.ruc else None
 
-    # Crear entidad proveedor
-    proveedor = Entidad(
-        ruc=datos.ruc,
-        razon_social=datos.razon_social,
-        referencia=datos.referencia,
-        telefono=datos.telefono,
-        email=datos.email,
-        tipo=TipoEntidad.EMPRESA,
-        activo=True,
-        creado_por=usuario_id,
-    )
-    db.add(proveedor)
-    db.flush()
+    if proveedor is None:
+        # Crear entidad nueva
+        proveedor = Entidad(
+            ruc=datos.ruc,
+            razon_social=datos.razon_social,
+            referencia=datos.referencia,
+            telefono=datos.telefono,
+            email=datos.email,
+            tipo=TipoEntidad.EMPRESA,
+            activo=True,
+            creado_por=usuario_id,
+        )
+        db.add(proveedor)
+        db.flush()
+    # Si ya existe: reutilizar sin modificar sus datos
 
-    # Asignar rol PROVEEDOR
+    # Asignar rol PROVEEDOR (idempotente — no duplica si ya lo tiene)
     _asignar_rol(db, proveedor, RolEntidad.PROVEEDOR)
 
-    # Resolver acopiador según tipo
+    # Acopiador
     if datos.tipo_acopiador in (TipoAcopiador.SIN_ACOPIADOR, TipoAcopiador.PROPIO):
         acopiador = proveedor
         _asignar_rol(db, proveedor, RolEntidad.ACOPIADOR)
 
     elif datos.tipo_acopiador == TipoAcopiador.TERCERO:
         if datos.acopiador_id:
-            # Acopiador existente
             acopiador = db.query(Entidad).filter_by(id=datos.acopiador_id).first()
             if not acopiador:
                 raise ValueError(f"Acopiador {datos.acopiador_id} no encontrado")
-
         elif datos.acopiador_nuevo:
-            # Crear acopiador nuevo inline
             ruc_acopiador = datos.acopiador_nuevo.ruc or f"ACOP-{uuid4().hex[:8].upper()}"
-
-            # Verificar unicidad solo si es RUC real
             if datos.acopiador_nuevo.ruc:
                 if db.query(Entidad).filter_by(ruc=ruc_acopiador).first():
                     raise ValueError(f"Ya existe una entidad con RUC {ruc_acopiador}")
-
             acopiador = Entidad(
                 ruc=ruc_acopiador,
                 razon_social=datos.acopiador_nuevo.razon_social,
-                telefono=datos.acopiador_nuevo.telefono,
                 tipo=TipoEntidad.PERSONA_NATURAL,
                 activo=True,
                 creado_por=usuario_id,
             )
             db.add(acopiador)
             db.flush()
-
         else:
             raise ValueError("Debe indicar acopiador_id o acopiador_nuevo para tipo 'tercero'")
 
         _asignar_rol(db, acopiador, RolEntidad.ACOPIADOR)
 
-    # Crear relación provacop
+    # ── Verificar que esta combinación proveedor-acopiador no exista ya
+    combinacion_existente = (
+        db.query(ProveedorAcopiador)
+        .filter_by(
+            proveedor_id=proveedor.id,
+            acopiador_id=acopiador.id,
+        )
+        .first()
+    )
+    if combinacion_existente:
+        raise ValueError("Ya existe una relación entre este proveedor y ese acopiador.")
+
     provacop = _get_or_crear_provacop(db, proveedor, acopiador)
 
-    # Parámetros comerciales (si vienen)
+    # Parámetros comerciales
     if datos.parametros:
         _actualizar_parametros(db, provacop, datos.parametros, usuario_id)
 
@@ -407,3 +417,119 @@ def obtener_parametros_acopiador(db: Session, acopiador_id: int) -> dict | None:
         "porcentaje_ley_comercial": pc.porcentaje_ley_comercial,
         "riesgo_comercial": pc.riesgo_comercial,
     }
+
+
+def _contar_sesiones_provacop(db: Session, provacop_id: int) -> int:
+    """Retorna cuántas sesiones de balanza existen para esta relación provacop."""
+    return db.query(SesionDescarga).filter_by(provacop_id=provacop_id).count()
+
+
+def cambiar_acopiador(
+    db: Session,
+    entidad_id: int,
+    nuevo_acopiador_id: int,
+    usuario_id: int,
+) -> dict:
+    """
+    Cambia el acopiador de un proveedor.
+    Solo permitido si la relación actual NO tiene sesiones registradas.
+    """
+    entidad = db.query(Entidad).filter_by(id=entidad_id).first()
+    if not entidad:
+        raise ValueError(f"Tercero {entidad_id} no encontrado")
+
+    provacop = _get_provacop_de_entidad(db, entidad_id)
+    if not provacop:
+        raise ValueError("Este proveedor no tiene relación comercial registrada")
+
+    # ── Bloqueo si hay sesiones ───────────────────────────────────────────────
+    n_sesiones = _contar_sesiones_provacop(db, provacop.id)
+    if n_sesiones > 0:
+        raise ValueError(
+            f"No se puede cambiar el acopiador: este proveedor ya tiene "
+            f"{n_sesiones} sesión(es) registrada(s) en balanza. "
+            f"El acopiador forma parte del registro histórico."
+        )
+
+    # ── Verificar que el nuevo acopiador existe ───────────────────────────────
+    nuevo_acopiador = db.query(Entidad).filter_by(id=nuevo_acopiador_id).first()
+    if not nuevo_acopiador:
+        raise ValueError(f"Acopiador {nuevo_acopiador_id} no encontrado")
+
+    # ── Verificar que no existe ya esa combinación ────────────────────────────
+    existe = (
+        db.query(ProveedorAcopiador)
+        .filter_by(
+            proveedor_id=entidad_id,
+            acopiador_id=nuevo_acopiador_id,
+        )
+        .first()
+    )
+    if existe:
+        raise ValueError("Ya existe una relación con ese acopiador")
+
+    # ── Actualizar: borrar params y cambiar FK ────────────────────────────────
+    if provacop.parametros:
+        db.delete(provacop.parametros)
+        db.flush()
+
+    provacop.acopiador_id = nuevo_acopiador_id
+    db.commit()
+    db.refresh(entidad)
+
+    provacop = _get_provacop_de_entidad(db, entidad_id)
+    return _serializar_tercero(entidad, provacop, db)
+
+
+def eliminar_tercero(
+    db: Session,
+    entidad_id: int,
+    usuario_id: int,
+) -> None:
+    """
+    Elimina un tercero (proveedor) de forma permanente.
+    Solo permitido si la relación comercial NO tiene sesiones registradas.
+    Solo Admin y Gerencia pueden ejecutar esto (validado en el router).
+    """
+    entidad = db.query(Entidad).filter_by(id=entidad_id).first()
+    if not entidad:
+        raise ValueError(f"Tercero {entidad_id} no encontrado")
+
+    provacop = _get_provacop_de_entidad(db, entidad_id)
+
+    # ── Bloqueo si hay sesiones ───────────────────────────────────────────────
+    if provacop:
+        n_sesiones = _contar_sesiones_provacop(db, provacop.id)
+        if n_sesiones > 0:
+            raise ValueError(
+                f"No se puede eliminar: este proveedor tiene "
+                f"{n_sesiones} sesión(es) registrada(s) en balanza."
+            )
+
+        # Borrar en orden por FK: params → provacop
+        if provacop.parametros:
+            db.delete(provacop.parametros)
+            db.flush()
+        db.delete(provacop)
+        db.flush()
+
+    # Borrar roles de entidad y la entidad misma
+    db.query(EntidadRol).filter_by(entidad_id=entidad_id).delete()
+    db.flush()
+    db.delete(entidad)
+    db.commit()
+
+
+def buscar_por_ruc(db: Session, ruc: str) -> dict | None:
+    """Busca entidad con rol PROVEEDOR por RUC. Retorna None si no existe."""
+    entidad = (
+        db.query(Entidad)
+        .join(EntidadRol, EntidadRol.entidad_id == Entidad.id)
+        .join(Rol, Rol.id == EntidadRol.rol_id)
+        .filter(Rol.codigo == RolEntidad.PROVEEDOR, Entidad.ruc == ruc)
+        .first()
+    )
+    if not entidad:
+        return None
+    provacop = _get_provacop_de_entidad(db, entidad.id)
+    return _serializar_tercero(entidad, provacop, db)
