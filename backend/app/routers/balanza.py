@@ -21,6 +21,7 @@ from app.schemas.balanza import (
     SesionLista,
 )
 from app.services import balanza as svc
+from app.services import balanza_pdf as pdf_svc
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -229,12 +230,8 @@ def descargar_ticket(
     Formato A5 landscape con: IP, pesos, proveedor/acopiador, fecha.
     """
     try:
-        pdf_bytes = svc.generar_ticket_pdf(db, sesion_id, lote_id)
-
-        # Nombre de archivo: ticket-IP-0042.pdf
-        lote = db.query(svc.Lote).filter(svc.Lote.id == lote_id).first()
-        nombre = f"ticket-{lote.ip}.pdf" if lote else f"ticket-lote-{lote_id}.pdf"
-
+        pdf_bytes = pdf_svc.generar_ticket_pdf(db, sesion_id, lote_id)
+        nombre = pdf_svc.nombre_archivo_ticket(db, lote_id)
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
