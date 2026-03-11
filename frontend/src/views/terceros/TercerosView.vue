@@ -231,33 +231,7 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-/* ── Página ──────────────────────────────────────────────────── */
-.terceros-page {
-  padding: 2rem;
-  max-width: 1100px;
-  margin: auto;
-}
-
 /* ── Header ─────────────────────────────────────────────────── */
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.page-header-left { flex: 1; }
-
-.page-title {
-  font-family: var(--font-mono);
-  font-size: 1.6rem;
-  color: var(--color-gold-light);
-  letter-spacing: 0.04em;
-  line-height: 1.1;
-}
-
 .page-subtitle {
   font-size: 0.78rem;
   color: var(--color-text-muted);
@@ -277,14 +251,6 @@ onMounted(cargar)
 
 .filtro-estado   { width: 150px; flex-shrink: 0; }
 .filtro-busqueda { flex: 1; min-width: 220px; }
-
-.field-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a8762' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2rem;
-}
 
 .btn-refresh {
   padding: 0.6rem 0.85rem;

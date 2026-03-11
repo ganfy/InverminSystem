@@ -46,7 +46,7 @@ ESTADOS_LOTE_ELIMINABLES = frozenset(
 
 
 def _ahora() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(UTC).isoformat()
 
 
 def _peso_neto(peso_final: Decimal, peso_inicial: Decimal) -> Decimal:
@@ -120,7 +120,9 @@ def _serializar_sesion_detalle(sesion: SesionDescarga) -> SesionDetalle:
         guia_remision=sesion.guia_remision,
         guia_transporte=sesion.guia_transporte,
         estado=sesion.estado,
-        fecha_ingreso=sesion.creado_en,
+        fecha_ingreso=datetime.fromisoformat(sesion.creado_en).astimezone(UTC)
+        if isinstance(sesion.creado_en, str)
+        else sesion.creado_en.astimezone(UTC),
         lotes=[_serializar_lote(lot) for lot in sesion.lotes],
     )
 

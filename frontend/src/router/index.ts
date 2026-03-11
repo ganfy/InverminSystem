@@ -31,6 +31,16 @@ const router = createRouter({
           name: 'Balanza',
           component: () => import('@/views/balanza/BalanzaView.vue'),
         },
+        {
+          path: 'balanza/nuevo',
+          name: 'RegistrarCamion',
+          component: () => import('@/views/balanza/RegistrarCamionView.vue'),
+        },
+        {
+          path: 'balanza/:id',
+          name: 'SesionBalanza',
+          component: () => import('@/views/balanza/SesionView.vue'),
+        }
       ],
     },
     {

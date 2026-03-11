@@ -311,7 +311,8 @@ async function handleLogout() {
 
 @media (min-width: 768px) {
   .main-wrapper {
-    margin-left: 220px;
+    margin-left: 5%;
+    margin-right: 5%;
   }
 }
 
@@ -355,7 +356,7 @@ async function handleLogout() {
 /* ── Contenido ───────────────────────────────────────────────── */
 .main-content {
   flex: 1;
-  padding: 1.5rem;
+  padding: var(--page-padding);
   overflow-y: auto;
 }
 </style>

@@ -837,11 +837,6 @@ async function guardar() {
 
 .field-full { grid-column: 1 / -1; }
 
-.field-error { font-size: 0.72rem; color: var(--color-error); margin-top: 0.2rem; }
-.field-hint  { font-size: 0.72rem; color: var(--color-text-faint); margin-top: 0.2rem; }
-
-.field-input.error { border-color: var(--color-error); }
-
 /* ── Acopiador section ───────────────────────────────────────── */
 .tipo-acopiador-grid {
   display: grid;

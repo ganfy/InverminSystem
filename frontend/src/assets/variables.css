@@ -31,4 +31,8 @@
   /* Espaciado */
   --radius-sm:          3px;
   --radius-md:          10px;
+
+  /* Espaciado estándar de página */
+  --page-padding:    2rem;
+  --sidebar-width:   220px;
 }

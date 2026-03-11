@@ -360,11 +360,6 @@ onMounted(cargar)
 </script>
 
 <style scoped>
-.usuarios-page {
-  padding: 2rem;
-  max-width: 1100px;
-  margin: auto;
-}
 
 .filtros {
   display: flex;
