@@ -184,8 +184,11 @@ export const balanzaApi = {
     return r.data
     },
 
-  ticketPreviewUrl(sesionId: number, loteId: number): string {
-    const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
-    return `${base}/balanza/${sesionId}/lotes/${loteId}/ticket/preview`
-  },
+  async ticketPreviewBlob(sesionId: number, loteId: number): Promise<string> {
+    // Descarga el HTML autenticado y retorna un object URL para abrir en pestaña
+    const r = await api.get(`/balanza/${sesionId}/lotes/${loteId}/ticket/preview`, {
+      responseType: 'blob',
+    })
+    return URL.createObjectURL(new Blob([r.data], { type: 'text/html' }))
+    },
 }

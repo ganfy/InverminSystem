@@ -1,220 +1,247 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-<meta charset="UTF-8">
-<style>
-@page {
-    size: A5 landscape;
-    margin: 1.4cm 1.8cm 1.2cm 1.8cm;
-}
+  <meta charset="UTF-8">
+  <style>
+    @page {
+      size: A5 landscape;
+      margin: 1.0cm 1.5cm 0.8cm 1.5cm;
+    }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 10pt;
-    color: #111;
-    line-height: 1.5;
-}
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9.5pt;
+      color: #000;
+      line-height: 1.55;
+    }
 
-/* ── Encabezado empresa ─────────────────────────────────── */
-.empresa-nombre {
-    font-size: 15pt;
-    font-weight: bold;
-    letter-spacing: .02em;
-}
-.empresa-sub {
-    font-size: 9pt;
-    color: #444;
-    margin-top: 1px;
-}
+    /* ── Empresa ─────────────────────────── */
+    .emp-nombre {
+      font-size: 13pt;
+      font-weight: bold;
+    }
 
-/* ── Línea divisoria ─────────────────────────────────────── */
-.hr {
-    border: none;
-    border-top: 1.5px solid #111;
-    margin: 6px 0;
-}
-.hr-dashed {
-    border: none;
-    border-top: 1px dashed #888;
-    margin: 5px 0;
-}
+    .emp-sub {
+      font-size: 9pt;
+    }
 
-/* ── Fila placa + ticket ─────────────────────────────────── */
-.fila-placa-ticket {
-    width: 100%;
-    margin: 4px 0 2px;
-}
-.fila-placa-ticket td {
-    font-size: 10pt;
-    vertical-align: middle;
-    padding: 0;
-}
-.td-ticket {
-    text-align: right;
-    font-size: 13pt;
-    font-weight: bold;
-    white-space: nowrap;
-}
+    /* ── Separador ───────────────────────── */
+    .hr {
+      border: none;
+      border-top: 1px solid #000;
+      margin: 4px 0;
+    }
 
-/* ── Tabla de campos ─────────────────────────────────────── */
-.datos {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 2px;
-}
-.datos td {
-    padding: 1px 0;
-    vertical-align: top;
-    font-size: 10pt;
-}
-.td-lbl {
-    width: 98px;
-    color: #444;
-    white-space: nowrap;
-}
-.td-sep {
-    width: 10px;
-    color: #666;
-}
-.td-val {
-    font-weight: normal;
-}
+    /* ── Placa + Ticket (fila especial) ──── */
+    .fila-placa {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-/* ── Sección pesos ───────────────────────────────────────── */
-.seccion-pesos {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 2px;
-}
-.seccion-pesos td {
-    vertical-align: top;
-    padding: 0;
-}
-.col-fechas { width: 55%; }
-.col-pesos  { width: 45%; }
+    .fila-placa td {
+      padding: 0;
+      vertical-align: middle;
+    }
 
-/* tabla interna de pesos */
-.tabla-pesos {
-    width: 100%;
-    border-collapse: collapse;
-    text-align: right;
-}
-.tabla-pesos td {
-    padding: 0 0 1px 0;
-    font-size: 10pt;
-}
-.peso-lbl { color: #444; }
-.peso-val { font-size: 12pt; font-weight: bold; padding-left: 6px; }
-.peso-neto-val { font-size: 14pt; }
-.peso-unit { font-size: 8.5pt; color: #555; padding-left: 3px; }
-</style>
+    .td-placa {
+      font-size: 9.5pt;
+    }
+
+    .td-ticket {
+      text-align: right;
+      font-size: 11pt;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    /* ── Tabla de campos ─────────────────── */
+    .datos {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .datos td {
+      padding: 0;
+      vertical-align: top;
+      font-size: 9.5pt;
+      line-height: 1.5;
+    }
+
+    .lbl {
+      width: 88px;
+      white-space: nowrap;
+    }
+
+    .sep {
+      width: 10px;
+    }
+
+    /* ── Sección inferior: fechas + pesos ── */
+    .seccion {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1px;
+    }
+
+    .seccion td {
+      vertical-align: top;
+      padding: 0;
+    }
+
+    .col-fechas {
+      width: 54%;
+    }
+
+    .col-pesos {
+      width: 46%;
+    }
+
+    .tabla-pesos {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .tabla-pesos td {
+      padding: 0;
+      font-size: 9.5pt;
+      line-height: 1.5;
+    }
+
+    .p-lbl {}
+
+    .p-sep {
+      width: 10px;
+    }
+
+    .p-val {
+      text-align: right;
+      font-size: 12pt;
+      font-weight: bold;
+      padding-right: 2px;
+    }
+
+    .p-neto {
+      font-size: 13.5pt;
+    }
+
+    .p-unit {
+      font-size: 8pt;
+      white-space: nowrap;
+    }
+  </style>
 </head>
+
 <body>
 
-<!-- EMPRESA -->
-<div class="empresa-nombre">{{ empresa_nombre }}</div>
-<div class="empresa-sub">{{ empresa_planta }} &nbsp;&middot;&nbsp; R.U.C. {{ empresa_ruc }}</div>
+  <!-- EMPRESA -->
+  <div class="emp-nombre">{{ empresa_nombre }}</div>
+  <div class="emp-sub">{{ empresa_planta }}</div>
+  <div class="emp-sub">R.U.C. {{ empresa_ruc }}</div>
 
-<div class="hr"></div>
+  <div class="hr"></div>
 
-<!-- PLACA + TICKET -->
-<table class="fila-placa-ticket">
-  <tr>
-    <td>Placa : <strong>{{ placa }}</strong> &nbsp;&nbsp; Carreta : <strong>{{ carreta }}</strong></td>
-    <td class="td-ticket">Ticket : {{ numero_ticket }}</td>
-  </tr>
-</table>
+  <!-- PLACA / CARRETA | TICKET -->
+  <table class="fila-placa">
+    <tr>
+      <td class="td-placa">Placa : {{ placa }} &nbsp;&nbsp; Carreta : {{ carreta }}</td>
+      <td class="td-ticket">Ticket : {{ numero_ticket }}</td>
+    </tr>
+  </table>
 
-<div class="hr-dashed"></div>
+  <div class="hr"></div>
 
-<!-- DATOS TRANSPORTE Y LOTE -->
-<table class="datos">
-  <tr>
-    <td class="td-lbl">Conductor</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ conductor }}</td>
-  </tr>
-  <tr>
-    <td class="td-lbl">Transportista</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ transportista }}</td>
-  </tr>
-  <tr>
-    <td class="td-lbl">Razon Social</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ razon_social }}</td>
-  </tr>
-  <!-- <tr>
-    <td class="td-lbl">Proveedor</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">[{{ proveedor_ruc }}] {{ proveedor_razon_social }}</td>
-  </tr>
-  {% if acopiador_html %}
-  <tr>
-    <td class="td-lbl">Acopiador</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ acopiador_razon_social }}</td>
-  </tr>
-  {% endif %} -->
-  <tr>
-    <td class="td-lbl">Producto</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ tipo_material }}</td>
-  </tr>
-  <tr>
-    <td class="td-lbl">Documento</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ documento }}</td>
-  </tr>
-  <tr>
-    <td class="td-lbl">Observaciones</td>
-    <td class="td-sep">:</td>
-    <td class="td-val">{{ observaciones }}</td>
-  </tr>
-</table>
+  <!-- DATOS -->
+  <table class="datos">
+    <tr>
+      <td class="lbl">Conductor</td>
+      <td class="sep">:</td>
+      <td>{{ conductor }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Transportista</td>
+      <td class="sep">:</td>
+      <td>{{ transportista }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Razon Social</td>
+      <td class="sep">:</td>
+      <td>{{ razon_social }}</td>
+    </tr>
+    <!-- {% if acopiador_html %}
+    <tr>
+      <td class="lbl">Acopiador</td>
+      <td class="sep">:</td>
+      <td>{{ acopiador_razon_social }}</td>
+    </tr>
+    {% endif %} -->
+    <tr>
+      <td class="lbl">Producto</td>
+      <td class="sep">:</td>
+      <td>{{ tipo_material }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Documento</td>
+      <td class="sep">:</td>
+      <td>{{ documento }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Observaciones</td>
+      <td class="sep">:</td>
+      <td>{{ observaciones }}</td>
+    </tr>
+  </table>
 
-<div class="hr"></div>
+  <div class="hr"></div>
 
-<!-- FECHAS (izq) + PESOS (der) -->
-<table class="seccion-pesos">
-  <tr>
-    <td class="col-fechas">
-      <table class="datos">
-        <tr>
-          <td class="td-lbl">Fecha Inicial</td>
-          <td class="td-sep">:</td>
-          <td class="td-val">{{ fecha_inicio }}</td>
-        </tr>
-        <tr>
-          <td class="td-lbl">Fecha Final</td>
-          <td class="td-sep">:</td>
-          <td class="td-val">{{ fecha_fin }}</td>
-        </tr>
-      </table>
-    </td>
-    <td class="col-pesos">
-      <table class="tabla-pesos">
-        <tr>
-          <td class="peso-lbl">Peso Bruto</td>
-          <td class="peso-val">{{ peso_bruto }}</td>
-          <td class="peso-unit">TM</td>
-        </tr>
-        <tr>
-          <td class="peso-lbl">Peso Tara</td>
-          <td class="peso-val">{{ peso_tara }}</td>
-          <td class="peso-unit">TM</td>
-        </tr>
-        <tr>
-          <td class="peso-lbl">Peso Neto</td>
-          <td class="peso-val peso-neto-val">{{ peso_neto }}</td>
-          <td class="peso-unit">TM</td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
+  <!-- FECHAS (izq) | PESOS (der) -->
+  <table class="seccion">
+    <tr>
+      <td class="col-fechas">
+        <table class="datos">
+          <tr>
+            <td class="lbl">Fecha Inicial</td>
+            <td class="sep">:</td>
+            <td>{{ fecha_inicio }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">Fecha Final</td>
+            <td class="sep">:</td>
+            <td>{{ fecha_fin }}</td>
+          </tr>
+        </table>
+      </td>
+      <td class="col-pesos">
+        <table class="tabla-pesos">
+          <tr>
+            <td class="p-lbl">Peso Bruto</td>
+            <td class="p-sep">:</td>
+            <td class="p-val">{{ peso_bruto }}</td>
+            <td class="p-unit">TM</td>
+          </tr>
+          <tr>
+            <td class="p-lbl">Peso Tara</td>
+            <td class="p-sep">:</td>
+            <td class="p-val">{{ peso_tara }}</td>
+            <td class="p-unit">TM</td>
+          </tr>
+          <tr>
+            <td class="p-lbl">Peso Neto</td>
+            <td class="p-sep">:</td>
+            <td class="p-val p-neto">{{ peso_neto }}</td>
+            <td class="p-unit">TM</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 
 </body>
+
 </html>

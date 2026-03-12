@@ -29,11 +29,11 @@ export const NAV_CONFIG: NavSection[] = [
   },
   {
     section: 'OPERACIONES',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'Operador Balanza', 'Laboratorista', 'Técnico Muestreo'],
+    roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza', 'Laboratorista', 'TécnicoMuestreo'],
     items: [
-      { label: 'Balanza',             path: '/balanza',    icon: '⊟', roles: ['Admin', 'Gerencia', 'Comercial', 'Operador Balanza'] },
-      { label: 'Muestreo',            path: '/muestreo',   icon: '◈', roles: ['Admin', 'Gerencia', 'Comercial', 'Técnico Muestreo'] },
-      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: '⊕', roles: ['Admin', 'Gerencia', 'Comercial', 'Técnico Muestreo'] },
+      { label: 'Balanza',             path: '/balanza',    icon: '⊟', roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] },
+      { label: 'Muestreo',            path: '/muestreo',   icon: '◈', roles: ['Admin', 'Gerencia', 'Comercial', 'TécnicoMuestreo'] },
+      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: '⊕', roles: ['Admin', 'Gerencia', 'Comercial', 'TécnicoMuestreo'] },
       { label: 'Laboratorio',         path: '/laboratorio',icon: '⊗', roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] },
       { label: 'Liquidaciones',       path: '/liquidaciones', icon: '≡', roles: ['Admin', 'Gerencia', 'Comercial'] },
       { label: 'Facturación',         path: '/facturacion',icon: '◻', roles: ['Admin', 'Gerencia', 'Comercial'] },

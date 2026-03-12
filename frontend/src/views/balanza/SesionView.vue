@@ -610,9 +610,15 @@ async function finalizar() {
   if (ok) await store.finalizarSesion(sesionId)
 }
 
-function verTicket(lote: LoteDetalle) {
-  const url = balanzaApi.ticketPreviewUrl(sesionId, lote.id)
-  window.open(url, '_blank')
+async function verTicket(lote: LoteDetalle) {
+  try {
+    const url = await balanzaApi.ticketPreviewBlob(sesionId, lote.id)
+    window.open(url, '_blank')
+    // Liberar memoria después de un momento (la pestaña ya cargó el HTML)
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  } catch {
+    ui.toast('Error al cargar preview del ticket', 'error')
+  }
 }
 
 async function descargarTicket(lote: LoteDetalle) {
