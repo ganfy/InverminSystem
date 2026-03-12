@@ -9,7 +9,7 @@ from decimal import Decimal
 from pydantic import BaseModel, field_validator, model_validator
 
 # =============================================================================
-# ENUMS / LITERALES  (espejo de models.enums para validación en capa schema)
+# ENUMS / LITERALES
 # =============================================================================
 
 TIPOS_MATERIAL = ("Mineral", "Llampo", "M.Llampo")
@@ -25,8 +25,8 @@ ESTADOS_LOTE_ELIMINABLES = ("RECEPCIONADO", "LIQUIDADO", "FACTURADO")
 class PesajeCrear(BaseModel):
     """Datos de pesaje enviados al crear un lote."""
 
-    peso_inicial: Decimal  # TM — peso con carga
-    peso_final: Decimal  # TM — peso sin carga (tara)
+    peso_inicial: Decimal  # TM — BRUTO (camión cargado, primer pesaje)
+    peso_final: Decimal  # TM — TARA  (camión vacío, segundo pesaje tras descarga)
     sacos: int | None = None
     granel: bool = False
     fecha_inicio: datetime | None = None  # si no viene, el servicio usa now()
@@ -39,18 +39,19 @@ class PesajeCrear(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def peso_final_mayor(self) -> "PesajeCrear":
+    def bruto_mayor_tara(self) -> "PesajeCrear":
         """
-        peso_final (BRUTO = camión cargado) > peso_inicial (TARA = camión vacío).
-        Alineado con check constraint: ck_pesajes_peso_final_mayor_inicial.
-        peso_neto = peso_final - peso_inicial.
+        peso_inicial (BRUTO = camión cargado) debe ser MAYOR que
+        peso_final   (TARA  = camión vacío tras descarga).
+        peso_neto = peso_inicial - peso_final.
+        Alineado con constraint ck_pesajes_bruto_mayor_tara.
         """
-        if self.peso_final is not None and self.peso_inicial is not None:
-            if self.peso_final <= self.peso_inicial:
+        if self.peso_inicial is not None and self.peso_final is not None:
+            if self.peso_inicial <= self.peso_final:
                 raise ValueError(
-                    "peso_final (bruto) debe ser MAYOR que peso_inicial (tara). "
-                    "Recuerda: peso_inicial = tara del camión vacío, "
-                    "peso_final = peso bruto con carga."
+                    "peso_inicial (bruto) debe ser MAYOR que peso_final (tara). "
+                    "Recuerda: peso_inicial = bruto (camión cargado), "
+                    "peso_final = tara (camión vacío)."
                 )
         return self
 
@@ -89,6 +90,33 @@ class LoteCrear(BaseModel):
         return v
 
 
+class LoteEditar(BaseModel):
+    """
+    Admin: modificar datos de un lote ya registrado.
+    Solo accesible con rol Admin (verificado en router).
+    """
+
+    tipo_material: str | None = None
+    peso_inicial: Decimal | None = None  # BRUTO — si se envía, validar con peso_final
+    peso_final: Decimal | None = None  # TARA
+    sacos: int | None = None
+    granel: bool | None = None
+
+    @field_validator("tipo_material")
+    @classmethod
+    def tipo_valido(cls, v: str | None) -> str | None:
+        if v is not None and v not in TIPOS_MATERIAL:
+            raise ValueError(f"tipo_material debe ser uno de: {TIPOS_MATERIAL}")
+        return v
+
+    @model_validator(mode="after")
+    def bruto_mayor_tara(self) -> "LoteEditar":
+        if self.peso_inicial is not None and self.peso_final is not None:
+            if self.peso_inicial <= self.peso_final:
+                raise ValueError("peso_inicial (bruto) debe ser MAYOR que peso_final (tara).")
+        return self
+
+
 class LoteResumen(BaseModel):
     """Lote resumido para la lista dentro de una sesión."""
 
@@ -98,7 +126,7 @@ class LoteResumen(BaseModel):
     tipo_material: str | None = None
     estado: str
     volado: bool
-    peso_neto: Decimal | None = None  # del pesaje vigente
+    peso_neto: Decimal | None = None
     fecha_pesaje: datetime | None = None
     eliminado: bool
 
@@ -138,18 +166,42 @@ class SesionCrear(BaseModel):
         return v.strip().upper()
 
 
+class SesionEditar(BaseModel):
+    """
+    Edición de cabecera de sesión (corrección de errores de registro).
+    A nivel BD: UPDATE directo sobre sesiones_descarga.
+    Cambiar provacop_id modifica el par proveedor/acopiador de toda la sesión;
+    los lotes NO almacenan provacop_id, por lo que no requiere cascada.
+    Solo se actualiza lo que se envíe (PATCH parcial).
+    """
+
+    provacop_id: int | None = None
+    placa: str | None = None
+    carreta: str | None = None
+    conductor: str | None = None
+    transportista: str | None = None
+    razon_social: str | None = None
+    guia_remision: str | None = None
+    guia_transporte: str | None = None
+
+    @field_validator("placa")
+    @classmethod
+    def placa_upper(cls, v: str | None) -> str | None:
+        return v.strip().upper() if v else v
+
+
 class SesionLista(BaseModel):
     """Fila en la lista de sesiones (BalanzaView)."""
 
     id: int
-    fecha_ingreso: datetime  # = creado_en del AuditMixin
+    fecha_ingreso: datetime
     proveedor_razon_social: str
     acopiador_razon_social: str
-    es_propio: bool  # acopiador == proveedor
+    es_propio: bool
     placa: str
     guia_remision: str | None = None
     total_lotes: int
-    lotes_activos: int  # sin soft delete
+    lotes_activos: int
     estado: str
 
     model_config = {"from_attributes": True}
@@ -182,6 +234,24 @@ class SesionDetalle(BaseModel):
 
 
 # =============================================================================
+# AUTOCOMPLETE PROVEEDOR-ACOPIADOR
+# =============================================================================
+
+
+class ProvAcopDropdown(BaseModel):
+    provacop_id: int
+    proveedor_id: int
+    proveedor_razon_social: str
+    proveedor_ruc: str | None = None
+    acopiador_id: int
+    acopiador_razon_social: str
+    acopiador_ruc: str | None = None
+    es_propio: bool
+
+    model_config = {"from_attributes": True}
+
+
+# =============================================================================
 # ELIMINAR LOTE
 # =============================================================================
 
@@ -197,23 +267,3 @@ class EliminarLoteRequest(BaseModel):
         if not v.strip():
             raise ValueError("El motivo no puede estar vacío")
         return v.strip()
-
-
-# =============================================================================
-# PROVEEDOR-ACOPIADOR DROPDOWN  (para el formulario nueva sesión)
-# =============================================================================
-
-
-class ProvAcopDropdown(BaseModel):
-    """Opción del autocomplete al crear sesión."""
-
-    provacop_id: int
-    proveedor_id: int
-    proveedor_razon_social: str
-    proveedor_ruc: str | None = None
-    acopiador_id: int
-    acopiador_razon_social: str
-    acopiador_ruc: str | None = None
-    es_propio: bool
-
-    model_config = {"from_attributes": True}

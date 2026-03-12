@@ -5,7 +5,9 @@ import type {
   SesionLista,
   SesionDetalle,
   SesionCrear,
+  SesionEditar,
   LoteCrear,
+  LoteEditar,
   ProvAcopDropdown,
   SesionesParams,
 } from '@/api/balanza'
@@ -67,6 +69,20 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  async function editarSesion(id: number, datos: SesionEditar): Promise<boolean> {
+    guardando.value = true
+    try {
+      sesionActual.value = await balanzaApi.editarSesion(id, datos)
+      ui.toast('Sesión actualizada', 'success')
+      return true
+    } catch (e: any) {
+      ui.toast(e?.response?.data?.detail ?? 'Error al editar sesión', 'error')
+      return false
+    } finally {
+      guardando.value = false
+    }
+  }
+
   async function finalizarSesion(id: number) {
     guardando.value = true
     try {
@@ -113,6 +129,25 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  async function editarLote(
+    sesionId: number,
+    loteId: number,
+    datos: LoteEditar,
+  ): Promise<boolean> {
+    guardando.value = true
+    try {
+      await balanzaApi.editarLote(sesionId, loteId, datos)
+      await cargarSesion(sesionId)
+      ui.toast('Lote actualizado', 'success')
+      return true
+    } catch (e: any) {
+      ui.toast(e?.response?.data?.detail ?? 'Error al editar lote', 'error')
+      return false
+    } finally {
+      guardando.value = false
+    }
+  }
+
   async function eliminarLote(sesionId: number, loteId: number, motivo: string): Promise<boolean> {
     guardando.value = true
     try {
@@ -144,11 +179,29 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+   async function descargarTicketsSesion(sesionId: number) {
+    try {
+      const blob = await balanzaApi.ticketsSesionBlob(sesionId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `tickets-sesion-${sesionId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      ui.toast('Error al generar PDF de tickets', 'error')
+    }
+  }
+
   return {
     sesiones, sesionActual, provacops,
     loading, loadingSesion, guardando,
     cargarProvacops, cargarSesiones, cargarSesion,
-    crearSesion, finalizarSesion, pausarSesion, reanudarSesion,
-    agregarLote, eliminarLote, descargarTicket,
+    crearSesion, editarSesion,
+    finalizarSesion, pausarSesion, reanudarSesion,
+    agregarLote, editarLote, eliminarLote, descargarTicket,
+    descargarTicketsSesion,
   }
 })

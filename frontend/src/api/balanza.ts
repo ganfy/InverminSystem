@@ -14,8 +14,8 @@ export interface ProvAcopDropdown {
 }
 
 export interface PesajeCrear {
-  peso_inicial: number   // TARA — camión vacío
-  peso_final: number     // BRUTO — camión cargado
+  peso_inicial: number   // BRUTO — camión cargado (primer pesaje)
+  peso_final: number     // TARA  — camión vacío   (segundo pesaje tras descarga)
   sacos?: number | null
   granel?: boolean
   fecha_inicio?: string | null
@@ -23,9 +23,9 @@ export interface PesajeCrear {
 
 export interface PesajeDetalle {
   id: number
-  peso_inicial: number
-  peso_final: number
-  peso_neto: number
+  peso_inicial: number   // BRUTO
+  peso_final: number     // TARA
+  peso_neto: number      // BRUTO - TARA = peso_inicial - peso_final
   sacos: number | null
   granel: boolean
   numero_ticket: string
@@ -36,6 +36,14 @@ export interface PesajeDetalle {
 export interface LoteCrear {
   tipo_material: string
   pesaje: PesajeCrear
+}
+
+export interface LoteEditar {
+  tipo_material?: string
+  peso_inicial?: number   // BRUTO
+  peso_final?: number     // TARA
+  sacos?: number | null
+  granel?: boolean
 }
 
 export interface LoteDetalle {
@@ -56,6 +64,17 @@ export interface LoteDetalle {
 export interface SesionCrear {
   provacop_id: number
   placa: string
+  carreta?: string | null
+  conductor?: string | null
+  transportista?: string | null
+  razon_social?: string | null
+  guia_remision?: string | null
+  guia_transporte?: string | null
+}
+
+export interface SesionEditar {
+  provacop_id?: number | null
+  placa?: string | null
   carreta?: string | null
   conductor?: string | null
   transportista?: string | null
@@ -128,6 +147,9 @@ export const balanzaApi = {
   obtenerSesion(id: number): Promise<SesionDetalle> {
     return api.get(`/balanza/${id}`).then(r => r.data)
   },
+  editarSesion(id: number, datos: SesionEditar): Promise<SesionDetalle> {
+    return api.patch(`/balanza/${id}`, datos).then(r => r.data)
+  },
   finalizarSesion(id: number): Promise<SesionDetalle> {
     return api.patch(`/balanza/${id}/finalizar`).then(r => r.data)
   },
@@ -142,6 +164,9 @@ export const balanzaApi = {
   agregarLote(sesionId: number, datos: LoteCrear): Promise<LoteDetalle> {
     return api.post(`/balanza/${sesionId}/lotes`, datos).then(r => r.data)
   },
+  editarLote(sesionId: number, loteId: number, datos: LoteEditar): Promise<LoteDetalle> {
+    return api.patch(`/balanza/${sesionId}/lotes/${loteId}`, datos).then(r => r.data)
+  },
   eliminarLote(sesionId: number, loteId: number, datos: EliminarLoteRequest): Promise<void> {
     return api.delete(`/balanza/${sesionId}/lotes/${loteId}`, { data: datos }).then(() => undefined)
   },
@@ -152,5 +177,15 @@ export const balanzaApi = {
       responseType: 'blob',
     })
     return r.data
+  },
+
+  async ticketsSesionBlob(sesionId: number): Promise<Blob> {
+    const r = await api.get(`/balanza/${sesionId}/tickets`, { responseType: 'blob' })
+    return r.data
+    },
+
+  ticketPreviewUrl(sesionId: number, loteId: number): string {
+    const base = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1'
+    return `${base}/balanza/${sesionId}/lotes/${loteId}/ticket/preview`
   },
 }

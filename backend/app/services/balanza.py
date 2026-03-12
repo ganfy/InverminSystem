@@ -22,9 +22,11 @@ from app.schemas.balanza import (
     EliminarLoteRequest,
     LoteCrear,
     LoteDetalle,
+    LoteEditar,
     ProvAcopDropdown,
     SesionCrear,
     SesionDetalle,
+    SesionEditar,
     SesionLista,
 )
 from sqlalchemy import extract, func
@@ -46,15 +48,15 @@ ESTADOS_LOTE_ELIMINABLES = frozenset(
 
 
 def _ahora() -> datetime:
-    return datetime.now(UTC).isoformat()
+    return datetime.now(UTC)
 
 
-def _peso_neto(peso_final: Decimal, peso_inicial: Decimal) -> Decimal:
+def _peso_neto(peso_inicial: Decimal, peso_final: Decimal) -> Decimal:
     """
-    peso_final (BRUTO) - peso_inicial (TARA) = peso_neto.
-    Alineado con RF-BAL-002 y check constraint ck_pesajes_peso_final_mayor_inicial.
+    BRUTO (peso_inicial) - TARA (peso_final) = peso_neto.
+    Solo se usa para serializar desde Python; la BD lo calcula igual.
     """
-    return (peso_final - peso_inicial).quantize(Decimal("0.01"))
+    return (peso_inicial - peso_final).quantize(Decimal("0.01"))
 
 
 def _serializar_lote(lote: Lote) -> LoteDetalle:
@@ -68,7 +70,7 @@ def _serializar_lote(lote: Lote) -> LoteDetalle:
         tipo_material=lote.tipo_material,
         estado=lote.estado,
         volado=lote.volado,
-        peso_neto=_peso_neto(pesaje.peso_final, pesaje.peso_inicial) if pesaje else None,
+        peso_neto=_peso_neto(pesaje.peso_inicial, pesaje.peso_final) if pesaje else None,
         fecha_pesaje=pesaje.fecha_fin if pesaje else None,
         eliminado=lote.eliminado,
         habilitado_ruma=lote.habilitado_ruma,
@@ -336,19 +338,23 @@ def agregar_lote(
     db.add(lote)
     db.flush()
 
-    db.add(
-        Pesaje(
-            lote_id=lote.id,
-            peso_inicial=p.peso_inicial,
-            peso_final=p.peso_final,
-            peso_neto=_peso_neto(p.peso_final, p.peso_inicial),
-            sacos=p.sacos,
-            granel=p.granel,
-            numero_ticket=f"TK-{ip}",
-            fecha_inicio=p.fecha_inicio or ahora,
-            fecha_fin=ahora,
-        )
+    pesaje = Pesaje(
+        lote_id=lote.id,
+        peso_inicial=p.peso_inicial,
+        peso_final=p.peso_final,
+        # peso_neto es GENERATED ALWAYS → no enviar
+        sacos=p.sacos,
+        granel=p.granel,
+        numero_ticket=None,
+        fecha_inicio=p.fecha_inicio or ahora,
+        fecha_fin=ahora,
     )
+    db.add(pesaje)
+    db.flush()  # obtiene pesaje.id de la secuencia
+    db.refresh(pesaje)  # carga peso_neto calculado por la BD
+
+    # Número de ticket: "TK-XXXXX" con padding 5 dígitos, basado en el PK
+    pesaje.numero_ticket = f"TK-{pesaje.id:03d}"
     db.flush()
 
     lote_cargado = db.query(Lote).options(joinedload(Lote.pesajes)).filter(Lote.id == lote.id).one()
@@ -423,6 +429,110 @@ def eliminar_lote(
     lote.eliminado_por = usuario_id
     lote.eliminado_en = _ahora()
     db.flush()
+
+
+def editar_sesion(
+    db: Session,
+    sesion_id: int,
+    datos: SesionEditar,
+    usuario_id: int,
+) -> SesionDetalle:
+    """
+    Edita la cabecera de una sesión (corrección de errores de registro).
+
+    BD: UPDATE directo sobre sesiones_descarga.
+    Si provacop_id cambia, se valida que el par exista y esté activo.
+    Los lotes heredan el proveedor a través de la FK sesion→provacop,
+    NO almacenan provacop_id directamente → no requiere cascada.
+    """
+    sesion = _cargar_sesion(db, sesion_id)
+
+    if datos.provacop_id is not None:
+        pa = db.query(ProveedorAcopiador).filter(ProveedorAcopiador.id == datos.provacop_id).first()
+        if not pa:
+            raise ValueError(f"Relación proveedor-acopiador {datos.provacop_id} no existe")
+        sesion.provacop_id = datos.provacop_id
+
+    if datos.placa is not None:
+        sesion.placa = datos.placa
+    if datos.carreta is not None:
+        sesion.carreta = datos.carreta
+    if datos.conductor is not None:
+        sesion.conductor = datos.conductor
+    if datos.transportista is not None:
+        sesion.transportista = datos.transportista
+    if datos.razon_social is not None:
+        sesion.razon_social = datos.razon_social
+    if datos.guia_remision is not None:
+        sesion.guia_remision = datos.guia_remision
+    if datos.guia_transporte is not None:
+        sesion.guia_transporte = datos.guia_transporte
+
+    sesion.modificado_por = usuario_id
+    sesion.modificado_en = _ahora()
+    db.flush()
+    return _serializar_sesion_detalle(_cargar_sesion(db, sesion_id))
+
+
+def editar_lote(
+    db: Session,
+    sesion_id: int,
+    lote_id: int,
+    datos: LoteEditar,
+    usuario_id: int,
+) -> LoteDetalle:
+    """
+    Admin: edita tipo_material y/o datos de pesaje de un lote existente.
+
+    El campo peso_neto es GENERATED ALWAYS en PostgreSQL;
+    al actualizar peso_inicial y/o peso_final el motor lo recalcula
+    automáticamente (fórmula: peso_inicial - peso_final).
+    """
+    lote = (
+        db.query(Lote)
+        .options(joinedload(Lote.pesajes))
+        .filter(Lote.id == lote_id, Lote.sesion_id == sesion_id)
+        .first()
+    )
+    if not lote:
+        raise ValueError(f"Lote {lote_id} no encontrado en sesión {sesion_id}")
+    if lote.eliminado:
+        raise ValueError("No se puede editar un lote eliminado")
+
+    if datos.tipo_material is not None:
+        lote.tipo_material = datos.tipo_material
+
+    # Editar pesaje si existe
+    pesaje = lote.pesajes[0] if lote.pesajes else None
+    if pesaje and (
+        datos.peso_inicial is not None
+        or datos.peso_final is not None
+        or datos.sacos is not None
+        or datos.granel is not None
+    ):
+        nuevo_bruto = datos.peso_inicial if datos.peso_inicial is not None else pesaje.peso_inicial
+        nuevo_tara = datos.peso_final if datos.peso_final is not None else pesaje.peso_final
+
+        if nuevo_bruto <= nuevo_tara:
+            raise ValueError("peso_inicial (bruto) debe ser mayor que peso_final (tara)")
+
+        pesaje.peso_inicial = nuevo_bruto
+        pesaje.peso_final = nuevo_tara
+        # peso_neto es columna GENERATED → PostgreSQL lo recalcula en flush
+
+        if datos.sacos is not None:
+            pesaje.sacos = datos.sacos
+        if datos.granel is not None:
+            pesaje.granel = datos.granel
+
+    lote.modificado_por = usuario_id
+    lote.modificado_en = _ahora()
+    db.flush()
+
+    lote_recargado = (
+        db.query(Lote).options(joinedload(Lote.pesajes)).filter(Lote.id == lote_id).one()
+    )
+    return _serializar_lote(lote_recargado)
 
 
 # =============================================================================

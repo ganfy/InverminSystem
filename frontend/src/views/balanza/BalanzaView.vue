@@ -94,7 +94,12 @@ function limpiarFiltros() {
   aplicarFiltros()
 }
 function formatFecha(iso: string) {
-  return new Date(iso + 'Z').toLocaleString('es-PE', {  timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const utc = (iso.includes('+') || iso.endsWith('Z')) ? iso : iso + 'Z'
+  return new Date(utc).toLocaleString('es-PE', {
+    timeZone: 'America/Lima',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  })
 }
 function estadoClass(e: string) { return { EN_PROCESO: 'en-proceso', PAUSADO: 'pausado', COMPLETO: 'completo' }[e] ?? '' }
 function estadoLabel(e: string) { return { EN_PROCESO: 'EN PROCESO', PAUSADO: 'PAUSADO', COMPLETO: 'COMPLETO' }[e] ?? e }

@@ -15,15 +15,17 @@ from app.schemas.balanza import (
     EliminarLoteRequest,
     LoteCrear,
     LoteDetalle,
+    LoteEditar,
     ProvAcopDropdown,
     SesionCrear,
     SesionDetalle,
+    SesionEditar,
     SesionLista,
 )
 from app.services import balanza as svc
 from app.services import balanza_pdf as pdf_svc
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/balanza", tags=["Balanza"])
@@ -106,6 +108,27 @@ def obtener_sesion(
         return svc.obtener_sesion(db, sesion_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.patch("/{sesion_id}", response_model=SesionDetalle)
+def editar_sesion(
+    sesion_id: int,
+    datos: SesionEditar,
+    current_user=Depends(check_permiso("BALANZA", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Edita la cabecera de una sesión: proveedor/acopiador y datos de transporte.
+    PATCH parcial — solo se actualizan los campos enviados.
+    Si provacop_id cambia, se valida que la relación exista.
+    """
+    try:
+        sesion = svc.editar_sesion(db, sesion_id, datos, usuario_id=current_user.id)
+        db.commit()
+        return sesion
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.patch("/{sesion_id}/finalizar", response_model=SesionDetalle)
@@ -213,6 +236,30 @@ def eliminar_lote(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
+@router.patch(
+    "/{sesion_id}/lotes/{lote_id}",
+    response_model=LoteDetalle,
+)
+def editar_lote(
+    sesion_id: int,
+    lote_id: int,
+    datos: LoteEditar,
+    current_user=Depends(check_permiso("BALANZA", "ADMIN")),  # solo Admin
+    db: Session = Depends(get_db),
+):
+    """
+    Admin: edita tipo_material y/o datos de pesaje de un lote.
+    peso_neto se recalcula automáticamente (columna GENERATED en PG).
+    """
+    try:
+        lote = svc.editar_lote(db, sesion_id, lote_id, datos, usuario_id=current_user.id)
+        db.commit()
+        return lote
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
 # =============================================================================
 # TICKET PDF  (RF-BAL-003)
 # =============================================================================
@@ -241,3 +288,50 @@ def descargar_ticket(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+
+
+@router.get("/{sesion_id}/tickets", summary="PDF con todos los tickets de la sesión")
+def descargar_tickets_sesion(
+    sesion_id: int,
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera un único PDF con los tickets de todos los lotes activos de la sesión,
+    ordenados por número de lote. Útil para entregar al transportista de una vez.
+    """
+    try:
+        pdf_bytes = pdf_svc.generar_tickets_sesion_pdf(db, sesion_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    filename = pdf_svc.nombre_archivo_sesion(sesion_id)
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/{sesion_id}/lotes/{lote_id}/ticket/preview",
+    response_class=HTMLResponse,
+    summary="Preview HTML del ticket (sin generar PDF)",
+)
+def preview_ticket(
+    sesion_id: int,
+    lote_id: int,
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve el HTML del ticket para visualizar en el navegador.
+    El cliente abre esta URL en una nueva pestaña — el usuario ve el ticket
+    y puede imprimirlo con Ctrl+P o guardarlo desde el navegador.
+    No genera ni almacena ningún archivo en el servidor.
+    """
+    try:
+        html = pdf_svc.generar_ticket_html(db, sesion_id, lote_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return HTMLResponse(content=html)

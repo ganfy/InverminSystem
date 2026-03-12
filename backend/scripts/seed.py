@@ -206,6 +206,18 @@ CONFIGURACIONES = [
         "valor": "5000",
         "descripcion": "Meta default de oro fino en gramos por campaña",
     },
+    # Planta
+    {
+        "clave": "empresa_nombre",
+        "valor": "INVERMIN PAITITI S.A.C.",
+        "descripcion": "Razón social para documentos",
+    },
+    {
+        "clave": "empresa_planta",
+        "valor": "Planta El Dorado",
+        "descripcion": "Nombre de la planta/sede",
+    },
+    {"clave": "empresa_ruc", "valor": "20601910587", "descripcion": "RUC de la empresa"},
 ]
 # ── Runner ────────────────────────────────────────────────────────────────────
 

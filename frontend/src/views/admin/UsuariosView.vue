@@ -209,8 +209,11 @@ const usuariosFiltrados = computed(() => {
 
 // ── Helpers ───────────────────────────────────────────────
 function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString('es-PE', {
+  const utc = (iso.includes('+') || iso.endsWith('Z')) ? iso : iso + 'Z'
+  return new Date(utc).toLocaleString('es-PE', {
+    timeZone: 'America/Lima',
     day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
   })
 }
 

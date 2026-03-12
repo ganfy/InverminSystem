@@ -412,7 +412,9 @@ class Pesaje(Base):
     peso_inicial = Column(Numeric(10, 2), nullable=False)  # TM
     peso_final = Column(Numeric(10, 2), nullable=False)  # TM
     peso_neto = Column(
-        Numeric(10, 2), nullable=False
+        Numeric(10, 2),
+        Computed("peso_inicial - peso_final", persisted=True),
+        nullable=False,
     )  # TO DO: calcular en servicio y guardar aquí, porque no es solo peso_final - peso_inicial (puede haber ajustes manuales por tara, humedad, etc.)
     numero_ticket = Column(String(50), unique=True)
     fecha_inicio = Column(DateTime)

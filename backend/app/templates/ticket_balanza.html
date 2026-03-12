@@ -5,162 +5,216 @@
 <style>
 @page {
     size: A5 landscape;
-    margin: 1.5cm;
+    margin: 1.4cm 1.8cm 1.2cm 1.8cm;
 }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: 'Courier New', monospace;
-    font-size: 11pt;
-    color: #1a1a1a;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10pt;
+    color: #111;
+    line-height: 1.5;
 }
 
-/* ── Encabezado ─────────────────────────────────────────────────── */
-.header {
-    text-align: center;
-    border-bottom: 2px solid #8B6914;
-    padding-bottom: 8px;
-    margin-bottom: 12px;
-}
-.header .empresa   { font-size: 16pt; font-weight: bold; color: #5a3e0a; }
-.header .subtitulo { font-size: 9pt; color: #666; letter-spacing: 1px; }
-
-/* ── IP del lote ────────────────────────────────────────────────── */
-.ticket-ip {
-    font-size: 26pt;
+/* ── Encabezado empresa ─────────────────────────────────── */
+.empresa-nombre {
+    font-size: 15pt;
     font-weight: bold;
-    color: #8B6914;
-    text-align: center;
-    margin: 10px 0;
-    letter-spacing: 3px;
+    letter-spacing: .02em;
+}
+.empresa-sub {
+    font-size: 9pt;
+    color: #444;
+    margin-top: 1px;
 }
 
-/* ── Tabla de datos ─────────────────────────────────────────────── */
-table {
+/* ── Línea divisoria ─────────────────────────────────────── */
+.hr {
+    border: none;
+    border-top: 1.5px solid #111;
+    margin: 6px 0;
+}
+.hr-dashed {
+    border: none;
+    border-top: 1px dashed #888;
+    margin: 5px 0;
+}
+
+/* ── Fila placa + ticket ─────────────────────────────────── */
+.fila-placa-ticket {
+    width: 100%;
+    margin: 4px 0 2px;
+}
+.fila-placa-ticket td {
+    font-size: 10pt;
+    vertical-align: middle;
+    padding: 0;
+}
+.td-ticket {
+    text-align: right;
+    font-size: 13pt;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* ── Tabla de campos ─────────────────────────────────────── */
+.datos {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
+    margin-top: 2px;
 }
-td {
-    padding: 4px 8px;
+.datos td {
+    padding: 1px 0;
     vertical-align: top;
+    font-size: 10pt;
 }
-.lbl {
-    color: #555;
-    font-size: 8.5pt;
-    text-transform: uppercase;
+.td-lbl {
+    width: 98px;
+    color: #444;
     white-space: nowrap;
-    width: 110px;
 }
-.val {
-    font-weight: bold;
-    font-size: 10.5pt;
+.td-sep {
+    width: 10px;
+    color: #666;
+}
+.td-val {
+    font-weight: normal;
 }
 
-/* ── Bloque de pesos ────────────────────────────────────────────── */
-.pesos {
-    background: #f5f0e8;
-    border-radius: 4px;
-    border-left: 3px solid #8B6914;
-    margin-top: 12px;
-    padding: 8px 12px;
+/* ── Sección pesos ───────────────────────────────────────── */
+.seccion-pesos {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 2px;
 }
-.peso-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin: 3px 0;
-    border-bottom: 1px dotted #d8cdb0;
+.seccion-pesos td {
+    vertical-align: top;
+    padding: 0;
 }
-.peso-row:last-child { border-bottom: none; }
-.peso-lbl  { font-size: 8.5pt; color: #555; text-transform: uppercase; }
-.peso-val  { font-size: 11pt; font-weight: bold; }
-.peso-neto .peso-lbl { color: #1a5c1a; font-weight: bold; }
-.peso-neto .peso-val { font-size: 15pt; color: #1a5c1a; }
+.col-fechas { width: 55%; }
+.col-pesos  { width: 45%; }
 
-/* ── Pie ────────────────────────────────────────────────────────── */
-.footer {
-    margin-top: 14px;
-    border-top: 1px dashed #ccc;
-    padding-top: 6px;
-    font-size: 8pt;
-    color: #888;
-    text-align: center;
+/* tabla interna de pesos */
+.tabla-pesos {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: right;
 }
+.tabla-pesos td {
+    padding: 0 0 1px 0;
+    font-size: 10pt;
+}
+.peso-lbl { color: #444; }
+.peso-val { font-size: 12pt; font-weight: bold; padding-left: 6px; }
+.peso-neto-val { font-size: 14pt; }
+.peso-unit { font-size: 8.5pt; color: #555; padding-left: 3px; }
 </style>
 </head>
 <body>
 
-<!-- ENCABEZADO -->
-<div class="header">
-    <div class="empresa">INVERMIN PAITITI S.A.C.</div>
-    <div class="subtitulo">TICKET DE RECEPCIÓN DE MINERAL</div>
-</div>
+<!-- EMPRESA -->
+<div class="empresa-nombre">{{ empresa_nombre }}</div>
+<div class="empresa-sub">{{ empresa_planta }} &nbsp;&middot;&nbsp; R.U.C. {{ empresa_ruc }}</div>
 
-<!-- IP DEL LOTE -->
-<div class="ticket-ip">{{ ip }}</div>
+<div class="hr"></div>
 
-<!-- DATOS DEL CAMIÓN / SESIÓN -->
-<table>
-    <tr>
-        <td class="lbl">Proveedor</td>
-        <td class="val">{{ proveedor_razon_social }}</td>
-        <td class="lbl">RUC</td>
-        <td class="val">{{ proveedor_ruc }}</td>
-    </tr>
-    {% if acopiador_html %}
-    <tr>
-        <td class="lbl">Acopiador</td>
-        <td class="val" colspan="3">{{ acopiador_razon_social }}</td>
-    </tr>
-    {% endif %}
-    <tr>
-        <td class="lbl">Placa</td>
-        <td class="val">{{ placa }}</td>
-        <td class="lbl">Conductor</td>
-        <td class="val">{{ conductor }}</td>
-    </tr>
-    <tr>
-        <td class="lbl">Tipo Material</td>
-        <td class="val">{{ tipo_material }}</td>
-        <td class="lbl">Fecha Ingreso</td>
-        <td class="val">{{ fecha_ingreso }}</td>
-    </tr>
-    <tr>
-        <td class="lbl">Guía Remisión</td>
-        <td class="val">{{ guia_remision }}</td>
-        <td class="lbl">Guía Transporte</td>
-        <td class="val">{{ guia_transporte }}</td>
-    </tr>
-    <tr>
-        <td class="lbl">Sacos</td>
-        <td class="val">{{ sacos }}</td>
-        <td class="lbl">Granel</td>
-        <td class="val">{{ granel }}</td>
-    </tr>
+<!-- PLACA + TICKET -->
+<table class="fila-placa-ticket">
+  <tr>
+    <td>Placa : <strong>{{ placa }}</strong> &nbsp;&nbsp; Carreta : <strong>{{ carreta }}</strong></td>
+    <td class="td-ticket">Ticket : {{ numero_ticket }}</td>
+  </tr>
 </table>
 
-<!-- PESOS -->
-<div class="pesos">
-    <div class="peso-row">
-        <span class="peso-lbl">Peso Bruto (TMH)</span>
-        <span class="peso-val">{{ peso_bruto }} TM</span>
-    </div>
-    <div class="peso-row">
-        <span class="peso-lbl">Peso Tara (TMH)</span>
-        <span class="peso-val">{{ peso_tara }} TM</span>
-    </div>
-    <div class="peso-row peso-neto">
-        <span class="peso-lbl">Peso Neto (TMH)</span>
-        <span class="peso-val">{{ peso_neto }} TM</span>
-    </div>
-</div>
+<div class="hr-dashed"></div>
 
-<!-- PIE -->
-<div class="footer">
-    N° Ticket: {{ numero_ticket }}
-    &nbsp;·&nbsp; Lote #{{ numero_lote }}
-    &nbsp;·&nbsp; Estado: {{ estado }}
-</div>
+<!-- DATOS TRANSPORTE Y LOTE -->
+<table class="datos">
+  <tr>
+    <td class="td-lbl">Conductor</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ conductor }}</td>
+  </tr>
+  <tr>
+    <td class="td-lbl">Transportista</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ transportista }}</td>
+  </tr>
+  <tr>
+    <td class="td-lbl">Razon Social</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ razon_social }}</td>
+  </tr>
+  <!-- <tr>
+    <td class="td-lbl">Proveedor</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">[{{ proveedor_ruc }}] {{ proveedor_razon_social }}</td>
+  </tr>
+  {% if acopiador_html %}
+  <tr>
+    <td class="td-lbl">Acopiador</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ acopiador_razon_social }}</td>
+  </tr>
+  {% endif %} -->
+  <tr>
+    <td class="td-lbl">Producto</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ tipo_material }}</td>
+  </tr>
+  <tr>
+    <td class="td-lbl">Documento</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ documento }}</td>
+  </tr>
+  <tr>
+    <td class="td-lbl">Observaciones</td>
+    <td class="td-sep">:</td>
+    <td class="td-val">{{ observaciones }}</td>
+  </tr>
+</table>
+
+<div class="hr"></div>
+
+<!-- FECHAS (izq) + PESOS (der) -->
+<table class="seccion-pesos">
+  <tr>
+    <td class="col-fechas">
+      <table class="datos">
+        <tr>
+          <td class="td-lbl">Fecha Inicial</td>
+          <td class="td-sep">:</td>
+          <td class="td-val">{{ fecha_inicio }}</td>
+        </tr>
+        <tr>
+          <td class="td-lbl">Fecha Final</td>
+          <td class="td-sep">:</td>
+          <td class="td-val">{{ fecha_fin }}</td>
+        </tr>
+      </table>
+    </td>
+    <td class="col-pesos">
+      <table class="tabla-pesos">
+        <tr>
+          <td class="peso-lbl">Peso Bruto</td>
+          <td class="peso-val">{{ peso_bruto }}</td>
+          <td class="peso-unit">TM</td>
+        </tr>
+        <tr>
+          <td class="peso-lbl">Peso Tara</td>
+          <td class="peso-val">{{ peso_tara }}</td>
+          <td class="peso-unit">TM</td>
+        </tr>
+        <tr>
+          <td class="peso-lbl">Peso Neto</td>
+          <td class="peso-val peso-neto-val">{{ peso_neto }}</td>
+          <td class="peso-unit">TM</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
 
 </body>
 </html>
