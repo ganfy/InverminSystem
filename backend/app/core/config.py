@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     azure_storage_container_tickets: str = "tickets"
     azure_storage_container_certificados: str = "certificados"
 
+    tesseract_path: str | None = None
+
     @property
     def database_url(self) -> str:
         if self.db_engine == "postgresql":

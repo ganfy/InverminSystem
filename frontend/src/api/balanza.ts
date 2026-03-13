@@ -1,4 +1,6 @@
 import api from './axios'
+import axios from 'axios'
+import type { DocumentoRespuesta, DatosExtraidos } from '@/types/balanza'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -191,4 +193,63 @@ export const balanzaApi = {
     })
     return URL.createObjectURL(new Blob([r.data], { type: 'text/html' }))
     },
+
+  // Documentos de sesión
+  async listarDocumentos(sesionId: number): Promise<DocumentoRespuesta[]> {
+    const { data } = await axios.get<DocumentoRespuesta[]>(
+      `/api/balanza/${sesionId}/documentos`
+    )
+    return data
+  },
+
+  async subirDocumento(
+    sesionId: number,
+    archivo: File,
+    tipo: string
+  ): Promise<DocumentoRespuesta> {
+    const form = new FormData()
+    form.append('archivo', archivo)
+    form.append('tipo_documento', tipo)
+
+    const { data } = await axios.post<DocumentoRespuesta>(
+      `/api/balanza/${sesionId}/documentos`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return data
+  },
+
+  async descargarDocumento(sesionId: number, docId: number): Promise<void> {
+    const response = await axios.get(`/api/balanza/${sesionId}/documentos/${docId}/download`, {
+      responseType: 'blob',
+    })
+    const blob = new Blob([response.data], { type: response.data.type })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  },
+
+  async eliminarDocumento(sesionId: number, docId: number): Promise<void> {
+    await axios.delete(`/api/balanza/${sesionId}/documentos/${docId}`)
+  },
+
+  async extraerDatosDocumentos(sesionId: number): Promise<DatosExtraidos> {
+    const { data } = await axios.post<DatosExtraidos>(
+      `/api/balanza/${sesionId}/documentos/extraer`
+    )
+    return data
+  },
+
+  async extraerDatosPreview(archivos: File[]): Promise<DatosExtraidos> {
+    const formData = new FormData()
+    // Nombre del campo debe coincidir con el parámetro FastAPI: `archivos`
+    archivos.forEach(f => formData.append('archivos', f))
+    const { data } = await api.post<DatosExtraidos>(
+      '/balanza/documentos/extraer-preview',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    return data
+  },
+
 }

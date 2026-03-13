@@ -12,6 +12,8 @@ Permisos (RBAC del documento):
 from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.schemas.balanza import (
+    DatosExtraidos,
+    DocumentoRespuesta,
     EliminarLoteRequest,
     LoteCrear,
     LoteDetalle,
@@ -23,9 +25,10 @@ from app.schemas.balanza import (
     SesionLista,
 )
 from app.services import balanza as svc
+from app.services import balanza_documentos as doc_svc
 from app.services import balanza_pdf as pdf_svc
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/balanza", tags=["Balanza"])
@@ -258,6 +261,127 @@ def editar_lote(
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+# =============================================================================
+# DOCUMENTOS DE SESIÓN
+# =============================================================================
+@router.post("/documentos/extraer-preview", response_model=DatosExtraidos)
+async def extraer_datos_preview(
+    archivos: list[UploadFile] = File(...),
+    current_user=Depends(check_permiso("BALANZA", "READ")),
+):
+    """Extrae datos de archivos sin sesión — para pre-llenar el form de registro."""
+    try:
+        return doc_svc.extraer_datos_archivos_directos(archivos)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post(
+    "/{sesion_id}/documentos",
+    response_model=DocumentoRespuesta,
+    status_code=status.HTTP_201_CREATED,
+)
+async def subir_documento(
+    sesion_id: int,
+    archivo: UploadFile = File(...),
+    tipo_documento: str = Form(...),
+    current_user=Depends(check_permiso("BALANZA", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Adjunta un documento (PDF o imagen) a una sesión.
+    tipo_documento: GUIA_REMISION | GUIA_TRANSPORTE | LICENCIA_CONDUCIR | OTRO
+    """
+    try:
+        doc = doc_svc.subir_documento(
+            db, sesion_id, archivo, tipo_documento, usuario_id=current_user.id
+        )
+        db.commit()
+        return doc
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+@router.get(
+    "/{sesion_id}/documentos",
+    response_model=list[DocumentoRespuesta],
+)
+def listar_documentos(
+    sesion_id: int,
+    current_user=Depends(check_permiso("BALANZA", "READ")),
+    db: Session = Depends(get_db),
+):
+    """Lista todos los documentos adjuntos a una sesión."""
+    return doc_svc.listar_documentos(db, sesion_id)
+
+
+@router.get("/{sesion_id}/documentos/{doc_id}/download")
+def descargar_documento(
+    sesion_id: int,
+    doc_id: int,
+    current_user=Depends(check_permiso("BALANZA", "READ")),
+    db: Session = Depends(get_db),
+):
+    """Descarga el archivo de un documento adjunto."""
+    try:
+        ruta, nombre = doc_svc.obtener_archivo(db, sesion_id, doc_id)
+        return FileResponse(
+            path=str(ruta),
+            filename=nombre,
+            media_type="application/octet-stream",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.delete(
+    "/{sesion_id}/documentos/{doc_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_documento(
+    sesion_id: int,
+    doc_id: int,
+    current_user=Depends(check_permiso("BALANZA", "DELETE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Elimina un documento adjunto (solo Admin y Gerencia — RBAC).
+    Borra el archivo de disco y el registro de BD.
+    """
+    try:
+        doc_svc.eliminar_documento(db, sesion_id, doc_id)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@router.post(
+    "/{sesion_id}/documentos/extraer",
+    response_model=DatosExtraidos,
+)
+def extraer_datos(
+    sesion_id: int,
+    current_user=Depends(check_permiso("BALANZA", "READ")),
+    db: Session = Depends(get_db),
+):
+    """
+    Analiza todos los documentos adjuntos con Claude API y extrae
+    datos estructurados (placa, conductor, guías, etc.) para pre-llenar
+    los campos de la sesión.
+    """
+    try:
+        return doc_svc.extraer_datos_documentos(db, sesion_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en extracción: {str(e)}",
+        ) from e
 
 
 # =============================================================================

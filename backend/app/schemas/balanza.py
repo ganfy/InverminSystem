@@ -267,3 +267,39 @@ class EliminarLoteRequest(BaseModel):
         if not v.strip():
             raise ValueError("El motivo no puede estar vacío")
         return v.strip()
+
+
+# ===============================================================
+# DOCUMENTOS DE SESIÓN
+# ================================================================
+
+
+class DocumentoRespuesta(BaseModel):
+    """Documento adjunto a una sesión de descarga."""
+
+    id: int
+    sesion_id: int
+    tipo_documento: str
+    nombre_original: str
+    ruta_archivo: str
+    creado_en: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class DatosExtraidos(BaseModel):
+    """
+    Resultado de la extracción automática de datos desde documentos adjuntos.
+    Todos los campos son opcionales (null si no se encontró en los docs).
+    """
+
+    placa: str | None = None
+    carreta: str | None = None
+    conductor: str | None = None
+    transportista: str | None = None
+    razon_social: str | None = None
+    ruc_proveedor: str | None = None
+    guia_remision: str | None = None
+    guia_transporte: str | None = None
+    peso_declarado_tm: float | None = None
+    documentos_detectados: list[str] = []
