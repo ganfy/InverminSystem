@@ -1,6 +1,5 @@
 <template>
   <div class="sesion-page">
-
     <!-- ── ENCABEZADO ──────────────────────────────────────── -->
     <div class="sesion-header">
       <div class="header-info">
@@ -44,7 +43,6 @@
           </label>
         </div>
       </div>
-
       <div class="header-right">
         <div class="lote-badge" :class="estadoClass(sesion?.estado ?? '')">
           <template v-if="lotesActivos.length > 0">
@@ -60,13 +58,10 @@
         >✎ Editar sesión</button>
       </div>
     </div>
-
     <!-- ── CUERPO 2 COLUMNAS ──────────────────────────────── -->
     <div class="sesion-body">
-
       <!-- Columna izquierda -->
       <div class="col-left">
-
         <!-- Datos de transporte -->
         <div class="card">
           <div class="card-titulo">DATOS DEL TRANSPORTE</div>
@@ -101,11 +96,19 @@
             </div>
           </div>
         </div>
-
         <!-- Pesaje activo (solo EN_PROCESO) -->
         <div v-if="sesion?.estado === 'EN_PROCESO'" class="card card-pesaje">
           <div class="card-titulo">PESAJE — NUEVO LOTE</div>
-
+          <BalanzaIndicator
+            :peso-display="pesoDisplay"
+            :unidad="unidad"
+            :estable="estable"
+            :conectado="conectado"
+            :ws-conectado="wsConectado"
+            :error="balanzaError"
+            :config="balanzaConfig"
+            class="mb-4"
+          />
           <div class="pesaje-display">
             <div class="peso-display-label">PESO ACTUAL EN BALANZA</div>
             <input
@@ -116,7 +119,6 @@
             />
             <span class="peso-display-unit">TM</span>
           </div>
-
           <div class="pesaje-campos">
             <!-- BRUTO = peso_inicial (primer pesaje, camión cargado) -->
             <div class="campo-peso">
@@ -149,21 +151,17 @@
               </div>
             </div>
           </div>
-
           <p v-if="pesoError" class="error-msg" style="margin:.25rem 0">{{ pesoError }}</p>
-
           <div class="pesaje-resumen">
             <span>BRUTO: <strong>{{ loteForm.peso_inicial ? fmtTm(loteForm.peso_inicial) + ' TM' : '—' }}</strong></span>
             <span>TARA: <strong>{{ loteForm.peso_final ? fmtTm(loteForm.peso_final) + ' TM' : '—' }}</strong></span>
             <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? fmtTm(pesoNeto) + ' TM' : '—' }}</strong></span>
           </div>
-
           <!-- Mensaje de validación (aparece solo al intentar con errores) -->
           <div v-if="mostrarFaltantes && loteFormFaltantes.length > 0" class="form-faltantes">
             <span class="faltante-icono">⚠</span>
             Falta: {{ loteFormFaltantes.join(' · ') }}
           </div>
-
           <button
             class="btn-primary ready btn-registrar"
             :class="{ 'btn-incompleto': !loteFormValido && mostrarFaltantes }"
@@ -174,13 +172,10 @@
             <span v-else>Capturar peso</span>
           </button>
         </div>
-
       </div><!-- /col-left -->
-
       <!-- Columna derecha: lista de lotes -->
       <div class="col-right">
         <div v-if="store.loadingSesion" class="estado-tabla">Cargando...</div>
-
         <div
           v-for="lote in sesion?.lotes.filter(l => !l.eliminado)"
           :key="lote.id"
@@ -204,7 +199,6 @@
               </span>
             </div>
           </div>
-
           <div class="lote-card-body">
             <div class="lote-fila">
               <span class="lote-dato-label">BRUTO:</span>
@@ -232,7 +226,6 @@
               <span class="badge-propio">Granel</span>
             </div>
           </div>
-
           <div class="lote-card-footer">
           <button class="btn-secondary btn-sm" @click="verTicket(lote)" title="Ver antes de imprimir">
             👁 Ver ticket
@@ -242,7 +235,6 @@
           </button>
         </div>
         </div>
-
         <!-- Lotes eliminados -->
         <details v-if="sesion?.lotes.some(l => l.eliminado)" class="lotes-eliminados">
           <summary>{{ sesion?.lotes.filter(l=>l.eliminado).length }} lote(s) eliminado(s)</summary>
@@ -257,15 +249,12 @@
             </div>
           </div>
         </details>
-
       </div><!-- /col-right -->
     </div><!-- /sesion-body -->
-
     <!-- ── BARRA INFERIOR ─────────────────────────────────── -->
     <div class="bottom-bar">
       <button class="btn-secondary" @click="router.push({ name: 'Balanza' })">← Volver</button>
       <div class="bottom-bar-acciones">
-        <!-- Botón: descargar todos los tickets (visible si hay al menos 1 lote) -->
         <button
         v-if="lotesActivos.length > 0"
         class="btn-secondary"
@@ -293,7 +282,6 @@
         </button>
       </div>
     </div>
-
     <!-- ── MODAL: Editar Sesión ───────────────────────────── -->
     <div v-if="editSesionModal.visible" class="modal-overlay" @click.self="cerrarEditarSesion">
       <div class="modal modal-lg">
@@ -350,7 +338,6 @@
               </div>
             </div>
           </div>
-
           <div class="seccion-edit">
             <div class="seccion-edit-titulo">DATOS DE TRANSPORTE</div>
             <div class="form-grid">
@@ -394,7 +381,6 @@
         </div>
       </div>
     </div>
-
     <!-- ── MODAL: Editar Lote (Admin) ────────────────────── -->
     <div v-if="editLoteModal.visible" class="modal-overlay" @click.self="cerrarEditarLote">
       <div class="modal">
@@ -440,7 +426,6 @@
         </div>
       </div>
     </div>
-
     <!-- ── MODAL: Eliminar Lote ──────────────────────────── -->
     <div v-if="eliminarModal.visible" class="modal-overlay" @click.self="cerrarEliminar">
       <div class="modal modal-sm">
@@ -465,7 +450,6 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -475,7 +459,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useBalanzaStore } from '@/stores/balanza'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import type { LoteDetalle, ProvAcopDropdown} from '@/api/balanza'
+import { useBalanza } from '@/composables/useBalanza'
+import BalanzaIndicator from '@/components/balanza/BalanzaIndicator.vue'
+import type { LoteDetalle, ProvAcopDropdown } from '@/api/balanza'
 import { balanzaApi } from '@/api/balanza'
 
 const globalSetTimeout = setTimeout
@@ -490,6 +476,31 @@ const sesionId     = Number(route.params.id)
 const sesion       = computed(() => store.sesionActual)
 const lotesActivos = computed(() => sesion.value?.lotes.filter(l => !l.eliminado) ?? [])
 
+// ── Balanza física ─────────────────────────────────────────
+const {
+  peso,
+  pesoDisplay,
+  unidad,
+  estable,
+  conectado,
+  wsConectado,
+  error: balanzaError,
+  config: balanzaConfig,
+  capturar,
+} = useBalanza()
+
+// ── Peso actual en balanza ─────────────────────────────────
+// Cuando el agente está conectado, pesoActual sigue a la balanza
+// automáticamente. Cuando no hay conexión, el operador escribe manual.
+const pesoActual = ref<number | null>(null)
+
+watch(peso, (nuevoPeso) => {
+  // Solo actualizar si la balanza está activa — no pisar edición manual
+  if (wsConectado.value && conectado.value && nuevoPeso !== null) {
+    pesoActual.value = nuevoPeso
+  }
+})
+
 // ── Tipo material — global para todos los lotes ────────────
 const tipoMaterial = ref('')
 
@@ -497,11 +508,38 @@ const tipoMaterial = ref('')
 const sacos  = ref<number | null>(null)
 const granel = ref(false)
 
-// ── Peso actual en balanza ─────────────────────────────────
-const pesoActual = ref<number | null>(null)
+const fechaBruto = ref<string | null>(null)
 
-function capturarBruto() { if (pesoActual.value !== null) loteForm.peso_inicial = pesoActual.value }
-function capturarTara()  { if (pesoActual.value !== null) loteForm.peso_final   = pesoActual.value }
+// ── Captura de pesos ───────────────────────────────────────
+// Con balanza conectada: pide lectura puntual al agente (Promise).
+// Sin balanza: usa el valor de pesoActual (ingreso manual).
+async function capturarBruto() {
+  const valor = await resolverPeso()
+  if (valor !== null) {
+    loteForm.peso_inicial = valor
+    fechaBruto.value = new Date().toISOString()
+  }
+}
+
+async function capturarTara() {
+  const valor = await resolverPeso()
+  if (valor !== null) {
+    loteForm.peso_final = valor
+  }
+}
+
+async function resolverPeso(): Promise<number | null> {
+  if (wsConectado.value && conectado.value) {
+    // Captura puntual desde el agente (más precisa que pesoActual en vuelo)
+    const lectura = await capturar()
+    if (!lectura.estable) {
+      ui.toast('Peso capturado, pero la balanza no estaba estable. Verificar.', 'warning')
+    }
+    return lectura.peso
+  }
+  // Fallback manual: usar lo que el operador escribió en el input
+  return pesoActual.value
+}
 
 // ── Formulario lote ────────────────────────────────────────
 const loteForm = reactive({
@@ -511,8 +549,6 @@ const loteForm = reactive({
 
 /**
  * Pre-rellena BRUTO del nuevo lote con TARA del lote anterior.
- * Lógica: un camión que descargas en varias pasadas →
- *   TARA_N = peso del camión tras descarga = BRUTO_{N+1} antes de nueva descarga.
  */
 function preFillBruto() {
   const activos = sesion.value?.lotes.filter(l => !l.eliminado) ?? []
@@ -524,7 +560,7 @@ function preFillBruto() {
   }
 }
 
-// Validación: BRUTO (peso_inicial) > TARA (peso_final)
+// Validación: BRUTO > TARA
 const pesoError = computed(() => {
   const { peso_inicial: bruto, peso_final: tara } = loteForm
   if (bruto !== null && tara !== null && bruto > 0 && tara > 0 && bruto <= tara) {
@@ -539,7 +575,6 @@ const pesoNeto = computed(() => {
   return (bruto !== null && tara !== null && bruto > tara) ? bruto - tara : 0
 })
 
-/** Lista de requisitos pendientes para habilitar "Capturar peso" */
 const loteFormFaltantes = computed(() => {
   const f: string[] = []
   if (!tipoMaterial.value)                                  f.push('seleccionar PRODUCTO')
@@ -553,8 +588,7 @@ const loteFormFaltantes = computed(() => {
   return f
 })
 
-const loteFormValido = computed(() => loteFormFaltantes.value.length === 0)
-
+const loteFormValido   = computed(() => loteFormFaltantes.value.length === 0)
 const mostrarFaltantes = ref(false)
 
 function intentarRegistrar() {
@@ -566,10 +600,9 @@ function intentarRegistrar() {
   registrarLote()
 }
 
-// Ocultar mensaje al corregir campos
 watch(
   [tipoMaterial, () => loteForm.peso_inicial, () => loteForm.peso_final],
-  () => { if (loteFormValido.value) mostrarFaltantes.value = false }
+  () => { if (loteFormValido.value) mostrarFaltantes.value = false },
 )
 
 async function registrarLote() {
@@ -577,16 +610,16 @@ async function registrarLote() {
   const ok = await store.agregarLote(sesionId, {
     tipo_material: tipoMaterial.value,
     pesaje: {
-      peso_inicial: loteForm.peso_inicial!,   // BRUTO
-      peso_final:   loteForm.peso_final!,     // TARA
+      peso_inicial: loteForm.peso_inicial!,
+      peso_final:   loteForm.peso_final!,
       sacos:        granel.value ? null : (sacos.value || null),
       granel:       granel.value,
+      fecha_inicio: fechaBruto.value ?? undefined,
     },
   })
   if (ok) {
     loteForm.peso_inicial = null
     loteForm.peso_final   = null
-    // Pre-rellenar BRUTO del siguiente lote con la TARA que acaba de quedar registrada
     preFillBruto()
   }
 }
@@ -600,7 +633,9 @@ async function pausar() {
   })
   if (ok) await store.pausarSesion(sesionId)
 }
+
 async function reanudar() { await store.reanudarSesion(sesionId) }
+
 async function finalizar() {
   const ok = await ui.showConfirm({
     title: 'Finalizar sesión',
@@ -614,7 +649,6 @@ async function verTicket(lote: LoteDetalle) {
   try {
     const url = await balanzaApi.ticketPreviewBlob(sesionId, lote.id)
     window.open(url, '_blank')
-    // Liberar memoria después de un momento (la pestaña ya cargó el HTML)
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   } catch {
     ui.toast('Error al cargar preview del ticket', 'error')
@@ -626,7 +660,6 @@ async function descargarTicket(lote: LoteDetalle) {
 }
 
 const descargandoTodos = ref(false)
-
 async function descargarTodos() {
   if (!sesion.value) return
   descargandoTodos.value = true
@@ -670,6 +703,7 @@ function abrirEditarSesion() {
   editSesionModal.editAcop = null
   editSesionModal.visible  = true
 }
+
 function cerrarEditarSesion() { editSesionModal.visible = false }
 
 const editProvsFiltered = computed(() => {
@@ -687,7 +721,7 @@ const editAcopsFiltered = computed(() => {
   const q = editSesionModal.busqAcop.toLowerCase()
   return store.provacops.filter(p =>
     p.proveedor_id === editSesionModal.editProv!.proveedor_id &&
-    p.acopiador_razon_social.toLowerCase().includes(q)
+    p.acopiador_razon_social.toLowerCase().includes(q),
   )
 })
 
@@ -700,6 +734,7 @@ function editSelProv(p: ProvAcopDropdown) {
   const opts = store.provacops.filter(x => x.proveedor_id === p.proveedor_id)
   if (opts.length === 1) editSelAcop(opts[0]!)
 }
+
 function editSelAcop(a: ProvAcopDropdown) {
   editSesionModal.editAcop = a
   editSesionModal.busqAcop = a.acopiador_razon_social
@@ -742,6 +777,7 @@ function abrirEditarLote(lote: LoteDetalle) {
     },
   })
 }
+
 function cerrarEditarLote() { editLoteModal.visible = false }
 
 async function guardarEditarLote() {
@@ -753,7 +789,7 @@ async function guardarEditarLote() {
   }
   const ok = await store.editarLote(sesionId, editLoteModal.loteId, {
     tipo_material: f.tipo_material,
-    peso_inicial:  f.peso_inicial ?? undefined,
+    peso_inicial:  f.peso_final   ?? undefined,
     peso_final:    f.peso_final   ?? undefined,
     sacos:         f.sacos,
     granel:        f.granel,
@@ -767,6 +803,7 @@ const eliminarModal = reactive({ visible: false, loteId: 0, ip: '', motivo: '', 
 function abrirEliminar(lote: LoteDetalle) {
   Object.assign(eliminarModal, { visible: true, loteId: lote.id, ip: lote.ip, motivo: '', error: '' })
 }
+
 function cerrarEliminar() { eliminarModal.visible = false }
 
 async function confirmarEliminar() {
@@ -777,15 +814,19 @@ async function confirmarEliminar() {
 
 // ── Helpers ────────────────────────────────────────────────
 function fmtTm(n: number | string) { return Number(n).toFixed(3) }
+
 function estadoClass(e: string) {
   return { EN_PROCESO: 'badge-en-proceso', PAUSADO: 'badge-pausado', COMPLETO: 'badge-completo' }[e] ?? ''
 }
+
 function estadoLabel(e: string) {
   return { EN_PROCESO: 'EN PROCESO', PAUSADO: 'PAUSADO', COMPLETO: 'COMPLETO' }[e] ?? e
 }
+
 function loteEstadoClass(lote: LoteDetalle) {
   return lote.pesaje?.peso_final != null ? 'lc-completado' : 'lc-en-proceso'
 }
+
 function loteEstadoLabel(lote: LoteDetalle) {
   return lote.pesaje?.peso_final != null ? 'Completado' : 'En proceso'
 }
@@ -798,7 +839,6 @@ onMounted(async () => {
 
 <style scoped>
 .sesion-page { max-width: 1200px; }
-
 /* ── Header ──────────────────────────────────────────────── */
 .sesion-header {
   display: flex; justify-content: space-between; align-items: flex-start;
@@ -815,7 +855,6 @@ onMounted(async () => {
 .granel-label   { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--color-text-muted); cursor: pointer; }
 .header-right   { display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; flex-shrink: 0; }
 .btn-editar-sesion { font-size: .78rem; padding: .3rem .7rem; }
-
 .lote-badge {
   font-family: var(--font-mono); font-size: .78rem; letter-spacing: .08em;
   text-align: center; padding: .5rem .9rem; border-radius: var(--radius-sm);
@@ -824,14 +863,12 @@ onMounted(async () => {
 .badge-en-proceso { border-color: var(--color-warning) !important; color: var(--color-warning) !important; }
 .badge-pausado    { border-color: var(--color-gold) !important; color: var(--color-gold) !important; }
 .badge-completo   { border-color: var(--color-success) !important; color: var(--color-success) !important; }
-
 /* ── Body 2 columnas ─────────────────────────────────────── */
 .sesion-body {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 1.25rem; margin-bottom: 1.25rem;
 }
 @media (max-width: 900px) { .sesion-body { grid-template-columns: 1fr; } }
-
 /* ── Cards ───────────────────────────────────────────────── */
 .card {
   background: var(--color-bg-card); border: 1px solid var(--color-border);
@@ -842,14 +879,12 @@ onMounted(async () => {
   color: var(--color-gold); margin-bottom: 1rem;
   padding-bottom: .4rem; border-bottom: 1px solid var(--color-border);
 }
-
 /* ── Transporte ──────────────────────────────────────────── */
 .transp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .75rem; }
 .transp-full { grid-column: 1 / -1; }
 .transp-fila { display: flex; gap: .5rem; align-items: baseline; }
 .transp-label { font-family: var(--font-mono); font-size: .68rem; color: var(--color-text-muted); white-space: nowrap; min-width: 85px; }
 .transp-val   { font-size: .85rem; color: var(--color-text); }
-
 /* ── Pesaje activo ───────────────────────────────────────── */
 .card-pesaje { border-color: var(--color-gold); }
 .pesaje-display {
@@ -864,12 +899,10 @@ onMounted(async () => {
   border: none; outline: none; width: 140px; text-align: right;
 }
 .peso-display-unit { font-family: var(--font-mono); font-size: 1rem; color: var(--color-text-muted); }
-
 .pesaje-campos { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: .75rem; }
 .campo-peso    { display: flex; flex-direction: column; gap: .3rem; }
 .campo-peso-label { font-family: var(--font-mono); font-size: .7rem; color: var(--color-text-muted); letter-spacing: .1em; }
 .campo-peso-row { display: flex; gap: .4rem; }
-
 .btn-capturar {
   background: rgba(184,150,46,.15); border: 1px solid var(--color-border);
   color: var(--color-gold); font-family: var(--font-mono); font-size: .72rem;
@@ -877,14 +910,12 @@ onMounted(async () => {
   transition: background .15s;
 }
 .btn-capturar:hover { background: rgba(184,150,46,.3); }
-
 .pesaje-resumen {
   display: flex; gap: 1.5rem; margin-bottom: 1rem;
   font-family: var(--font-mono); font-size: .8rem; color: var(--color-text-muted);
 }
 .neto-resumen strong { color: var(--color-gold-light); }
 .btn-registrar { width: 100%; }
-
 /* ── Lotes ───────────────────────────────────────────────── */
 .lote-card {
   background: var(--color-bg-card); border: 1px solid var(--color-border);
@@ -892,7 +923,6 @@ onMounted(async () => {
 }
 .lote-en-proceso { border-color: rgba(220,160,20,.5); }
 .lote-eliminado  { opacity: .45; }
-
 .lote-card-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: .6rem 1rem; background: rgba(184,150,46,.06);
@@ -901,7 +931,6 @@ onMounted(async () => {
 .lote-ip { font-family: var(--font-mono); font-size: .82rem; color: var(--color-gold); }
 .lote-acciones { display: flex; align-items: center; gap: .4rem; }
 .btn-icon-danger:hover { color: var(--color-error); border-color: var(--color-error); }
-
 .badge-lote-estado {
   font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em;
   padding: .2rem .5rem; border-radius: var(--radius-sm);
@@ -909,7 +938,6 @@ onMounted(async () => {
 .lc-completado { background: rgba(60,180,80,.15); color: #4ecf7a; border: 1px solid #4ecf7a; }
 .lc-en-proceso { background: rgba(220,160,20,.12); color: var(--color-warning); border: 1px solid var(--color-warning); }
 .badge-eliminado { background: rgba(220,60,60,.1); color: var(--color-error); border: 1px solid var(--color-error); }
-
 .lote-card-body {
   padding: .75rem 1rem; display: grid;
   grid-template-columns: 1fr 1fr; gap: .3rem .75rem;
@@ -920,7 +948,6 @@ onMounted(async () => {
 .lote-dato-val   { font-family: var(--font-mono); font-size: .85rem; color: var(--color-text); }
 .neto-val        { font-size: 1.1rem; color: var(--color-gold-light); font-weight: 600; }
 .badge-propio    { font-size: .68rem; padding: .15rem .4rem; background: rgba(184,150,46,.1); border-radius: 3px; color: var(--color-gold); }
-
 .lote-card-footer {
   padding: .5rem 1rem; border-top: 1px solid var(--color-border);
   display: flex; justify-content: flex-end;
@@ -928,7 +955,6 @@ onMounted(async () => {
 .btn-sm { padding: .3rem .7rem; font-size: .78rem; }
 .lotes-eliminados { margin-top: .5rem; font-size: .82rem; color: var(--color-text-muted); }
 .lotes-eliminados summary { cursor: pointer; padding: .3rem 0; }
-
 /* ── Modal edición ───────────────────────────────────────── */
 .seccion-edit { margin-bottom: 1.25rem; }
 .seccion-edit-titulo {
@@ -937,7 +963,6 @@ onMounted(async () => {
   padding-bottom: .3rem; border-bottom: 1px solid var(--color-border);
 }
 .field-disabled { opacity: .4; cursor: not-allowed; }
-
 /* ── Autocomplete ────────────────────────────────────────── */
 .autocomplete-wrap { position: relative; }
 .ac-dropdown {
@@ -947,7 +972,6 @@ onMounted(async () => {
 }
 .ac-item { padding: .5rem .75rem; font-size: .85rem; cursor: pointer; }
 .ac-item:hover { background: var(--color-gold-bg); }
-
 /* ── Otros ───────────────────────────────────────────────── */
 .elim-aviso { font-size: .82rem; color: var(--color-error); margin: 0; }
 .bottom-bar {
@@ -957,20 +981,13 @@ onMounted(async () => {
 .bottom-bar-acciones { display: flex; gap: .75rem; }
 .estado-tabla { padding: 2rem; text-align: center; color: var(--color-text-muted); }
 .form-faltantes {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--color-warning);
-  background: rgba(220, 160, 20, 0.08);
-  border: 1px solid rgba(220, 160, 20, 0.3);
-  border-radius: var(--radius-sm);
-  padding: 0.4rem 0.75rem;
-  margin-bottom: 0.5rem;
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono); font-size: 0.75rem;
+  color: var(--color-warning); background: rgba(220,160,20,.08);
+  border: 1px solid rgba(220,160,20,.3); border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem; margin-bottom: 0.5rem;
 }
 .faltante-icono { font-size: 0.9rem; }
-
 .btn-incompleto {
   border-color: var(--color-warning) !important;
   box-shadow: 0 0 0 1px var(--color-warning);
