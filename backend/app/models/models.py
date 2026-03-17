@@ -284,6 +284,7 @@ class SesionDescarga(AuditMixin, Base):
     __tablename__ = "sesiones_descarga"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    offline_id = Column(String(36), unique=True)  # UUID para sincronización offline
     provacop_id = Column(Integer, ForeignKey("proveedor_acopiador.id"), nullable=False)
     placa = Column(String(10), nullable=False)
     carreta = Column(String(10))

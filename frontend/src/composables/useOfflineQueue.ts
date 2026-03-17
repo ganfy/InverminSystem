@@ -1,0 +1,266 @@
+/**
+ * useOfflineQueue.ts
+ * ==================
+ * Gestiona el almacenamiento local offline usando IndexedDB.
+ *
+ * Stores:
+ *   - ip_block      → bloque de IPs reservado { desde, hasta, usado, anio }
+ *   - provacops     → caché de relaciones proveedor-acopiador
+ *   - sesiones_q    → sesiones pendientes de sync
+ *   - lotes_q       → lotes pendientes de sync (agrupados por sesion offline_id)
+ *
+ * Garantías:
+ *   - Un registro offline no se elimina hasta confirmar sync exitoso.
+ *   - Re-enviar el mismo batch es seguro (offline_id como clave de idempotencia).
+ */
+
+import { ref } from 'vue'
+
+const DB_NAME = 'invermin_offline'
+const DB_VERSION = 1
+
+// ── Tipos ──────────────────────────────────────────────────
+
+export interface IPBlock {
+    desde: number
+    hasta: number
+    usado: number       // cuántos IPs del bloque ya se usaron
+    anio: number
+    reservado_en: string
+}
+
+export interface ProvAcopCacheItem {
+    provacop_id: number
+    proveedor_id: number
+    proveedor_razon_social: string
+    proveedor_ruc: string
+    acopiador_id: number
+    acopiador_razon_social: string
+    acopiador_ruc: string
+    es_propio: boolean
+}
+
+export interface PesajeOfflineData {
+    peso_inicial: number
+    peso_final: number
+    sacos: number | null
+    granel: boolean
+    fecha_inicio: string | null
+    fecha_fin: string | null
+}
+
+export interface LoteOfflineData {
+    offline_id: string      // UUID local
+    ip: string              // IP del bloque reservado
+    numero_lote: number
+    tipo_material: string
+    pesaje: PesajeOfflineData
+    creado_en: string
+}
+
+export interface SesionOfflineData {
+    offline_id: string      // UUID local, clave primaria en IndexedDB
+    provacop_id: number
+    placa: string
+    carreta: string | null
+    conductor: string | null
+    transportista: string | null
+    razon_social: string | null
+    guia_remision: string | null
+    guia_transporte: string | null
+    estado: 'EN_PROCESO' | 'COMPLETO'
+    creado_en: string
+    lotes: LoteOfflineData[]
+    synced: boolean         // true = confirmado por servidor
+    sync_error: string | null
+}
+
+// ── Apertura de DB ─────────────────────────────────────────
+
+let _db: IDBDatabase | null = null
+
+async function openDB(): Promise<IDBDatabase> {
+    if (_db) return _db
+
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION)
+
+        req.onupgradeneeded = (e) => {
+            const db = (e.target as IDBOpenDBRequest).result
+
+            // Bloque IP — un solo registro
+            if (!db.objectStoreNames.contains('ip_block')) {
+                db.createObjectStore('ip_block', { keyPath: 'anio' })
+            }
+
+            // Caché de provacops
+            if (!db.objectStoreNames.contains('provacops')) {
+                db.createObjectStore('provacops', { keyPath: 'provacop_id' })
+            }
+
+            // Cola de sesiones offline
+            if (!db.objectStoreNames.contains('sesiones_q')) {
+                const s = db.createObjectStore('sesiones_q', { keyPath: 'offline_id' })
+                s.createIndex('synced', 'synced', { unique: false })
+            }
+        }
+
+        req.onsuccess = () => { _db = req.result; resolve(_db) }
+        req.onerror = () => reject(req.error)
+    })
+}
+
+// ── Helpers genéricos ──────────────────────────────────────
+
+async function get<T>(store: string, key: IDBValidKey): Promise<T | null> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readonly')
+        const req = tx.objectStore(store).get(key)
+        req.onsuccess = () => resolve(req.result ?? null)
+        req.onerror = () => reject(req.error)
+    })
+}
+
+async function put(store: string, value: unknown): Promise<void> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite')
+        const req = tx.objectStore(store).put(value)
+        req.onsuccess = () => resolve()
+        req.onerror = () => reject(req.error)
+    })
+}
+
+async function getAll<T>(store: string): Promise<T[]> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readonly')
+        const req = tx.objectStore(store).getAll()
+        req.onsuccess = () => resolve(req.result)
+        req.onerror = () => reject(req.error)
+    })
+}
+
+async function del(store: string, key: IDBValidKey): Promise<void> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(store, 'readwrite')
+        const req = tx.objectStore(store).delete(key)
+        req.onsuccess = () => resolve()
+        req.onerror = () => reject(req.error)
+    })
+}
+
+// ── API pública ────────────────────────────────────────────
+
+// -- Bloque IP --
+
+export async function guardarBloqueIP(bloque: Omit<IPBlock, 'usado' | 'reservado_en'>): Promise<void> {
+    await put('ip_block', {
+        ...bloque,
+        usado: 0,
+        reservado_en: new Date().toISOString(),
+    })
+}
+
+export async function obtenerBloqueIP(): Promise<IPBlock | null> {
+    const anio = new Date().getFullYear()
+    return get<IPBlock>('ip_block', anio)
+}
+
+/**
+ * Obtiene el siguiente IP disponible del bloque local.
+ * Retorna null si el bloque está agotado (necesita reservar uno nuevo).
+ */
+export async function siguienteIP(): Promise<string | null> {
+    const anio = new Date().getFullYear()
+    const bloque = await get<IPBlock>('ip_block', anio)
+    if (!bloque) return null
+
+    const numero = bloque.desde + bloque.usado
+    if (numero > bloque.hasta) return null    // bloque agotado
+
+    // Incrementar contador local
+    await put('ip_block', { ...bloque, usado: bloque.usado + 1 })
+
+    return `IP-${String(numero).padStart(4, '0')}`
+}
+
+export async function bloqueAgotado(): Promise<boolean> {
+    const bloque = await obtenerBloqueIP()
+    if (!bloque) return true
+    return (bloque.desde + bloque.usado) > bloque.hasta
+}
+
+export async function ipsDisponibles(): Promise<number> {
+    const bloque = await obtenerBloqueIP()
+    if (!bloque) return 0
+    return Math.max(0, bloque.hasta - bloque.desde - bloque.usado + 1)
+}
+
+// -- Caché provacops --
+
+export async function guardarProvacops(items: ProvAcopCacheItem[]): Promise<void> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('provacops', 'readwrite')
+        const store = tx.objectStore('provacops')
+        store.clear()
+        for (const item of items) store.put(item)
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+    })
+}
+
+export async function obtenerProvacops(): Promise<ProvAcopCacheItem[]> {
+    return getAll<ProvAcopCacheItem>('provacops')
+}
+
+// -- Cola de sesiones --
+
+export async function encolarSesion(sesion: SesionOfflineData): Promise<void> {
+    await put('sesiones_q', sesion)
+}
+
+export async function obtenerSesionesPendientes(): Promise<SesionOfflineData[]> {
+    const todas = await getAll<SesionOfflineData>('sesiones_q')
+    return todas.filter(s => !s.synced)
+}
+
+export async function marcarSesionSynced(offlineId: string, serverId: number): Promise<void> {
+    const sesion = await get<SesionOfflineData>('sesiones_q', offlineId)
+    if (!sesion) return
+    await put('sesiones_q', { ...sesion, synced: true, sync_error: null })
+}
+
+export async function marcarSesionError(offlineId: string, error: string): Promise<void> {
+    const sesion = await get<SesionOfflineData>('sesiones_q', offlineId)
+    if (!sesion) return
+    await put('sesiones_q', { ...sesion, sync_error: error })
+}
+
+export async function actualizarEstadoSesionLocal(
+    offlineId: string,
+    estado: 'EN_PROCESO' | 'PAUSADO' | 'COMPLETO'
+): Promise<void> {
+    const sesion = await get<SesionOfflineData>('sesiones_q', offlineId)
+    if (!sesion) return
+    await put('sesiones_q', { ...sesion, estado })
+  }
+
+/**
+ * Elimina sesiones ya sincronizadas de IndexedDB.
+ * Solo se llama DESPUÉS de confirmar que el servidor las recibió.
+ */
+export async function limpiarSynced(): Promise<number> {
+    const todas = await getAll<SesionOfflineData>('sesiones_q')
+    const synced = todas.filter(s => s.synced)
+    for (const s of synced) await del('sesiones_q', s.offline_id)
+    return synced.length
+}
+
+export async function contarPendientes(): Promise<number> {
+    const pendientes = await obtenerSesionesPendientes()
+    return pendientes.length
+}

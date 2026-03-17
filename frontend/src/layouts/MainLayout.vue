@@ -57,6 +57,17 @@
     <!-- Contenido principal -->
     <div class="main-wrapper">
 
+      <SyncIndicator
+        :online="online"
+        :sincronizando="sincronizando"
+        :pendientes="pendientes"
+        :ips-restantes="ipsRestantes"
+        :ultimo-sync="ultimoSync"
+        :error-sync="errorSync"
+        @sync="sincronizar"
+        style="margin-left: auto; margin-right: 1rem;"
+      />
+
       <!-- Topbar mobile -->
       <header class="topbar">
         <button class="hamburger" @click="sidebarOpen = !sidebarOpen">
@@ -74,15 +85,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useSync } from '@/composables/useSync'
+import SyncIndicator from '@/components/balanza/SyncIndicator.vue'
 import { NAV_CONFIG } from '@/router/nav'
 import type { NavSection } from '@/router/nav'
 
 const authStore = useAuthStore()
 const router    = useRouter()
 const route     = useRoute()
+
+const {
+  online,
+  sincronizando,
+  pendientes,
+  ipsRestantes,
+  ultimoSync,
+  errorSync,
+  inicializar,
+  sincronizar
+} = useSync()
+
+// Al autenticarse, inicializar el sistema offline
+watch(
+  () => authStore.isAuthenticated,
+  async (autenticado) => {
+    if (autenticado) await inicializar()
+  },
+  { immediate: true },
+)
 
 const sidebarOpen = ref(false)
 const rol = computed(() => authStore.user?.rol ?? '')

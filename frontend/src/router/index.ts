@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+// Balanza — imports estáticos (necesarios para operación offline)
+import BalanzaView from '@/views/balanza/BalanzaView.vue'
+import RegistrarCamionView from '@/views/balanza/RegistrarCamionView.vue'
+import SesionView from '@/views/balanza/SesionView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,18 +33,18 @@ const router = createRouter({
         {
           path: 'balanza',
           name: 'Balanza',
-          component: () => import('@/views/balanza/BalanzaView.vue'),
+          component: BalanzaView,
         },
         {
           path: 'balanza/nuevo',
           name: 'RegistrarCamion',
-          component: () => import('@/views/balanza/RegistrarCamionView.vue'),
+          component: RegistrarCamionView,
         },
         {
           path: 'balanza/:id',
           name: 'SesionBalanza',
-          component: () => import('@/views/balanza/SesionView.vue'),
-        }
+          component: SesionView,
+        },
       ],
     },
     {
@@ -63,7 +67,7 @@ router.beforeEach(async (to) => {
   }
 
   if (!store.isAuthenticated) {
-    return { name: 'login' }
+    return { name: 'Login' }
   }
 
   if (!store.user) {
@@ -71,7 +75,7 @@ router.beforeEach(async (to) => {
       await store.fetchMe()
     } catch {
       store.clearTokens()
-      return { name: 'login' }
+      return { name: 'Login' }
     }
   }
 

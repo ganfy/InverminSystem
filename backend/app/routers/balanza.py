@@ -10,7 +10,8 @@ Permisos (RBAC del documento):
 """
 
 from app.core.database import get_db
-from app.core.deps import check_permiso
+from app.core.deps import check_permiso, get_current_user
+from app.models.models import Usuario
 from app.schemas.balanza import (
     DatosExtraidos,
     DocumentoRespuesta,
@@ -24,8 +25,15 @@ from app.schemas.balanza import (
     SesionEditar,
     SesionLista,
 )
+from app.schemas.balanza_offline import (
+    BloqueIPRespuesta,
+    CacheProvacopsRespuesta,
+    SyncBatchRequest,
+    SyncBatchRespuesta,
+)
 from app.services import balanza as svc
 from app.services import balanza_documentos as doc_svc
+from app.services import balanza_offline as offline_svc
 from app.services import balanza_pdf as pdf_svc
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -459,3 +467,82 @@ def preview_ticket(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return HTMLResponse(content=html)
+
+
+# =============================================================================
+# MODO OFFLINE — ENDPOINTS AUXILIARES PARA FRONTEND
+# =============================================================================
+
+# ── RF-BAL-005: Reserva de bloque IP ──────────────────────
+
+
+@router.post(
+    "/offline/ip-range",
+    response_model=BloqueIPRespuesta,
+    summary="Reservar bloque de IPs para operación offline",
+)
+def reservar_bloque_ip(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Reserva un bloque de IPs consecutivos para que el dispositivo
+    pueda asignarlos offline sin colisiones.
+
+    El tamaño del bloque se lee de configuracion.tamano_bloque_ip (default 50).
+    Se llama automáticamente al iniciar sesión o al sincronizar.
+    """
+    return offline_svc.reservar_bloque_ip(db)
+
+
+# ── RF-BAL-005: Caché de provacops ─────────────────────────
+
+
+@router.get(
+    "/offline/provacops",
+    response_model=CacheProvacopsRespuesta,
+    summary="Obtener caché de relaciones proveedor-acopiador para uso offline",
+)
+def obtener_cache_provacops(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Devuelve todas las relaciones proveedor-acopiador activas.
+    El frontend las almacena en IndexedDB para validar offline.
+    Se debe llamar en cada login y al sincronizar.
+    """
+    from datetime import UTC, datetime
+
+    items = offline_svc.obtener_cache_provacops(db)
+    return CacheProvacopsRespuesta(
+        total=len(items),
+        items=items,
+        ts_servidor=datetime.now(UTC).isoformat(),
+    )
+
+
+# ── RF-BAL-005: Sync batch ─────────────────────────────────
+
+
+@router.post(
+    "/offline/sync",
+    response_model=SyncBatchRespuesta,
+    summary="Sincronizar sesiones y lotes creados offline",
+)
+def sincronizar_batch(
+    payload: SyncBatchRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Recibe el batch de sesiones+lotes creados offline y los persiste.
+
+    - Idempotente: re-enviar el mismo batch no duplica datos.
+    - Nunca aborta el batch completo por un error individual.
+    - Retorna el resultado item por item con el server_id asignado
+      para que el frontend actualice su IndexedDB local.
+
+    Orden interno de procesamiento: sesiones → lotes → pesajes.
+    """
+    return offline_svc.sincronizar_batch(db, payload, current_user.id)

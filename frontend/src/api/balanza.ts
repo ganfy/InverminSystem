@@ -1,6 +1,7 @@
 import api from './axios'
 import axios from 'axios'
 import type { DocumentoRespuesta, DatosExtraidos } from '@/types/balanza'
+import type { SesionOfflineData } from '@/composables/useOfflineQueue'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ export interface SesionLista {
 
 export interface SesionDetalle {
   id: number
+  offline_id: string | null
   provacop_id: number
   proveedor_id: number
   proveedor_razon_social: string
@@ -129,6 +131,50 @@ export interface SesionesParams {
 
 export interface EliminarLoteRequest {
   motivo: string
+}
+
+
+export interface BloqueIPRespuesta {
+  desde: number
+  hasta: number
+  tamano: number
+  formato: string
+  anio: number
+}
+
+export interface ProvAcopCacheItem {
+  provacop_id: number
+  proveedor_id: number
+  proveedor_razon_social: string
+  proveedor_ruc: string
+  acopiador_id: number
+  acopiador_razon_social: string
+  acopiador_ruc: string
+  es_propio: boolean
+}
+
+export interface CacheProvacopsRespuesta {
+  total: number
+  items: ProvAcopCacheItem[]
+  ts_servidor: string
+}
+
+export interface SyncBatchRequest {
+  sesiones: SesionOfflineData[]
+}
+
+export interface SyncItemResultado {
+  offline_id: string
+  server_id: number | null
+  ya_existia: boolean
+  error: string | null
+  lotes: Array<{ offline_id: string; ip: string; ya_existia: boolean; error: string | null }>
+}
+
+export interface SyncBatchRespuesta {
+  procesados: number
+  resultados: SyncItemResultado[]
+  ts_servidor: string
 }
 
 // ── Llamadas ──────────────────────────────────────────────────────────────────
@@ -252,4 +298,21 @@ export const balanzaApi = {
     return data
   },
 
+  // RF-BAL-005: Reservar bloque de IPs para operación offline
+  async reservarBloqueIP(): Promise<BloqueIPRespuesta> {
+    const { data } = await api.post<BloqueIPRespuesta>('/balanza/offline/ip-range')
+    return data
+  },
+
+  // RF-BAL-005: Obtener caché de provacops para uso offline
+  async obtenerCacheProvacops(): Promise<CacheProvacopsRespuesta> {
+    const { data } = await api.get<CacheProvacopsRespuesta>('/balanza/offline/provacops')
+    return data
+  },
+
+  // RF-BAL-005: Enviar batch de sesiones/lotes creados offline
+  async syncBatch(payload: SyncBatchRequest): Promise<SyncBatchRespuesta> {
+    const { data } = await api.post<SyncBatchRespuesta>('/balanza/offline/sync', payload)
+    return data
+  },
 }
