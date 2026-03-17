@@ -186,7 +186,6 @@ def _sync_sesion(
             guia_remision=data.guia_remision,
             guia_transporte=data.guia_transporte,
             estado=EstadoSesion.COMPLETO if data.estado == "COMPLETO" else EstadoSesion.EN_PROCESO,
-            usuario_registro=usuario_id,
             creado_por=usuario_id,
             creado_en=data.creado_en or ahora,
             offline_id=data.offline_id,

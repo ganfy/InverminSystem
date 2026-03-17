@@ -78,29 +78,26 @@ export function useSync() {
     // ── Inicialización (llamar al login) ─────────────────────
 
     async function inicializar(): Promise<void> {
-        // Sin red: solo cargar contadores locales, no intentar requests
         if (!isOnline()) {
             await actualizarContadores()
             return
         }
 
+        // Cada paso falla de forma independiente — uno no bloquea al siguiente
         try {
-            // 1. Reservar bloque IP si el actual está agotado o no existe
-            if (await bloqueAgotado()) {
-                await renovarBloqueIP()
-            }
-
-            // 2. Cachear provacops actualizados
-            await actualizarCacheProvacops()
-
-            // 3. Sincronizar pendientes de sesiones anteriores
-            await sincronizar()
-
+            if (await bloqueAgotado()) await renovarBloqueIP()
         } catch (err) {
-            // Red disponible pero servidor falló — no bloquear la app
-            console.warn('[useSync] Error en inicialización:', err)
-            await actualizarContadores()
+            console.warn('[useSync] No se pudo renovar bloque IP:', err)
         }
+
+        try {
+            await actualizarCacheProvacops()
+        } catch (err) {
+            console.warn('[useSync] No se pudo actualizar caché provacops:', err)
+        }
+
+        // El sync siempre se intenta, aunque lo anterior haya fallado
+        await sincronizar()
     }
 
     // ── Reserva de bloque IP ─────────────────────────────────

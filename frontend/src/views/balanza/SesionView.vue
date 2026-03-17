@@ -44,6 +44,9 @@
         </div>
       </div>
       <div class="header-right">
+        <!-- [OFFLINE] indicador -->
+        <span v-if="esOffline" class="badge-offline-header">⚡ OFFLINE</span>
+
         <div class="lote-badge" :class="estadoClass(sesion?.estado ?? '')">
           <template v-if="lotesActivos.length > 0">
             LOTE {{ lotesActivos.length }} DE {{ sesion?.lotes.filter(l=>!l.eliminado).length }}
@@ -54,10 +57,24 @@
         <button
           v-if="sesion?.estado !== 'COMPLETO'"
           class="btn-secondary btn-editar-sesion"
+          :disabled="esOffline"
+          :title="esOffline ? 'No disponible sin conexión' : 'Editar sesión'"
           @click="abrirEditarSesion"
         >✎ Editar sesión</button>
       </div>
     </div>
+
+    <!-- [OFFLINE] aviso documentos no subidos -->
+    <div v-if="esOffline" class="aviso-offline">
+      <span class="aviso-icono">⚠</span>
+      <div class="aviso-texto">
+        <strong>Modo sin conexión</strong> — Los documentos adjuntos en el formulario
+        anterior <em>no se pudieron subir</em>. Estarán disponibles para agregar
+        manualmente al sincronizar esta sesión.
+        Editar sesión, pausar y ticket PDF no están disponibles hasta sincronizar.
+      </div>
+    </div>
+
     <!-- ── CUERPO 2 COLUMNAS ──────────────────────────────── -->
     <div class="sesion-body">
       <!-- Columna izquierda -->
@@ -120,7 +137,6 @@
             <span class="peso-display-unit">TM</span>
           </div>
           <div class="pesaje-campos">
-            <!-- BRUTO = peso_inicial (primer pesaje, camión cargado) -->
             <div class="campo-peso">
               <label class="campo-peso-label">BRUTO (camión cargado)</label>
               <div class="campo-peso-row">
@@ -135,7 +151,6 @@
                 </button>
               </div>
             </div>
-            <!-- TARA = peso_final (segundo pesaje, camión vacío) -->
             <div class="campo-peso">
               <label class="campo-peso-label">TARA (camión vacío)</label>
               <div class="campo-peso-row">
@@ -157,7 +172,6 @@
             <span>TARA: <strong>{{ loteForm.peso_final ? fmtTm(loteForm.peso_final) + ' TM' : '—' }}</strong></span>
             <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? fmtTm(pesoNeto) + ' TM' : '—' }}</strong></span>
           </div>
-          <!-- Mensaje de validación (aparece solo al intentar con errores) -->
           <div v-if="mostrarFaltantes && loteFormFaltantes.length > 0" class="form-faltantes">
             <span class="faltante-icono">⚠</span>
             Falta: {{ loteFormFaltantes.join(' · ') }}
@@ -169,31 +183,35 @@
             @click="intentarRegistrar"
           >
             <span v-if="store.guardando" class="spinner" />
-            <span v-else>Capturar peso</span>
+            <span v-else>{{ esOffline ? 'Registrar lote (offline)' : 'Capturar peso' }}</span>
           </button>
         </div>
       </div><!-- /col-left -->
+
       <!-- Columna derecha: lista de lotes -->
       <div class="col-right">
         <div v-if="store.loadingSesion" class="estado-tabla">Cargando...</div>
         <div
           v-for="lote in sesion?.lotes.filter(l => !l.eliminado)"
-          :key="lote.id"
+          :key="lote.ip"
           class="lote-card"
           :class="{ 'lote-en-proceso': !lote.pesaje?.peso_final }"
         >
           <div class="lote-card-header">
             <span class="lote-ip">{{ lote.ip }} | Lote {{ lote.numero_lote }}</span>
             <div class="lote-acciones">
-              <button
-                v-if="authStore.user?.rol === 'Admin'"
-                class="btn-icon" title="Editar lote"
-                @click="abrirEditarLote(lote)"
-              >✎</button>
-              <button
-                class="btn-icon btn-icon-danger" title="Eliminar lote"
-                @click="abrirEliminar(lote)"
-              >✕</button>
+              <!-- [OFFLINE] editar/eliminar solo online -->
+              <template v-if="!esOffline">
+                <button
+                  v-if="authStore.user?.rol === 'Admin'"
+                  class="btn-icon" title="Editar lote"
+                  @click="abrirEditarLote(lote)"
+                >✎</button>
+                <button
+                  class="btn-icon btn-icon-danger" title="Eliminar lote"
+                  @click="abrirEliminar(lote)"
+                >✕</button>
+              </template>
               <span class="badge-lote-estado" :class="loteEstadoClass(lote)">
                 {{ loteEstadoLabel(lote) }}
               </span>
@@ -227,13 +245,28 @@
             </div>
           </div>
           <div class="lote-card-footer">
-          <button class="btn-secondary btn-sm" @click="verTicket(lote)" title="Ver antes de imprimir">
-            👁 Ver ticket
-          </button>
-          <button class="btn-secondary btn-sm" @click="descargarTicket(lote)" title="Descargar PDF">
-            ⬇ PDF
-          </button>
-        </div>
+            <!-- [OFFLINE] imprime local; [ONLINE] ver preview + descargar PDF -->
+            <template v-if="esOffline">
+              <button class="btn-secondary btn-sm"
+                @click="store.previsualizarTicketOffline(lote)"
+                title="Ver ticket antes de imprimir">
+                👁 Ver ticket
+              </button>
+              <button class="btn-secondary btn-sm"
+                @click="store.imprimirTicketOffline(lote)"
+                title="Imprimir ticket">
+                🖨 Imprimir
+              </button>
+            </template>
+            <template v-else>
+              <button class="btn-secondary btn-sm" @click="verTicket(lote)" title="Ver antes de imprimir">
+                👁 Ver ticket
+              </button>
+              <button class="btn-secondary btn-sm" @click="descargarTicket(lote)" title="Descargar PDF">
+                ⬇ PDF
+              </button>
+            </template>
+          </div>
         </div>
         <!-- Lotes eliminados -->
         <details v-if="sesion?.lotes.some(l => l.eliminado)" class="lotes-eliminados">
@@ -251,26 +284,39 @@
         </details>
       </div><!-- /col-right -->
     </div><!-- /sesion-body -->
+
     <!-- ── BARRA INFERIOR ─────────────────────────────────── -->
     <div class="bottom-bar">
       <button class="btn-secondary" @click="router.push({ name: 'Balanza' })">← Volver</button>
       <div class="bottom-bar-acciones">
+        <!-- Tickets sesión: online → PDF del servidor / offline → impresión local -->
         <button
-        v-if="lotesActivos.length > 0"
-        class="btn-secondary"
-        :disabled="descargandoTodos"
-        @click="descargarTodos"
-        title="Genera un PDF con los tickets de todos los lotes para entregar al transportista"
+          v-if="lotesActivos.length > 0"
+          class="btn-secondary"
+          :disabled="descargandoTodos"
+          @click="ticketsSesion()"
+          title="Genera un PDF con los tickets de todos los lotes para entregar al transportista"
         >
-        <span v-if="descargandoTodos" class="spinner" />
-        <span v-else>🖨 Tickets sesión</span>
+          <span v-if="descargandoTodos" class="spinner" />
+          <span v-else>🖨 Tickets sesión</span>
         </button>
-        <button v-if="sesion?.estado === 'EN_PROCESO'" class="btn-secondary" @click="pausar">
-          ⏸ Pausar
-        </button>
-        <button v-if="sesion?.estado === 'PAUSADO'" class="btn-secondary" @click="reanudar">
-          ▶ Reanudar
-        </button>
+
+        <button
+          v-if="sesion?.estado === 'EN_PROCESO'"
+          class="btn-secondary"
+          :disabled="esOffline"
+          :title="esOffline ? 'No disponible sin conexión' : 'Pausar sesión'"
+          @click="pausar"
+        >⏸ Pausar</button>
+
+        <button
+          v-if="sesion?.estado === 'PAUSADO'"
+          class="btn-secondary"
+          :disabled="esOffline"
+          :title="esOffline ? 'No disponible sin conexión' : 'Reanudar sesión'"
+          @click="reanudar"
+        >▶ Reanudar</button>
+
         <button
           v-if="sesion?.estado !== 'COMPLETO'"
           class="btn-primary ready"
@@ -278,10 +324,11 @@
           @click="finalizar"
         >
           <span v-if="store.guardando" class="spinner" />
-          <span v-else>Finalizar y generar tickets →</span>
+          <span v-else>{{ esOffline ? 'Finalizar (offline) →' : 'Finalizar y generar tickets →' }}</span>
         </button>
       </div>
     </div>
+
     <!-- ── MODAL: Editar Sesión ───────────────────────────── -->
     <div v-if="editSesionModal.visible" class="modal-overlay" @click.self="cerrarEditarSesion">
       <div class="modal modal-lg">
@@ -381,6 +428,7 @@
         </div>
       </div>
     </div>
+
     <!-- ── MODAL: Editar Lote (Admin) ────────────────────── -->
     <div v-if="editLoteModal.visible" class="modal-overlay" @click.self="cerrarEditarLote">
       <div class="modal">
@@ -426,6 +474,7 @@
         </div>
       </div>
     </div>
+
     <!-- ── MODAL: Eliminar Lote ──────────────────────────── -->
     <div v-if="eliminarModal.visible" class="modal-overlay" @click.self="cerrarEliminar">
       <div class="modal modal-sm">
@@ -472,7 +521,11 @@ const store     = useBalanzaStore()
 const authStore = useAuthStore()
 const ui        = useUiStore()
 
-const sesionId     = Number(route.params.id)
+// [OFFLINE] ID como string; detecta si es sesión offline por el prefijo
+const sesionIdRaw = route.params.id as string
+const esOffline   = computed(() => sesionIdRaw.startsWith('offline-'))
+const sesionIdNum = computed(() => esOffline.value ? -1 : Number(sesionIdRaw))
+
 const sesion       = computed(() => store.sesionActual)
 const lotesActivos = computed(() => sesion.value?.lotes.filter(l => !l.eliminado) ?? [])
 
@@ -490,12 +543,8 @@ const {
 } = useBalanza()
 
 // ── Peso actual en balanza ─────────────────────────────────
-// Cuando el agente está conectado, pesoActual sigue a la balanza
-// automáticamente. Cuando no hay conexión, el operador escribe manual.
 const pesoActual = ref<number | null>(null)
-
 watch(peso, (nuevoPeso) => {
-  // Solo actualizar si la balanza está activa — no pisar edición manual
   if (wsConectado.value && conectado.value && nuevoPeso !== null) {
     pesoActual.value = nuevoPeso
   }
@@ -507,12 +556,9 @@ const tipoMaterial = ref('')
 // ── Sacos / Granel ─────────────────────────────────────────
 const sacos  = ref<number | null>(null)
 const granel = ref(false)
-
 const fechaBruto = ref<string | null>(null)
 
 // ── Captura de pesos ───────────────────────────────────────
-// Con balanza conectada: pide lectura puntual al agente (Promise).
-// Sin balanza: usa el valor de pesoActual (ingreso manual).
 async function capturarBruto() {
   const valor = await resolverPeso()
   if (valor !== null) {
@@ -520,36 +566,25 @@ async function capturarBruto() {
     fechaBruto.value = new Date().toISOString()
   }
 }
-
 async function capturarTara() {
   const valor = await resolverPeso()
-  if (valor !== null) {
-    loteForm.peso_final = valor
-  }
+  if (valor !== null) loteForm.peso_final = valor
 }
-
 async function resolverPeso(): Promise<number | null> {
   if (wsConectado.value && conectado.value) {
-    // Captura puntual desde el agente (más precisa que pesoActual en vuelo)
     const lectura = await capturar()
-    if (!lectura.estable) {
-      ui.toast('Peso capturado, pero la balanza no estaba estable. Verificar.', 'warning')
-    }
+    if (!lectura.estable) ui.toast('Peso capturado, pero la balanza no estaba estable. Verificar.', 'warning')
     return lectura.peso
   }
-  // Fallback manual: usar lo que el operador escribió en el input
   return pesoActual.value
 }
 
 // ── Formulario lote ────────────────────────────────────────
 const loteForm = reactive({
-  peso_inicial: null as number | null,  // BRUTO (camión cargado)
-  peso_final:   null as number | null,  // TARA  (camión vacío)
+  peso_inicial: null as number | null,
+  peso_final:   null as number | null,
 })
 
-/**
- * Pre-rellena BRUTO del nuevo lote con TARA del lote anterior.
- */
 function preFillBruto() {
   const activos = sesion.value?.lotes.filter(l => !l.eliminado) ?? []
   if (activos.length > 0) {
@@ -560,7 +595,6 @@ function preFillBruto() {
   }
 }
 
-// Validación: BRUTO > TARA
 const pesoError = computed(() => {
   const { peso_inicial: bruto, peso_final: tara } = loteForm
   if (bruto !== null && tara !== null && bruto > 0 && tara > 0 && bruto <= tara) {
@@ -569,7 +603,6 @@ const pesoError = computed(() => {
   return ''
 })
 
-// NETO = BRUTO - TARA
 const pesoNeto = computed(() => {
   const { peso_inicial: bruto, peso_final: tara } = loteForm
   return (bruto !== null && tara !== null && bruto > tara) ? bruto - tara : 0
@@ -592,10 +625,7 @@ const loteFormValido   = computed(() => loteFormFaltantes.value.length === 0)
 const mostrarFaltantes = ref(false)
 
 function intentarRegistrar() {
-  if (!loteFormValido.value) {
-    mostrarFaltantes.value = true
-    return
-  }
+  if (!loteFormValido.value) { mostrarFaltantes.value = true; return }
   mostrarFaltantes.value = false
   registrarLote()
 }
@@ -607,47 +637,63 @@ watch(
 
 async function registrarLote() {
   if (!loteFormValido.value) return
-  const ok = await store.agregarLote(sesionId, {
-    tipo_material: tipoMaterial.value,
-    pesaje: {
-      peso_inicial: loteForm.peso_inicial!,
-      peso_final:   loteForm.peso_final!,
-      sacos:        granel.value ? null : (sacos.value || null),
-      granel:       granel.value,
-      fecha_inicio: fechaBruto.value ?? undefined,
+  // [OFFLINE] pasar string si es sesión offline, number si es online
+  const ok = await store.agregarLote(
+    esOffline.value ? sesionIdRaw : sesionIdNum.value,
+    {
+      tipo_material: tipoMaterial.value,
+      pesaje: {
+        peso_inicial: loteForm.peso_inicial!,
+        peso_final:   loteForm.peso_final!,
+        sacos:        granel.value ? null : (sacos.value || null),
+        granel:       granel.value,
+        fecha_inicio: fechaBruto.value ?? undefined,
+      },
     },
-  })
+  )
   if (ok) {
     loteForm.peso_inicial = null
     loteForm.peso_final   = null
+    fechaBruto.value      = null
     preFillBruto()
   }
 }
 
 // ── Sesión ─────────────────────────────────────────────────
 async function pausar() {
+  if (esOffline.value) { ui.toast('Pausar no disponible sin conexión', 'warning'); return }
   const ok = await ui.showConfirm({
     title: 'Pausar sesión',
     message: '¿Pausar? Podrá reanudarla.',
     confirmLabel: 'Pausar',
   })
-  if (ok) await store.pausarSesion(sesionId)
+  if (ok) await store.pausarSesion(sesionIdNum.value)
 }
 
-async function reanudar() { await store.reanudarSesion(sesionId) }
+async function reanudar() {
+  if (esOffline.value) { ui.toast('Reanudar no disponible sin conexión', 'warning'); return }
+  await store.reanudarSesion(sesionIdNum.value)
+}
 
 async function finalizar() {
   const ok = await ui.showConfirm({
     title: 'Finalizar sesión',
-    message: `¿Finalizar con ${lotesActivos.value.length} lote(s)? Se generarán los tickets.`,
-    confirmLabel: 'Finalizar y generar tickets',
+    message: esOffline.value
+      ? `¿Finalizar con ${lotesActivos.value.length} lote(s)? Los datos se sincronizarán al reconectar.`
+      : `¿Finalizar con ${lotesActivos.value.length} lote(s)? Se generarán los tickets.`,
+    confirmLabel: esOffline.value ? 'Finalizar (offline)' : 'Finalizar y generar tickets',
   })
-  if (ok) await store.finalizarSesion(sesionId)
+  if (!ok) return
+  if (esOffline.value) {
+    await store.finalizarSesionOffline(sesionIdRaw)
+  } else {
+    await store.finalizarSesion(sesionIdNum.value)
+  }
 }
 
 async function verTicket(lote: LoteDetalle) {
   try {
-    const url = await balanzaApi.ticketPreviewBlob(sesionId, lote.id)
+    const url = await balanzaApi.ticketPreviewBlob(sesionIdNum.value, lote.id)
     window.open(url, '_blank')
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   } catch {
@@ -656,7 +702,7 @@ async function verTicket(lote: LoteDetalle) {
 }
 
 async function descargarTicket(lote: LoteDetalle) {
-  await store.descargarTicket(sesionId, lote.id, lote.ip)
+  await store.descargarTicket(sesionIdNum.value, lote.id, lote.ip)
 }
 
 const descargandoTodos = ref(false)
@@ -670,6 +716,14 @@ async function descargarTodos() {
     ui.toast('Error al generar PDF', 'error')
   } finally {
     descargandoTodos.value = false
+  }
+}
+
+function ticketsSesion() {
+  if (esOffline.value) {
+    store.imprimirTicketsSesionOffline()
+  } else {
+    descargarTodos()
   }
 }
 
@@ -688,6 +742,7 @@ const editSesionModal = reactive({
 })
 
 function abrirEditarSesion() {
+  if (esOffline.value) { ui.toast('Editar sesión no disponible sin conexión', 'warning'); return }
   const s = sesion.value
   if (!s) return
   store.cargarProvacops()
@@ -698,7 +753,7 @@ function abrirEditarSesion() {
     guia_remision: s.guia_remision ?? '', guia_transporte: s.guia_transporte ?? '',
   })
   editSesionModal.busqProv = s.proveedor_razon_social
-  editSesionModal.busqAcop = s.acopiador_razon_social
+  editSesionModal.busqAcop = s.acopiador_razon_social ?? ''
   editSesionModal.editProv = null
   editSesionModal.editAcop = null
   editSesionModal.visible  = true
@@ -743,10 +798,8 @@ function editSelAcop(a: ProvAcopDropdown) {
 
 async function guardarEditarSesion() {
   const payload: Record<string, any> = { ...editSesionModal.form }
-  if (editSesionModal.editAcop) {
-    payload.provacop_id = editSesionModal.editAcop.provacop_id
-  }
-  const ok = await store.editarSesion(sesionId, payload)
+  if (editSesionModal.editAcop) payload.provacop_id = editSesionModal.editAcop.provacop_id
+  const ok = await store.editarSesion(sesionIdNum.value, payload)
   if (ok) cerrarEditarSesion()
 }
 
@@ -787,9 +840,9 @@ async function guardarEditarLote() {
     editLoteModal.error = 'El BRUTO debe ser mayor que la TARA'
     return
   }
-  const ok = await store.editarLote(sesionId, editLoteModal.loteId, {
+  const ok = await store.editarLote(sesionIdNum.value, editLoteModal.loteId, {
     tipo_material: f.tipo_material,
-    peso_inicial:  f.peso_final   ?? undefined,
+    peso_inicial:  f.peso_inicial ?? undefined,
     peso_final:    f.peso_final   ?? undefined,
     sacos:         f.sacos,
     granel:        f.granel,
@@ -803,12 +856,11 @@ const eliminarModal = reactive({ visible: false, loteId: 0, ip: '', motivo: '', 
 function abrirEliminar(lote: LoteDetalle) {
   Object.assign(eliminarModal, { visible: true, loteId: lote.id, ip: lote.ip, motivo: '', error: '' })
 }
-
 function cerrarEliminar() { eliminarModal.visible = false }
 
 async function confirmarEliminar() {
   if (!eliminarModal.motivo.trim()) { eliminarModal.error = 'Motivo obligatorio'; return }
-  const ok = await store.eliminarLote(sesionId, eliminarModal.loteId, eliminarModal.motivo.trim())
+  const ok = await store.eliminarLote(sesionIdNum.value, eliminarModal.loteId, eliminarModal.motivo.trim())
   if (ok) cerrarEliminar()
 }
 
@@ -818,22 +870,27 @@ function fmtTm(n: number | string) { return Number(n).toFixed(3) }
 function estadoClass(e: string) {
   return { EN_PROCESO: 'badge-en-proceso', PAUSADO: 'badge-pausado', COMPLETO: 'badge-completo' }[e] ?? ''
 }
-
 function estadoLabel(e: string) {
   return { EN_PROCESO: 'EN PROCESO', PAUSADO: 'PAUSADO', COMPLETO: 'COMPLETO' }[e] ?? e
 }
-
 function loteEstadoClass(lote: LoteDetalle) {
   return lote.pesaje?.peso_final != null ? 'lc-completado' : 'lc-en-proceso'
 }
-
 function loteEstadoLabel(lote: LoteDetalle) {
   return lote.pesaje?.peso_final != null ? 'Completado' : 'En proceso'
 }
 
+// ── Montaje ────────────────────────────────────────────────
 onMounted(async () => {
-  await store.cargarSesion(sesionId)
-  preFillBruto()
+  if (esOffline.value) {
+    // Si ya está en memoria (nav inmediata post-creación) no releer IndexedDB
+    if (store.sesionActual?.offline_id !== sesionIdRaw) {
+      await store.cargarSesionOffline(sesionIdRaw)
+    }
+  } else {
+    await store.cargarSesion(sesionIdNum.value)
+    preFillBruto()
+  }
 })
 </script>
 
@@ -855,6 +912,7 @@ onMounted(async () => {
 .granel-label   { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--color-text-muted); cursor: pointer; }
 .header-right   { display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; flex-shrink: 0; }
 .btn-editar-sesion { font-size: .78rem; padding: .3rem .7rem; }
+.btn-editar-sesion:disabled { opacity: .4; cursor: not-allowed; }
 .lote-badge {
   font-family: var(--font-mono); font-size: .78rem; letter-spacing: .08em;
   text-align: center; padding: .5rem .9rem; border-radius: var(--radius-sm);
@@ -863,6 +921,24 @@ onMounted(async () => {
 .badge-en-proceso { border-color: var(--color-warning) !important; color: var(--color-warning) !important; }
 .badge-pausado    { border-color: var(--color-gold) !important; color: var(--color-gold) !important; }
 .badge-completo   { border-color: var(--color-success) !important; color: var(--color-success) !important; }
+
+/* ── [OFFLINE] badge y aviso ─────────────────────────────── */
+.badge-offline-header {
+  font-family: var(--font-mono); font-size: .68rem; letter-spacing: .14em;
+  background: rgba(245,158,11,.15); color: #f59e0b;
+  border: 1px solid rgba(245,158,11,.4); border-radius: 3px;
+  padding: 2px 8px;
+}
+.aviso-offline {
+  display: flex; gap: .75rem; align-items: flex-start;
+  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.3);
+  border-radius: var(--radius-md); padding: .75rem 1rem; margin-bottom: 1rem;
+}
+.aviso-icono { font-size: 1.1rem; flex-shrink: 0; margin-top: .05rem; }
+.aviso-texto { font-size: .82rem; color: var(--color-text-muted); line-height: 1.5; }
+.aviso-texto strong { color: #f59e0b; }
+.aviso-texto em { font-style: normal; text-decoration: underline; text-decoration-color: rgba(245,158,11,.5); }
+
 /* ── Body 2 columnas ─────────────────────────────────────── */
 .sesion-body {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -950,7 +1026,7 @@ onMounted(async () => {
 .badge-propio    { font-size: .68rem; padding: .15rem .4rem; background: rgba(184,150,46,.1); border-radius: 3px; color: var(--color-gold); }
 .lote-card-footer {
   padding: .5rem 1rem; border-top: 1px solid var(--color-border);
-  display: flex; justify-content: flex-end;
+  display: flex; justify-content: flex-end; gap: .5rem;
 }
 .btn-sm { padding: .3rem .7rem; font-size: .78rem; }
 .lotes-eliminados { margin-top: .5rem; font-size: .82rem; color: var(--color-text-muted); }

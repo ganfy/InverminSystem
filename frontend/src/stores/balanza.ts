@@ -13,7 +13,7 @@ import type {
   LoteDetalle,
 } from '@/api/balanza'
 import { useUiStore } from '@/stores/ui'
-import { useSync } from '@/composables/useSync'
+import { useAuthStore } from '@/stores/auth'
 import {
   siguienteIP,
   bloqueAgotado,
@@ -26,16 +26,158 @@ import {
 
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
 
+// ── Helpers privados ───────────────────────────────────────
+
+function esOfflineId(id: number | string): boolean {
+  return typeof id === 'string' && id.startsWith('offline-')
+}
+
+function estamosOffline(): boolean {
+  return FORCE_OFFLINE || !navigator.onLine
+}
+
+function loteOfflineADetalle(lote: LoteOfflineData): LoteDetalle {
+  const pesoNeto = lote.pesaje.peso_inicial - lote.pesaje.peso_final
+  return {
+    id: -1,
+    ip: lote.ip,
+    numero_lote: lote.numero_lote,
+    tipo_material: lote.tipo_material,
+    estado: 'RECEPCIONADO',
+    volado: false,
+    eliminado: false,
+    habilitado_ruma: false,
+    peso_neto: pesoNeto,
+    pesaje: {
+      id: -1,
+      peso_inicial: lote.pesaje.peso_inicial,
+      peso_final: lote.pesaje.peso_final,
+      peso_neto: pesoNeto,
+      sacos: lote.pesaje.sacos,
+      granel: lote.pesaje.granel,
+      numero_ticket: `${lote.ip}`,   // IP como referencia hasta sincronizar
+      fecha_inicio: lote.pesaje.fecha_inicio,
+      fecha_fin: lote.pesaje.fecha_fin,
+    },
+    fecha_pesaje: null,
+    fecha_habilitacion: null,
+  }
+}
+
+// ── Ticket HTML — replica ticket_balanza.html del servidor ─
+
+function _fmtPeso(v: number | null | undefined): string {
+  return v != null ? Number(v).toFixed(3) : '-'
+}
+
+function _fmtFecha(iso: string | null | undefined): string {
+  if (!iso) return '-'
+  return new Date(iso).toLocaleString('es-PE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).replace(',', '')
+}
+
+const _TICKET_CSS = `
+@page { size: A5 landscape; margin: 1.0cm 1.5cm 0.8cm 1.5cm; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Courier New',Courier,monospace; font-size:9.5pt; color:#000; line-height:1.55; }
+.emp-nombre { font-size:13pt; font-weight:bold; }
+.emp-sub    { font-size:9pt; }
+.hr { border:none; border-top:1px solid #000; margin:4px 0; }
+.fila-placa { width:100%; border-collapse:collapse; }
+.fila-placa td { padding:0; vertical-align:middle; }
+.td-ticket { text-align:right; font-size:11pt; font-weight:bold; white-space:nowrap; }
+.datos { width:100%; border-collapse:collapse; }
+.datos td { padding:0; vertical-align:top; font-size:9.5pt; line-height:1.5; }
+.lbl { width:100px; white-space:nowrap; }
+.sep { width:10px; }
+.seccion { width:100%; border-collapse:collapse; margin-top:1px; }
+.seccion td { vertical-align:top; padding:0; }
+.col-fechas { width:54%; }
+.col-pesos  { width:46%; }
+.tabla-pesos { width:100%; border-collapse:collapse; }
+.tabla-pesos td { padding:0; font-size:9.5pt; line-height:1.5; }
+.p-sep { width:10px; }
+.p-val { text-align:right; font-size:12pt; font-weight:bold; padding-right:2px; }
+.p-neto { font-size:13.5pt; }
+.p-unit { font-size:8pt; white-space:nowrap; }
+`
+
+function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
+  const obs = [
+    lote.ip,
+    `LOTE-${lote.numero_lote}`,
+    lote.pesaje?.granel
+      ? 'GRANEL'
+      : (lote.pesaje?.sacos ? `${lote.pesaje.sacos} SACOS` : ''),
+  ].filter(Boolean).join(' ')
+
+  const acopHtml = (!s.es_propio && s.acopiador_razon_social)
+    ? `<tr><td class="lbl">Acopiador</td><td class="sep">:</td><td>${s.acopiador_razon_social}</td></tr>`
+    : ''
+
+  return `
+<div class="emp-nombre">INVERMIN PAITITI S.A.C.</div>
+<div class="emp-sub">Planta El Dorado</div>
+<div class="emp-sub">R.U.C. 20601910587</div>
+<div class="hr"></div>
+<table class="fila-placa"><tr>
+  <td>Placa : ${s.placa} &nbsp;&nbsp; Carreta : ${s.carreta || '0'}</td>
+  <td class="td-ticket">Ticket : ${lote.ip}</td>
+</tr></table>
+<div class="hr"></div>
+<table class="datos">
+  <tr><td class="lbl">Conductor</td><td class="sep">:</td><td>${s.conductor || '-'}</td></tr>
+  <tr><td class="lbl">Transportista</td><td class="sep">:</td><td>${s.transportista || '-'}</td></tr>
+  <tr><td class="lbl">Razon Social</td><td class="sep">:</td><td>${s.razon_social || s.proveedor_razon_social || '-'}</td></tr>
+  ${acopHtml}
+  <tr><td class="lbl">Producto</td><td class="sep">:</td><td>${lote.tipo_material?.toUpperCase() ?? '-'}</td></tr>
+  <tr><td class="lbl">Documento</td><td class="sep">:</td><td>${s.guia_remision || s.guia_transporte || '-'}</td></tr>
+  <tr><td class="lbl">Observaciones</td><td class="sep">:</td><td>${obs}</td></tr>
+</table>
+<div class="hr"></div>
+<table class="seccion"><tr>
+  <td class="col-fechas">
+    <table class="datos">
+      <tr><td class="lbl">Fecha Inicial</td><td class="sep">:</td><td>${_fmtFecha(lote.pesaje?.fecha_inicio)}</td></tr>
+      <tr><td class="lbl">Fecha Final</td><td class="sep">:</td><td>${_fmtFecha(lote.pesaje?.fecha_fin)}</td></tr>
+    </table>
+  </td>
+  <td class="col-pesos">
+    <table class="tabla-pesos">
+      <tr><td>Peso Bruto</td><td class="p-sep">:</td><td class="p-val">${_fmtPeso(lote.pesaje?.peso_inicial)}</td><td class="p-unit">TM</td></tr>
+      <tr><td>Peso Tara</td><td class="p-sep">:</td><td class="p-val">${_fmtPeso(lote.pesaje?.peso_final)}</td><td class="p-unit">TM</td></tr>
+      <tr><td>Peso Neto</td><td class="p-sep">:</td><td class="p-val p-neto">${_fmtPeso(lote.peso_neto)}</td><td class="p-unit">TM</td></tr>
+    </table>
+  </td>
+</tr></table>`
+}
+
+function _abrirVentana(html: string) {
+  const win = window.open('', '_blank', 'width=900,height=620')
+  if (!win) {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    return
+  }
+  win.document.write(html)
+  win.document.close()
+}
+
+// ── Store ──────────────────────────────────────────────────
+
 export const useBalanzaStore = defineStore('balanza', () => {
   const ui = useUiStore()
+  const auth = useAuthStore()
 
-  const sesiones      = ref<SesionLista[]>([])
-  const sesionActual  = ref<SesionDetalle | null>(null)
-  const provacops     = ref<ProvAcopDropdown[]>([])
-  const loading       = ref(false)
+  const sesiones = ref<SesionLista[]>([])
+  const sesionActual = ref<SesionDetalle | null>(null)
+  const provacops = ref<ProvAcopDropdown[]>([])
+  const loading = ref(false)
   const loadingSesion = ref(false)
-  const guardando     = ref(false)
-
+  const guardando = ref(false)
 
   function generarOfflineId(): string {
     return `offline-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -50,7 +192,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
-  // ── Sesiones ───────────────────────────────────────────────
+  // ── Sesiones online ────────────────────────────────────────
   async function cargarSesiones(params?: SesionesParams) {
     loading.value = true
     try {
@@ -73,9 +215,58 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  // ── Sesiones offline ───────────────────────────────────────
+
+  async function cargarSesionOffline(offlineId: string) {
+    loadingSesion.value = true
+    try {
+      // Si ya está en memoria (navegación inmediata post-creación) no releer
+      if (sesionActual.value?.offline_id === offlineId) return
+
+      const pendientes = await obtenerSesionesPendientes()
+      const sesionLocal = pendientes.find(s => s.offline_id === offlineId)
+      if (!sesionLocal) {
+        ui.toast('Sesión offline no encontrada', 'error')
+        return
+      }
+
+      const cache = await obtenerProvacops()
+      const provacop = cache.find(p => p.provacop_id === sesionLocal.provacop_id)
+
+      sesionActual.value = {
+        id: -1,
+        offline_id: offlineId,
+        provacop_id: sesionLocal.provacop_id,
+        proveedor_razon_social: provacop?.proveedor_razon_social ?? '(sin caché)',
+        proveedor_ruc: provacop?.proveedor_ruc ?? '',
+        acopiador_razon_social: provacop?.acopiador_razon_social ?? '',
+        acopiador_ruc: provacop?.acopiador_ruc ?? null,
+        es_propio: provacop?.es_propio ?? false,
+        placa: sesionLocal.placa,
+        carreta: sesionLocal.carreta,
+        conductor: sesionLocal.conductor,
+        transportista: sesionLocal.transportista,
+        razon_social: sesionLocal.razon_social,
+        guia_remision: sesionLocal.guia_remision,
+        guia_transporte: sesionLocal.guia_transporte,
+        estado: sesionLocal.estado as SesionDetalle['estado'],
+        fecha_ingreso: sesionLocal.creado_en,
+        lotes: sesionLocal.lotes.map(loteOfflineADetalle),
+        proveedor_id: 0,
+        acopiador_id: 0,
+      }
+    } catch (e) {
+      console.error('cargarSesionOffline:', e)
+      ui.toast('Error al cargar sesión offline', 'error')
+    } finally {
+      loadingSesion.value = false
+    }
+  }
+
+  // ── Crear sesión (online/offline) ──────────────────────────
   async function crearSesion(datos: SesionCrear): Promise<SesionDetalle | null> {
-    // ── Online: flujo normal ──────────────────────────────────
-    if (!FORCE_OFFLINE && navigator.onLine) {
+    // Online
+    if (!estamosOffline()) {
       guardando.value = true
       try {
         const resp = await balanzaApi.crearSesion(datos)
@@ -89,12 +280,11 @@ export const useBalanzaStore = defineStore('balanza', () => {
       }
     }
 
-    // ── Offline: guardar en IndexedDB ─────────────────────────
-    // Verificar caché de provacops para validar entidad-rol
-    const provacops = await obtenerProvacops()
-    const provacop = provacops.find(p => p.provacop_id === datos.provacop_id)
+    // Offline
+    const cache = await obtenerProvacops()
+    const provacop = cache.find(p => p.provacop_id === datos.provacop_id)
     if (!provacop) {
-      ui.toast('No hay datos de proveedor en caché offline. Sincroniza primero.', 'error')
+      ui.toast('Sin caché de proveedor. Conecta al menos una vez antes de operar offline.', 'error')
       return null
     }
 
@@ -120,9 +310,8 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
     await encolarSesion(sesionOffline)
 
-    // Construir objeto "optimista" para el UI — sin server_id real
     const sesionOptimista: SesionDetalle = {
-      id: -1, // ID temporal, se reemplaza al sync
+      id: -1,
       offline_id: offlineId,
       provacop_id: datos.provacop_id,
       proveedor_razon_social: provacop.proveedor_razon_social,
@@ -141,7 +330,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
       fecha_ingreso: ahora,
       lotes: [],
       proveedor_id: 0,
-      acopiador_id: 0
+      acopiador_id: 0,
     }
 
     sesionActual.value = sesionOptimista
@@ -175,6 +364,28 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  async function finalizarSesionOffline(offlineId: string) {
+    guardando.value = true
+    try {
+      const pendientes = await obtenerSesionesPendientes()
+      const sesionLocal = pendientes.find(s => s.offline_id === offlineId)
+      if (!sesionLocal) { ui.toast('Sesión offline no encontrada', 'error'); return }
+
+      sesionLocal.estado = 'COMPLETO'
+      await encolarSesion(sesionLocal)
+
+      if (sesionActual.value?.offline_id === offlineId) {
+        sesionActual.value = { ...sesionActual.value, estado: 'COMPLETO' }
+      }
+      ui.toast('Sesión finalizada localmente. Se sincronizará al reconectar.', 'warning')
+    } catch (e) {
+      console.error('finalizarSesionOffline:', e)
+      ui.toast('Error al finalizar sesión offline', 'error')
+    } finally {
+      guardando.value = false
+    }
+  }
+
   async function pausarSesion(id: number) {
     try {
       sesionActual.value = await balanzaApi.pausarSesion(id)
@@ -195,18 +406,17 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
   // ── Lotes ──────────────────────────────────────────────────
   async function agregarLote(
-    sesionId: number,
+    sesionId: number | string,
     datos: LoteCrear,
   ): Promise<LoteDetalle | null> {
+    const offline = estamosOffline() || esOfflineId(sesionId)
 
-    // ── Online: flujo normal ──────────────────────────────────
-    if (!FORCE_OFFLINE && navigator.onLine && sesionId > 0) {
+    // Online
+    if (!offline) {
       guardando.value = true
       try {
-        const lote = await balanzaApi.agregarLote(sesionId, datos)
-        if (sesionActual.value) {
-          sesionActual.value.lotes.push(lote)
-        }
+        const lote = await balanzaApi.agregarLote(sesionId as number, datos)
+        if (sesionActual.value) sesionActual.value.lotes.push(lote)
         return lote
       } catch (err: any) {
         ui.toast(err?.response?.data?.detail ?? 'Error al agregar lote', 'error')
@@ -216,7 +426,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
       }
     }
 
-    // ── Offline (o sesión offline sin server_id) ──────────────
+    // Offline
     const agotado = await bloqueAgotado()
     if (agotado) {
       ui.toast('Bloque de IPs agotado. Necesitas conexión para renovar.', 'error')
@@ -249,45 +459,22 @@ export const useBalanzaStore = defineStore('balanza', () => {
       creado_en: ahora,
     }
 
-    // Agregar el lote a la sesión offline en IndexedDB
-    if (sesionActual.value?.offline_id) {
+    // Persistir en IndexedDB
+    const sesionOfflineId = esOfflineId(sesionId)
+      ? (sesionId as string)
+      : sesionActual.value?.offline_id
+
+    if (sesionOfflineId) {
       const pendientes = await obtenerSesionesPendientes()
-      const sesionLocal = pendientes.find(s => s.offline_id === sesionActual.value!.offline_id)
+      const sesionLocal = pendientes.find(s => s.offline_id === sesionOfflineId)
       if (sesionLocal) {
         sesionLocal.lotes.push(loteOffline)
         await encolarSesion(sesionLocal)
       }
     }
 
-    // Objeto optimista para el UI
-    const loteOptimista: LoteDetalle = {
-      id: -1,
-      ip,
-      numero_lote: numeroLote,
-      tipo_material: datos.tipo_material,
-      estado: 'RECEPCIONADO',
-      volado: false,
-      eliminado: false,
-      habilitado_ruma: false,
-      peso_neto: datos.pesaje.peso_inicial - datos.pesaje.peso_final,
-      pesaje: {
-        id: -1,
-        peso_inicial: datos.pesaje.peso_inicial,
-        peso_final: datos.pesaje.peso_final,
-        peso_neto: datos.pesaje.peso_inicial - datos.pesaje.peso_final,
-        sacos: datos.pesaje.sacos ?? null,
-        granel: datos.pesaje.granel ?? false,
-        numero_ticket: `TK-OFFLINE-${ip}`,
-        fecha_inicio: ahora,
-        fecha_fin: ahora,
-      },
-      fecha_pesaje: null,
-      fecha_habilitacion: null
-    }
-
-    if (sesionActual.value) {
-      sesionActual.value.lotes.push(loteOptimista)
-    }
+    const loteOptimista = loteOfflineADetalle(loteOffline)
+    if (sesionActual.value) sesionActual.value.lotes.push(loteOptimista)
 
     ui.toast(`Lote ${ip} guardado localmente — sin red.`, 'warning')
     return loteOptimista
@@ -312,7 +499,11 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
-  async function eliminarLote(sesionId: number, loteId: number, motivo: string): Promise<boolean> {
+  async function eliminarLote(
+    sesionId: number,
+    loteId: number,
+    motivo: string,
+  ): Promise<boolean> {
     guardando.value = true
     try {
       await balanzaApi.eliminarLote(sesionId, loteId, { motivo })
@@ -327,15 +518,14 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  // ── Tickets online ─────────────────────────────────────────
   async function descargarTicket(sesionId: number, loteId: number, ip: string) {
     try {
       const blob = await balanzaApi.ticketBlob(sesionId, loteId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `ticket-${ip}.pdf`
-      document.body.appendChild(a)
-      a.click()
+      a.href = url; a.download = `ticket-${ip}.pdf`
+      document.body.appendChild(a); a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch {
@@ -343,15 +533,13 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
-   async function descargarTicketsSesion(sesionId: number) {
+  async function descargarTicketsSesion(sesionId: number) {
     try {
       const blob = await balanzaApi.ticketsSesionBlob(sesionId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = `tickets-sesion-${sesionId}.pdf`
-      document.body.appendChild(a)
-      a.click()
+      a.href = url; a.download = `tickets-sesion-${sesionId}.pdf`
+      document.body.appendChild(a); a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch {
@@ -359,13 +547,81 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  // ── Tickets offline ────────────────────────────────────────
+  // El HTML replica ticket_balanza.html del servidor (mismo CSS, misma estructura).
+  // El IP del bloque reservado es real; el número de ticket usa el IP como
+  // referencia hasta que el servidor asigne el TK definitivo al sincronizar.
+
+  function imprimirTicketOffline(lote: LoteDetalle) {
+    if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
+    const s = sesionActual.value
+    const html = `<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"/><title>Ticket ${lote.ip}</title>
+<style>${_TICKET_CSS}</style></head><body>
+${_ticketCuerpo(lote, s)}
+<script>window.onload = () => { window.print() }<\/script>
+</body></html>`
+    _abrirVentana(html)
+  }
+
+  function previsualizarTicketOffline(lote: LoteDetalle) {
+    if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
+    // Igual que imprimir pero sin el script de window.print()
+    const html = `<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8"/><title>Ticket ${lote.ip}</title>
+  <style>${_TICKET_CSS}</style></head><body>
+  ${_ticketCuerpo(lote, sesionActual.value)}
+  </body></html>`
+    _abrirVentana(html)
+  }
+
+  function imprimirTicketsSesionOffline() {
+    const s = sesionActual.value
+    if (!s) { ui.toast('No hay sesión activa', 'error'); return }
+
+    const lotes = s.lotes.filter(l => !l.eliminado)
+    if (!lotes.length) { ui.toast('Sin lotes para imprimir', 'warning'); return }
+
+    const cssPagina = _TICKET_CSS + `
+.ticket { page-break-after: always; }
+.ticket:last-child { page-break-after: avoid; }`
+
+    const cuerpos = lotes.map(l => `<div class="ticket">${_ticketCuerpo(l, s)}</div>`)
+
+    const html = `<!DOCTYPE html><html lang="es"><head>
+<meta charset="UTF-8"/><title>Tickets sesión</title>
+<style>${cssPagina}</style></head><body>
+${cuerpos.join('\n')}
+<script>window.onload = () => { window.print() }<\/script>
+</body></html>`
+    _abrirVentana(html)
+  }
+
   return {
+    // Estado
     sesiones, sesionActual, provacops,
     loading, loadingSesion, guardando,
-    cargarProvacops, cargarSesiones, cargarSesion,
-    crearSesion, editarSesion,
-    finalizarSesion, pausarSesion, reanudarSesion,
-    agregarLote, editarLote, eliminarLote, descargarTicket,
+    // Autocomplete
+    cargarProvacops,
+    // Sesiones
+    cargarSesiones,
+    cargarSesion,
+    cargarSesionOffline,
+    crearSesion,
+    editarSesion,
+    finalizarSesion,
+    finalizarSesionOffline,
+    pausarSesion,
+    reanudarSesion,
+    // Lotes
+    agregarLote,
+    editarLote,
+    eliminarLote,
+    // Tickets
+    descargarTicket,
     descargarTicketsSesion,
+    imprimirTicketOffline,
+    imprimirTicketsSesionOffline,
+    previsualizarTicketOffline,
   }
 })

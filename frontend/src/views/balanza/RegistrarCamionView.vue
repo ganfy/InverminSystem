@@ -333,7 +333,7 @@ async function continuar() {
   if (!sesion) return  // store.crearSesion ya maneja el error con toast
 
   // 2. Subir archivos pendientes (en background, sin bloquear navegación)
-  if (archivosPendientes.value.length) {
+  if (archivosPendientes.value.length  && sesion.id > 0) {
     // Fire-and-forget: los archivos se suben en background
     // Si fallan, el usuario puede subirlos desde SesionView
     Promise.allSettled(
@@ -343,7 +343,8 @@ async function continuar() {
     )
   }
 
-  router.push({ name: 'SesionBalanza', params: { id: sesion.id } })
+  const destId = sesion.offline_id ?? sesion.id
+  router.push({ name: 'SesionBalanza', params: { id: String(destId) } })
 }
 
 onMounted(() => store.cargarProvacops())
