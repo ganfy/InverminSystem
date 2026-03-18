@@ -17,7 +17,7 @@
 import { ref } from 'vue'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 2
+const DB_VERSION = 4
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -84,6 +84,20 @@ export interface SesionOfflineData {
     sync_error: string | null
 }
 
+export interface LoteOnlineData {
+    offline_id: string        // UUID local — clave de idempotencia
+    sesion_id: number         // ID real en servidor
+    tipo_material: string
+    ip: string
+    numero_lote: number
+    numero_ticket: string
+    pesaje: PesajeOfflineData
+    creado_en: string
+    synced: boolean
+    sync_error: string | null
+}
+
+
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -109,6 +123,14 @@ async function openDB(): Promise<IDBDatabase> {
             if (oldVersion < 2) {
                 // bloque de tickets — un único registro con keyPath 'id' = 'tk'
                 db.createObjectStore('tk_block', { keyPath: 'id' })
+            }
+
+            if (oldVersion < 3) {
+                db.createObjectStore('lotes_online_q', { keyPath: 'offline_id' })
+            }
+
+            if (oldVersion < 4) {
+                db.createObjectStore('finalizaciones_q', { keyPath: 'sesion_id' })
             }
         }
 
@@ -310,3 +332,56 @@ export async function bloqueTKAgotado(): Promise<boolean> {
     if (!bloque) return true
     return (bloque.desde + bloque.usado) > bloque.hasta
 }
+
+// ── Cola de lotes de sesiones online (modo híbrido) ────────
+
+export async function encolarLoteOnline(lote: LoteOnlineData): Promise<void> {
+    await put('lotes_online_q', lote)
+}
+
+export async function obtenerLotesOnlinePendientes(): Promise<LoteOnlineData[]> {
+    const todos = await getAll<LoteOnlineData>('lotes_online_q')
+    return todos.filter(l => !l.synced)
+}
+
+export async function marcarLoteOnlineSynced(offlineId: string): Promise<void> {
+    const lote = await get<LoteOnlineData>('lotes_online_q', offlineId)
+    if (!lote) return
+    await put('lotes_online_q', { ...lote, synced: true, sync_error: null })
+}
+
+export async function marcarLoteOnlineError(offlineId: string, error: string): Promise<void> {
+    const lote = await get<LoteOnlineData>('lotes_online_q', offlineId)
+    if (!lote) return
+    await put('lotes_online_q', { ...lote, sync_error: error })
+}
+
+export async function limpiarLotesOnlineSynced(): Promise<void> {
+    const todos = await getAll<LoteOnlineData>('lotes_online_q')
+    for (const l of todos.filter(l => l.synced)) {
+        await del('lotes_online_q', l.offline_id)
+    }
+}
+
+export async function contarLotesOnlinePendientes(sesionId?: number): Promise<number> {
+    const pendientes = await obtenerLotesOnlinePendientes()
+    if (sesionId !== undefined) return pendientes.filter(l => l.sesion_id === sesionId).length
+    return pendientes.length
+}
+
+export interface FinalizacionPendiente {
+    sesion_id: number
+    creado_en: string
+}
+
+export async function encolarFinalizacion(sesionId: number): Promise<void> {
+    await put('finalizaciones_q', { sesion_id: sesionId, creado_en: new Date().toISOString() })
+}
+
+export async function obtenerFinalizacionesPendientes(): Promise<FinalizacionPendiente[]> {
+    return getAll<FinalizacionPendiente>('finalizaciones_q')
+}
+
+export async function eliminarFinalizacion(sesionId: number): Promise<void> {
+    await del('finalizaciones_q', sesionId)
+  }

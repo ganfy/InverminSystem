@@ -75,6 +75,23 @@
       </div>
     </div>
 
+    <!-- Online con pendientes: advertencia de bloqueo -->
+    <div v-if="!esOffline && store.lotesHybridPendientes > 0" class="aviso-offline aviso-hybrid">
+      <span class="aviso-icono">⚠</span>
+      <div class="aviso-texto">
+        <strong>{{ store.lotesHybridPendientes }} lote(s) sin sincronizar</strong>
+        — Finalizar no estará disponible hasta reconectar y sincronizar.
+      </div>
+    </div>
+
+    <!-- Offline con pendientes: solo informativo -->
+    <div v-if="esOffline && store.lotesHybridPendientes > 0" class="aviso-offline aviso-hybrid">
+      <span class="aviso-icono">⚡</span>
+      <div class="aviso-texto">
+        <strong>{{ store.lotesHybridPendientes }} lote(s) se sincronizarán al reconectar.</strong>
+      </div>
+    </div>
+
     <!-- ── CUERPO 2 COLUMNAS ──────────────────────────────── -->
     <div class="sesion-body">
       <!-- Columna izquierda -->
@@ -308,7 +325,8 @@
         <button
           v-if="sesion?.estado !== 'COMPLETO'"
           class="btn-primary ready"
-          :disabled="store.guardando || lotesActivos.length === 0"
+          :disabled="store.guardando || lotesActivos.length === 0 || (!esOffline && store.lotesHybridPendientes > 0)"
+          :title="store.lotesHybridPendientes > 0 ? 'Hay lotes pendientes de sincronizar' : undefined"
           @click="finalizar"
         >
           <span v-if="store.guardando" class="spinner" />
@@ -497,6 +515,7 @@ import { useBalanzaStore } from '@/stores/balanza'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { useBalanza } from '@/composables/useBalanza'
+import { useSync } from '@/composables/useSync'
 import BalanzaIndicator from '@/components/balanza/BalanzaIndicator.vue'
 import type { LoteDetalle, ProvAcopDropdown } from '@/api/balanza'
 import { balanzaApi } from '@/api/balanza'
@@ -511,11 +530,13 @@ const ui        = useUiStore()
 
 // [OFFLINE] ID como string; detecta si es sesión offline por el prefijo
 const sesionIdRaw = route.params.id as string
-const esOffline   = computed(() => sesionIdRaw.startsWith('offline-'))
+const esOffline = computed(() => sesionIdRaw.startsWith('offline-') || !online.value)
 const sesionIdNum = computed(() => esOffline.value ? -1 : Number(sesionIdRaw))
 
 const sesion       = computed(() => store.sesionActual)
 const lotesActivos = computed(() => sesion.value?.lotes.filter(l => !l.eliminado) ?? [])
+
+const { online, sesionRecargada, limpiarSesionRecargada } = useSync()
 
 // ── Balanza física ─────────────────────────────────────────
 const {
@@ -589,6 +610,19 @@ function preFillTipoMaterial() {
   const ultimo = activos[activos.length - 1]
   if (ultimo?.tipo_material) {
     tipoMaterial.value = ultimo.tipo_material
+  }
+}
+
+function preFillSacosGranel() {
+  const activos = sesion.value?.lotes.filter(l => !l.eliminado) ?? []
+  const ultimo = activos[activos.length - 1]
+  if (!ultimo?.pesaje) return
+  if (ultimo.pesaje.granel) {
+    granel.value = true
+    sacos.value  = null
+  } else if (ultimo.pesaje.sacos != null) {
+    granel.value = false
+    sacos.value  = ultimo.pesaje.sacos
   }
 }
 
@@ -687,6 +721,16 @@ async function finalizar() {
     await store.finalizarSesion(sesionIdNum.value)
   }
 }
+
+// Auto-reload cuando useSync sincroniza lotes de esta sesión
+watch(sesionRecargada, async (idRecargado) => {
+  if (!idRecargado || esOffline.value) return
+  if (idRecargado === sesionIdNum.value) {
+    await store.cargarSesion(sesionIdNum.value)
+    ui.toast('Lotes sincronizados — sesión actualizada.', 'success')
+    limpiarSesionRecargada()
+  }
+})
 
 // ── Modal: Editar Sesión ───────────────────────────────────
 const editSesionModal = reactive({
@@ -853,6 +897,7 @@ onMounted(async () => {
     preFillBruto()
   }
   preFillTipoMaterial()
+  preFillSacosGranel()
 })
 </script>
 
@@ -900,7 +945,11 @@ onMounted(async () => {
 .aviso-texto { font-size: .82rem; color: var(--color-text-muted); line-height: 1.5; }
 .aviso-texto strong { color: #f59e0b; }
 .aviso-texto em { font-style: normal; text-decoration: underline; text-decoration-color: rgba(245,158,11,.5); }
-
+.aviso-hybrid {
+  background: rgba(220, 140, 0, 0.08);
+  border-color: rgba(220, 140, 0, 0.35);
+  color: var(--color-warning);
+}
 /* ── Body 2 columnas ─────────────────────────────────────── */
 .sesion-body {
   display: grid; grid-template-columns: 1fr 1fr;

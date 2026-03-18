@@ -118,7 +118,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBalanzaStore } from '@/stores/balanza'
-import { obtenerSesionesPendientes, obtenerProvacops } from '@/composables/useOfflineQueue'
+import { obtenerSesionesPendientes, obtenerProvacops, obtenerFinalizacionesPendientes } from '@/composables/useOfflineQueue'
 import type { SesionOfflineData } from '@/composables/useOfflineQueue'
 import { watch } from 'vue'
 import { useSync } from '@/composables/useSync'
@@ -142,9 +142,10 @@ const sesionesOffline = ref<SesionOfflineVista[]>([])
 
 async function cargarSesionesOffline() {
   try {
-    const [pendientes, cache] = await Promise.all([
+    const [pendientes, cache, finalizaciones] = await Promise.all([
       obtenerSesionesPendientes(),
       obtenerProvacops(),
+      obtenerFinalizacionesPendientes(),  // para refrescar estado de sesiones con finalización pendiente
     ])
     // Excluir las ya sincronizadas
     sesionesOffline.value = pendientes
@@ -152,11 +153,19 @@ async function cargarSesionesOffline() {
       .map(s => ({
         ...s,
         proveedor_razon_social:
-          cache.find(p => p.provacop_id === s.provacop_id)?.proveedor_razon_social ?? '',
+          cache.find(p => p.provacop_id === s.provacop_id)?.proveedor_razon_social
+          ?? '(sin caché)',
       }))
-  } catch {
-    // IndexedDB puede no estar disponible en SSR o privado — silencioso
-    sesionesOffline.value = []
+
+    // Aplicar estados locales de finalizaciones híbridas sobre la lista del servidor
+    if (finalizaciones.length > 0) {
+      const idsFinalizados = new Set(finalizaciones.map(f => f.sesion_id))
+      store.sesiones = store.sesiones.map(s =>
+        idsFinalizados.has(s.id) ? { ...s, estado: 'COMPLETO' } : s
+      )
+    }
+  } catch (e) {
+    console.error('cargarSesionesOffline:', e)
   }
 }
 
@@ -205,9 +214,10 @@ function estadoLabel(e: string) {
   return { EN_PROCESO: 'EN PROCESO', PAUSADO: 'PAUSADO', COMPLETO: 'COMPLETO' }[e] ?? e
 }
 
-onMounted(() => {
+onMounted(async() => {
   aplicarFiltros()
-  cargarSesionesOffline()
+  await store.cargarSesiones()
+  await cargarSesionesOffline()
 })
 </script>
 

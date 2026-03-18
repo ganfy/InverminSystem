@@ -27,6 +27,14 @@ import {
     ipsDisponibles,
     guardarBloqueTK,
     bloqueTKAgotado,
+    encolarLoteOnline,
+    obtenerFinalizacionesPendientes,
+    eliminarFinalizacion,
+    obtenerLotesOnlinePendientes,
+    marcarLoteOnlineError,
+    marcarLoteOnlineSynced,
+    limpiarLotesOnlineSynced,
+    type LoteOnlineData,
 } from '@/composables/useOfflineQueue'
 
 // ── Modo offline forzado (solo desarrollo) ─────────────────
@@ -47,6 +55,7 @@ const pendientes = ref<number>(0)
 const ultimoSync = ref<string | null>(null)
 const errorSync = ref<string | null>(null)
 const ipsRestantes = ref<number>(0)
+const sesionRecargada = ref<number | null>(null) // ID de sesión que se recargó desde otra pestaña (para evitar recargas infinitas)
 
 // ── Composable ─────────────────────────────────────────────
 
@@ -146,38 +155,113 @@ export function useSync() {
 
     // ── Sync batch ───────────────────────────────────────────
 
+    /**
+ * Sincroniza lotes de sesiones online creados mientras no había conexión.
+ * Retorna los IDs de sesión que recibieron lotes nuevos.
+ */
+    async function sincronizarLotesOnline(): Promise<number[]> {
+        const pendientes = await obtenerLotesOnlinePendientes()
+        if (pendientes.length === 0) return []
+
+        // Agrupar por sesion_id
+        const porSesion = new Map<number, LoteOnlineData[]>()
+        for (const lote of pendientes) {
+            const grupo = porSesion.get(lote.sesion_id) ?? []
+            grupo.push(lote)
+            porSesion.set(lote.sesion_id, grupo)
+        }
+
+        const sesionesActualizadas: number[] = []
+
+        for (const [sesionId, lotes] of porSesion) {
+            // Ordenar por numero_lote para preservar secuencia
+            lotes.sort((a, b) => a.numero_lote - b.numero_lote)
+
+            let algunoOk = false
+            for (const lote of lotes) {
+                try {
+                    await balanzaApi.agregarLote(sesionId, {
+                        tipo_material: lote.tipo_material,
+                        pesaje: {
+                            peso_inicial: lote.pesaje.peso_inicial,
+                            peso_final: lote.pesaje.peso_final,
+                            sacos: lote.pesaje.sacos,
+                            granel: lote.pesaje.granel,
+                            fecha_inicio: lote.pesaje.fecha_inicio ?? undefined,
+                        },
+                    })
+                    await marcarLoteOnlineSynced(lote.offline_id)
+                    algunoOk = true
+                } catch (err: any) {
+                    const msg = err?.response?.data?.detail ?? err?.message ?? 'Error desconocido'
+                    await marcarLoteOnlineError(lote.offline_id, msg)
+                    console.error(`[useSync] Error al sincronizar lote ${lote.offline_id}:`, msg)
+                }
+            }
+
+            if (algunoOk) sesionesActualizadas.push(sesionId)
+        }
+
+        await limpiarLotesOnlineSynced()
+        return sesionesActualizadas
+    }
+
+    async function sincronizarFinalizaciones(): Promise<void> {
+        const pendientes = await obtenerFinalizacionesPendientes()
+        for (const fin of pendientes) {
+            try {
+                await balanzaApi.finalizarSesion(fin.sesion_id)
+                await eliminarFinalizacion(fin.sesion_id)
+            } catch (err: any) {
+                // Si ya estaba finalizada, limpiar igual
+                const detail = err?.response?.data?.detail ?? ''
+                if (detail.includes('ya está completada')) {
+                    await eliminarFinalizacion(fin.sesion_id)
+                } else {
+                    console.error(`[useSync] Error al finalizar sesión ${fin.sesion_id}:`, detail)
+                }
+            }
+        }
+      }
+
     async function sincronizar(): Promise<void> {
         if (sincronizando.value || !isOnline()) return
-
-        const sesiones = await obtenerSesionesPendientes()
-        if (sesiones.length === 0) {
-            await actualizarContadores()
-            return
-        }
 
         sincronizando.value = true
         errorSync.value = null
 
         try {
-            const resp = await balanzaApi.syncBatch({ sesiones })
-
-            for (const resultado of resp.resultados) {
-                if (resultado.error) {
-                    await marcarSesionError(resultado.offline_id, resultado.error)
-                } else {
-                    await marcarSesionSynced(resultado.offline_id, resultado.server_id!)
+            // 1. Primero: lotes de sesiones online creados offline (híbrido)
+            const sesionesConLotesNuevos = await sincronizarLotesOnline()
+            if (sesionesConLotesNuevos.length > 0) {
+                // Notificar a SesionView para auto-reload (última sesión actualizada)
+                const ultimaSesion = sesionesConLotesNuevos[sesionesConLotesNuevos.length - 1]
+                if (ultimaSesion !== undefined) {
+                    sesionRecargada.value = ultimaSesion
                 }
             }
 
-            await limpiarSynced()
-            ultimoSync.value = new Date().toLocaleString('es-PE')
+            // 2. Luego: sesiones creadas completamente offline
+            const sesiones = await obtenerSesionesPendientes()
+            if (sesiones.length > 0) {
+                const resp = await balanzaApi.syncBatch({ sesiones })
+                for (const resultado of resp.resultados) {
+                    if (resultado.error) {
+                        await marcarSesionError(resultado.offline_id, resultado.error)
+                    } else {
+                        await marcarSesionSynced(resultado.offline_id, resultado.server_id!)
+                    }
+                }
+                await limpiarSynced()
+                ultimoSync.value = new Date().toLocaleString('es-PE')
+            }
 
-            // Renovar bloque si se agotó durante el turno offline
+            await sincronizarFinalizaciones()
             if (await bloqueAgotado()) await renovarBloqueIP()
 
         } catch (err: any) {
             errorSync.value = err?.message ?? 'Error de sincronización'
-            console.error('[useSync] Error en sync batch:', err)
+            console.error('[useSync] Error en sync:', err)
         } finally {
             sincronizando.value = false
             await actualizarContadores()
@@ -198,10 +282,12 @@ export function useSync() {
         ultimoSync: computed(() => ultimoSync.value),
         errorSync: computed(() => errorSync.value),
         ipsRestantes: computed(() => ipsRestantes.value),
+        sesionRecargada: computed(() => sesionRecargada.value),
 
         inicializar,
         sincronizar,
         renovarBloqueIP,
         actualizarContadores,
+        limpiarSesionRecargada: () => { sesionRecargada.value = null },
     }
 }

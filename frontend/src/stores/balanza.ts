@@ -22,8 +22,13 @@ import {
   bloqueTKAgotado,
   obtenerProvacops,
   obtenerSesionesPendientes,
+  encolarLoteOnline,
+  contarLotesOnlinePendientes,
+  obtenerLotesOnlinePendientes,
+  encolarFinalizacion,
   type SesionOfflineData,
   type LoteOfflineData,
+  type LoteOnlineData,
 } from '@/composables/useOfflineQueue'
 import { _TICKET_CSS, _TICKET_CSS_MULTI } from './_TICKET_CSS'
 
@@ -40,6 +45,34 @@ function estamosOffline(): boolean {
 }
 
 function loteOfflineADetalle(lote: LoteOfflineData): LoteDetalle {
+  const pesoNeto = lote.pesaje.peso_inicial - lote.pesaje.peso_final
+  return {
+    id: -1,
+    ip: lote.ip,
+    numero_lote: lote.numero_lote,
+    tipo_material: lote.tipo_material,
+    estado: 'RECEPCIONADO',
+    volado: false,
+    eliminado: false,
+    habilitado_ruma: false,
+    peso_neto: pesoNeto,
+    pesaje: {
+      id: -1,
+      peso_inicial: lote.pesaje.peso_inicial,
+      peso_final: lote.pesaje.peso_final,
+      peso_neto: pesoNeto,
+      sacos: lote.pesaje.sacos,
+      granel: lote.pesaje.granel,
+      numero_ticket: lote.numero_ticket,
+      fecha_inicio: lote.pesaje.fecha_inicio,
+      fecha_fin: lote.pesaje.fecha_fin,
+    },
+    fecha_pesaje: null,
+    fecha_habilitacion: null,
+  }
+}
+
+function loteOnlineADetalle(lote: LoteOnlineData): LoteDetalle {
   const pesoNeto = lote.pesaje.peso_inicial - lote.pesaje.peso_final
   return {
     id: -1,
@@ -155,6 +188,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
   const loading = ref(false)
   const loadingSesion = ref(false)
   const guardando = ref(false)
+  const lotesHybridPendientes = ref<number>(0) //lotes offline de sesiones online
 
   function generarOfflineId(): string {
     return `offline-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -171,11 +205,12 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
   // ── Sesiones online ────────────────────────────────────────
   async function cargarSesiones(params?: SesionesParams) {
+    if (estamosOffline()) return  // ← sin red: mantener lo que hay, sin toast de error
     loading.value = true
     try {
       sesiones.value = await balanzaApi.listarSesiones(params)
-    } catch {
-      ui.toast('Error al cargar sesiones', 'error')
+    } catch (e: any) {
+      ui.toast(e?.response?.data?.detail ?? 'Error al cargar sesiones', 'error')
     } finally {
       loading.value = false
     }
@@ -184,9 +219,25 @@ export const useBalanzaStore = defineStore('balanza', () => {
   async function cargarSesion(id: number) {
     loadingSesion.value = true
     try {
-      sesionActual.value = await balanzaApi.obtenerSesion(id)
-    } catch {
-      ui.toast('Error al cargar sesión', 'error')
+      const sesion = await balanzaApi.obtenerSesion(id)
+
+      // Fusionar lotes offline pendientes de esta sesión
+      const lotesOffline = await obtenerLotesOnlinePendientes()
+      const lotesPendientes = lotesOffline.filter(l => l.sesion_id === id)
+
+      if (lotesPendientes.length > 0) {
+        // Evitar duplicados por si alguno ya llegó al servidor
+        const ipsServidor = new Set(sesion.lotes.map(l => l.ip))
+        const lotesExtra = lotesPendientes
+          .filter(l => !ipsServidor.has(l.ip))
+          .map(loteOnlineADetalle)
+        sesion.lotes.push(...lotesExtra)
+      }
+
+      sesionActual.value = sesion
+      await actualizarLotesHybridPendientes(id)
+    } catch (e: any) {
+      ui.toast(e?.response?.data?.detail ?? 'Error al cargar sesión', 'error')
     } finally {
       loadingSesion.value = false
     }
@@ -330,6 +381,18 @@ export const useBalanzaStore = defineStore('balanza', () => {
   }
 
   async function finalizarSesion(id: number) {
+    // Verificar lotes híbridos pendientes
+    if (!estamosOffline()) {
+      const pendientesHybrid = await contarLotesOnlinePendientes(id)
+      if (pendientesHybrid > 0) {
+        ui.toast(
+          `Hay ${pendientesHybrid} lote(s) sin sincronizar. Reconecta para finalizar.`,
+          'error'
+        )
+        return
+      }
+    }
+
     guardando.value = true
     try {
       sesionActual.value = await balanzaApi.finalizarSesion(id)
@@ -341,20 +404,29 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
-  async function finalizarSesionOffline(offlineId: string) {
+  async function finalizarSesionOffline(sesionIdRaw: string) {
     guardando.value = true
     try {
-      const pendientes = await obtenerSesionesPendientes()
-      const sesionLocal = pendientes.find(s => s.offline_id === offlineId)
-      if (!sesionLocal) { ui.toast('Sesión offline no encontrada', 'error'); return }
-
-      sesionLocal.estado = 'COMPLETO'
-      await encolarSesion(sesionLocal)
-
-      if (sesionActual.value?.offline_id === offlineId) {
-        sesionActual.value = { ...sesionActual.value, estado: 'COMPLETO' }
+      if (esOfflineId(sesionIdRaw)) {
+        // Sesión 100% offline — marcar en sesiones_q
+        const pendientes = await obtenerSesionesPendientes()
+        const sesionLocal = pendientes.find(s => s.offline_id === sesionIdRaw)
+        if (!sesionLocal) { ui.toast('Sesión offline no encontrada', 'error'); return }
+        sesionLocal.estado = 'COMPLETO'
+        await encolarSesion(sesionLocal)
+        if (sesionActual.value?.offline_id === sesionIdRaw) {
+          sesionActual.value = { ...sesionActual.value, estado: 'COMPLETO' }
+        }
+        ui.toast('Sesión finalizada localmente. Se sincronizará al reconectar.', 'warning')
+      } else {
+        // Sesión híbrida (ID real, lotes offline) — marcar en memoria + cola
+        const sesionId = Number(sesionIdRaw)
+        await encolarFinalizacion(sesionId)
+        if (sesionActual.value) {
+          sesionActual.value = { ...sesionActual.value, estado: 'COMPLETO' }
+        }
+        ui.toast('Sesión finalizada localmente. Se completará en el servidor al reconectar.', 'warning')
       }
-      ui.toast('Sesión finalizada localmente. Se sincronizará al reconectar.', 'warning')
     } catch (e) {
       console.error('finalizarSesionOffline:', e)
       ui.toast('Error al finalizar sesión offline', 'error')
@@ -454,6 +526,29 @@ export const useBalanzaStore = defineStore('balanza', () => {
         sesionLocal.lotes.push(loteOffline)
         await encolarSesion(sesionLocal)
       }
+    } else if (typeof sesionId === 'number' && sesionId > 0) {
+      // Sesión híbrida: tiene ID real pero estamos offline
+      const loteOnline: LoteOnlineData = {
+        offline_id: offlineId,
+        sesion_id: sesionId,
+        tipo_material: datos.tipo_material,
+        ip,
+        numero_lote: numeroLote,
+        numero_ticket: numeroTicket,
+        pesaje: {
+          peso_inicial: datos.pesaje.peso_inicial,
+          peso_final: datos.pesaje.peso_final,
+          sacos: datos.pesaje.sacos ?? null,
+          granel: datos.pesaje.granel ?? false,
+          fecha_inicio: datos.pesaje.fecha_inicio ?? ahora,
+          fecha_fin: ahora,
+        },
+        creado_en: ahora,
+        synced: false,
+        sync_error: null,
+      }
+      await encolarLoteOnline(loteOnline)
+      await actualizarLotesHybridPendientes(sesionId)
     }
 
     const loteOptimista = loteOfflineADetalle(loteOffline)
@@ -499,6 +594,11 @@ export const useBalanzaStore = defineStore('balanza', () => {
     } finally {
       guardando.value = false
     }
+  }
+
+  // ── Helper para actualizar el contador
+  async function actualizarLotesHybridPendientes(sesionId?: number) {
+    lotesHybridPendientes.value = await contarLotesOnlinePendientes(sesionId)
   }
 
   // ── Tickets online ─────────────────────────────────────────
@@ -595,8 +695,6 @@ export const useBalanzaStore = defineStore('balanza', () => {
       _abrirVentana(html)
   }
 
-  // REEMPLAZAR imprimirTicketsSesionOffline:
-
   function imprimirTicketsSesionOffline() {
     const s = sesionActual.value
     if (!s) { ui.toast('No hay sesión activa', 'error'); return }
@@ -628,6 +726,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     // Estado
     sesiones, sesionActual, provacops,
     loading, loadingSesion, guardando,
+    lotesHybridPendientes,
     // Autocomplete
     cargarProvacops,
     // Sesiones
