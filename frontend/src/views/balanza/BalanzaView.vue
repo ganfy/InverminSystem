@@ -8,10 +8,10 @@
     </div>
 
     <!-- ── [OFFLINE] Sesiones pendientes de sincronizar ──── -->
-    <div v-if="sesionesOffline.length > 0" class="offline-section">
+    <div v-if="sesionesOffline.length > 0 || sesionesHybrid.length > 0" class="offline-section">
       <div class="offline-section-header">
         <span class="offline-section-titulo">⚡ SIN SINCRONIZAR</span>
-        <span class="offline-section-count">{{ sesionesOffline.length }} sesión(es) local(es)</span>
+        <span class="offline-section-count">{{ sesionesOffline.length + sesionesHybrid.length }} sesión(es) local(es)</span>
       </div>
       <div class="tabla-wrapper">
         <table class="tabla">
@@ -49,10 +49,32 @@
                 >✎</button>
               </td>
             </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+            <!-- Sesiones híbridas finalizadas offline -->
+        <tr
+          v-for="s in sesionesHybrid"
+          :key="'hybrid-' + s.sesion_id"
+          class="fila-sesion fila-offline"
+          @click="router.push({ name: 'SesionBalanza', params: { id: s.sesion_id } })"
+        >
+          <td class="td-mono">{{ formatFechaLocal(s.creado_en) }}</td>
+          <td>{{ s.proveedor_razon_social }}</td>
+          <td class="td-mono td-placa">{{ s.placa }}</td>
+          <td class="td-mono">{{ s.total_lotes }}</td>
+          <td>
+            <span class="badge-estado badge-completo">COMPLETO</span>
+            <span class="badge-local">SYNC PEND.</span>
+          </td>
+          <td class="td-acciones" @click.stop>
+            <button class="btn-icon"
+              @click="router.push({ name: 'SesionBalanza', params: { id: s.sesion_id } })">
+              ✎
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
     <!-- ── Filtros ────────────────────────────────────────── -->
     <div class="filtros">
@@ -118,7 +140,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBalanzaStore } from '@/stores/balanza'
-import { obtenerSesionesPendientes, obtenerProvacops, obtenerFinalizacionesPendientes } from '@/composables/useOfflineQueue'
+import { obtenerSesionesPendientes,
+  obtenerProvacops,
+  obtenerFinalizacionesPendientes,
+  type FinalizacionPendiente,
+} from '@/composables/useOfflineQueue'
 import type { SesionOfflineData } from '@/composables/useOfflineQueue'
 import { watch } from 'vue'
 import { useSync } from '@/composables/useSync'
@@ -126,10 +152,17 @@ import { useSync } from '@/composables/useSync'
 const router = useRouter()
 const store  = useBalanzaStore()
 
-const { pendientes } = useSync()
+const { pendientes, online } = useSync()
 
 watch(pendientes, () => {
   cargarSesionesOffline()
+})
+
+watch(online, async (ahoraOnline) => {
+  if (ahoraOnline) {
+    await store.cargarSesiones()
+    await cargarSesionesOffline()
+  }
 })
 
 // ── [OFFLINE] Sesiones locales ────────────────────────────
@@ -139,6 +172,7 @@ interface SesionOfflineVista extends SesionOfflineData {
 }
 
 const sesionesOffline = ref<SesionOfflineVista[]>([])
+const sesionesHybrid = ref<FinalizacionPendiente[]>([])
 
 async function cargarSesionesOffline() {
   try {
@@ -159,10 +193,14 @@ async function cargarSesionesOffline() {
 
     // Aplicar estados locales de finalizaciones híbridas sobre la lista del servidor
     if (finalizaciones.length > 0) {
+      const idsServidor = new Set(store.sesiones.map(s => s.id))
       const idsFinalizados = new Set(finalizaciones.map(f => f.sesion_id))
       store.sesiones = store.sesiones.map(s =>
         idsFinalizados.has(s.id) ? { ...s, estado: 'COMPLETO' } : s
       )
+      sesionesHybrid.value = finalizaciones.filter(f => idsServidor.has(f.sesion_id))
+    } else {
+      sesionesHybrid.value = []
     }
   } catch (e) {
     console.error('cargarSesionesOffline:', e)

@@ -97,6 +97,14 @@ export interface LoteOnlineData {
     sync_error: string | null
 }
 
+export interface FinalizacionPendiente {
+    sesion_id: number
+    creado_en: string
+    placa: string
+    proveedor_razon_social: string
+    total_lotes: number
+  }
+
 
 // ── Apertura de DB ─────────────────────────────────────────
 
@@ -374,9 +382,16 @@ export interface FinalizacionPendiente {
     creado_en: string
 }
 
-export async function encolarFinalizacion(sesionId: number): Promise<void> {
-    await put('finalizaciones_q', { sesion_id: sesionId, creado_en: new Date().toISOString() })
-}
+export async function encolarFinalizacion(
+    sesionId: number,
+    display: { placa: string; proveedor_razon_social: string; total_lotes: number }
+): Promise<void> {
+    await put('finalizaciones_q', {
+        sesion_id: sesionId,
+        creado_en: new Date().toISOString(),
+        ...display,
+    })
+  }
 
 export async function obtenerFinalizacionesPendientes(): Promise<FinalizacionPendiente[]> {
     return getAll<FinalizacionPendiente>('finalizaciones_q')

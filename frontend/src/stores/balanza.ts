@@ -421,7 +421,11 @@ export const useBalanzaStore = defineStore('balanza', () => {
       } else {
         // Sesión híbrida (ID real, lotes offline) — marcar en memoria + cola
         const sesionId = Number(sesionIdRaw)
-        await encolarFinalizacion(sesionId)
+        await encolarFinalizacion(sesionId, {
+          placa: sesionActual.value?.placa ?? '',
+          proveedor_razon_social: sesionActual.value?.proveedor_razon_social ?? '',
+          total_lotes: sesionActual.value?.lotes.filter(l => !l.eliminado).length ?? 0,
+        })
         if (sesionActual.value) {
           sesionActual.value = { ...sesionActual.value, estado: 'COMPLETO' }
         }
