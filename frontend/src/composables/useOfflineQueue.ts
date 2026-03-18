@@ -103,8 +103,7 @@ export interface FinalizacionPendiente {
     placa: string
     proveedor_razon_social: string
     total_lotes: number
-  }
-
+}
 
 // ── Apertura de DB ─────────────────────────────────────────
 
@@ -371,15 +370,18 @@ export async function limpiarLotesOnlineSynced(): Promise<void> {
     }
 }
 
+export async function eliminarLoteOnline(offlineId: string): Promise<void> {
+    await del('lotes_online_q', offlineId)
+}
+
 export async function contarLotesOnlinePendientes(sesionId?: number): Promise<number> {
     const pendientes = await obtenerLotesOnlinePendientes()
     if (sesionId !== undefined) return pendientes.filter(l => l.sesion_id === sesionId).length
     return pendientes.length
 }
 
-export interface FinalizacionPendiente {
-    sesion_id: number
-    creado_en: string
+export async function obtenerTodosLotesOnline(): Promise<LoteOnlineData[]> {
+    return getAll<LoteOnlineData>('lotes_online_q')
 }
 
 export async function encolarFinalizacion(

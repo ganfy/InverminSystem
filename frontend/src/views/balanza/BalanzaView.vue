@@ -143,6 +143,9 @@ import { useBalanzaStore } from '@/stores/balanza'
 import { obtenerSesionesPendientes,
   obtenerProvacops,
   obtenerFinalizacionesPendientes,
+  obtenerLotesOnlinePendientes,
+  contarPendientes,
+  contarLotesOnlinePendientes,
   type FinalizacionPendiente,
 } from '@/composables/useOfflineQueue'
 import type { SesionOfflineData } from '@/composables/useOfflineQueue'
@@ -152,15 +155,32 @@ import { useSync } from '@/composables/useSync'
 const router = useRouter()
 const store  = useBalanzaStore()
 
-const { pendientes, online } = useSync()
+const { pendientes, online, ultimoSync, sesionRecargada, limpiarSesionRecargada } = useSync()
 
 watch(pendientes, () => {
   cargarSesionesOffline()
 })
 
+// Recargar tabla cuando sync completa (garantiza que los lotes ya están en servidor)
+watch(ultimoSync, async () => {
+  await store.cargarSesiones()
+  await cargarSesionesOffline()
+})
+
 watch(online, async (ahoraOnline) => {
   if (ahoraOnline) {
-    await store.cargarSesiones()
+    // Pequeño delay para que el sync arranque primero
+    await new Promise(r => setTimeout(r, 300))
+    const hayLotes = await contarLotesOnlinePendientes()
+    const haySesiones = (await obtenerSesionesPendientes()).length
+    if (hayLotes === 0 && haySesiones === 0) {
+      // Sin pendientes: recargar directo (no habrá watch(ultimoSync))
+      await store.cargarSesiones()
+      await cargarSesionesOffline()
+    }
+    // Con pendientes: watch(ultimoSync) lo maneja cuando sync termina
+  } else {
+    // Al desconectarse: refrescar sección offline inmediatamente
     await cargarSesionesOffline()
   }
 })

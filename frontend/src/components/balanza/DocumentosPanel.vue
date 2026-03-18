@@ -261,11 +261,14 @@
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
   onMounted(() => { if (props.sesionId) cargarDelServidor() })
-  watch(() => props.sesionId, id => { if (id) cargarDelServidor() })
+  watch(() => props.sesionId, id => {
+    if (id && navigator.onLine) cargarDelServidor()
+  })
 
   // ── Métodos: servidor ─────────────────────────────────────────────────────────
   async function cargarDelServidor() {
     if (!props.sesionId) return
+    if (!navigator.onLine) return  // ← no intentar si offline
     try {
       documentosServidor.value = await balanzaApi.listarDocumentos(props.sesionId)
     } catch { /* silencioso */ }

@@ -202,7 +202,6 @@ export function useSync() {
             if (algunoOk) sesionesActualizadas.push(sesionId)
         }
 
-        await limpiarLotesOnlineSynced()
         return sesionesActualizadas
     }
 
@@ -230,20 +229,22 @@ export function useSync() {
         sincronizando.value = true
         errorSync.value = null
 
+        // En sincronizar(), reemplazar el bloque completo del try:
         try {
-            // 1. Primero: lotes de sesiones online creados offline (híbrido)
+            let sincronizado = false
+
+            // 1. lotes híbridos
             const sesionesConLotesNuevos = await sincronizarLotesOnline()
             if (sesionesConLotesNuevos.length > 0) {
-                // Notificar a SesionView para auto-reload (última sesión actualizada)
-                const ultimaSesion = sesionesConLotesNuevos[sesionesConLotesNuevos.length - 1]
-                if (ultimaSesion !== undefined) {
-                    sesionRecargada.value = ultimaSesion
-                }
+                sincronizado = true
+                const ultima = sesionesConLotesNuevos[sesionesConLotesNuevos.length - 1]
+                if (ultima !== undefined) sesionRecargada.value = ultima
             }
 
-            // 2. Luego: sesiones creadas completamente offline
+            // 2. sesiones offline
             const sesiones = await obtenerSesionesPendientes()
             if (sesiones.length > 0) {
+                sincronizado = true
                 const resp = await balanzaApi.syncBatch({ sesiones })
                 for (const resultado of resp.resultados) {
                     if (resultado.error) {
@@ -253,10 +254,14 @@ export function useSync() {
                     }
                 }
                 await limpiarSynced()
-                ultimoSync.value = new Date().toLocaleString('es-PE')
             }
 
+            // 3. finalizaciones híbridas
             await sincronizarFinalizaciones()
+
+            // Siempre marcar timestamp — es la señal de "sync completó" para los watchers
+            ultimoSync.value = new Date().toLocaleString('es-PE')
+
             if (await bloqueAgotado()) await renovarBloqueIP()
 
         } catch (err: any) {

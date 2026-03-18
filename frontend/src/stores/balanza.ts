@@ -25,6 +25,9 @@ import {
   encolarLoteOnline,
   contarLotesOnlinePendientes,
   obtenerLotesOnlinePendientes,
+  obtenerTodosLotesOnline,
+  eliminarLoteOnline,
+  limpiarLotesOnlineSynced,
   encolarFinalizacion,
   type SesionOfflineData,
   type LoteOfflineData,
@@ -97,6 +100,7 @@ function loteOnlineADetalle(lote: LoteOnlineData): LoteDetalle {
     },
     fecha_pesaje: null,
     fecha_habilitacion: null,
+    local_only: !lote.synced,
   }
 }
 
@@ -220,19 +224,24 @@ export const useBalanzaStore = defineStore('balanza', () => {
     loadingSesion.value = true
     try {
       const sesion = await balanzaApi.obtenerSesion(id)
+      const ipsServidor = new Set(sesion.lotes.map(l => l.ip))
 
-      // Fusionar lotes offline pendientes de esta sesión
-      const lotesOffline = await obtenerLotesOnlinePendientes()
-      const lotesPendientes = lotesOffline.filter(l => l.sesion_id === id)
+      // Leer TODOS los lotes locales de esta sesión (synced o no)
+      const todosLocales = await obtenerTodosLotesOnline()
+      const deEstaSesion = todosLocales.filter(l => l.sesion_id === id)
 
-      if (lotesPendientes.length > 0) {
-        // Evitar duplicados por si alguno ya llegó al servidor
-        const ipsServidor = new Set(sesion.lotes.map(l => l.ip))
-        const lotesExtra = lotesPendientes
-          .filter(l => !ipsServidor.has(l.ip))
-          .map(loteOnlineADetalle)
-        sesion.lotes.push(...lotesExtra)
+      for (const lote of deEstaSesion) {
+        if (ipsServidor.has(lote.ip)) {
+          // El servidor ya lo tiene — limpiar IndexedDB
+          await eliminarLoteOnline(lote.offline_id)
+        } else {
+          // El servidor aún no lo tiene — mostrar como local_only
+          sesion.lotes.push(loteOnlineADetalle(lote))
+        }
       }
+
+      // Ordenar por numero_lote para presentación consistente
+      sesion.lotes.sort((a, b) => a.numero_lote - b.numero_lote)
 
       sesionActual.value = sesion
       await actualizarLotesHybridPendientes(id)

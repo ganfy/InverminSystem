@@ -232,6 +232,12 @@
               <span class="badge-lote-estado" :class="loteEstadoClass(lote)">
                 {{ loteEstadoLabel(lote) }}
               </span>
+              <span v-if="lote.local_only" class="badge-local-lote" title="Pendiente de sincronizar">
+                ⚡ LOCAL
+              </span>
+              <span class="badge-lote-estado" :class="loteEstadoClass(lote)">
+                {{ loteEstadoLabel(lote) }}
+              </span>
             </div>
           </div>
           <div class="lote-card-body">
@@ -509,7 +515,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBalanzaStore } from '@/stores/balanza'
 import { useAuthStore } from '@/stores/auth'
@@ -724,10 +730,14 @@ async function finalizar() {
 
 // Auto-reload cuando useSync sincroniza lotes de esta sesión
 watch(sesionRecargada, async (idRecargado) => {
-  if (!idRecargado || esOffline.value) return
+  if (!idRecargado) return
   if (idRecargado === sesionIdNum.value) {
+    // Esperar un tick para que limpiarLotesOnlineSynced ya haya corrido
+    await nextTick()
     await store.cargarSesion(sesionIdNum.value)
-    ui.toast('Lotes sincronizados — sesión actualizada.', 'success')
+    preFillTipoMaterial()
+    preFillSacosGranel()
+    ui.toast('Sesión actualizada con lotes sincronizados.', 'success')
     limpiarSesionRecargada()
   }
 })
@@ -1038,6 +1048,16 @@ onMounted(async () => {
 .lote-card-footer {
   padding: .5rem 1rem; border-top: 1px solid var(--color-border);
   display: flex; justify-content: flex-end; gap: .5rem;
+}
+.badge-local-lote {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  background: rgba(245,158,11,.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,.4);
+  border-radius: 3px;
+  padding: 1px 5px;
 }
 .btn-sm { padding: .3rem .7rem; font-size: .78rem; }
 .lotes-eliminados { margin-top: .5rem; font-size: .82rem; color: var(--color-text-muted); }
