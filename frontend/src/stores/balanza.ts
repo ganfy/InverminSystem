@@ -25,7 +25,7 @@ import {
   type SesionOfflineData,
   type LoteOfflineData,
 } from '@/composables/useOfflineQueue'
-import { _TICKET_CSS } from './_TICKET_CSS'
+import { _TICKET_CSS, _TICKET_CSS_MULTI } from './_TICKET_CSS'
 
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
 
@@ -530,6 +530,38 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  // ── Helper HTML de ticket ──────────────────────────────────
+  function _buildTicketHtml(css: string, cuerpo: string, titulo: string, autoPrint: boolean): string {
+    const script = autoPrint
+      ? `<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},250)})<\/script>`
+      : ''
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>${titulo}</title><style>${css}</style></head><body>${cuerpo}${script}</body></html>`
+  }
+
+  // ── Tickets unificados (online + offline) ──────────────────
+
+  /** Abre previsualización sin auto-print (botón "Ver") */
+  function verTicket(lote: LoteDetalle) {
+    if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
+    _abrirVentana(_buildTicketHtml(_TICKET_CSS, _ticketCuerpo(lote, sesionActual.value), `Ticket ${lote.ip}`, false))
+  }
+
+  /** Abre ticket con auto-print (botón "Imprimir") */
+  function imprimirTicket(lote: LoteDetalle) {
+    if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
+    _abrirVentana(_buildTicketHtml(_TICKET_CSS, _ticketCuerpo(lote, sesionActual.value), `Ticket ${lote.ip}`, true))
+  }
+
+  /** Abre todos los tickets de la sesión en A4 portrait (2 por hoja) con auto-print */
+  function imprimirTicketsSesion() {
+    const s = sesionActual.value
+    if (!s) { ui.toast('No hay sesión activa', 'error'); return }
+    const lotes = s.lotes.filter(l => !l.eliminado)
+    if (!lotes.length) { ui.toast('Sin lotes para imprimir', 'warning'); return }
+    const cuerpos = lotes.map(l => `<div class="ticket">${_ticketCuerpo(l, s)}</div>`).join('\n')
+    _abrirVentana(_buildTicketHtml(_TICKET_CSS_MULTI, cuerpos, `Tickets sesión — ${lotes.length} lote(s)`, true))
+  }
+
   // ── Tickets offline ────────────────────────────────────────
   // El HTML replica ticket_balanza.html del servidor (mismo CSS, misma estructura).
   // El IP del bloque reservado es real; el número de ticket usa el IP como
@@ -618,5 +650,8 @@ export const useBalanzaStore = defineStore('balanza', () => {
     imprimirTicketOffline,
     imprimirTicketsSesionOffline,
     previsualizarTicketOffline,
+    verTicket,
+    imprimirTicket,
+    imprimirTicketsSesion,
   }
 })

@@ -246,26 +246,16 @@
           </div>
           <div class="lote-card-footer">
             <!-- [OFFLINE] imprime local; [ONLINE] ver preview + descargar PDF -->
-            <template v-if="esOffline">
-              <button class="btn-secondary btn-sm"
-                @click="store.previsualizarTicketOffline(lote)"
-                title="Ver ticket antes de imprimir">
-                👁 Ver ticket
-              </button>
-              <button class="btn-secondary btn-sm"
-                @click="store.imprimirTicketOffline(lote)"
-                title="Imprimir ticket">
-                🖨 Imprimir
-              </button>
-            </template>
-            <template v-else>
-              <button class="btn-secondary btn-sm" @click="verTicket(lote)" title="Ver antes de imprimir">
-                👁 Ver ticket
-              </button>
-              <button class="btn-secondary btn-sm" @click="descargarTicket(lote)" title="Descargar PDF">
-                ⬇ PDF
-              </button>
-            </template>
+            <button class="btn-secondary btn-sm"
+              @click="store.verTicket(lote)"
+              title="Ver ticket antes de imprimir">
+              👁 Ver ticket
+            </button>
+            <button class="btn-secondary btn-sm"
+              @click="store.imprimirTicket(lote)"
+              title="Imprimir ticket">
+              🖨 Imprimir
+            </button>
           </div>
         </div>
         <!-- Lotes eliminados -->
@@ -293,12 +283,10 @@
         <button
           v-if="lotesActivos.length > 0"
           class="btn-secondary"
-          :disabled="descargandoTodos"
-          @click="ticketsSesion()"
-          title="Genera un PDF con los tickets de todos los lotes para entregar al transportista"
+          @click="store.imprimirTicketsSesion()"
+          title="Imprimir todos los tickets (2 por hoja A4)"
         >
-          <span v-if="descargandoTodos" class="spinner" />
-          <span v-else>🖨 Tickets sesión</span>
+          🖨 Tickets sesión
         </button>
 
         <button
@@ -697,42 +685,6 @@ async function finalizar() {
     await store.finalizarSesionOffline(sesionIdRaw)
   } else {
     await store.finalizarSesion(sesionIdNum.value)
-  }
-}
-
-async function verTicket(lote: LoteDetalle) {
-  try {
-    const url = await balanzaApi.ticketPreviewBlob(sesionIdNum.value, lote.id)
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 10_000)
-  } catch {
-    ui.toast('Error al cargar preview del ticket', 'error')
-  }
-}
-
-async function descargarTicket(lote: LoteDetalle) {
-  await store.descargarTicket(sesionIdNum.value, lote.id, lote.ip)
-}
-
-const descargandoTodos = ref(false)
-async function descargarTodos() {
-  if (!sesion.value) return
-  descargandoTodos.value = true
-  try {
-    await store.descargarTicketsSesion(sesion.value.id)
-    ui.toast('PDF generado', 'success')
-  } catch {
-    ui.toast('Error al generar PDF', 'error')
-  } finally {
-    descargandoTodos.value = false
-  }
-}
-
-function ticketsSesion() {
-  if (esOffline.value) {
-    store.imprimirTicketsSesionOffline()
-  } else {
-    descargarTodos()
   }
 }
 
