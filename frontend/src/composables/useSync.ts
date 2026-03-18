@@ -64,6 +64,7 @@ export function useSync() {
     function onOffline() {
         if (FORCE_OFFLINE) return
         online.value = false
+        actualizarContadores()
     }
 
     onMounted(() => {

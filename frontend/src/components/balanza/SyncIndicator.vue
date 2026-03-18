@@ -45,18 +45,24 @@
     'sync--offline':      !props.online,
     'sync--error':        !!props.errorSync,
     'sync--sincronizando': props.sincronizando,
+    'sync--warning': !props.online && props.ipsRestantes > 0 && props.ipsRestantes <= 10,
   }))
 
   const dotClass = computed(() => ({
     'dot--green':  props.online && props.pendientes === 0 && !props.errorSync,
-    'dot--amber':  props.online && props.pendientes > 0,
-    'dot--red':    !props.online || !!props.errorSync,
+    'dot--amber': (props.online && props.pendientes > 0) ||
+              (!props.online && props.ipsRestantes <= 10 && props.ipsRestantes > 0),
+    'dot--red':   !props.online && (props.ipsRestantes === 0 || !!props.errorSync),
     'dot--pulse':  props.sincronizando,
   }))
 
   const labelText = computed(() => {
     if (props.sincronizando) return 'Sincronizando…'
-    if (!props.online)       return `Offline · ${props.ipsRestantes} IPs disp.`
+    if (!props.online) {
+    if (props.ipsRestantes === 0)  return 'Sin IPs — reconectar'
+    if (props.ipsRestantes <= 10)  return `⚠ Solo ${props.ipsRestantes} IPs disp.`
+    return `Offline · ${props.ipsRestantes} IPs disp.`
+}
     if (props.pendientes > 0) return `${props.pendientes} pendiente${props.pendientes > 1 ? 's' : ''}`
     return 'En línea'
   })
@@ -92,6 +98,7 @@
   .sync--pendiente  { background: rgba(220,160,20,.1); border-color: rgba(220,160,20,.3); color: var(--color-warning); }
   .sync--offline    { background: rgba(220,60,60,.1);  border-color: rgba(220,60,60,.3);  color: var(--color-error); }
   .sync--error      { background: rgba(220,60,60,.15); border-color: rgba(220,60,60,.4);  color: var(--color-error); }
+  .sync--warning { background: rgba(220,160,20,.1); border-color: rgba(220,160,20,.3); color: var(--color-warning); }
 
   /* Dot */
   .sync-dot {

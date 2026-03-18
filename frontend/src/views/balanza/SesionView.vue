@@ -595,6 +595,15 @@ function preFillBruto() {
   }
 }
 
+function preFillTipoMaterial() {
+  if (tipoMaterial.value) return
+  const activos = sesion.value?.lotes.filter(l => !l.eliminado) ?? []
+  const ultimo = activos[activos.length - 1]
+  if (ultimo?.tipo_material) {
+    tipoMaterial.value = ultimo.tipo_material
+  }
+}
+
 const pesoError = computed(() => {
   const { peso_inicial: bruto, peso_final: tara } = loteForm
   if (bruto !== null && tara !== null && bruto > 0 && tara > 0 && bruto <= tara) {
@@ -891,6 +900,7 @@ onMounted(async () => {
     await store.cargarSesion(sesionIdNum.value)
     preFillBruto()
   }
+  preFillTipoMaterial()
 })
 </script>
 
