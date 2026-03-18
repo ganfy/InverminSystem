@@ -84,6 +84,20 @@ def reservar_bloque_ip(db: Session) -> BloqueIPRespuesta:
     )
 
 
+def reservar_bloque_ticket(db: Session) -> dict:
+    """
+    Reserva un bloque de números de ticket para operación offline.
+    Usa configuracion: proximo_ticket / tamano_bloque_ticket.
+    El frontend asignará TK-{n:05d} sin llamar al servidor.
+    """
+    desde = int(_get_config(db, "proximo_ticket", "1"))
+    tamano = int(_get_config(db, "tamano_bloque_ticket", "50"))
+    hasta = desde + tamano - 1
+    _set_config(db, "proximo_ticket", str(hasta + 1))
+    db.flush()
+    return {"desde": desde, "hasta": hasta, "tamano": tamano}
+
+
 # ── 2. Caché de provacops ──────────────────────────────────
 
 
@@ -261,7 +275,7 @@ def _sync_lote(
         db.flush()
         db.refresh(pesaje)
 
-        pesaje.numero_ticket = f"TK-{pesaje.id:03d}"
+        pesaje.numero_ticket = data.numero_ticket or pesaje.id
         db.flush()
 
         return {"offline_id": data.offline_id, "ip": data.ip, "ya_existia": False, "error": None}

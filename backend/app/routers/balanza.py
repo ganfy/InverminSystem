@@ -495,6 +495,19 @@ def reservar_bloque_ip(
     return offline_svc.reservar_bloque_ip(db)
 
 
+@router.get(
+    "/offline/ticket-range",
+    summary="Reservar bloque de números de ticket para operación offline",
+)
+def reservar_bloque_ticket(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    from app.services.balanza_offline import reservar_bloque_ticket as _reservar_tk
+
+    return _reservar_tk(db)
+
+
 # ── RF-BAL-005: Caché de provacops ─────────────────────────
 
 

@@ -17,7 +17,7 @@
 import { ref } from 'vue'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -26,6 +26,14 @@ export interface IPBlock {
     hasta: number
     usado: number       // cuántos IPs del bloque ya se usaron
     anio: number
+    reservado_en: string
+}
+
+export interface TKBlock {
+    id: 'tk'          // clave fija — un solo registro
+    desde: number
+    hasta: number
+    usado: number
     reservado_en: string
 }
 
@@ -56,6 +64,7 @@ export interface LoteOfflineData {
     tipo_material: string
     pesaje: PesajeOfflineData
     creado_en: string
+    numero_ticket: string
 }
 
 export interface SesionOfflineData {
@@ -87,21 +96,19 @@ async function openDB(): Promise<IDBDatabase> {
 
         req.onupgradeneeded = (e) => {
             const db = (e.target as IDBOpenDBRequest).result
+            const oldVersion = e.oldVersion
 
-            // Bloque IP — un solo registro
-            if (!db.objectStoreNames.contains('ip_block')) {
+            if (oldVersion < 1) {
+                // stores originales
                 db.createObjectStore('ip_block', { keyPath: 'anio' })
-            }
-
-            // Caché de provacops
-            if (!db.objectStoreNames.contains('provacops')) {
                 db.createObjectStore('provacops', { keyPath: 'provacop_id' })
-            }
-
-            // Cola de sesiones offline
-            if (!db.objectStoreNames.contains('sesiones_q')) {
                 const s = db.createObjectStore('sesiones_q', { keyPath: 'offline_id' })
                 s.createIndex('synced', 'synced', { unique: false })
+            }
+
+            if (oldVersion < 2) {
+                // bloque de tickets — un único registro con keyPath 'id' = 'tk'
+                db.createObjectStore('tk_block', { keyPath: 'id' })
             }
         }
 
@@ -263,4 +270,43 @@ export async function limpiarSynced(): Promise<number> {
 export async function contarPendientes(): Promise<number> {
     const pendientes = await obtenerSesionesPendientes()
     return pendientes.length
+}
+
+
+// ── Bloque de Tickets ──────────────────────────────────────
+
+export async function guardarBloqueTK(
+    bloque: Omit<TKBlock, 'id' | 'usado' | 'reservado_en'>
+): Promise<void> {
+    await put('tk_block', {
+        id: 'tk',
+        ...bloque,
+        usado: 0,
+        reservado_en: new Date().toISOString(),
+    })
+}
+
+export async function obtenerBloqueTK(): Promise<TKBlock | null> {
+    return get<TKBlock>('tk_block', 'tk')
+}
+
+/**
+ * Retorna el siguiente número de ticket formateado como "TK-XXXXX".
+ * Retorna null si el bloque está agotado.
+ */
+export async function siguienteTK(): Promise<string | null> {
+    const bloque = await obtenerBloqueTK()
+    if (!bloque) return null
+
+    const numero = bloque.desde + bloque.usado
+    if (numero > bloque.hasta) return null
+
+    await put('tk_block', { ...bloque, usado: bloque.usado + 1 })
+    return `TK-${String(numero).padStart(5, '0')}`
+}
+
+export async function bloqueTKAgotado(): Promise<boolean> {
+    const bloque = await obtenerBloqueTK()
+    if (!bloque) return true
+    return (bloque.desde + bloque.usado) > bloque.hasta
 }

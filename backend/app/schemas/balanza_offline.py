@@ -60,6 +60,7 @@ class LoteOffline(BaseModel):
     tipo_material: str
     pesaje: PesajeOffline
     creado_en: datetime | None = None
+    numero_ticket: str | None = None
 
 
 class SesionOffline(BaseModel):
@@ -96,3 +97,9 @@ class SyncBatchRespuesta(BaseModel):
     procesados: int
     resultados: list[SyncItemResultado]
     ts_servidor: str
+
+
+class BloqueTKRespuesta(BaseModel):
+    desde: int
+    hasta: int
+    tamano: int

@@ -18,11 +18,14 @@ import {
   siguienteIP,
   bloqueAgotado,
   encolarSesion,
+  siguienteTK,
+  bloqueTKAgotado,
   obtenerProvacops,
   obtenerSesionesPendientes,
   type SesionOfflineData,
   type LoteOfflineData,
 } from '@/composables/useOfflineQueue'
+import { _TICKET_CSS } from './_TICKET_CSS'
 
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
 
@@ -55,7 +58,7 @@ function loteOfflineADetalle(lote: LoteOfflineData): LoteDetalle {
       peso_neto: pesoNeto,
       sacos: lote.pesaje.sacos,
       granel: lote.pesaje.granel,
-      numero_ticket: `${lote.ip}`,   // IP como referencia hasta sincronizar
+      numero_ticket: lote.numero_ticket,
       fecha_inicio: lote.pesaje.fecha_inicio,
       fecha_fin: lote.pesaje.fecha_fin,
     },
@@ -78,32 +81,6 @@ function _fmtFecha(iso: string | null | undefined): string {
   }).replace(',', '')
 }
 
-const _TICKET_CSS = `
-@page { size: A5 landscape; margin: 1.0cm 1.5cm 0.8cm 1.5cm; }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Courier New',Courier,monospace; font-size:9.5pt; color:#000; line-height:1.55; }
-.emp-nombre { font-size:13pt; font-weight:bold; }
-.emp-sub    { font-size:9pt; }
-.hr { border:none; border-top:1px solid #000; margin:4px 0; }
-.fila-placa { width:100%; border-collapse:collapse; }
-.fila-placa td { padding:0; vertical-align:middle; }
-.td-ticket { text-align:right; font-size:11pt; font-weight:bold; white-space:nowrap; }
-.datos { width:100%; border-collapse:collapse; }
-.datos td { padding:0; vertical-align:top; font-size:9.5pt; line-height:1.5; }
-.lbl { width:100px; white-space:nowrap; }
-.sep { width:10px; }
-.seccion { width:100%; border-collapse:collapse; margin-top:1px; }
-.seccion td { vertical-align:top; padding:0; }
-.col-fechas { width:54%; }
-.col-pesos  { width:46%; }
-.tabla-pesos { width:100%; border-collapse:collapse; }
-.tabla-pesos td { padding:0; font-size:9.5pt; line-height:1.5; }
-.p-sep { width:10px; }
-.p-val { text-align:right; font-size:12pt; font-weight:bold; padding-right:2px; }
-.p-neto { font-size:13.5pt; }
-.p-unit { font-size:8pt; white-space:nowrap; }
-`
-
 function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
   const obs = [
     lote.ip,
@@ -111,20 +88,20 @@ function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
     lote.pesaje?.granel
       ? 'GRANEL'
       : (lote.pesaje?.sacos ? `${lote.pesaje.sacos} SACOS` : ''),
-  ].filter(Boolean).join(' ')
+  ].filter(Boolean).join(' | ')
 
   const acopHtml = (!s.es_propio && s.acopiador_razon_social)
     ? `<tr><td class="lbl">Acopiador</td><td class="sep">:</td><td>${s.acopiador_razon_social}</td></tr>`
     : ''
 
-  return `
+  return `<div class="ticket-page">
 <div class="emp-nombre">INVERMIN PAITITI S.A.C.</div>
 <div class="emp-sub">Planta El Dorado</div>
 <div class="emp-sub">R.U.C. 20601910587</div>
 <div class="hr"></div>
 <table class="fila-placa"><tr>
-  <td>Placa : ${s.placa} &nbsp;&nbsp; Carreta : ${s.carreta || '0'}</td>
-  <td class="td-ticket">Ticket : ${lote.ip}</td>
+  <td class="td-placa">Placa : ${s.placa} &nbsp;&nbsp; Carreta : ${s.carreta || '0'}</td>
+  <td class="td-ticket">Ticket : ${lote.pesaje?.numero_ticket ?? lote.ip}</td>
 </tr></table>
 <div class="hr"></div>
 <table class="datos">
@@ -151,19 +128,19 @@ function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
       <tr><td>Peso Neto</td><td class="p-sep">:</td><td class="p-val p-neto">${_fmtPeso(lote.peso_neto)}</td><td class="p-unit">TM</td></tr>
     </table>
   </td>
-</tr></table>`
+</tr></table>
+</div>`
 }
 
+
 function _abrirVentana(html: string) {
-  const win = window.open('', '_blank', 'width=900,height=620')
+  const blob = new Blob([html], { type: 'text/html; charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank', 'width=950,height=680')
   if (!win) {
-    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
     window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 30_000)
-    return
   }
-  win.document.write(html)
-  win.document.close()
+  setTimeout(() => URL.revokeObjectURL(url), 120_000)
 }
 
 // ── Store ──────────────────────────────────────────────────
@@ -427,17 +404,22 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
 
     // Offline
-    const agotado = await bloqueAgotado()
-    if (agotado) {
+    const agotadoIP = await bloqueAgotado()
+    if (agotadoIP) {
       ui.toast('Bloque de IPs agotado. Necesitas conexión para renovar.', 'error')
+      return null
+    }
+    const agotadoTK = await bloqueTKAgotado()
+    if (agotadoTK) {
+      ui.toast('Bloque de tickets agotado. Necesitas conexión para renovar.', 'error')
       return null
     }
 
     const ip = await siguienteIP()
-    if (!ip) {
-      ui.toast('No hay IPs disponibles offline.', 'error')
-      return null
-    }
+    if (!ip) { ui.toast('No hay IPs disponibles offline.', 'error'); return null }
+
+    const numeroTicket = await siguienteTK()
+    if (!numeroTicket) { ui.toast('No hay tickets disponibles offline.', 'error'); return null }
 
     const offlineId = generarOfflineId()
     const ahora = new Date().toISOString()
@@ -448,6 +430,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
       ip,
       numero_lote: numeroLote,
       tipo_material: datos.tipo_material,
+      numero_ticket: numeroTicket,    // ← NUEVO
       pesaje: {
         peso_inicial: datos.pesaje.peso_inicial,
         peso_final: datos.pesaje.peso_final,
@@ -554,26 +537,33 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
   function imprimirTicketOffline(lote: LoteDetalle) {
     if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
-    const s = sesionActual.value
     const html = `<!DOCTYPE html><html lang="es"><head>
-<meta charset="UTF-8"/><title>Ticket ${lote.ip}</title>
-<style>${_TICKET_CSS}</style></head><body>
-${_ticketCuerpo(lote, s)}
-<script>window.onload = () => { window.print() }<\/script>
-</body></html>`
-    _abrirVentana(html)
+    <meta charset="UTF-8"/>
+    <title>Ticket ${lote.ip}</title>
+    <style>${_TICKET_CSS}</style></head><body>
+    ${_ticketCuerpo(lote, sesionActual.value)}
+    <script>
+      window.addEventListener('load', function() {
+        setTimeout(function() { window.print() }, 250)
+      })
+    <\/script>
+    </body></html>`
+      _abrirVentana(html)
   }
 
   function previsualizarTicketOffline(lote: LoteDetalle) {
     if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
-    // Igual que imprimir pero sin el script de window.print()
+    // Sin script de print — el usuario lo lanza con Ctrl+P o el botón del navegador
     const html = `<!DOCTYPE html><html lang="es"><head>
-  <meta charset="UTF-8"/><title>Ticket ${lote.ip}</title>
-  <style>${_TICKET_CSS}</style></head><body>
-  ${_ticketCuerpo(lote, sesionActual.value)}
-  </body></html>`
-    _abrirVentana(html)
+    <meta charset="UTF-8"/>
+    <title>Preview — Ticket ${lote.ip}</title>
+    <style>${_TICKET_CSS}</style></head><body>
+    ${_ticketCuerpo(lote, sesionActual.value)}
+    </body></html>`
+      _abrirVentana(html)
   }
+
+  // REEMPLAZAR imprimirTicketsSesionOffline:
 
   function imprimirTicketsSesionOffline() {
     const s = sesionActual.value
@@ -582,19 +572,24 @@ ${_ticketCuerpo(lote, s)}
     const lotes = s.lotes.filter(l => !l.eliminado)
     if (!lotes.length) { ui.toast('Sin lotes para imprimir', 'warning'); return }
 
-    const cssPagina = _TICKET_CSS + `
-.ticket { page-break-after: always; }
-.ticket:last-child { page-break-after: avoid; }`
-
-    const cuerpos = lotes.map(l => `<div class="ticket">${_ticketCuerpo(l, s)}</div>`)
+    // Los estilos de page-break ya están en _TICKET_CSS bajo @media print
+    const cuerpos = lotes.map(l =>
+      `<div class="ticket">${_ticketCuerpo(l, s)}</div>`
+    )
 
     const html = `<!DOCTYPE html><html lang="es"><head>
-<meta charset="UTF-8"/><title>Tickets sesión</title>
-<style>${cssPagina}</style></head><body>
-${cuerpos.join('\n')}
-<script>window.onload = () => { window.print() }<\/script>
-</body></html>`
-    _abrirVentana(html)
+      <meta charset="UTF-8"/>
+      <title>Tickets sesión — ${lotes.length} lote(s)</title>
+      <style>${_TICKET_CSS}</style></head><body>
+      ${cuerpos.join('\n')}
+      <script>
+        window.addEventListener('load', function() {
+          // Pequeño delay para que el navegador termine de renderizar
+          setTimeout(function() { window.print() }, 250)
+        })
+      <\/script>
+      </body></html>`
+      _abrirVentana(html)
   }
 
   return {

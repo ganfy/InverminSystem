@@ -304,6 +304,11 @@ export const balanzaApi = {
     return data
   },
 
+  async reservarBloqueTK(): Promise<{ desde: number; hasta: number; tamano: number }> {
+    const { data } = await api.get('/balanza/offline/ticket-range')
+    return data
+  },
+
   // RF-BAL-005: Obtener caché de provacops para uso offline
   async obtenerCacheProvacops(): Promise<CacheProvacopsRespuesta> {
     const { data } = await api.get<CacheProvacopsRespuesta>('/balanza/offline/provacops')

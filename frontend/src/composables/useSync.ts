@@ -25,6 +25,8 @@ import {
     contarPendientes,
     bloqueAgotado,
     ipsDisponibles,
+    guardarBloqueTK,
+    bloqueTKAgotado,
 } from '@/composables/useOfflineQueue'
 
 // ── Modo offline forzado (solo desarrollo) ─────────────────
@@ -83,11 +85,16 @@ export function useSync() {
             return
         }
 
-        // Cada paso falla de forma independiente — uno no bloquea al siguiente
         try {
             if (await bloqueAgotado()) await renovarBloqueIP()
         } catch (err) {
             console.warn('[useSync] No se pudo renovar bloque IP:', err)
+        }
+
+        try {
+            if (await bloqueTKAgotado()) await renovarBloqueTK()
+        } catch (err) {
+            console.warn('[useSync] No se pudo renovar bloque TK:', err)
         }
 
         try {
@@ -96,7 +103,6 @@ export function useSync() {
             console.warn('[useSync] No se pudo actualizar caché provacops:', err)
         }
 
-        // El sync siempre se intenta, aunque lo anterior haya fallado
         await sincronizar()
     }
 
@@ -114,6 +120,15 @@ export function useSync() {
         } catch (err) {
             // No propagar — si falla, seguimos con el bloque que había en IndexedDB
             console.warn('[useSync] No se pudo reservar bloque IP:', err)
+        }
+    }
+
+    async function renovarBloqueTK(): Promise<void> {
+        try {
+            const bloque = await balanzaApi.reservarBloqueTK()
+            await guardarBloqueTK({ desde: bloque.desde, hasta: bloque.hasta })
+        } catch (err) {
+            console.warn('[useSync] No se pudo reservar bloque TK:', err)
         }
     }
 
