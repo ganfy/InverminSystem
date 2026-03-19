@@ -15,6 +15,7 @@
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { balanzaApi } from '@/api/balanza'
+import { useUiStore } from '@/stores/ui'
 import {
     guardarBloqueIP,
     guardarProvacops,
@@ -35,6 +36,8 @@ import {
     marcarLoteOnlineSynced,
     limpiarLotesOnlineSynced,
     type LoteOnlineData,
+    siguienteIP,
+    encolarSesion,
 } from '@/composables/useOfflineQueue'
 
 // ── Modo offline forzado (solo desarrollo) ─────────────────
@@ -56,6 +59,7 @@ const ultimoSync = ref<string | null>(null)
 const errorSync = ref<string | null>(null)
 const ipsRestantes = ref<number>(0)
 const sesionRecargada = ref<number | null>(null) // ID de sesión que se recargó desde otra pestaña (para evitar recargas infinitas)
+const sesionOfflineSincronizada = ref<{ offline_id: string, server_id: number } | null>(null)
 
 // ── Composable ─────────────────────────────────────────────
 
@@ -240,17 +244,76 @@ export function useSync() {
                 const ultima = sesionesConLotesNuevos[sesionesConLotesNuevos.length - 1]
                 if (ultima !== undefined) sesionRecargada.value = ultima
             }
+            await limpiarLotesOnlineSynced()
 
             // 2. sesiones offline
             const sesiones = await obtenerSesionesPendientes()
             if (sesiones.length > 0) {
                 sincronizado = true
                 const resp = await balanzaApi.syncBatch({ sesiones })
+
+                const sesionesPostSync = await obtenerSesionesPendientes()
+                const ui = useUiStore()
+
                 for (const resultado of resp.resultados) {
                     if (resultado.error) {
-                        await marcarSesionError(resultado.offline_id, resultado.error)
+                        // DETECCIÓN DE COLISIÓN DE IP
+                        if (resultado.error.includes('ERR_IP_COLLISION')) {
+                            const match = resultado.error.match(/ERR_IP_COLLISION\|([A-Z0-9-]+)/)
+                            const ipEnConflicto = match ? match[1] : 'Desconocido'
+
+                            // Mostrar alerta bloqueante para el usuario
+                            const ok = await ui.showConfirm({
+                                title: 'Cruce de Tickets Detectado',
+                                message: `El ticket ${ipEnConflicto} ya se encuentra registrado en otra sesión (usualmente por cruce de caché).\n\n¿Deseas asignarle un nuevo número correlativo automáticamente para no perder los datos del pesaje? (Ten en cuenta que el ticket físico conservará el número antiguo).`,
+                                confirmLabel: 'Sí, reasignar IP',
+                            })
+
+                            if (ok) {
+                                // Reparar usando memoria local
+                                const sesionLocal = sesionesPostSync.find(s => s.offline_id === resultado.offline_id)
+                                if (sesionLocal) {
+                                    const nuevoIp = await siguienteIP()
+                                    if (nuevoIp) {
+                                        const loteConflicto = sesionLocal.lotes.find(l => l.ip === ipEnConflicto)
+                                        if (loteConflicto) {
+                                            loteConflicto.ip = nuevoIp
+                                            await encolarSesion(sesionLocal)
+                                            ui.toast(`Se reasignó a ${nuevoIp}. Reintentando sincronización en segundo plano...`, 'info')
+
+                                            // Programar reintento automático
+                                            setTimeout(sincronizar, 2000)
+                                            continue // Evita marcar la sesión con error final
+                                        }
+                                    } else {
+                                        ui.toast('No hay IPs disponibles para reasignar. Conéctate para renovar el bloque.', 'error')
+                                    }
+                                }
+                            }
+
+                            // Si hizo clic en "NO" o falló la reasignación, dejamos el error
+                            await marcarSesionError(resultado.offline_id, `Cruce de IP: ${ipEnConflicto}. Requiere arreglo manual.`)
+                        } else {
+                            await marcarSesionError(resultado.offline_id, resultado.error)
+                        }
                     } else {
+                        const enviada = sesiones.find(s => s.offline_id === resultado.offline_id)
+                        const actualLocal = sesionesPostSync.find(s => s.offline_id === resultado.offline_id)
+
+                        // Si la sesión local fue modificada durante el sync (se agregó un lote o cambió el estado), no marcar como sincronizada para evitar perder esos cambios. Se reintentará en el próximo ciclo de sync.
+                        if (enviada && actualLocal) {
+                            if (actualLocal.lotes.length > enviada.lotes.length || actualLocal.estado !== enviada.estado) {
+                                console.warn(`[useSync] Sesión ${resultado.offline_id} modificada durante sync. Reteniendo para próximo ciclo.`)
+                                continue
+                            }
+                        }
+
                         await marcarSesionSynced(resultado.offline_id, resultado.server_id!)
+                        // Disparar evento para que la vista redirija al nuevo ID
+                        sesionOfflineSincronizada.value = {
+                            offline_id: resultado.offline_id,
+                            server_id: resultado.server_id!
+                        }
                     }
                 }
                 await limpiarSynced()
@@ -288,11 +351,12 @@ export function useSync() {
         errorSync: computed(() => errorSync.value),
         ipsRestantes: computed(() => ipsRestantes.value),
         sesionRecargada: computed(() => sesionRecargada.value),
-
+        sesionOfflineSincronizada: computed(() => sesionOfflineSincronizada.value),
         inicializar,
         sincronizar,
         renovarBloqueIP,
         actualizarContadores,
         limpiarSesionRecargada: () => { sesionRecargada.value = null },
+        limpiarSesionOfflineSincronizada: () => { sesionOfflineSincronizada.value = null },
     }
 }

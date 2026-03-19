@@ -192,6 +192,7 @@
   import { useUiStore } from '@/stores/ui'
   import { useAuthStore } from '@/stores/auth'
   import { balanzaApi } from '@/api/balanza'
+  import { useSync } from '@/composables/useSync'
   import type { DocumentoRespuesta, DatosExtraidos, TipoDocumento } from '@/types/balanza'
 
   // ── Props & emits ─────────────────────────────────────────────────────────────
@@ -260,18 +261,27 @@
   })
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────────
+  const { online } = useSync()
+
   onMounted(() => { if (props.sesionId) cargarDelServidor() })
-  watch(() => props.sesionId, id => {
-    if (id && navigator.onLine) cargarDelServidor()
+  watch([() => props.sesionId, online], ([id, isOnline]) => {
+    if (id && isOnline) cargarDelServidor()
   })
 
   // ── Métodos: servidor ─────────────────────────────────────────────────────────
   async function cargarDelServidor() {
     if (!props.sesionId) return
-    if (!navigator.onLine) return  // ← no intentar si offline
+    if (!navigator.onLine) return
     try {
       documentosServidor.value = await balanzaApi.listarDocumentos(props.sesionId)
-    } catch { /* silencioso */ }
+    } catch (err: any) {
+      // Si hay error de proxy/red (como ECONNRESET) justo en el milisegundo al reconectar, reintentar.
+      if (!err?.response) {
+         setTimeout(async () => {
+           try { documentosServidor.value = await balanzaApi.listarDocumentos(props.sesionId!) } catch {}
+         }, 2000)
+      }
+    }
   }
 
   // ── Métodos: selección de archivos ────────────────────────────────────────────

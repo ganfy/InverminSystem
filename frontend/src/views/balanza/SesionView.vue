@@ -537,12 +537,41 @@ const ui        = useUiStore()
 // [OFFLINE] ID como string; detecta si es sesión offline por el prefijo
 const sesionIdRaw = route.params.id as string
 const esOffline = computed(() => sesionIdRaw.startsWith('offline-') || !online.value)
-const sesionIdNum = computed(() => esOffline.value ? -1 : Number(sesionIdRaw))
+const sesionIdNum = computed(() => sesionIdRaw.startsWith('offline-') ? -1 : Number(sesionIdRaw))
 
 const sesion       = computed(() => store.sesionActual)
 const lotesActivos = computed(() => sesion.value?.lotes.filter(l => !l.eliminado) ?? [])
 
-const { online, sesionRecargada, limpiarSesionRecargada } = useSync()
+const {
+  online, sesionRecargada,
+  limpiarSesionRecargada,
+  sesionOfflineSincronizada,
+  limpiarSesionOfflineSincronizada
+} = useSync()
+
+// Auto-redirect cuando una sesión 100% offline se sincroniza exitosamente en background
+watch(sesionOfflineSincronizada, (val) => {
+  if (val && val.offline_id === sesionIdRaw) {
+    ui.toast('Conexión recuperada. Sesión sincronizada con el servidor.', 'success')
+    // Reemplaza la ruta actual con el ID real del servidor
+    router.replace({ name: 'Sesion', params: { id: val.server_id.toString() } })
+    limpiarSesionOfflineSincronizada()
+  }
+})
+
+// Auto-reload cuando useSync sincroniza lotes de esta sesión
+watch(sesionRecargada, async (idRecargado) => {
+  if (!idRecargado) return
+  if (idRecargado === sesionIdNum.value) {
+    // Esperar un tick para que limpiarLotesOnlineSynced ya haya corrido
+    await nextTick()
+    await store.cargarSesion(sesionIdNum.value)
+    preFillTipoMaterial()
+    preFillSacosGranel()
+    preFillBruto()
+    limpiarSesionRecargada()
+  }
+})
 
 // ── Balanza física ─────────────────────────────────────────
 const {
@@ -676,7 +705,7 @@ async function registrarLote() {
   if (!loteFormValido.value) return
   // [OFFLINE] pasar string si es sesión offline, number si es online
   const ok = await store.agregarLote(
-    esOffline.value ? sesionIdRaw : sesionIdNum.value,
+    sesionIdRaw.startsWith('offline-') ? sesionIdRaw : sesionIdNum.value,
     {
       tipo_material: tipoMaterial.value,
       pesaje: {
@@ -897,12 +926,13 @@ function loteEstadoLabel(lote: LoteDetalle) {
 
 // ── Montaje ────────────────────────────────────────────────
 onMounted(async () => {
-  if (esOffline.value) {
-    // Si ya está en memoria (nav inmediata post-creación) no releer IndexedDB
+  // Solo buscar en la cola 100% offline si el ID tiene el prefijo
+  if (sesionIdRaw.startsWith('offline-')) {
     if (store.sesionActual?.offline_id !== sesionIdRaw) {
       await store.cargarSesionOffline(sesionIdRaw)
     }
   } else {
+    // Si es una sesión del servidor (normal o híbrida), cargarla
     await store.cargarSesion(sesionIdNum.value)
     preFillBruto()
   }

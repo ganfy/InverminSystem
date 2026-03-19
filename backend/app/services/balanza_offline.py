@@ -180,42 +180,60 @@ def _sync_sesion(
     existente = (
         db.query(SesionDescarga).filter(SesionDescarga.offline_id == data.offline_id).first()
     )
-    if existente:
-        return SyncItemResultado(
-            offline_id=data.offline_id,
-            server_id=existente.id,
-            ya_existia=True,
-            error=None,
-            lotes=[],
-        )
-
     try:
-        sesion = SesionDescarga(
-            provacop_id=data.provacop_id,
-            placa=data.placa,
-            carreta=data.carreta,
-            conductor=data.conductor,
-            transportista=data.transportista,
-            razon_social=data.razon_social,
-            guia_remision=data.guia_remision,
-            guia_transporte=data.guia_transporte,
-            estado=EstadoSesion.COMPLETO if data.estado == "COMPLETO" else EstadoSesion.EN_PROCESO,
-            creado_por=usuario_id,
-            creado_en=data.creado_en or ahora,
-            offline_id=data.offline_id,
-        )
-        db.add(sesion)
-        db.flush()
+        if existente:
+            sesion_id = existente.id
+            ya_existia = True
+
+        else:
+            sesion = SesionDescarga(
+                provacop_id=data.provacop_id,
+                placa=data.placa,
+                carreta=data.carreta,
+                conductor=data.conductor,
+                transportista=data.transportista,
+                razon_social=data.razon_social,
+                guia_remision=data.guia_remision,
+                guia_transporte=data.guia_transporte,
+                estado=EstadoSesion.COMPLETO
+                if data.estado == "COMPLETO"
+                else EstadoSesion.EN_PROCESO,
+                creado_por=usuario_id,
+                creado_en=data.creado_en or ahora,
+                offline_id=data.offline_id,
+            )
+            db.add(sesion)
+            db.flush()
+
+            sesion_id = sesion.id
+            ya_existia = False
 
         lotes_resultado = []
+        errores_lotes = []
+
         for lote_data in data.lotes:
-            lote_res = _sync_lote(db, lote_data, sesion.id, usuario_id, ahora)
+            lote_res = _sync_lote(db, lote_data, sesion_id, usuario_id, ahora)
             lotes_resultado.append(lote_res)
 
+            if lote_res.get("error"):
+                if "ERR_IP_COLLISION" in lote_res["error"]:
+                    errores_lotes.append(lote_res["error"])
+                else:
+                    errores_lotes.append(f"Lote {lote_data.ip}: {lote_res['error']}")
+
+        if errores_lotes:
+            db.rollback()
+            return SyncItemResultado(
+                offline_id=data.offline_id,
+                server_id=None,
+                ya_existia=False,
+                error=" | ".join(errores_lotes),
+                lotes=[],
+            )
         return SyncItemResultado(
             offline_id=data.offline_id,
-            server_id=sesion.id,
-            ya_existia=False,
+            server_id=sesion_id,
+            ya_existia=ya_existia,
             error=None,
             lotes=lotes_resultado,
         )
@@ -243,8 +261,14 @@ def _sync_lote(
     # Idempotencia: si el IP ya existe, no duplicar
     existente = db.query(Lote).filter(Lote.ip == data.ip).first()
     if existente:
+        if existente.sesion_id != sesion_id:
+            return {
+                "offline_id": data.offline_id,
+                "ip": data.ip,
+                "ya_existia": False,
+                "error": f"ERR_IP_COLLISION|{data.ip}",
+            }
         return {"offline_id": data.offline_id, "ip": data.ip, "ya_existia": True, "error": None}
-
     try:
         lote = Lote(
             sesion_id=sesion_id,
@@ -261,10 +285,14 @@ def _sync_lote(
         db.flush()
 
         p = data.pesaje
+
+        peso_ini_dec = Decimal(str(p.peso_inicial)) if p.peso_inicial is not None else None
+        peso_fin_dec = Decimal(str(p.peso_final)) if p.peso_final is not None else None
+
         pesaje = Pesaje(
             lote_id=lote.id,
-            peso_inicial=Decimal(str(p.peso_inicial)),
-            peso_final=Decimal(str(p.peso_final)),
+            peso_inicial=peso_ini_dec,
+            peso_final=peso_fin_dec,
             sacos=p.sacos,
             granel=p.granel,
             numero_ticket=None,
@@ -275,7 +303,7 @@ def _sync_lote(
         db.flush()
         db.refresh(pesaje)
 
-        pesaje.numero_ticket = data.numero_ticket or pesaje.id
+        pesaje.numero_ticket = data.numero_ticket or str(pesaje.id)
         db.flush()
 
         return {"offline_id": data.offline_id, "ip": data.ip, "ya_existia": False, "error": None}

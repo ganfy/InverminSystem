@@ -354,7 +354,7 @@ def agregar_lote(
     db.refresh(pesaje)  # carga peso_neto calculado por la BD
 
     # Número de ticket: "TK-XXXXX" con padding 5 dígitos, basado en el PK
-    pesaje.numero_ticket = f"TK-{pesaje.id:03d}"
+    pesaje.numero_ticket = f"TK-{pesaje.id:05d}"
     db.flush()
 
     lote_cargado = db.query(Lote).options(joinedload(Lote.pesajes)).filter(Lote.id == lote.id).one()

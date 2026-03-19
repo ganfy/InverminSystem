@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { balanzaApi } from '@/api/balanza'
 import type {
   SesionLista,
@@ -29,17 +29,19 @@ import {
   eliminarLoteOnline,
   limpiarLotesOnlineSynced,
   encolarFinalizacion,
+  obtenerFinalizacionesPendientes,
   type SesionOfflineData,
   type LoteOfflineData,
   type LoteOnlineData,
 } from '@/composables/useOfflineQueue'
+import { useSync } from '@/composables/useSync'
 import { _TICKET_CSS, _TICKET_CSS_MULTI } from './_TICKET_CSS'
 
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
 
 // ── Helpers privados ───────────────────────────────────────
 
-function esOfflineId(id: number | string): boolean {
+function esOfflineId(id: number | string): id is string {
   return typeof id === 'string' && id.startsWith('offline-')
 }
 
@@ -186,8 +188,18 @@ export const useBalanzaStore = defineStore('balanza', () => {
   const ui = useUiStore()
   const auth = useAuthStore()
 
+  const { ultimoSync } = useSync()
+
   const sesiones = ref<SesionLista[]>([])
   const sesionActual = ref<SesionDetalle | null>(null)
+
+  watch(ultimoSync, (nuevoSync) => {
+    // Si hubo un sync exitoso de fondo y tenemos red, refrescamos la lista
+    if (nuevoSync && !estamosOffline()) {
+      cargarSesiones()
+    }
+  })
+
   const provacops = ref<ProvAcopDropdown[]>([])
   const loading = ref(false)
   const loadingSesion = ref(false)
@@ -223,7 +235,54 @@ export const useBalanzaStore = defineStore('balanza', () => {
   async function cargarSesion(id: number) {
     loadingSesion.value = true
     try {
-      const sesion = await balanzaApi.obtenerSesion(id)
+      let sesion: SesionDetalle;
+
+      try {
+        sesion = await balanzaApi.obtenerSesion(id)
+      } catch (err: any) {
+        // Tolerancia si el backend está caído (ERR_NETWORK) o no hay internet
+        const esErrorRed = estamosOffline() || !err?.response || err?.code === 'ERR_NETWORK' || err?.message?.toLowerCase().includes('network');
+        // Si no hay red, construir un fallback usando la lista cacheada o finalizaciones
+        if (esErrorRed) {
+          const sLista = sesiones.value.find(s => s.id === id)
+          const finalizaciones = await obtenerFinalizacionesPendientes()
+          const fin = finalizaciones.find(f => f.sesion_id === id)
+
+          // Buscar también si esta sesión tiene lotes pendientes (para recuperar las "En Proceso")
+          const todosLocales = await obtenerTodosLotesOnline()
+          const deEstaSesion = todosLocales.filter(l => Number(l.sesion_id) === id)
+
+          if (sLista || fin || deEstaSesion.length > 0) {
+            sesion = {
+              id: id,
+              offline_id: '',
+              provacop_id: 0,
+              proveedor_razon_social: sLista?.proveedor_razon_social ?? fin?.proveedor_razon_social ?? 'Desconocido',
+              proveedor_ruc: '',
+              acopiador_razon_social: sLista?.acopiador_razon_social ?? '',
+              acopiador_ruc: null,
+              es_propio: sLista?.es_propio ?? false,
+              placa: sLista?.placa ?? fin?.placa ?? '---',
+              carreta: null,
+              conductor: null,
+              transportista: null,
+              razon_social: null,
+              guia_remision: sLista?.guia_remision ?? null,
+              guia_transporte: null,
+              estado: (sLista?.estado ?? (fin ? 'COMPLETO' : 'EN_PROCESO')) as any,
+              fecha_ingreso: sLista?.fecha_ingreso ?? fin?.creado_en ?? new Date().toISOString(),
+              lotes: [],
+              proveedor_id: 0,
+              acopiador_id: 0,
+            }
+          } else {
+            throw new Error('No hay datos en el caché local para visualizar esta sesión')
+            // No hay rastro de la sesión en la memoria local
+          }
+        } else {
+          throw err
+        }
+      }
       const ipsServidor = new Set(sesion.lotes.map(l => l.ip))
 
       // Leer TODOS los lotes locales de esta sesión (synced o no)
@@ -246,7 +305,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
       sesionActual.value = sesion
       await actualizarLotesHybridPendientes(id)
     } catch (e: any) {
-      ui.toast(e?.response?.data?.detail ?? 'Error al cargar sesión', 'error')
+      ui.toast(e?.response?.data?.detail ?? e?.message ?? 'Error al cargar sesión', 'error')
     } finally {
       loadingSesion.value = false
     }
@@ -528,22 +587,25 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
 
     // Persistir en IndexedDB
-    const sesionOfflineId = esOfflineId(sesionId)
-      ? (sesionId as string)
-      : sesionActual.value?.offline_id
+    // 1. Identificamos estrictamente el tipo de sesión basándonos SOLO en el ID proporcionado
+    const isSesion100Offline = typeof sesionId === 'string' && sesionId.startsWith('offline-');
+    const numericId = Number(sesionId);
 
-    if (sesionOfflineId) {
+    if (isSesion100Offline) {
       const pendientes = await obtenerSesionesPendientes()
-      const sesionLocal = pendientes.find(s => s.offline_id === sesionOfflineId)
+      const sesionLocal = pendientes.find(s => s.offline_id === sesionId)
       if (sesionLocal) {
         sesionLocal.lotes.push(loteOffline)
         await encolarSesion(sesionLocal)
+      } else {
+        // En caso de que la sesión se haya borrado en medio de la operación
+        ui.toast('Error crítico: La sesión offline ya no está en la cola.', 'error')
       }
-    } else if (typeof sesionId === 'number' && sesionId > 0) {
-      // Sesión híbrida: tiene ID real pero estamos offline
+    } else if (!isNaN(numericId) && numericId > 0) {
+      // 2. Sesión híbrida (ID real numérico) - Va a la cola de lotes online
       const loteOnline: LoteOnlineData = {
         offline_id: offlineId,
-        sesion_id: sesionId,
+        sesion_id: numericId,
         tipo_material: datos.tipo_material,
         ip,
         numero_lote: numeroLote,
@@ -561,7 +623,9 @@ export const useBalanzaStore = defineStore('balanza', () => {
         sync_error: null,
       }
       await encolarLoteOnline(loteOnline)
-      await actualizarLotesHybridPendientes(sesionId)
+      await actualizarLotesHybridPendientes(numericId)
+    } else {
+      ui.toast('Sesión sin ID válido. El lote se guardará en memoria pero no persistirá.', 'error')
     }
 
     const loteOptimista = loteOfflineADetalle(loteOffline)

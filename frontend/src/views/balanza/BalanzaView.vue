@@ -211,14 +211,12 @@ async function cargarSesionesOffline() {
           ?? '(sin caché)',
       }))
 
-    // Aplicar estados locales de finalizaciones híbridas sobre la lista del servidor
     if (finalizaciones.length > 0) {
-      const idsServidor = new Set(store.sesiones.map(s => s.id))
       const idsFinalizados = new Set(finalizaciones.map(f => f.sesion_id))
       store.sesiones = store.sesiones.map(s =>
         idsFinalizados.has(s.id) ? { ...s, estado: 'COMPLETO' } : s
       )
-      sesionesHybrid.value = finalizaciones.filter(f => idsServidor.has(f.sesion_id))
+      sesionesHybrid.value = finalizaciones
     } else {
       sesionesHybrid.value = []
     }
