@@ -213,9 +213,26 @@ export const useBalanzaStore = defineStore('balanza', () => {
   // ── Autocomplete ───────────────────────────────────────────
   async function cargarProvacops(busqueda?: string) {
     try {
+      // Si sabemos de antemano que estamos offline, forzamos el catch
+      if (estamosOffline()) {
+        throw new Error('Sin conexión a internet')
+      }
+
       provacops.value = await balanzaApi.provacops(busqueda)
-    } catch {
-      ui.toast('Error al cargar proveedores', 'error')
+
+    } catch (error) {
+      // Fallback: intentar cargar desde IndexedDB (caché local offline)
+      try {
+        const cacheLocales = await obtenerProvacops()
+        if (cacheLocales && cacheLocales.length > 0) {
+          provacops.value = cacheLocales as unknown as ProvAcopDropdown[]
+          ui.toast('Modo offline: Usando proveedores locales', 'warning')
+        } else {
+          ui.toast('Sin conexión y sin proveedores cacheados.', 'error')
+        }
+      } catch (cacheError) {
+        ui.toast('Error al cargar proveedores', 'error')
+      }
     }
   }
 

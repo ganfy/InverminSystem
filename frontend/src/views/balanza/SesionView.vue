@@ -229,9 +229,6 @@
                   @click="abrirEliminar(lote)"
                 >✕</button>
               </template>
-              <span class="badge-lote-estado" :class="loteEstadoClass(lote)">
-                {{ loteEstadoLabel(lote) }}
-              </span>
               <span v-if="lote.local_only" class="badge-local-lote" title="Pendiente de sincronizar">
                 ⚡ LOCAL
               </span>

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 // Balanza — imports estáticos (necesarios para operación offline)
+import LoginView from '@/views/auth/LoginView.vue'
 import BalanzaView from '@/views/balanza/BalanzaView.vue'
 import RegistrarCamionView from '@/views/balanza/RegistrarCamionView.vue'
 import SesionView from '@/views/balanza/SesionView.vue'
@@ -12,7 +13,7 @@ const router = createRouter({
     {
       path: '/login',
       name: 'Login',
-      component: () => import('@/views/auth/LoginView.vue'),
+      component: () => LoginView,
       meta: { public: true },
     },
     {

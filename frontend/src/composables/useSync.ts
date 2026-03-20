@@ -81,9 +81,15 @@ export function useSync() {
     }
 
     onMounted(() => {
+        if (!FORCE_OFFLINE) {
+            online.value = navigator.onLine
+        }
         window.addEventListener('online', onOnline)
         window.addEventListener('offline', onOffline)
         actualizarContadores()
+        if (online.value) {
+            sincronizar()
+        }
     })
 
     onUnmounted(() => {

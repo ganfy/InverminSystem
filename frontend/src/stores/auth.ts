@@ -35,6 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     try {
       await authApi.logout()
+    } catch (error) {
+      // Si estamos offline o el backend no responde, ignoramos el error. De todas formas, vamos a limpiar la sesión local.
+      console.warn('Error al hacer logout en el servidor. Limpiando sesión local...', error)
     } finally {
       clearTokens()
     }
