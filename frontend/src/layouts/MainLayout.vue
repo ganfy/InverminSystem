@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'app-layout--offline': !online }">
 
     <!-- Overlay mobile -->
     <div
@@ -346,6 +346,7 @@ async function handleLogout() {
   .main-wrapper {
     margin-left: 5%;
     margin-right: 5%;
+    margin-top: 1%;
   }
 }
 
@@ -391,5 +392,42 @@ async function handleLogout() {
   flex: 1;
   padding: var(--page-padding);
   overflow-y: auto;
+}
+
+/* ── Estado Offline (Advertencia Visual) ─────────────────────── */
+
+/* 1. Cinta superior de precaución */
+.app-layout--offline::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px; /* Grosor de la línea superior */
+  /* Patrón de franjas rojas y transparentes/oscuras */
+  background: repeating-linear-gradient(
+    45deg,
+    var(--color-error, #d32f2f),
+    var(--color-error, #d32f2f) 15px,
+    #b71c1c 15px,
+    #b71c1c 30px
+  );
+  z-index: 9999; /* Asegura que esté por encima de todo */
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(211, 47, 47, 0.4);
+  animation: slide-bg 2s linear infinite; /* Pequeña animación opcional */
+}
+
+/* 2. Tinte rojizo sutil en el contenido principal */
+.app-layout--offline .main-content {
+  background-color: rgba(211, 47, 47, 0.03);
+  /* Asegúrate de que el contenedor principal tenga transición para que el cambio sea suave */
+  transition: background-color 0.3s ease;
+}
+
+/* Animación sutil para la cinta de precaución */
+@keyframes slide-bg {
+  0% { background-position: 0 0; }
+  100% { background-position: 42px 0; }
 }
 </style>
