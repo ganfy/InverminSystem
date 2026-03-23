@@ -15,9 +15,10 @@
  */
 
 import { ref } from 'vue'
+import type { SesionLista, SesionDetalle } from '@/api/balanza'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -147,6 +148,10 @@ async function openDB(): Promise<IDBDatabase> {
 
             if (oldVersion < 4) {
                 db.createObjectStore('finalizaciones_q', { keyPath: 'sesion_id' })
+            }
+
+            if (oldVersion < 5) {
+                db.createObjectStore('sesiones_cache', { keyPath: 'id' })
             }
         }
 
@@ -516,4 +521,26 @@ export async function editarLoteOffline(
     }
 
     throw new Error('Lote offline no encontrado para editar')
+}
+
+// ── Caché de Sesiones Activas (Fotografías Online) ──────────────
+export async function guardarSesionCache(sesion: SesionDetalle): Promise<void> {
+    await put('sesiones_cache', JSON.parse(JSON.stringify(sesion)))
+}
+
+export async function obtenerSesionCache(id: number): Promise<SesionDetalle | null> {
+    return get<SesionDetalle>('sesiones_cache', id)
+}
+
+export async function eliminarSesionCache(id: number): Promise<void> {
+    await del('sesiones_cache', id)
+}
+
+export async function guardarListaSesionesCache(sesiones: SesionLista[]): Promise<void> {
+    await put('sesiones_cache', { id: 'lista_dashboard', data: JSON.parse(JSON.stringify(sesiones)) })
+}
+
+export async function obtenerListaSesionesCache(): Promise<SesionLista[]> {
+    const cached = await get<{ id: string, data: SesionLista[] }>('sesiones_cache', 'lista_dashboard')
+    return cached ? cached.data : []
 }

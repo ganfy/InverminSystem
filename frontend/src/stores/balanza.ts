@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, toRaw } from 'vue'
 import { balanzaApi } from '@/api/balanza'
 import type {
   SesionLista,
@@ -32,6 +32,11 @@ import {
   obtenerFinalizacionesPendientes,
   editarSesionOffline,
   editarLoteOffline,
+  guardarSesionCache,
+  obtenerSesionCache,
+  eliminarSesionCache,
+  guardarListaSesionesCache,
+  obtenerListaSesionesCache,
   type SesionOfflineData,
   type LoteOfflineData,
   type LoteOnlineData,
@@ -195,6 +200,15 @@ export const useBalanzaStore = defineStore('balanza', () => {
   const sesiones = ref<SesionLista[]>([])
   const sesionActual = ref<SesionDetalle | null>(null)
 
+  // Auto-sincronización del caché online
+  watch(sesionActual, async (nuevaSesion) => {
+    // Solo cacheamos si la sesión es del servidor (no 100% offline), tenemos red y no está completada
+    if (nuevaSesion && !esOfflineId(nuevaSesion.id) && !estamosOffline() && nuevaSesion.estado !== 'COMPLETO') {
+      // Guardamos una copia profunda (limpia de proxies de Vue) en IndexedDB
+      await guardarSesionCache(JSON.parse(JSON.stringify(toRaw(nuevaSesion))))
+    }
+  }, { deep: true })
+
   watch(ultimoSync, (nuevoSync) => {
     // Si hubo un sync exitoso de fondo y tenemos red, refrescamos la lista
     if (nuevoSync && !estamosOffline()) {
@@ -240,12 +254,25 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
   // ── Sesiones online ────────────────────────────────────────
   async function cargarSesiones(params?: SesionesParams) {
-    if (estamosOffline()) return  // ← sin red: mantener lo que hay, sin toast de error
     loading.value = true
     try {
-      sesiones.value = await balanzaApi.listarSesiones(params)
+      if (estamosOffline()) throw new Error('OFFLINE_FORZADO')
+
+      const data = await balanzaApi.listarSesiones(params)
+      sesiones.value = data
+
+      // Guardar la fotografía de la lista para el modo offline
+      await guardarListaSesionesCache(data)
+
     } catch (e: any) {
-      ui.toast(e?.response?.data?.detail ?? 'Error al cargar sesiones', 'error')
+      // MODO OFFLINE O CAÍDA DEL SERVIDOR: Rescatamos la lista del caché
+      const cachedList = await obtenerListaSesionesCache()
+      if (cachedList && cachedList.length > 0) {
+        sesiones.value = cachedList
+        // ui.toast('Mostrando sesiones guardadas localmente.', 'info') // Opcional
+      } else {
+        ui.toast('Sin red y sin historial de sesiones.', 'warning')
+      }
     } finally {
       loading.value = false
     }
@@ -258,45 +285,57 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
       try {
         sesion = await balanzaApi.obtenerSesion(id)
+
+        if (sesion.estado !== 'COMPLETO') {
+          await guardarSesionCache(sesion)
+        } else {
+          await eliminarSesionCache(id) // Limpiamos si ya se completó
+        }
       } catch (err: any) {
         // Tolerancia si el backend está caído (ERR_NETWORK) o no hay internet
         const esErrorRed = estamosOffline() || !err?.response || err?.code === 'ERR_NETWORK' || err?.message?.toLowerCase().includes('network');
         // Si no hay red, construir un fallback usando la lista cacheada o finalizaciones
         if (esErrorRed) {
-          const sLista = sesiones.value.find(s => s.id === id)
-          const finalizaciones = await obtenerFinalizacionesPendientes()
-          const fin = finalizaciones.find(f => f.sesion_id === id)
+          const sesionEnCache = await obtenerSesionCache(id)
 
-          // Buscar también si esta sesión tiene lotes pendientes (para recuperar las "En Proceso")
-          const todosLocales = await obtenerTodosLotesOnline()
-          const deEstaSesion = todosLocales.filter(l => Number(l.sesion_id) === id)
-
-          if (sLista || fin || deEstaSesion.length > 0) {
-            sesion = {
-              id: id,
-              offline_id: '',
-              provacop_id: 0,
-              proveedor_razon_social: sLista?.proveedor_razon_social ?? fin?.proveedor_razon_social ?? 'Desconocido',
-              proveedor_ruc: '',
-              acopiador_razon_social: sLista?.acopiador_razon_social ?? '',
-              acopiador_ruc: null,
-              es_propio: sLista?.es_propio ?? false,
-              placa: sLista?.placa ?? fin?.placa ?? '---',
-              carreta: null,
-              conductor: null,
-              transportista: null,
-              razon_social: null,
-              guia_remision: sLista?.guia_remision ?? null,
-              guia_transporte: null,
-              estado: (sLista?.estado ?? (fin ? 'COMPLETO' : 'EN_PROCESO')) as any,
-              fecha_ingreso: sLista?.fecha_ingreso ?? fin?.creado_en ?? new Date().toISOString(),
-              lotes: [],
-              proveedor_id: 0,
-              acopiador_id: 0,
-            }
+          if (sesionEnCache) {
+            // ¡Genial! Tenemos los lotes online guardados localmente
+            sesion = sesionEnCache
           } else {
-            throw new Error('No hay datos en el caché local para visualizar esta sesión')
-            // No hay rastro de la sesión en la memoria local
+            // 3. Fallback: Intentar armar un cascarón vacío si no tenemos la fotografía
+            const sLista = sesiones.value.find(s => s.id === id)
+            const finalizaciones = await obtenerFinalizacionesPendientes()
+            const fin = finalizaciones.find(f => f.sesion_id === id)
+            const todosLocales = await obtenerTodosLotesOnline()
+            const deEstaSesion = todosLocales.filter(l => Number(l.sesion_id) === id)
+
+            if (sLista || fin || deEstaSesion.length > 0) {
+              sesion = {
+                id: id,
+                offline_id: '',
+                provacop_id: 0,
+                proveedor_razon_social: sLista?.proveedor_razon_social ?? fin?.proveedor_razon_social ?? 'Desconocido',
+                proveedor_ruc: '',
+                acopiador_razon_social: sLista?.acopiador_razon_social ?? '',
+                acopiador_ruc: null,
+                es_propio: sLista?.es_propio ?? false,
+                placa: sLista?.placa ?? fin?.placa ?? '---',
+                carreta: null,
+                conductor: null,
+                transportista: null,
+                razon_social: null,
+                guia_remision: sLista?.guia_remision ?? null,
+                guia_transporte: null,
+                estado: (sLista?.estado ?? (fin ? 'COMPLETO' : 'EN_PROCESO')) as any,
+                fecha_ingreso: sLista?.fecha_ingreso ?? fin?.creado_en ?? new Date().toISOString(),
+                lotes: [],
+                proveedor_id: 0,
+                acopiador_id: 0,
+              }
+            } else {
+              throw new Error('No hay datos en el caché local para visualizar esta sesión')
+              // No hay rastro de la sesión en la memoria local
+            }
           }
         } else {
           throw err

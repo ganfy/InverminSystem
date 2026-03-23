@@ -991,10 +991,12 @@ function loteEstadoLabel(lote: LoteDetalle) {
 // ── Montaje ────────────────────────────────────────────────
 onMounted(async () => {
   // Solo buscar en la cola 100% offline si el ID tiene el prefijo
-  if (sesionIdRaw.startsWith('offline-')) {
-    if (store.sesionActual?.offline_id !== sesionIdRaw) {
-      await store.cargarSesionOffline(sesionIdRaw)
-    }
+  const idParam = route.params.id as string
+
+  // 2. Evaluamos qué tipo de sesión debemos cargar
+  if (idParam.startsWith('offline-')) {
+    // Es una sesión 100% offline, usamos la función que acepta 'string'
+    await store.cargarSesionOffline(idParam)
   } else {
     // Si es una sesión del servidor (normal o híbrida), cargarla
     await store.cargarSesion(sesionIdNum.value)

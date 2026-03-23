@@ -11,7 +11,7 @@
     <div v-if="sesionesOffline.length > 0 || sesionesHybrid.length > 0" class="offline-section">
       <div class="offline-section-header">
         <span class="offline-section-titulo">⚡ SIN SINCRONIZAR</span>
-        <span class="offline-section-count">{{ sesionesOffline.length + sesionesHybrid.length }} sesión(es) local(es)</span>
+        <span class="offline-section-count">{{ sesionesOffline.length }} sesión(es) local(es)</span>
       </div>
       <div class="tabla-wrapper">
         <table class="tabla">
@@ -49,28 +49,27 @@
                 >✎</button>
               </td>
             </tr>
-            <!-- Sesiones híbridas finalizadas offline -->
-        <tr
-          v-for="s in sesionesHybrid"
-          :key="'hybrid-' + s.sesion_id"
-          class="fila-sesion fila-offline"
-          @click="router.push({ name: 'SesionBalanza', params: { id: s.sesion_id } })"
-        >
-          <td class="td-mono">{{ formatFechaLocal(s.creado_en) }}</td>
-          <td>{{ s.proveedor_razon_social }}</td>
-          <td class="td-mono td-placa">{{ s.placa }}</td>
-          <td class="td-mono">{{ s.total_lotes }}</td>
-          <td>
-            <span class="badge-estado badge-completo">COMPLETO</span>
-            <span class="badge-local">SYNC PEND.</span>
-          </td>
-          <td class="td-acciones" @click.stop>
-            <button class="btn-icon"
-              @click="router.push({ name: 'SesionBalanza', params: { id: s.sesion_id } })">
-              ✎
-            </button>
-          </td>
-        </tr>
+            <tr
+              v-for="s in sesionesHybrid"
+              :key="'hybrid-' + s.id"
+              class="fila-sesion fila-offline"
+              @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })"
+            >
+              <td class="td-mono">{{ formatFechaLocal(s.creado_en) }}</td>
+              <td>{{ s.proveedor_razon_social }}</td>
+              <td class="td-mono td-placa">{{ s.placa }}</td>
+              <td class="td-mono">{{ s.total_lotes }}</td>
+              <td>
+                <span class="badge-estado" :class="estadoClass(s.estado)">{{ estadoLabel(s.estado) }}</span>
+                <span class="badge-local">SYNC PEND.</span>
+              </td>
+              <td class="td-acciones" @click.stop>
+                <button class="btn-icon"
+                  @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })">
+                  ✎
+                </button>
+              </td>
+            </tr>
       </tbody>
     </table>
   </div>
@@ -110,7 +109,7 @@
             <td colspan="8" class="sin-datos">Sin sesiones registradas</td>
           </tr>
           <tr
-            v-for="s in store.sesiones" :key="s.id"
+            v-for="s in sesionesPrincipales" :key="s.id"
             class="fila-sesion"
             @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })"
           >
@@ -125,6 +124,7 @@
             </td>
             <td>
               <span class="badge-estado" :class="estadoClass(s.estado)">{{ estadoLabel(s.estado) }}</span>
+              <span v-if="tienePendientes(s.id)" class="badge-local" title="Tiene lotes locales sin subir">SYNC PEND.</span>
             </td>
             <td class="td-acciones" @click.stop>
               <button class="btn-icon" @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })">✎</button>
@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBalanzaStore } from '@/stores/balanza'
 import { obtenerSesionesPendientes,
@@ -186,22 +186,27 @@ watch(online, async (ahoraOnline) => {
 })
 
 // ── [OFFLINE] Sesiones locales ────────────────────────────
-// Enriquecemos SesionOfflineData con el nombre del proveedor (de la caché)
 interface SesionOfflineVista extends SesionOfflineData {
   proveedor_razon_social: string
 }
 
 const sesionesOffline = ref<SesionOfflineVista[]>([])
-const sesionesHybrid = ref<FinalizacionPendiente[]>([])
+const sesionesHybrid = ref<any[]>([])
+const idsConPendientes = ref<Set<number>>(new Set())
+
+const sesionesPrincipales = computed(() => {
+  return store.sesiones.filter(s => !idsConPendientes.value.has(s.id))
+})
 
 async function cargarSesionesOffline() {
   try {
-    const [pendientes, cache, finalizaciones] = await Promise.all([
+    const [pendientes, cache, finalizaciones, lotesPendientes] = await Promise.all([
       obtenerSesionesPendientes(),
       obtenerProvacops(),
       obtenerFinalizacionesPendientes(),  // para refrescar estado de sesiones con finalización pendiente
+      obtenerLotesOnlinePendientes()
     ])
-    // Excluir las ya sincronizadas
+    // 1. Llenar la tabla superior SOLO con sesiones 100% offline
     sesionesOffline.value = pendientes
       .filter(s => !s.synced)
       .map(s => ({
@@ -211,18 +216,48 @@ async function cargarSesionesOffline() {
           ?? '(sin caché)',
       }))
 
-    if (finalizaciones.length > 0) {
-      const idsFinalizados = new Set(finalizaciones.map(f => f.sesion_id))
-      store.sesiones = store.sesiones.map(s =>
-        idsFinalizados.has(s.id) ? { ...s, estado: 'COMPLETO' } : s
-      )
-      sesionesHybrid.value = finalizaciones
-    } else {
-      sesionesHybrid.value = []
+    // 2. Mapear qué sesiones de la tabla principal tienen tareas offline pendientes
+    const setPendientes = new Set<number>()
+    finalizaciones.forEach(f => setPendientes.add(f.sesion_id))
+    lotesPendientes.forEach(l => setPendientes.add(l.sesion_id))
+    idsConPendientes.value = setPendientes
+
+    const hibridas = []
+    for (const id of setPendientes) {
+      const sBase = store.sesiones.find(s => s.id === id)
+      const lotesLocalesDeEstaSesion = lotesPendientes.filter(l => l.sesion_id === id).length
+
+      if (sBase) {
+        hibridas.push({
+          id: sBase.id,
+          creado_en: sBase.fecha_ingreso,
+          proveedor_razon_social: sBase.proveedor_razon_social,
+          placa: sBase.placa,
+          total_lotes: sBase.total_lotes + lotesLocalesDeEstaSesion,
+          // Si tiene finalización pendiente, la mostramos como completa
+          estado: finalizaciones.some(f => f.sesion_id === id) ? 'COMPLETO' : sBase.estado
+        })
+      } else {
+        // Fallback de seguridad por si no está en la memoria principal
+        const fin = finalizaciones.find(f => f.sesion_id === id)
+        hibridas.push({
+          id: id,
+          creado_en: fin?.creado_en ?? new Date().toISOString(),
+          proveedor_razon_social: fin?.proveedor_razon_social ?? `Sesión ${id}`,
+          placa: fin?.placa ?? '---',
+          total_lotes: fin?.total_lotes ?? lotesLocalesDeEstaSesion,
+          estado: fin ? 'COMPLETO' : 'EN_PROCESO'
+        })
+      }
     }
+    sesionesHybrid.value = hibridas
   } catch (e) {
     console.error('cargarSesionesOffline:', e)
   }
+}
+
+function tienePendientes(sesionId: number): boolean {
+  return idsConPendientes.value.has(sesionId)
 }
 
 // ── Filtros online ────────────────────────────────────────
