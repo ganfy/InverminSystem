@@ -166,9 +166,9 @@ export function useSync() {
     // ── Sync batch ───────────────────────────────────────────
 
     /**
- * Sincroniza lotes de sesiones online creados mientras no había conexión.
- * Retorna los IDs de sesión que recibieron lotes nuevos.
- */
+     * Sincroniza lotes de sesiones online creados mientras no había conexión.
+     * Retorna los IDs de sesión que recibieron lotes nuevos.
+     */
     async function sincronizarLotesOnline(): Promise<number[]> {
         const pendientes = await obtenerLotesOnlinePendientes()
         if (pendientes.length === 0) return []

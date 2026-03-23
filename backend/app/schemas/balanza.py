@@ -6,6 +6,7 @@ Cubre: SesionDescarga, Lote, Pesaje, LoteEliminado (auditoría).
 from datetime import datetime
 from decimal import Decimal
 
+from alembic.environment import Optional
 from pydantic import BaseModel, field_validator, model_validator
 
 # =============================================================================
@@ -30,6 +31,8 @@ class PesajeCrear(BaseModel):
     sacos: int | None = None
     granel: bool = False
     fecha_inicio: datetime | None = None  # si no viene, el servicio usa now()
+    es_manual: bool = False
+    justificacion_manual: Optional[str] = None
 
     @field_validator("peso_inicial", "peso_final")
     @classmethod
@@ -101,6 +104,8 @@ class LoteEditar(BaseModel):
     peso_final: Decimal | None = None  # TARA
     sacos: int | None = None
     granel: bool | None = None
+    es_manual: Optional[bool] = None
+    justificacion_manual: Optional[str] = None
 
     @field_validator("tipo_material")
     @classmethod

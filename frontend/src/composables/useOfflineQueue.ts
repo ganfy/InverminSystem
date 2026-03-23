@@ -55,6 +55,8 @@ export interface PesajeOfflineData {
     granel: boolean
     fecha_inicio: string | null
     fecha_fin: string | null
+    es_manual: boolean;
+    justificacion_manual: string | null;
 }
 
 export interface LoteOfflineData {
@@ -104,6 +106,13 @@ export interface FinalizacionPendiente {
     proveedor_razon_social: string
     total_lotes: number
 }
+
+export type LoteEditable = {
+    numero_lote?: number
+    tipo_material?: string
+    numero_ticket?: string
+    ip?: string
+  }
 
 // ── Apertura de DB ─────────────────────────────────────────
 
@@ -402,3 +411,45 @@ export async function obtenerFinalizacionesPendientes(): Promise<FinalizacionPen
 export async function eliminarFinalizacion(sesionId: number): Promise<void> {
     await del('finalizaciones_q', sesionId)
   }
+
+// ── Funciones para Editar Borradores Offline (Draft Editing) ──────────────
+
+export async function editarSesionOffline(offlineId: string, datos: Partial<SesionOfflineData>): Promise<void> {
+    const sesion = await get<SesionOfflineData>('sesiones_q', offlineId)
+    if (!sesion) throw new Error('Sesión offline no encontrada')
+    await put('sesiones_q', { ...sesion, ...datos })
+}
+
+export async function editarLoteOffline(
+    ipLote: string,
+    datosLote: LoteEditable,
+    datosPesaje?: Partial<PesajeOfflineData>
+): Promise<void> {
+    // 1. Buscar en lotes híbridos (sesión online, lote offline)
+    const lotesOnline = await obtenerTodosLotesOnline()
+    const loteHibrido = lotesOnline.find(l => l.ip === ipLote)
+
+    if (loteHibrido) {
+        if (datosPesaje) loteHibrido.pesaje = { ...loteHibrido.pesaje, ...datosPesaje }
+        await put('lotes_online_q', { ...loteHibrido, ...datosLote })
+        return
+    }
+
+    // 2. Buscar en sesiones 100% offline
+    const sesiones = await obtenerSesionesPendientes()
+
+    for (const sesion of sesiones) {
+        const index = sesion.lotes.findIndex(l => l.ip === ipLote)
+        if (index !== -1) {
+            const loteTarget = sesion.lotes[index]
+
+            if (!loteTarget) continue
+            if (datosPesaje) loteTarget.pesaje = { ...loteTarget.pesaje, ...datosPesaje }
+            sesion.lotes[index] = { ...loteTarget, ...datosLote } as LoteOfflineData
+            await put('sesiones_q', sesion)
+            return
+        }
+    }
+
+    throw new Error('Lote offline no encontrado para editar')
+}

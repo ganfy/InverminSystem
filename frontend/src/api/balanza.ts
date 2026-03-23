@@ -22,6 +22,8 @@ export interface PesajeCrear {
   sacos?: number | null
   granel?: boolean
   fecha_inicio?: string | null
+  es_manual?: boolean;
+  justificacion_manual?: string | null;
 }
 
 export interface PesajeDetalle {
@@ -47,6 +49,8 @@ export interface LoteEditar {
   peso_final?: number     // TARA
   sacos?: number | null
   granel?: boolean
+  es_manual?: boolean;
+  justificacion_manual?: string | null;
 }
 
 export interface LoteDetalle {

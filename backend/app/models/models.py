@@ -399,10 +399,9 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
     __table_args__ = (UniqueConstraint("sesion_id", "numero_lote", name="uq_lote_sesion_numero"),)
 
 
-class Pesaje(Base):
+class Pesaje(Base, AuditMixin):
     """
     Registro de pesaje por lote (peso inicial → peso final).
-    Sin AuditMixin: registro inmutable una vez guardado.
     """
 
     __tablename__ = "pesajes"
@@ -420,6 +419,8 @@ class Pesaje(Base):
     numero_ticket = Column(String(50), unique=True)
     fecha_inicio = Column(DateTime)
     fecha_fin = Column(DateTime, server_default=func.now())
+    es_manual = Column(Boolean, default=False, nullable=False)
+    justificacion_manual = Column(String(255), nullable=True)
     granel = Column(Boolean, default=False)
 
     lote = relationship("Lote", back_populates="pesajes")

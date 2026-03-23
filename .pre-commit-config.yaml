@@ -14,3 +14,15 @@ repos:
       - id: check-merge-conflict    # detecta marcadores de conflicto git
       - id: check-yaml              # valida sintaxis YAML
       - id: debug-statements        # detecta print() / breakpoint() olvidados
+
+  - repo: local
+    hooks:
+      - id: run-vitest
+        name: Run Frontend Tests (Vitest)
+        # Se mueve a la carpeta frontend y corre los tests sin modo "watch"
+        entry: npm --prefix frontend run test:unit -- --run
+        language: system
+        files: ^frontend/
+        # Ejecutar si hay cambios en archivos JS/TS/Vue
+        types_or: [javascript, ts, vue]
+        pass_filenames: false

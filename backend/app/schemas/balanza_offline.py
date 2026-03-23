@@ -51,6 +51,8 @@ class PesajeOffline(BaseModel):
     granel: bool = False
     fecha_inicio: datetime | None = None
     fecha_fin: datetime | None = None
+    es_manual: bool | None = None
+    justificacion_manual: str | None = None
 
 
 class LoteOffline(BaseModel):

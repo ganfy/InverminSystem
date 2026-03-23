@@ -30,6 +30,8 @@ import {
   limpiarLotesOnlineSynced,
   encolarFinalizacion,
   obtenerFinalizacionesPendientes,
+  editarSesionOffline,
+  editarLoteOffline,
   type SesionOfflineData,
   type LoteOfflineData,
   type LoteOnlineData,
@@ -451,10 +453,35 @@ export const useBalanzaStore = defineStore('balanza', () => {
     return sesionOptimista
   }
 
-  async function editarSesion(id: number, datos: SesionEditar): Promise<boolean> {
+  async function editarSesion(idRaw: number | string, datos: SesionEditar): Promise<boolean> {
+    // LÓGICA OFFLINE
+    if (esOfflineId(idRaw)) {
+      try {
+        await editarSesionOffline(idRaw as string, datos as any)
+        await cargarSesionOffline(idRaw as string)
+
+        ui.toast('Sesión offline editada localmente', 'success')
+        return true
+      } catch (e) {
+        ui.toast('Error al editar sesión offline', 'error')
+        return false
+      }
+    }
+
+    if (estamosOffline()) {
+      ui.toast('No se puede editar un registro del servidor sin conexión a internet.', 'warning')
+      return false
+    }
+
+    // LÓGICA ONLINE
     guardando.value = true
     try {
-      sesionActual.value = await balanzaApi.editarSesion(id, datos)
+      const sesionActualizada = await balanzaApi.editarSesion(idRaw as number, datos)
+      sesionActual.value = sesionActualizada
+      const idx = sesiones.value.findIndex(s => s.id === idRaw)
+      if (idx !== -1) {
+        sesiones.value[idx] = { ...sesiones.value[idx], ...datos } as any
+      }
       ui.toast('Sesión actualizada', 'success')
       return true
     } catch (e: any) {
@@ -599,6 +626,8 @@ export const useBalanzaStore = defineStore('balanza', () => {
         granel: datos.pesaje.granel ?? false,
         fecha_inicio: datos.pesaje.fecha_inicio ?? ahora,
         fecha_fin: ahora,
+        es_manual: datos.pesaje.es_manual ?? false,
+        justificacion_manual: datos.pesaje.justificacion_manual ?? null,
       },
       creado_en: ahora,
     }
@@ -634,6 +663,8 @@ export const useBalanzaStore = defineStore('balanza', () => {
           granel: datos.pesaje.granel ?? false,
           fecha_inicio: datos.pesaje.fecha_inicio ?? ahora,
           fecha_fin: ahora,
+          es_manual: datos.pesaje.es_manual ?? false,
+          justificacion_manual: datos.pesaje.justificacion_manual ?? null,
         },
         creado_en: ahora,
         synced: false,
@@ -653,14 +684,60 @@ export const useBalanzaStore = defineStore('balanza', () => {
   }
 
   async function editarLote(
-    sesionId: number,
-    loteId: number,
+    sesionId: number | string,
+    loteId: number | string, // Si es offline, recibiremos el IP aquí (ej: 'IP-00123')
     datos: LoteEditar,
   ): Promise<boolean> {
+    // Si loteId es un string, asumimos que es el IP de un lote offline
+    const esLoteOffline = typeof loteId === 'string'
+
+    if (esLoteOffline || esOfflineId(sesionId)) {
+      try {
+        const datosLote: any = {}
+        if (datos.tipo_material !== undefined) datosLote.tipo_material = datos.tipo_material
+
+        const datosPesaje: any = {}
+        if (datos.peso_inicial !== undefined) datosPesaje.peso_inicial = Number(datos.peso_inicial)
+        if (datos.peso_final !== undefined) datosPesaje.peso_final = Number(datos.peso_final)
+        if (datos.sacos !== undefined) datosPesaje.sacos = datos.sacos
+        if (datos.granel !== undefined) datosPesaje.granel = datos.granel
+        // Auditoría manual en edición local
+        if (datos.es_manual !== undefined) datosPesaje.es_manual = datos.es_manual
+        if (datos.justificacion_manual !== undefined) datosPesaje.justificacion_manual = datos.justificacion_manual
+
+        // Llamamos a nuestra función pasándole el IP
+        await editarLoteOffline(
+          loteId as string,
+          Object.keys(datosLote).length > 0 ? datosLote : {},
+          Object.keys(datosPesaje).length > 0 ? datosPesaje : undefined
+        )
+
+        // Recargamos la sesión desde la memoria para refrescar la UI
+        if (esOfflineId(sesionId)) {
+          await cargarSesionOffline(sesionId as string)
+        } else {
+          await cargarSesion(sesionId as number)
+        }
+
+        ui.toast('Lote offline editado localmente', 'success')
+        return true
+      } catch (e) {
+        console.error(e)
+        ui.toast('Error al editar lote offline', 'error')
+        return false
+      }
+    }
+
+    if (estamosOffline()) {
+      ui.toast('No se puede editar un registro del servidor sin conexión a internet.', 'warning')
+      return false
+    }
+
+    // LÓGICA ONLINE NORMAL
     guardando.value = true
     try {
-      await balanzaApi.editarLote(sesionId, loteId, datos)
-      await cargarSesion(sesionId)
+      await balanzaApi.editarLote(sesionId as number, loteId as number, datos)
+      await cargarSesion(sesionId as number)
       ui.toast('Lote actualizado', 'success')
       return true
     } catch (e: any) {

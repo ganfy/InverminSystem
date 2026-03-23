@@ -55,10 +55,9 @@
           <br />{{ estadoLabel(sesion?.estado ?? '') }}
         </div>
         <button
-          v-if="sesion?.estado !== 'COMPLETO'"
           class="btn-secondary btn-editar-sesion"
-          :disabled="esOffline"
-          :title="esOffline ? 'No disponible sin conexión' : 'Editar sesión'"
+          :disabled="!online && sesionIdNum !== -1"
+          :title="(!online && sesionIdNum !== -1) ? 'Solo puedes editar sesiones del servidor con internet' : 'Editar datos de transporte o proveedor'"
           @click="abrirEditarSesion"
         >✎ Editar sesión</button>
       </div>
@@ -162,6 +161,7 @@
                   type="number" step="0.001" min="0"
                   v-model.number="loteForm.peso_inicial"
                   placeholder="TM"
+                  @input="isManualBruto = true"
                 />
                 <button class="btn-capturar" title="Capturar peso actual como BRUTO" @click="capturarBruto">
                   ↓ Capturar
@@ -176,6 +176,7 @@
                   type="number" step="0.001" min="0"
                   v-model.number="loteForm.peso_final"
                   placeholder="TM"
+                  @input="isManualTara = true"
                 />
                 <button class="btn-capturar" title="Capturar peso actual como TARA" @click="capturarTara">
                   ↓ Capturar
@@ -188,6 +189,23 @@
             <span>BRUTO: <strong>{{ loteForm.peso_inicial ? fmtTm(loteForm.peso_inicial) + ' TM' : '—' }}</strong></span>
             <span>TARA: <strong>{{ loteForm.peso_final ? fmtTm(loteForm.peso_final) + ' TM' : '—' }}</strong></span>
             <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? fmtTm(pesoNeto) + ' TM' : '—' }}</strong></span>
+          </div>
+
+          <div v-if="requiereJustificacion" class="field" style="margin-bottom: 1rem; text-align: left;">
+            <label class="field-label" style="color: var(--color-warning);">⚠ Ingreso Manual: Justificación requerida</label>
+            <textarea
+              class="field-input"
+              rows="2"
+              v-model="loteForm.justificacion_manual"
+              placeholder="Explique el motivo del ingreso manual..."
+            ></textarea>
+          </div>
+
+          <div v-else-if="esRegistroManual && !balanzaDisponible" class="aviso-offline" style="margin-bottom: 1rem; padding: 0.5rem 0.75rem;">
+            <span class="aviso-icono" style="font-size: 1rem;">ℹ️</span>
+            <div class="aviso-texto" style="font-size: 0.75rem;">
+              Balanza desconectada. Se registrará justificación automática.
+            </div>
           </div>
           <div v-if="mostrarFaltantes && loteFormFaltantes.length > 0" class="form-faltantes">
             <span class="faltante-icono">⚠</span>
@@ -218,17 +236,21 @@
             <span class="lote-ip">{{ lote.ip }} | Lote {{ lote.numero_lote }}</span>
             <div class="lote-acciones">
               <!-- [OFFLINE] editar/eliminar solo online -->
-              <template v-if="!esOffline">
+
                 <button
-                  v-if="authStore.user?.rol === 'Admin'"
-                  class="btn-icon" title="Editar lote"
+                  v-if="authStore.user?.rol === 'Admin' || lote.id === -1"
+                  class="btn-icon btn-secondary"
+                  title="Editar lote"
+                  :disabled="!online && lote.id !== -1"
                   @click="abrirEditarLote(lote)"
                 >✎</button>
                 <button
-                  class="btn-icon btn-icon-danger" title="Eliminar lote"
+                  v-if="authStore.user?.rol === 'Admin' || lote.id === -1"
+                  class="btn-icon btn-icon-danger btn-secondary" title="Eliminar lote"
+                  :disabled="!online && lote.id !== -1"
                   @click="abrirEliminar(lote)"
                 >✕</button>
-              </template>
+
               <span v-if="lote.local_only" class="badge-local-lote" title="Pendiente de sincronizar">
                 ⚡ LOCAL
               </span>
@@ -471,6 +493,11 @@
               <input type="checkbox" id="edit-granel" v-model="editLoteModal.form.granel" @change="editLoteModal.form.sacos = null" />
               <label for="edit-granel" class="field-label" style="margin:0">Granel</label>
             </div>
+
+            <div class="field field-full" style="padding-top: 1rem;">
+              <label class="field-label" style="color: var(--color-warning);">Justificación de Edición Manual *</label>
+              <textarea class="field-input" rows="2" v-model="editLoteModal.form.justificacion_manual" placeholder="Obligatorio..."></textarea>
+            </div>
           </div>
           <p v-if="editLoteModal.error" class="error-msg" style="margin-top:.75rem">{{ editLoteModal.error }}</p>
         </div>
@@ -493,10 +520,10 @@
         </div>
         <div class="modal-body">
           <p class="elim-aviso">Acción irreversible — queda registrado en auditoría.</p>
-          <div class="field" style="margin-top:.75rem">
+          <!-- <div class="field" style="margin-top:.75rem">
             <label class="field-label">Motivo *</label>
             <textarea class="field-input" rows="3" v-model="eliminarModal.motivo" placeholder="Describa el motivo..." />
-          </div>
+          </div> -->
           <p v-if="eliminarModal.error" class="error-msg">{{ eliminarModal.error }}</p>
         </div>
         <div class="modal-footer">
@@ -604,12 +631,16 @@ async function capturarBruto() {
   const valor = await resolverPeso()
   if (valor !== null) {
     loteForm.peso_inicial = valor
+    isManualBruto.value = false
     fechaBruto.value = new Date().toISOString()
   }
 }
 async function capturarTara() {
   const valor = await resolverPeso()
-  if (valor !== null) loteForm.peso_final = valor
+  if (valor !== null) {
+    loteForm.peso_final = valor
+    isManualTara.value = false
+  }
 }
 async function resolverPeso(): Promise<number | null> {
   if (wsConectado.value && conectado.value) {
@@ -620,12 +651,18 @@ async function resolverPeso(): Promise<number | null> {
   return pesoActual.value
 }
 
+const isManualBruto = ref(false)
+const isManualTara = ref(false)
+const esRegistroManual = computed(() => isManualBruto.value || isManualTara.value)
+const balanzaDisponible = computed(() => wsConectado.value && conectado.value)
+const requiereJustificacion = computed(() => esRegistroManual.value && balanzaDisponible.value)
+
 // ── Formulario lote ────────────────────────────────────────
 const loteForm = reactive({
   peso_inicial: null as number | null,
   peso_final:   null as number | null,
+  justificacion_manual: '',
 })
-
 function preFillBruto() {
   const activos = sesion.value?.lotes.filter(l => !l.eliminado) ?? []
   if (activos.length > 0) {
@@ -681,6 +718,7 @@ const loteFormFaltantes = computed(() => {
     loteForm.peso_inicial > 0 && loteForm.peso_final > 0 &&
     loteForm.peso_inicial <= loteForm.peso_final
   )                                                         f.push('BRUTO debe ser > TARA')
+  if (requiereJustificacion.value && !loteForm.justificacion_manual.trim()) f.push('justificación manual')
   return f
 })
 
@@ -700,6 +738,13 @@ watch(
 
 async function registrarLote() {
   if (!loteFormValido.value) return
+
+  let justificacionFinal = null
+  if (esRegistroManual.value) {
+    justificacionFinal = balanzaDisponible.value
+      ? loteForm.justificacion_manual
+      : 'Ingreso manual automático: Balanza física desconectada o sin servicio.'
+  }
   // [OFFLINE] pasar string si es sesión offline, number si es online
   const ok = await store.agregarLote(
     sesionIdRaw.startsWith('offline-') ? sesionIdRaw : sesionIdNum.value,
@@ -711,6 +756,8 @@ async function registrarLote() {
         sacos:        granel.value ? null : (sacos.value || null),
         granel:       granel.value,
         fecha_inicio: fechaBruto.value ?? undefined,
+        es_manual:    esRegistroManual.value,
+        justificacion_manual: justificacionFinal,
       },
     },
   )
@@ -718,6 +765,9 @@ async function registrarLote() {
     loteForm.peso_inicial = null
     loteForm.peso_final   = null
     fechaBruto.value      = null
+    loteForm.justificacion_manual = ''
+    isManualBruto.value = false
+    isManualTara.value = false
     preFillBruto()
   }
 }
@@ -783,7 +833,6 @@ const editSesionModal = reactive({
 })
 
 function abrirEditarSesion() {
-  if (esOffline.value) { ui.toast('Editar sesión no disponible sin conexión', 'warning'); return }
   const s = sesion.value
   if (!s) return
   store.cargarProvacops()
@@ -840,34 +889,45 @@ function editSelAcop(a: ProvAcopDropdown) {
 async function guardarEditarSesion() {
   const payload: Record<string, any> = { ...editSesionModal.form }
   if (editSesionModal.editAcop) payload.provacop_id = editSesionModal.editAcop.provacop_id
-  const ok = await store.editarSesion(sesionIdNum.value, payload)
+  const targetId = esOffline.value ? sesionIdRaw : sesionIdNum.value
+  const ok = await store.editarSesion(targetId, payload)
   if (ok) cerrarEditarSesion()
 }
 
 // ── Modal: Editar Lote (Admin) ─────────────────────────────
 const editLoteModal = reactive({
   visible: false,
-  loteId: 0,
+  loteId: 0 as number | string,
   ip: '',
   error: '',
   form: {
-    tipo_material: 'Mineral',
+    tipo_material: '',
     peso_inicial: null as number | null,
     peso_final:   null as number | null,
     sacos:        null as number | null,
     granel:       false,
+    justificacion_manual: '',
   },
 })
 
 function abrirEditarLote(lote: LoteDetalle) {
+  if (!online.value && lote.id !== -1) {
+    ui.toast('No se puede editar un lote del servidor sin conexión a internet.', 'warning')
+    return
+  }
   Object.assign(editLoteModal, {
-    visible: true, loteId: lote.id, ip: lote.ip, error: '',
+    visible: true,
+    // Si el lote no ha ido al servidor (id: -1), usamos su IP como identificador
+    loteId: lote.id === -1 ? lote.ip : lote.id,
+    ip: lote.ip,
+    error: '',
     form: {
-      tipo_material: lote.tipo_material ?? 'Mineral',
+      tipo_material: lote.tipo_material ?? '',
       peso_inicial:  lote.pesaje ? Number(lote.pesaje.peso_inicial) : null,
       peso_final:    lote.pesaje ? Number(lote.pesaje.peso_final)   : null,
       sacos:         lote.pesaje?.sacos ?? null,
       granel:        lote.pesaje?.granel ?? false,
+      justificacion_manual: '',
     },
   })
 }
@@ -881,12 +941,15 @@ async function guardarEditarLote() {
     editLoteModal.error = 'El BRUTO debe ser mayor que la TARA'
     return
   }
-  const ok = await store.editarLote(sesionIdNum.value, editLoteModal.loteId, {
+  const targetSesionId = sesionIdRaw.startsWith('offline-') ? sesionIdRaw : sesionIdNum.value;
+  const ok = await store.editarLote(targetSesionId, editLoteModal.loteId, {
     tipo_material: f.tipo_material,
     peso_inicial:  f.peso_inicial ?? undefined,
     peso_final:    f.peso_final   ?? undefined,
     sacos:         f.sacos,
     granel:        f.granel,
+    es_manual:     true,
+    justificacion_manual: f.justificacion_manual.trim() || undefined,
   })
   if (ok) cerrarEditarLote()
 }
@@ -895,6 +958,10 @@ async function guardarEditarLote() {
 const eliminarModal = reactive({ visible: false, loteId: 0, ip: '', motivo: '', error: '' })
 
 function abrirEliminar(lote: LoteDetalle) {
+  if (!online.value && lote.id !== -1) {
+    ui.toast('No se puede eliminar un lote del servidor sin conexión a internet.', 'warning')
+    return
+  }
   Object.assign(eliminarModal, { visible: true, loteId: lote.id, ip: lote.ip, motivo: '', error: '' })
 }
 function cerrarEliminar() { eliminarModal.visible = false }
@@ -956,7 +1023,7 @@ onMounted(async () => {
 .granel-label   { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--color-text-muted); cursor: pointer; }
 .header-right   { display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; flex-shrink: 0; }
 .btn-editar-sesion { font-size: .78rem; padding: .3rem .7rem; }
-.btn-editar-sesion:disabled { opacity: .4; cursor: not-allowed; }
+.btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
 .lote-badge {
   font-family: var(--font-mono); font-size: .78rem; letter-spacing: .08em;
   text-align: center; padding: .5rem .9rem; border-radius: var(--radius-sm);
@@ -1054,7 +1121,7 @@ onMounted(async () => {
 }
 .lote-ip { font-family: var(--font-mono); font-size: .82rem; color: var(--color-gold); }
 .lote-acciones { display: flex; align-items: center; gap: .4rem; }
-.btn-icon-danger:hover { color: var(--color-error); border-color: var(--color-error); }
+.btn-icon-danger:enabled:hover { color: var(--color-error); border-color: var(--color-error); }
 .badge-lote-estado {
   font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em;
   padding: .2rem .5rem; border-radius: var(--radius-sm);

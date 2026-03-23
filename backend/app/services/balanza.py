@@ -348,6 +348,10 @@ def agregar_lote(
         numero_ticket=None,
         fecha_inicio=p.fecha_inicio or ahora,
         fecha_fin=ahora,
+        justificacion_manual=p.justificacion_manual if p.es_manual else None,
+        es_manual=p.es_manual,
+        creado_por=usuario_id,
+        creado_en=ahora,
     )
     db.add(pesaje)
     db.flush()  # obtiene pesaje.id de la secuencia
@@ -445,9 +449,22 @@ def editar_sesion(
     Los lotes heredan el proveedor a través de la FK sesion→provacop,
     NO almacenan provacop_id directamente → no requiere cascada.
     """
-    sesion = _cargar_sesion(db, sesion_id)
+    sesion = (
+        db.query(SesionDescarga)
+        .options(joinedload(SesionDescarga.lotes).joinedload(Lote.mapeo_cip))
+        .filter(SesionDescarga.id == sesion_id)
+        .first()
+    )
 
-    if datos.provacop_id is not None:
+    # VALIDACIÓN: Cambio de Proveedor/Acopiador
+    if datos.provacop_id is not None and datos.provacop_id != sesion.provacop_id:
+        # Si algún lote activo de esta sesión ya tiene CIP, bloqueamos
+        tiene_cip = any(lot.mapeo_cip is not None for lot in sesion.lotes if not lot.eliminado)
+        if tiene_cip:
+            raise ValueError(
+                "No se puede cambiar el Proveedor/Acopiador. Ya existen lotes en esta sesión enviados a laboratorio (tienen código CIP)."
+            )
+
         pa = db.query(ProveedorAcopiador).filter(ProveedorAcopiador.id == datos.provacop_id).first()
         if not pa:
             raise ValueError(f"Relación proveedor-acopiador {datos.provacop_id} no existe")
@@ -490,7 +507,7 @@ def editar_lote(
     """
     lote = (
         db.query(Lote)
-        .options(joinedload(Lote.pesajes))
+        .options(joinedload(Lote.pesajes), joinedload(Lote.mapeo_cip))
         .filter(Lote.id == lote_id, Lote.sesion_id == sesion_id)
         .first()
     )
@@ -499,10 +516,24 @@ def editar_lote(
     if lote.eliminado:
         raise ValueError("No se puede editar un lote eliminado")
 
+    # VALIDACIÓN: Bloquear edición de datos sensibles si ya pasó a muestreo
+    if lote.mapeo_cip is not None:
+        intenta_editar_sensible = any(
+            [
+                datos.tipo_material is not None and datos.tipo_material != lote.tipo_material,
+                datos.peso_inicial is not None,
+                datos.peso_final is not None,
+            ]
+        )
+        if intenta_editar_sensible:
+            raise ValueError(
+                "No se pueden alterar pesos ni el tipo de material de un lote que ya tiene un código CIP asignado."
+            )
+
     if datos.tipo_material is not None:
         lote.tipo_material = datos.tipo_material
 
-    # Editar pesaje si existe
+    # Editar pesaje si existe y está permitido
     pesaje = lote.pesajes[0] if lote.pesajes else None
     if pesaje and (
         datos.peso_inicial is not None
@@ -516,14 +547,24 @@ def editar_lote(
         if nuevo_bruto <= nuevo_tara:
             raise ValueError("peso_inicial (bruto) debe ser mayor que peso_final (tara)")
 
-        pesaje.peso_inicial = nuevo_bruto
-        pesaje.peso_final = nuevo_tara
-        # peso_neto es columna GENERATED → PostgreSQL lo recalcula en flush
-
+        if datos.peso_inicial is not None:
+            pesaje.peso_inicial = datos.peso_inicial
+        if datos.peso_final is not None:
+            pesaje.peso_final = datos.peso_final
         if datos.sacos is not None:
             pesaje.sacos = datos.sacos
         if datos.granel is not None:
             pesaje.granel = datos.granel
+
+        if datos.es_manual is not None:
+            pesaje.es_manual = datos.es_manual
+            if datos.es_manual and not datos.justificacion_manual:
+                raise ValueError(
+                    "La justificación es obligatoria cuando se marca el pesaje como manual."
+                )
+            pesaje.justificacion_manual = datos.justificacion_manual if datos.es_manual else None
+
+        pesaje.modificado_por = usuario_id
 
     lote.modificado_por = usuario_id
     lote.modificado_en = _ahora()
