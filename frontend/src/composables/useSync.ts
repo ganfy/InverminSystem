@@ -279,7 +279,11 @@ export function useSync() {
                                 // Reparar usando memoria local
                                 const sesionLocal = sesionesPostSync.find(s => s.offline_id === resultado.offline_id)
                                 if (sesionLocal) {
-                                    const nuevoIp = await siguienteIP()
+                                    const ipsConocidos = sesionLocal.lotes
+                                        .map(l => l.ip)
+                                        .filter(Boolean) as string[]
+
+                                    const nuevoIp = await siguienteIP(ipsConocidos)
                                     if (nuevoIp) {
                                         const loteConflicto = sesionLocal.lotes.find(l => l.ip === ipEnConflicto)
                                         if (loteConflicto) {

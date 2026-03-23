@@ -218,18 +218,49 @@ export async function obtenerBloqueIP(): Promise<IPBlock | null> {
  * Obtiene el siguiente IP disponible del bloque local.
  * Retorna null si el bloque está agotado (necesita reservar uno nuevo).
  */
-export async function siguienteIP(): Promise<string | null> {
+export async function siguienteIP(ipsConocidos: string[] = []): Promise<string | null> {
     const anio = new Date().getFullYear()
     const bloque = await get<IPBlock>('ip_block', anio)
     if (!bloque) return null
 
-    const numero = bloque.desde + bloque.usado
-    if (numero > bloque.hasta) return null    // bloque agotado
+    let maxUsado = bloque.usado
 
-    // Incrementar contador local
-    await put('ip_block', { ...bloque, usado: bloque.usado + 1 })
+    const lotesOnline = await getAll<LoteOnlineData>('lotes_online_q')
+    const sesionesOffline = await getAll<SesionOfflineData>('sesiones_q')
 
-    return `IP-${String(numero).padStart(4, '0')}`
+    const extraerNumeroIP = (ipStr: string): number => {
+        const match = ipStr.match(/^IP-(\d+)$/)
+        if (!match || !match[1]) return -1
+        return parseInt(match[1], 10)
+    }
+
+    const procesarIP = (ipStr?: string) => {
+        if (!ipStr) return
+        const numero = extraerNumeroIP(ipStr)
+        if (numero >= bloque.desde && numero <= bloque.hasta) {
+            const usadoRelativo = numero - bloque.desde + 1
+            if (usadoRelativo > maxUsado) {
+                maxUsado = usadoRelativo
+            }
+        }
+    }
+
+    // 1. Considerar los IPs que la interfaz online ya sabe que existen
+    for (const ip of ipsConocidos) procesarIP(ip)
+
+    // 2. Considerar lo que hay en las colas offline pendientes
+    for (const lote of lotesOnline) procesarIP(lote.ip)
+    for (const sesion of sesionesOffline) {
+        for (const lote of sesion.lotes) procesarIP(lote.ip)
+    }
+
+    const nextIpNumero = bloque.desde + maxUsado
+
+    if (nextIpNumero > bloque.hasta) return null
+
+    await put('ip_block', { ...bloque, usado: maxUsado + 1 })
+
+    return `IP-${String(nextIpNumero).padStart(4, '0')}`
 }
 
 export async function bloqueAgotado(): Promise<boolean> {
@@ -332,15 +363,48 @@ export async function obtenerBloqueTK(): Promise<TKBlock | null> {
  * Retorna el siguiente número de ticket formateado como "TK-XXXXX".
  * Retorna null si el bloque está agotado.
  */
-export async function siguienteTK(): Promise<string | null> {
+export async function siguienteTK(tksConocidos: string[] = []): Promise<string | null> {
     const bloque = await obtenerBloqueTK()
     if (!bloque) return null
 
-    const numero = bloque.desde + bloque.usado
-    if (numero > bloque.hasta) return null
+    let maxUsado = bloque.usado
 
-    await put('tk_block', { ...bloque, usado: bloque.usado + 1 })
-    return `TK-${String(numero).padStart(5, '0')}`
+    const lotesOnline = await getAll<LoteOnlineData>('lotes_online_q')
+    const sesionesOffline = await getAll<SesionOfflineData>('sesiones_q')
+
+    const extraerNumeroTK = (tkStr: string): number => {
+        const match = tkStr.match(/^TK-(\d+)$/)
+        if (!match || !match[1]) return -1
+        return parseInt(match[1], 10)
+    }
+
+    const procesarTK = (tkStr?: string) => {
+        if (!tkStr) return
+        const numero = extraerNumeroTK(tkStr)
+        if (numero >= bloque.desde && numero <= bloque.hasta) {
+            const usadoRelativo = numero - bloque.desde + 1
+            if (usadoRelativo > maxUsado) {
+                maxUsado = usadoRelativo
+            }
+        }
+    }
+
+    // 1. Considerar los tickets de la interfaz online
+    for (const tk of tksConocidos) procesarTK(tk)
+
+    // 2. Considerar lo offline
+    for (const lote of lotesOnline) procesarTK(lote.numero_ticket)
+    for (const sesion of sesionesOffline) {
+        for (const lote of sesion.lotes) procesarTK(lote.numero_ticket)
+    }
+
+    const nextTkNumero = bloque.desde + maxUsado
+
+    if (nextTkNumero > bloque.hasta) return null
+
+    await put('tk_block', { ...bloque, usado: maxUsado + 1 })
+
+    return `TK-${String(nextTkNumero).padStart(5, '0')}`
 }
 
 export async function bloqueTKAgotado(): Promise<boolean> {

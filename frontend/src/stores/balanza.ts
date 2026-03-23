@@ -603,10 +603,20 @@ export const useBalanzaStore = defineStore('balanza', () => {
       return null
     }
 
-    const ip = await siguienteIP()
+    // 1. Extraemos los IPs conocidos actualmente en la vista (memoria híbrida)
+    const ipsConocidos = sesionActual.value?.lotes
+      .map(l => l.ip)
+      .filter(Boolean) as string[]
+
+    const ip = await siguienteIP(ipsConocidos)
     if (!ip) { ui.toast('No hay IPs disponibles offline.', 'error'); return null }
 
-    const numeroTicket = await siguienteTK()
+    // 2. Extraemos los Tickets conocidos actualmente en la vista
+    const tksConocidos = sesionActual.value?.lotes
+      .map(l => l.pesaje?.numero_ticket)
+      .filter(Boolean) as string[]
+
+    const numeroTicket = await siguienteTK(tksConocidos)
     if (!numeroTicket) { ui.toast('No hay tickets disponibles offline.', 'error'); return null }
 
     const offlineId = generarOfflineId()
