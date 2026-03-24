@@ -81,6 +81,7 @@ function loteOfflineADetalle(lote: LoteOfflineData): LoteDetalle {
     },
     fecha_pesaje: null,
     fecha_habilitacion: null,
+    local_only: true,
   }
 }
 
@@ -202,10 +203,31 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
   // Auto-sincronización del caché online
   watch(sesionActual, async (nuevaSesion) => {
-    // Solo cacheamos si la sesión es del servidor (no 100% offline), tenemos red y no está completada
-    if (nuevaSesion && !esOfflineId(nuevaSesion.id) && !estamosOffline() && nuevaSesion.estado !== 'COMPLETO') {
-      // Guardamos una copia profunda (limpia de proxies de Vue) en IndexedDB
-      await guardarSesionCache(JSON.parse(JSON.stringify(toRaw(nuevaSesion))))
+    if (!nuevaSesion) return
+
+    const serverLotes = nuevaSesion.lotes.filter(l => !l.local_only)
+
+    // 1. MANTENER ACTUALIZADA LA LISTA DEL DASHBOARD (El conteo de lotes)
+    const idx = sesiones.value.findIndex(s => s.id === nuevaSesion.id)
+    if (idx !== -1) {
+      const sesion = sesiones.value[idx]
+      if (!sesion) return
+
+      sesion.total_lotes = serverLotes.length
+      sesion.lotes_activos = serverLotes.filter(l => !l.eliminado).length
+      sesion.estado = nuevaSesion.estado
+
+      // Guardar la fotografía de la lista actualizada
+      if (!estamosOffline()) {
+        await guardarListaSesionesCache(JSON.parse(JSON.stringify(toRaw(sesiones.value))))
+      }
+    }
+
+    // 2. MANTENER ACTUALIZADO EL DETALLE EN CACHÉ (Sin envenenarlo con lotes locales)
+    if (!esOfflineId(nuevaSesion.id) && !estamosOffline() && nuevaSesion.estado !== 'COMPLETO') {
+      const sesionParaCache = JSON.parse(JSON.stringify(toRaw(nuevaSesion)))
+      sesionParaCache.lotes = serverLotes // Evita que los lotes offline se guarden en IndexedDB
+      await guardarSesionCache(sesionParaCache)
     }
   }, { deep: true })
 
@@ -299,7 +321,6 @@ export const useBalanzaStore = defineStore('balanza', () => {
           const sesionEnCache = await obtenerSesionCache(id)
 
           if (sesionEnCache) {
-            // ¡Genial! Tenemos los lotes online guardados localmente
             sesion = sesionEnCache
           } else {
             // 3. Fallback: Intentar armar un cascarón vacío si no tenemos la fotografía
@@ -375,7 +396,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     loadingSesion.value = true
     try {
       // Si ya está en memoria (navegación inmediata post-creación) no releer
-      if (sesionActual.value?.offline_id === offlineId) return
+      // if (sesionActual.value?.offline_id === offlineId) return
 
       const pendientes = await obtenerSesionesPendientes()
       const sesionLocal = pendientes.find(s => s.offline_id === offlineId)
@@ -425,6 +446,22 @@ export const useBalanzaStore = defineStore('balanza', () => {
       try {
         const resp = await balanzaApi.crearSesion(datos)
         sesionActual.value = resp
+
+        sesiones.value.unshift({
+          id: resp.id,
+          fecha_ingreso: resp.fecha_ingreso,
+          proveedor_razon_social: resp.proveedor_razon_social,
+          acopiador_razon_social: resp.acopiador_razon_social ?? '',
+          es_propio: resp.es_propio,
+          placa: resp.placa,
+          guia_remision: resp.guia_remision ?? null,
+          total_lotes: 0,
+          lotes_activos: 0,
+          estado: resp.estado
+        })
+        // Forzar actualización del caché del dashboard
+        await guardarListaSesionesCache(JSON.parse(JSON.stringify(toRaw(sesiones.value))))
+
         return resp
       } catch (err: any) {
         ui.toast(err?.response?.data?.detail ?? 'Error al crear sesión', 'error')

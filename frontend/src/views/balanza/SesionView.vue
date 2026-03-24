@@ -559,9 +559,12 @@ const authStore = useAuthStore()
 const ui        = useUiStore()
 
 // [OFFLINE] ID como string; detecta si es sesión offline por el prefijo
-const sesionIdRaw = route.params.id as string
-const esOffline = computed(() => sesionIdRaw.startsWith('offline-') || !online.value)
-const sesionIdNum = computed(() => sesionIdRaw.startsWith('offline-') ? -1 : Number(sesionIdRaw))
+const sesionIdRaw = computed(() => (route.params.id || '') as string)
+const esOffline = computed(() => sesionIdRaw.value.startsWith('offline-') || !online.value)
+const sesionIdNum = computed(() => {
+  if (!sesionIdRaw.value || sesionIdRaw.value.startsWith('offline-')) return -1
+  return Number(sesionIdRaw.value)
+})
 
 const sesion       = computed(() => store.sesionActual)
 const lotesActivos = computed(() => sesion.value?.lotes.filter(l => !l.eliminado) ?? [])
@@ -570,30 +573,30 @@ const {
   online, sesionRecargada,
   limpiarSesionRecargada,
   sesionOfflineSincronizada,
-  limpiarSesionOfflineSincronizada
+  limpiarSesionOfflineSincronizada,
+  ultimoSync
 } = useSync()
 
 // Auto-redirect cuando una sesión 100% offline se sincroniza exitosamente en background
 watch(sesionOfflineSincronizada, (val) => {
-  if (val && val.offline_id === sesionIdRaw) {
+  if (val && val.offline_id === sesionIdRaw.value) {
     ui.toast('Conexión recuperada. Sesión sincronizada con el servidor.', 'success')
-    // Reemplaza la ruta actual con el ID real del servidor
-    router.replace({ name: 'Sesion', params: { id: val.server_id.toString() } })
+    if (val.server_id) {
+      router.replace({ name: 'SesionBalanza', params: { id: val.server_id.toString() } })
+    }
     limpiarSesionOfflineSincronizada()
   }
 })
 
 // Auto-reload cuando useSync sincroniza lotes de esta sesión
-watch(sesionRecargada, async (idRecargado) => {
-  if (!idRecargado) return
-  if (idRecargado === sesionIdNum.value) {
-    // Esperar un tick para que limpiarLotesOnlineSynced ya haya corrido
-    await nextTick()
+watch(ultimoSync, async () => {
+  if (route.name !== 'SesionBalanza' || !sesionIdRaw.value) return
+  if (!sesionIdRaw.value.startsWith('offline-') && sesionIdNum.value !== -1) {
     await store.cargarSesion(sesionIdNum.value)
     preFillTipoMaterial()
     preFillSacosGranel()
     preFillBruto()
-    limpiarSesionRecargada()
+    ui.toast('Datos actualizados tras recuperar conexión.', 'info')
   }
 })
 
@@ -747,7 +750,7 @@ async function registrarLote() {
   }
   // [OFFLINE] pasar string si es sesión offline, number si es online
   const ok = await store.agregarLote(
-    sesionIdRaw.startsWith('offline-') ? sesionIdRaw : sesionIdNum.value,
+    sesionIdRaw.value.startsWith('offline-') ? sesionIdRaw.value : sesionIdNum.value,
     {
       tipo_material: tipoMaterial.value,
       pesaje: {
@@ -798,7 +801,7 @@ async function finalizar() {
   })
   if (!ok) return
   if (esOffline.value) {
-    await store.finalizarSesionOffline(sesionIdRaw)
+    await store.finalizarSesionOffline(sesionIdRaw.value)
   } else {
     await store.finalizarSesion(sesionIdNum.value)
   }
@@ -889,7 +892,7 @@ function editSelAcop(a: ProvAcopDropdown) {
 async function guardarEditarSesion() {
   const payload: Record<string, any> = { ...editSesionModal.form }
   if (editSesionModal.editAcop) payload.provacop_id = editSesionModal.editAcop.provacop_id
-  const targetId = esOffline.value ? sesionIdRaw : sesionIdNum.value
+  const targetId = esOffline.value ? sesionIdRaw.value : sesionIdNum.value
   const ok = await store.editarSesion(targetId, payload)
   if (ok) cerrarEditarSesion()
 }
@@ -941,7 +944,7 @@ async function guardarEditarLote() {
     editLoteModal.error = 'El BRUTO debe ser mayor que la TARA'
     return
   }
-  const targetSesionId = sesionIdRaw.startsWith('offline-') ? sesionIdRaw : sesionIdNum.value;
+  const targetSesionId = sesionIdRaw.value.startsWith('offline-') ? sesionIdRaw.value : sesionIdNum.value;
   const ok = await store.editarLote(targetSesionId, editLoteModal.loteId, {
     tipo_material: f.tipo_material,
     peso_inicial:  f.peso_inicial ?? undefined,
@@ -952,6 +955,11 @@ async function guardarEditarLote() {
     justificacion_manual: f.justificacion_manual.trim() || undefined,
   })
   if (ok) cerrarEditarLote()
+  if (sesionIdRaw.value.startsWith('offline-')) {
+      await store.cargarSesionOffline(sesionIdRaw.value)
+    } else {
+      await store.cargarSesion(sesionIdNum.value)
+    }
 }
 
 // ── Modal: Eliminar Lote ───────────────────────────────────
@@ -969,7 +977,10 @@ function cerrarEliminar() { eliminarModal.visible = false }
 async function confirmarEliminar() {
   if (!eliminarModal.motivo.trim()) { eliminarModal.error = 'Motivo obligatorio'; return }
   const ok = await store.eliminarLote(sesionIdNum.value, eliminarModal.loteId, eliminarModal.motivo.trim())
-  if (ok) cerrarEliminar()
+  if (ok) {
+    cerrarEliminar()
+    await store.cargarSesion(sesionIdNum.value)
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -989,21 +1000,25 @@ function loteEstadoLabel(lote: LoteDetalle) {
 }
 
 // ── Montaje ────────────────────────────────────────────────
-onMounted(async () => {
-  // Solo buscar en la cola 100% offline si el ID tiene el prefijo
-  const idParam = route.params.id as string
+async function inicializarVista() {
+  store.lotesHybridPendientes = 0;
+  const idParam = sesionIdRaw.value;
 
-  // 2. Evaluamos qué tipo de sesión debemos cargar
   if (idParam.startsWith('offline-')) {
-    // Es una sesión 100% offline, usamos la función que acepta 'string'
     await store.cargarSesionOffline(idParam)
   } else {
-    // Si es una sesión del servidor (normal o híbrida), cargarla
     await store.cargarSesion(sesionIdNum.value)
     preFillBruto()
   }
   preFillTipoMaterial()
   preFillSacosGranel()
+}
+onMounted(inicializarVista)
+
+watch(() => route.params.id, (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    inicializarVista()
+  }
 })
 </script>
 
