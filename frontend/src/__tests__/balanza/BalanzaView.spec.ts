@@ -44,10 +44,10 @@ describe('BalanzaView.vue', () => {
                 proveedor_razon_social: 'PROVEEDOR ONLINE',
                 placa: 'ABC-123',
                 estado: 'EN_PROCESO',
-                fecha_ingreso: '2023-10-01T12:00:00Z', // <- ¡Agregamos esta línea!
-                es_propio: false,                      // <- Agregamos esto para evitar otros warnings
-                lotes_activos: 1,                      // <- Agregamos esto
-                total_lotes: 1                         // <- Agregamos esto
+                fecha_ingreso: '2023-10-01T12:00:00Z',
+                es_propio: false,
+                lotes_activos: 1,
+                total_lotes: 1
             } as any
           ]
         store.loading = false
@@ -59,7 +59,7 @@ describe('BalanzaView.vue', () => {
         expect(wrapper.text()).toContain('ABC-123')
     })
 
-    // Nota: Para probar completamente el estado offline, deberías sobreescribir los
+    // Nota: Para probar completamente el estado offline, sobreescribir los
     // mocks de vi.mock('@/composables/useOfflineQueue') para que devuelvan arrays
     // con datos y validar que el bloque `<div class="offline-section">` se renderice.
 })
