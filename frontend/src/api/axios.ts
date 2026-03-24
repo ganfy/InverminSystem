@@ -1,4 +1,5 @@
 import axios from 'axios'
+import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
 
 const api = axios.create({
@@ -22,6 +23,18 @@ let queue: Array<(token: string) => void> = []
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+
+    if (error.response?.status === 401) {
+      const authStore = useAuthStore()
+      authStore.clearTokens()
+      router.push({ name: 'Login' })
+    }
+
+    // 2. Si el backend dice "Prohibido" (El usuario no tiene el rol necesario)
+    if (error.response?.status === 403) {
+      router.push({ name: 'Unauthorized' })
+    }
+
     const original = error.config
 
     if (error.response?.status !== 401 || original._retry) {

@@ -1,11 +1,11 @@
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import BalanzaView from '@/views/balanza/BalanzaView.vue'
 import { createTestingPinia } from '@pinia/testing'
 import { useBalanzaStore } from '@/stores/balanza'
 import { ref } from 'vue'
+import { obtenerSesionesPendientes, obtenerProvacops } from '@/composables/useOfflineQueue'
 
-// Simulamos los composables de Sync y Offline Queue
 vi.mock('@/composables/useSync', () => ({
     useSync: () => ({
         pendientes: ref(false),
@@ -25,10 +25,19 @@ vi.mock('@/composables/useOfflineQueue', () => ({
     contarLotesOnlinePendientes: vi.fn(() => Promise.resolve(0))
 }))
 
-// Mock básico del router
-vi.mock('vue-router', () => ({
-    useRouter: vi.fn(() => ({ push: vi.fn() }))
-}))
+vi.mock('vue-router', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('vue-router')>()
+    return {
+        ...actual,
+        useRouter: vi.fn(() => ({
+            push: vi.fn()
+        })),
+        useRoute: vi.fn(() => ({
+            params: {},
+            query: {}
+        }))
+    }
+})
 
 describe('BalanzaView.vue', () => {
     it('renderiza la lista de sesiones desde el store (Modo Online)', async () => {
@@ -37,7 +46,6 @@ describe('BalanzaView.vue', () => {
         })
 
         const store = useBalanzaStore()
-        // Inyectamos sesiones mockeadas
         store.sesiones = [
             {
                 id: 1,
@@ -59,7 +67,30 @@ describe('BalanzaView.vue', () => {
         expect(wrapper.text()).toContain('ABC-123')
     })
 
-    // Nota: Para probar completamente el estado offline, sobreescribir los
-    // mocks de vi.mock('@/composables/useOfflineQueue') para que devuelvan arrays
-    // con datos y validar que el bloque `<div class="offline-section">` se renderice.
+    it('renderiza el bloque de sesiones offline si existen pendientes en IndexedDB', async () => {
+        vi.mocked(obtenerSesionesPendientes).mockResolvedValueOnce([
+            {
+                offline_id: 'off-1',
+                provacop_id: 1,
+                placa: 'OFF-999',
+                estado: 'EN_PROCESO',
+                creado_en: '2023-10-01T12:00:00Z',
+                lotes: []
+            } as any
+        ])
+
+        vi.mocked(obtenerProvacops).mockResolvedValueOnce([
+            { provacop_id: 1, proveedor_razon_social: 'MINERA OFFLINE' } as any
+        ])
+
+        const wrapper = mount(BalanzaView, {
+            global: { plugins: [createTestingPinia({ createSpy: vi.fn })] }
+        })
+
+        await flushPromises()
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.text()).toContain('OFF-999')
+        expect(wrapper.text()).toContain('MINERA OFFLINE')
+    })
 })

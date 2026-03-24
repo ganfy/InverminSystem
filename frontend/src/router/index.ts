@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-// Balanza — imports estáticos (necesarios para operación offline)
 import LoginView from '@/views/auth/LoginView.vue'
 import BalanzaView from '@/views/balanza/BalanzaView.vue'
 import RegistrarCamionView from '@/views/balanza/RegistrarCamionView.vue'
 import SesionView from '@/views/balanza/SesionView.vue'
+
+import UnauthorizedView from '@/views/auth/UnauthorizedView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -15,6 +16,12 @@ const router = createRouter({
       name: 'Login',
       component: () => LoginView,
       meta: { public: true },
+    },
+    {
+      path: '/unauthorized',
+      name: 'Unauthorized',
+      component: UnauthorizedView,
+      meta: { requiresAuth: true }, // Requiere estar logueado para ver este error
     },
     {
       path: '/',
@@ -79,6 +86,23 @@ router.beforeEach(async (to) => {
       return { name: 'Login' }
     }
   }
+  // -----------------------------------------------------------
+  // CONTROL DE ACCESO BASADO EN ROLES Y RUTAS (Path Intercept)
+  // -----------------------------------------------------------
+
+  // 1. Proteger rutas de Administración (Solo para rol 'Admin')
+  if (to.path.startsWith('/admin')) {
+    if (store.rol !== 'Admin') {
+      return { name: 'Unauthorized' }
+    }
+  }
+
+  // 2. Proteger rutas de Balanza (Solo Admin o Balancero)
+  // if (to.path.startsWith('/balanza')) {
+  //   if (store.rol !== 'Admin' && store.rol !== 'Balancero') {
+  //     return { name: 'Unauthorized' }
+  //   }
+  // }
 
   return true
 })

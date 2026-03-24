@@ -6,11 +6,19 @@ import LoginView from '@/views/auth/LoginView.vue'
 import { useAuthStore } from '@/stores/auth'
 
 // Simulamos Vue Router
-vi.mock('vue-router', () => ({
-    useRouter: vi.fn(() => ({
-        push: vi.fn()
-    }))
-}))
+vi.mock('vue-router', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('vue-router')>()
+    return {
+        ...actual,
+        useRouter: vi.fn(() => ({
+            push: vi.fn()
+        })),
+        useRoute: vi.fn(() => ({
+            params: {},
+            query: {}
+        }))
+    }
+  })
 
 describe('LoginView.vue', () => {
     let wrapper: any

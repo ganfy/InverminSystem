@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UsuarioMe, TokenResponse } from '@/types/auth'
 import { authApi } from '@/api/auth'
+import router from '@/router'
 
 async function hashearCredenciales(username: string, pass: string): Promise<string> {
   const msgUint8 = new TextEncoder().encode(username.toLowerCase() + ':' + pass)
@@ -97,6 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.warn('Error al hacer logout en el servidor. Limpiando sesión local...', error)
     } finally {
       clearTokens()
+      router.push({name: 'Login'})
     }
   }
 
