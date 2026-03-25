@@ -467,7 +467,7 @@
   }
   .panel-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: 600;
     color: var(--color-text);
   }
@@ -476,7 +476,7 @@
     color: var(--color-gold);
     border-radius: 999px;
     padding: 0.1rem 0.6rem;
-    font-size: 0.78rem;
+  font-size: var(--text-sm);
     font-weight: 600;
   }
 
@@ -489,7 +489,7 @@
     border: 1px solid rgba(14, 165, 233, 0.18);
     border-radius: var(--radius-sm);
     padding: 0.65rem 0.85rem;
-    font-size: 0.82rem;
+    font-size: var(--text-md);
     color: var(--color-text-muted);
     line-height: 1.55;
   }
@@ -510,16 +510,16 @@
     background: var(--color-gold-bg);
   }
   .hidden-input { display: none; }
-  .upload-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
+  .upload-icon { font-size: var(--text-xl); margin-bottom: 0.3rem; }
   .upload-text {
     margin: 0 0 0.2rem;
     color: var(--color-text);
-    font-size: 0.88rem;
+    font-size: var(--text-md)rem;
   }
   .upload-hint {
     margin: 0;
     color: var(--color-text-muted);
-    font-size: 0.76rem;
+    font-size: var(--text-sm);
   }
 
   /* ── Pendientes ──────────────────────────────────────────────*/
@@ -534,7 +534,7 @@
   }
   .pendientes-title {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: var(--text-md);
     font-weight: 600;
     color: var(--color-text-muted);
   }
@@ -545,7 +545,7 @@
   }
   .pendiente-nombre {
     flex: 1;
-    font-size: 0.83rem;
+    font-size: var(--text-md)rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -558,14 +558,14 @@
     border-radius: var(--radius-sm);
     background: var(--color-bg-card);
     color: var(--color-text);
-    font-size: 0.82rem;
+    font-size: var(--text-md);
   }
   .btn-remove-pending {
     background: none;
     border: none;
     color: var(--color-text-muted);
     cursor: pointer;
-    font-size: 0.88rem;
+    font-size: var(--text-md)rem;
     padding: 0.2rem 0.35rem;
     border-radius: 4px;
   }
@@ -582,7 +582,7 @@
     border-radius: var(--radius-sm);
     background: none;
     cursor: pointer;
-    font-size: 0.83rem;
+    font-size: var(--text-md)rem;
     color: var(--color-text-muted);
   }
   .btn-upload {
@@ -591,7 +591,7 @@
     border-radius: var(--radius-sm);
     background: var(--color-gold);
     color: #000;
-    font-size: 0.83rem;
+    font-size: var(--text-md)rem;
     font-weight: 600;
     cursor: pointer;
   }
@@ -611,7 +611,7 @@
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
   }
-  .doc-icon { font-size: 1.15rem; flex-shrink: 0; }
+  .doc-icon { font-size: var(--text-base); flex-shrink: 0; }
   .doc-info {
     flex: 1;
     display: flex;
@@ -619,14 +619,14 @@
     min-width: 0;
   }
   .doc-nombre {
-    font-size: 0.83rem;
+    font-size: var(--text-md)rem;
     font-weight: 500;
     color: var(--color-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .doc-tipo { font-size: 0.73rem; color: var(--color-text-muted); }
+  .doc-tipo { font-size: var(--text-sm); color: var(--color-text-muted); }
   .doc-actions { display: flex; gap: 0.2rem; }
   .btn-icon {
     background: none;
@@ -634,7 +634,7 @@
     cursor: pointer;
     padding: 0.3rem 0.45rem;
     border-radius: var(--radius-sm);
-    font-size: 0.88rem;
+    font-size: var(--text-md);
     transition: background 0.15s;
   }
   .btn-icon:hover { background: var(--color-gold-bg); }
@@ -642,7 +642,7 @@
   .empty-msg {
     text-align: center;
     color: var(--color-text-muted);
-    font-size: 0.83rem;
+    font-size: var(--text-md)rem;
     margin: 0;
     padding: 0.5rem 0;
   }
@@ -665,7 +665,7 @@
     background: var(--color-gold-bg);
     color: var(--color-gold);
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: var(--text-base);
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
     align-self: flex-start;
@@ -679,7 +679,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .extraccion-hint {
     margin: 0;
-    font-size: 0.77rem;
+    font-size: var(--text-sm);
     color: var(--color-text-muted);
     line-height: 1.5;
   }
@@ -701,7 +701,7 @@
   }
   .resultado-titulo {
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: var(--text-base);
     color: var(--color-text);
   }
   .btn-reextraer {
@@ -710,7 +710,7 @@
     border-radius: var(--radius-sm);
     background: none;
     cursor: pointer;
-    font-size: 0.78rem;
+  font-size: var(--text-sm);
     color: var(--color-text-muted);
   }
   .campos-grid {
@@ -720,14 +720,14 @@
   }
   .campo-item { display: flex; flex-direction: column; gap: 0.1rem; }
   .campo-label {
-    font-size: 0.7rem;
+    font-size: var(--text-sm);
     color: var(--color-text-muted);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
   .campo-valor {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     color: var(--color-text);
     font-weight: 500;
   }
@@ -736,16 +736,16 @@
     display: flex;
     gap: 0.5rem;
     align-items: flex-start;
-    font-size: 0.83rem;
+    font-size: var(--text-md)rem;
     color: var(--color-text);
     background: var(--color-gold-bg);
     border-radius: var(--radius-sm);
     padding: 0.45rem 0.7rem;
   }
-  .peso-hint { color: var(--color-text-muted); font-size: 0.76rem; }
+  .peso-hint { color: var(--color-text-muted); font-size: var(--text-sm); }
   .resultado-aviso {
     margin: 0;
-    font-size: 0.78rem;
+  font-size: var(--text-sm);
     color: var(--color-text-muted);
     font-style: italic;
   }

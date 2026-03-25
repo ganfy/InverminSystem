@@ -327,16 +327,16 @@ onMounted(async() => {
   border-bottom: 1px solid rgba(245,158,11,.3);
 }
 .offline-section-titulo {
-  font-family: var(--font-mono); font-size: .72rem;
+  font-family: var(--font-mono); font-size: var(--text-sm);
   letter-spacing: .18em; color: #f59e0b;
 }
 .offline-section-count {
-  font-family: var(--font-mono); font-size: .7rem; color: var(--color-text-muted);
+  font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted);
 }
 .fila-offline { background: rgba(245,158,11,.04); }
 .fila-offline:hover { background: rgba(245,158,11,.09) !important; }
 .badge-local {
-  font-family: var(--font-mono); font-size: .6rem; letter-spacing: .1em;
+  font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: .1em;
   background: rgba(245,158,11,.15); color: #f59e0b;
   border: 1px solid rgba(245,158,11,.3); border-radius: 3px;
   padding: 1px 5px; margin-left: .4rem; vertical-align: middle;

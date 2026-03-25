@@ -378,7 +378,7 @@ onMounted(cargar)
 .reset-usuario {
   color: var(--color-text-muted);
   margin-bottom: 1rem;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 .reset-usuario strong { color: var(--color-text); }
 </style>

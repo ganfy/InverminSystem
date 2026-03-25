@@ -211,7 +211,7 @@ async function handleLogout() {
   align-items: center;
   justify-content: center;
   color: var(--color-gold);
-  font-size: 1.1rem;
+  font-size: var(--text-base);
   flex-shrink: 0;
 }
 
@@ -224,13 +224,13 @@ async function handleLogout() {
 
 .sidebar-title {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-md);
   color: var(--color-gold-light);
   letter-spacing: 0.1em;
 }
 
 .sidebar-subtitle {
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   color: var(--color-text-dim);
   letter-spacing: 0.15em;
 }
@@ -246,7 +246,7 @@ async function handleLogout() {
 }
 
 .nav-section-label {
-  font-size: 0.6rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.2em;
   color: var(--color-text-faint);
   padding: 0.75rem 1rem 0.25rem;
@@ -260,7 +260,7 @@ async function handleLogout() {
   padding: 0.55rem 1rem;
   color: var(--color-text-muted);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: var(--text-md);
   font-family: var(--font-main);
   letter-spacing: 0.05em;
   transition: color 0.15s, background 0.15s;
@@ -279,7 +279,7 @@ async function handleLogout() {
 }
 
 .nav-icon {
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   width: 18px;
   text-align: center;
   flex-shrink: 0;
@@ -300,7 +300,7 @@ async function handleLogout() {
 }
 
 .sidebar-user-name {
-  font-size: 0.8rem;
+  font-size: var(--text-md);
   color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
@@ -308,7 +308,7 @@ async function handleLogout() {
 }
 
 .sidebar-user-rol {
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   color: var(--color-text-dim);
   letter-spacing: 0.08em;
 }
@@ -321,7 +321,7 @@ async function handleLogout() {
   width: 32px;
   height: 32px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--text-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -373,7 +373,7 @@ async function handleLogout() {
   background: transparent;
   border: none;
   color: var(--color-gold);
-  font-size: 1.3rem;
+  font-size: var(--text-base);
   cursor: pointer;
   line-height: 1;
   padding: 0;
@@ -381,7 +381,7 @@ async function handleLogout() {
 
 .topbar-title {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-md);
   color: var(--color-text-muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;

@@ -738,13 +738,13 @@ async function guardar() {
 }
 
 .modal-icon {
-  font-size: 1.1rem;
+  font-size: var(--text-base)text-base);
   color: var(--color-gold);
   font-family: var(--font-mono);
 }
 
 .modal-header h2 {
-  font-size: 1rem;
+  font-size: var(--text-base);
   color: var(--color-gold-light);
   font-family: var(--font-mono);
   letter-spacing: 0.05em;
@@ -765,7 +765,7 @@ async function guardar() {
   background: transparent;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-sm)text-sm);
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -791,7 +791,7 @@ async function guardar() {
   background: transparent;
   border: none;
   color: var(--color-text-muted);
-  font-size: 1rem;
+  font-size: var(--text-base);
   cursor: pointer;
   padding: 0.25rem;
   transition: color 0.15s;
@@ -808,7 +808,7 @@ async function guardar() {
   padding: 0.6rem 1.5rem;
   background: rgba(179, 144, 40, 0.05);
   border-bottom: 1px solid var(--color-border);
-  font-size: 0.8rem;
+  font-size: var(--text-md);
   font-family: var(--font-mono);
   color: var(--color-text);
   letter-spacing: 0.08em;
@@ -818,7 +818,7 @@ async function guardar() {
 
 .seccion-num {
   color: var(--color-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--text-sm)text-sm);
 }
 
 /* ── Body ────────────────────────────────────────────────────── */
@@ -869,15 +869,15 @@ async function guardar() {
   background: rgba(179, 144, 40, 0.1);
 }
 
-.tipo-icon  { font-size: 1.4rem; color: var(--color-gold); }
+.tipo-icon  { font-size: var(--text-lg); color: var(--color-gold); }
 .tipo-nombre {
-  font-size: 0.8rem;
+  font-size: var(--text-md);
   font-family: var(--font-mono);
   color: var(--color-text);
   letter-spacing: 0.05em;
 }
 .tipo-desc {
-  font-size: 0.68rem;
+font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 1.3;
 }
@@ -903,7 +903,7 @@ async function guardar() {
   border: none;
   color: var(--color-gold);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+font-size: var(--text-sm);
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
@@ -921,7 +921,7 @@ async function guardar() {
 }
 
 .acopiador-readonly-label {
-  font-size: 0.68rem;
+font-size: var(--text-xs);
   letter-spacing: 0.15em;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
@@ -929,7 +929,7 @@ async function guardar() {
 }
 
 .acopiador-readonly-nombre {
-  font-size: 1rem;
+  font-size: var(--text-base);
   color: var(--color-text);
   font-family: var(--font-main);
   font-weight: 600;
@@ -939,7 +939,7 @@ async function guardar() {
 }
 
 .badge-propio {
-  font-size: 0.62rem;
+font-size: var(--text-xs);
   background: rgba(179, 144, 40, 0.2);
   color: var(--color-gold);
   border: 1px solid var(--color-gold);
@@ -950,7 +950,7 @@ async function guardar() {
 }
 
 .acopiador-readonly-hint {
-  font-size: 0.72rem;
+font-size: var(--text-sm);
   color: var(--color-text-faint);
   margin-top: 0.4rem;
 }
@@ -979,7 +979,7 @@ async function guardar() {
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+font-size: var(--text-sm);
   padding: 0.4rem 0.75rem;
   cursor: pointer;
   transition: all 0.15s;
@@ -1005,7 +1005,7 @@ async function guardar() {
   background: rgba(14, 165, 233, 0.08);
   border: 1px solid rgba(14, 165, 233, 0.25);
   border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  font-size: var(--text-md);
   color: #38bdf8;
   margin-bottom: 1.25rem;
   font-family: var(--font-mono);
@@ -1016,7 +1016,7 @@ async function guardar() {
 }
 
 .params-grupo-titulo {
-  font-size: 0.68rem;
+font-size: var(--text-xs);
   letter-spacing: 0.15em;
   color: var(--color-gold);
   font-family: var(--font-mono);
@@ -1050,13 +1050,13 @@ async function guardar() {
 }
 
 .toggle-label {
-  font-size: 0.82rem;
+  font-size: var(--text-md);
   font-family: var(--font-mono);
   color: var(--color-text-muted);
 }
 
 .toggle-hint {
-  font-size: 0.72rem;
+font-size: var(--text-sm);
   color: var(--color-text-faint);
   margin-left: 0.3rem;
 }

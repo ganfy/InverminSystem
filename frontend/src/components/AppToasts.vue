@@ -50,7 +50,7 @@ const icons = {
   border-radius: 4px;
   border-left: 3px solid;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-md);
   min-width: 260px;
   max-width: 380px;
   cursor: pointer;
@@ -79,7 +79,7 @@ const icons = {
   color: #38bdf8;
 }
 
-.toast-icon { font-size: 0.9rem; flex-shrink: 0; }
+.toast-icon { font-size: var(--text-base); flex-shrink: 0; }
 .toast-msg  { line-height: 1.4; }
 
 /* Transición */

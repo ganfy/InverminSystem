@@ -352,23 +352,6 @@ onMounted(() => store.cargarProvacops())
 
 <style scoped>
 .registrar-page { max-width: 1100px; }
-/* ── Sección ──────────────────────────────────────────────── */
-.seccion {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1.5rem 2rem;
-  margin-bottom: 1.5rem;
-}
-.seccion-titulo {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.18em;
-  color: var(--color-gold);
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
-}
 /* ── Grids ────────────────────────────────────────────────── */
 .seccion-grid {
   display: grid;
@@ -391,7 +374,7 @@ onMounted(() => store.cargarProvacops())
 }
 .campo-label {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   letter-spacing: 0.1em;
   color: var(--color-text-muted);
   white-space: nowrap;
@@ -402,43 +385,6 @@ onMounted(() => store.cargarProvacops())
 .campo-fila .field-input { flex: 1; margin: 0; }
 .field-readonly { opacity: 0.65; cursor: default; }
 .field-disabled { opacity: 0.4; cursor: not-allowed; }
-/* ── Autocomplete ─────────────────────────────────────────── */
-.autocomplete-wrap { position: relative; flex: 1; }
-.autocomplete-wrap .field-input { width: 100%; }
-.ac-dropdown {
-  position: absolute;
-  top: 100%; left: 0; right: 0;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border-focus);
-  border-top: none;
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 200;
-}
-.ac-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.55rem 0.9rem;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--color-text);
-  border-bottom: 1px solid var(--color-border);
-  transition: background 0.15s;
-}
-.ac-item:last-child { border-bottom: none; }
-.ac-item:hover { background: var(--color-gold-bg); }
-.badge-propio {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  background: rgba(14, 165, 233, 0.15);
-  color: #38bdf8;
-  padding: 1px 6px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
 /* ── Barra inferior ───────────────────────────────────────── */
 .bottom-bar {
   display: flex;

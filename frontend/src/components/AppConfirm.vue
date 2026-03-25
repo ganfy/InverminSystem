@@ -36,7 +36,7 @@ const ui = useUiStore()
 .confirm-msg {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   line-height: 1.5;
   margin: 0;
 }
@@ -46,7 +46,7 @@ const ui = useUiStore()
   border-radius: 3px;
   border: none;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-md);
   font-weight: 600;
   cursor: pointer;
   background: var(--color-gold);

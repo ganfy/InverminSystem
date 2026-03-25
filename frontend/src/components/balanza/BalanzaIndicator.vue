@@ -23,7 +23,7 @@
 
       <!-- Error detalle -->
       <p v-if="error && !wsConectado" class="balanza-error-msg">
-        Agente no disponible — verificar que balanza_agent.py está corriendo
+        Agente no disponible — verificar que script esté corriendo
       </p>
       <p v-else-if="error" class="balanza-error-msg">
         {{ error }}
@@ -68,87 +68,66 @@
 
   <style scoped>
   .balanza-indicator {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 14px 18px;
-    border-radius: 10px;
-    border: 1.5px solid var(--color-border);
-    background: var(--color-surface);
-    min-width: 200px;
-  }
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-card); /* Ajustado */
+  min-width: 200px;
+}
 
-  .balanza-indicator--ok   { border-color: var(--color-success); background: var(--color-success-bg); }
-  .balanza-indicator--warn { border-color: var(--color-warning); background: var(--color-warning-bg); }
-  .balanza-indicator--off  { border-color: var(--color-border);  background: var(--color-surface-muted); }
+.balanza-indicator--ok   { border-color: var(--color-success); }
+.balanza-indicator--warn { border-color: var(--color-warning); }
+.balanza-indicator--off  { border-color: var(--color-border);  background: var(--color-bg-input); }
 
-  /* Status row */
-  .balanza-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--color-text-muted);
-  }
+/* Status row */
+.balanza-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--text-xs); /* Ajustado */
+  color: var(--color-text-muted);
+}
 
-  .balanza-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .dot--green  { background: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-light); }
-  .dot--yellow { background: var(--color-warning); box-shadow: 0 0 0 3px var(--color-warning-light); }
-  .dot--gray   { background: var(--color-text-muted); }
+.balanza-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.dot--green  { background: var(--color-success); box-shadow: 0 0 0 3px rgba(81, 161, 85, 0.3); } /* Ajustado */
+.dot--yellow { background: var(--color-warning); box-shadow: 0 0 0 3px rgba(207, 151, 61, 0.3); } /* Ajustado */
+.dot--gray   { background: var(--color-text-muted); }
 
-  .balanza-port {
-    margin-left: auto;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    opacity: 0.7;
-  }
+.balanza-port {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs); /* Ajustado */
+  opacity: 0.7;
+}
 
-  /* Peso */
-  .balanza-peso-wrapper {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-  }
+/* Peso */
+.balanza-peso-wrapper { display: flex; align-items: baseline; gap: 6px; }
 
-  .balanza-peso {
-    font-size: 32px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--color-text-primary);
-    letter-spacing: -0.5px;
-    transition: color 0.2s;
-  }
+.balanza-peso {
+  font-size: var(--text-xxl); /* Ajustado */
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text); /* Ajustado */
+  letter-spacing: -0.5px;
+  transition: color 0.2s;
+}
+.balanza-peso--inestable { color: var(--color-warning); }
 
-  .balanza-peso--inestable {
-    color: var(--color-warning-text);
-  }
+.balanza-unidad {
+  font-size: var(--text-base); /* Ajustado */
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
 
-  .balanza-unidad {
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--color-text-muted);
-  }
+/* Badges */
+.badge {
+  display: inline-block; padding: 2px 10px;
+  border-radius: 100px; font-size: var(--text-xs); font-weight: 500;
+}
+.badge--ok   { background: var(--color-success-bg); color: var(--color-success); } /* Ajustado */
+.badge--warn { background: rgba(207, 151, 61, 0.15); color: var(--color-warning); } /* Ajustado */
 
-  /* Badges */
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 500;
-  }
-  .badge--ok   { background: var(--color-success-light); color: var(--color-success-dark); }
-  .badge--warn { background: var(--color-warning-light); color: var(--color-warning-dark); }
-
-  /* Error */
-  .balanza-error-msg {
-    font-size: 11px;
-    color: var(--color-danger-text);
-    margin: 0;
-  }
+/* Error */
+.balanza-error-msg { font-size: var(--text-xs); color: var(--color-error); margin: 0; }
   </style>

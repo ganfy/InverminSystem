@@ -233,7 +233,7 @@ onMounted(cargar)
 <style scoped>
 /* ── Header ─────────────────────────────────────────────────── */
 .page-subtitle {
-  font-size: 0.78rem;
+font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin-top: 0.25rem;
   font-family: var(--font-mono);
@@ -255,7 +255,7 @@ onMounted(cargar)
 .btn-refresh {
   padding: 0.6rem 0.85rem;
   min-height: 42px;
-  font-size: 1.1rem;
+  font-size: var(--text-base);
   line-height: 1;
 }
 
@@ -272,7 +272,7 @@ onMounted(cargar)
   gap: 0.75rem;
   padding: 2rem;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-md);
   color: var(--color-text-muted);
 }
 
@@ -294,7 +294,7 @@ onMounted(cargar)
   border: none;
   color: var(--color-gold);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-md);
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
@@ -310,7 +310,7 @@ onMounted(cargar)
 .tabla {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: var(--text-md);
 }
 
 .tabla thead tr {
@@ -322,7 +322,7 @@ onMounted(cargar)
   padding: 0.7rem 1rem;
   text-align: left;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+font-size: var(--text-xs);
   letter-spacing: 0.15em;
   color: var(--color-text-muted);
   text-transform: uppercase;
@@ -352,12 +352,12 @@ onMounted(cargar)
 
 .col-mono {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-md);
   color: var(--color-text-muted);
 }
 
 .col-ref {
-  font-size: 0.82rem;
+  font-size: var(--text-md);
   color: var(--color-text-dim);
 }
 
@@ -367,7 +367,7 @@ onMounted(cargar)
   background: rgba(179, 144, 40, 0.1);
   border: 1px solid rgba(179, 144, 40, 0.25);
   border-radius: 2px;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-family: var(--font-mono);
   color: var(--color-gold);
   max-width: 180px;
@@ -384,13 +384,13 @@ onMounted(cargar)
   padding: 0.18rem 0.55rem;
   border-radius: 2px;
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+font-size: var(--text-xs);
   letter-spacing: 0.12em;
   font-weight: 700;
 }
 
 .badge-estado.activo {
-  background: rgba(81, 161, 85, 0.15);
+  background: var(--color-success-bg);
   color: #4ade80;
   border: 1px solid rgba(81, 161, 85, 0.3);
 }
@@ -418,7 +418,7 @@ onMounted(cargar)
   height: 30px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -436,7 +436,7 @@ onMounted(cargar)
   padding: 3rem 1rem;
   color: var(--color-text-faint);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--text-md);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -444,7 +444,7 @@ onMounted(cargar)
 }
 
 .tabla-vacia-icon {
-  font-size: 1.5rem;
+  font-size: var(--text-xl);
   color: var(--color-border);
 }
 
@@ -457,7 +457,7 @@ onMounted(cargar)
 
 .tabla-count {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+font-size: var(--text-sm);
   color: var(--color-text-faint);
   letter-spacing: 0.08em;
 }

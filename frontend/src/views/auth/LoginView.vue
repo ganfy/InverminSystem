@@ -107,7 +107,7 @@ async function handleLogin() {
 }
 
 .logo-symbol {
-  font-size: 2.5rem;
+  font-size: var(--text-xxxl);
   color: var(--color-gold);
   line-height: 1;
 }
@@ -121,7 +121,7 @@ async function handleLogin() {
 
 .app-title {
   font-family: var(--font-mono);
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   color: var(--color-gold-light);
   letter-spacing: 0.15em;
   text-align: center;
@@ -137,7 +137,7 @@ async function handleLogin() {
 
 .login-form .field-input {
   padding: 1rem 1.25rem;
-  font-size: 1.05rem;
+  font-size: var(--text-base);
   border-radius: var(--radius-md);
 }
 
@@ -145,7 +145,7 @@ async function handleLogin() {
   width: 100%;
   margin-top: 0.5rem;
   padding: 1rem;
-  font-size: 1rem;
+  font-size: var(--text-base);
   border-radius: var(--radius-md);
 }
 
@@ -156,7 +156,7 @@ async function handleLogin() {
 }
 
 .version {
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   color: var(--color-text-faint);
   letter-spacing: 0.1em;
 }
