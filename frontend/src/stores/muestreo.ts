@@ -1,9 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { muestreoApi, type MuestreoCreate } from '@/api/muestreo'
+import { muestreoApi, type LoteMuestreo, type MuestreoCreate } from '@/api/muestreo'
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
-import { encolarMuestreoOffline } from '@/composables/useOfflineQueue'
+import {
+    encolarMuestreoOffline,
+    obtenerMuestreosPendientes ,
+    guardarLotesMuestreoCache,
+    obtenerLotesMuestreoCache,
+} from '@/composables/useOfflineQueue'
 
 export const useMuestreoStore = defineStore('muestreo', () => {
     const ui = useUiStore()
@@ -14,8 +19,8 @@ export const useMuestreoStore = defineStore('muestreo', () => {
     const cargando = ref(false)
 
     // Aquí guardaremos los lotes que bajen del servidor
-    const lotesPendientes = ref<any[]>([])
-    const lotesCompletados = ref<any[]>([])
+    const lotesPendientes = ref<LoteMuestreo[]>([])
+    const lotesCompletados = ref<LoteMuestreo[]>([])
 
     // --- Helpers Matemáticos (Se ejecutan en el cliente para UI rápida) ---
 
@@ -102,6 +107,47 @@ export const useMuestreoStore = defineStore('muestreo', () => {
         }
     }
 
+    /**
+     * Calcula qué número de intento le toca a un lote de forma segura.
+     */
+    async function calcularProximoIntento(ipLote: string): Promise<number> {
+        const lote = lotesPendientes.value.find(l => l.ip === ipLote) ||
+            lotesCompletados.value.find(l => l.ip === ipLote)
+
+        const intentosBackend = lote?.cantidad_intentos_previos || 0
+
+        const muestreosPendientes = await obtenerMuestreosPendientes()
+        const intentosOffline = muestreosPendientes.filter(m => m.ip === ipLote).length
+
+        return intentosBackend + intentosOffline + 1
+    }
+
+    /**
+     * Carga los lotes. Estrategia Offline-First.
+     */
+    async function cargarLotes() {
+        cargando.value = true
+        try {
+            if (sync.online.value) {
+                // 1. ONLINE: Descargamos la verdad absoluta del servidor
+                const lotesServer = await muestreoApi.obtenerLotes()
+                // 2. Guardamos en la tablet para cuando se vaya el internet
+                await guardarLotesMuestreoCache(lotesServer)
+            }
+        } catch (error) {
+            console.warn('No se pudo actualizar lotes del servidor. Usando caché local.', error)
+        } finally {
+            // 3. SIEMPRE leemos de IndexedDB para pintar la UI (Garantiza consistencia)
+            const lotesLocal = await obtenerLotesMuestreoCache()
+
+            // Separar en las dos listas
+            lotesPendientes.value = lotesLocal.filter(l => l.estado_muestreo === 'PENDIENTE')
+            lotesCompletados.value = lotesLocal.filter(l => l.estado_muestreo === 'COMPLETADO')
+
+            cargando.value = false
+        }
+    }
+
     return {
         // Estado
         guardando,
@@ -111,6 +157,8 @@ export const useMuestreoStore = defineStore('muestreo', () => {
         // Métodos
         calcularHumedad,
         registrarHumedad,
-        generarCodigosCip
+        generarCodigosCip,
+        calcularProximoIntento,
+        cargarLotes,
     }
 })

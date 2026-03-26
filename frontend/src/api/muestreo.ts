@@ -43,12 +43,25 @@ export interface SyncMuestreosResponse {
     }>
 }
 
+export interface LoteMuestreo {
+    ip: string
+    fecha_recepcion: string | null
+    fecha_muestreo: string | null
+    peso_neto: number
+    sacos: number | null
+    proveedor_razon_social: string
+    estado_muestreo: 'PENDIENTE' | 'COMPLETADO'
+    cantidad_intentos_previos: number
+    tiene_humedad: boolean
+    etiquetado: boolean
+}
+
 export const muestreoApi = {
     /**
      * Registra un muestreo individual estando online.
      */
     async registrarMuestreo(ipLote: string, datos: MuestreoCreate): Promise<MuestreoOut> {
-        const response = await api.post<MuestreoOut>(`/laboratorio/lotes/${ipLote}/muestreos`, datos)
+        const response = await api.post<MuestreoOut>(`/muestreo/lotes/${ipLote}/muestreos`, datos)
         return response.data
     },
 
@@ -56,7 +69,7 @@ export const muestreoApi = {
      * Sincroniza un bloque de muestreos guardados offline.
      */
     async syncBatch(muestreos: MuestreoOfflineItem[]): Promise<SyncMuestreosResponse> {
-        const response = await api.post<SyncMuestreosResponse>('/laboratorio/muestreos/sync', { muestreos })
+        const response = await api.post<SyncMuestreosResponse>('/muestreo/sync', { muestreos })
         return response.data
     },
 
@@ -64,10 +77,19 @@ export const muestreoApi = {
      * Genera los códigos CIP (Muestreo Ciego) para el laboratorio.
      */
     async generarCips(ipLote: string, cantidad: number = 2): Promise<MapeoCIPOut[]> {
-        const response = await api.post<MapeoCIPOut[]>(`/laboratorio/lotes/${ipLote}/cips`, {
+        const response = await api.post<MapeoCIPOut[]>(`/muestreo/lotes/${ipLote}/cips`, {
             cantidad,
             laboratorio: 'Por definir'
         })
         return response.data
-    }
+    },
+
+    /**
+     * Obtiene la lista de lotes que requieren muestreo.
+     */
+    async obtenerLotes(): Promise<LoteMuestreo[]> {
+        // Ajusta la ruta según tu backend real
+        const response = await api.get<LoteMuestreo[]>('/muestreo/lotes')
+        return response.data
+    },
 }

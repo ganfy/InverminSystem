@@ -1,6 +1,6 @@
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models.models import Usuario
+from app.models.models import Lote, Muestreo, Usuario
 from app.schemas.muestreo import (
     GenerarCipsRequest,
     MapeoCIPOut,
@@ -14,7 +14,7 @@ from app.services import muestreo as sample_service
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/laboratorio", tags=["Laboratorio y Muestreo"])
+router = APIRouter(prefix="/muestreo", tags=["Muestreo"])
 
 
 # ==========================================
@@ -85,4 +85,27 @@ def generar_cips(
     """
     return sample_service.generar_cips_para_lote(
         db=db, ip_lote=ip_lote, cantidad=solicitud.cantidad
+    )
+
+
+@router.get("/lotes", status_code=status.HTTP_200_OK)
+def listar_lotes_muestreo(db: Session = Depends(get_db)):
+    """
+    Devuelve la lista de lotes listos para el muestreo (sesiones finalizadas).
+    """
+    return sample_service.obtener_lotes_para_muestreo(db)
+
+
+@router.get("/lotes/{ip_lote}/muestreos", response_model=list[MuestreoOut])
+def listar_muestreos_lote(ip_lote: str, db: Session = Depends(get_db)):
+    """Obtiene el historial de intentos de humedad de un lote específico."""
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    return (
+        db.query(Muestreo)
+        .filter(Muestreo.lote_id == lote.id)
+        .order_by(Muestreo.intento.asc())
+        .all()
     )

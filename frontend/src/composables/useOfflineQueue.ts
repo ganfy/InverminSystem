@@ -16,6 +16,7 @@
 
 import { ref } from 'vue'
 import type { SesionLista, SesionDetalle } from '@/api/balanza'
+import type { LoteMuestreo } from '@/api/muestreo'
 
 const DB_NAME = 'invermin_offline'
 const DB_VERSION = 6
@@ -592,4 +593,22 @@ export async function limpiarMuestreosSynced(): Promise<void> {
     for (const m of todos.filter(x => x.synced)) {
         await del('muestreos_q', m.offline_id)
     }
+}
+
+export async function guardarLotesMuestreoCache(lotes: LoteMuestreo[]): Promise<void> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('lotes_muestreo_cache', 'readwrite')
+        const store = tx.objectStore('lotes_muestreo_cache')
+        store.clear() // Limpiamos la caché vieja
+        for (const lote of lotes) {
+            store.put(lote)
+        }
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+    })
+}
+
+export async function obtenerLotesMuestreoCache(): Promise<LoteMuestreo[]> {
+    return getAll<LoteMuestreo>('lotes_muestreo_cache')
 }

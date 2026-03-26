@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from app.models.models import Lote, MapeoCIP, Muestreo
+from app.models.models import Lote, MapeoCIP, Muestreo, SesionDescarga
 from app.schemas.muestreo import MuestreoCreate
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -128,7 +128,7 @@ def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 2) -> list
             codigo_cip=codigo_final,
             laboratorio="Por definir",
             tipo_muestra="Laboratorio",
-            fecha_envio=datetime.utcnow().date(),
+            fecha_envio=datetime.now().date(),
         )
         db.add(nuevo_cip)
         nuevos_cips.append(nuevo_cip)
@@ -138,3 +138,50 @@ def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 2) -> list
         db.refresh(cip)
 
     return nuevos_cips
+
+
+def obtener_lotes_para_muestreo(db: Session):
+    lotes_db = db.query(Lote).join(Lote.sesion).filter(SesionDescarga.estado == "COMPLETO").all()
+
+    resultado = []
+
+    for lote in lotes_db:
+        pesaje = lote.pesajes[0] if lote.pesajes else None
+        peso_neto = pesaje.peso_neto if pesaje else 0.0
+        sacos = pesaje.sacos if pesaje else None
+
+        proveedor_nombre = "Desconocido"
+        if lote.sesion and lote.sesion.provacop and lote.sesion.provacop.proveedor:
+            proveedor_nombre = lote.sesion.provacop.proveedor.razon_social
+
+        # NUEVO: Obtener intentos y la fecha del último
+        intentos = (
+            db.query(Muestreo)
+            .filter(Muestreo.lote_id == lote.id)
+            .order_by(Muestreo.intento.desc())
+            .all()
+        )
+        intentos_previos = len(intentos)
+        fecha_ultimo_muestreo = (
+            intentos[0].creado_en.isoformat() if intentos and intentos[0].creado_en else None
+        )
+
+        tiene_etiquetas = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).first() is not None
+        estado_muestreo = "COMPLETADO" if intentos_previos > 0 else "PENDIENTE"
+
+        resultado.append(
+            {
+                "ip": lote.ip,
+                "fecha_recepcion": lote.creado_en.isoformat() if lote.creado_en else None,
+                "fecha_muestreo": fecha_ultimo_muestreo,  # <-- ¡Aquí agregamos la fecha!
+                "peso_neto": float(peso_neto),
+                "sacos": sacos,
+                "proveedor_razon_social": proveedor_nombre,
+                "estado_muestreo": estado_muestreo,
+                "cantidad_intentos_previos": intentos_previos,
+                "tiene_humedad": intentos_previos > 0,
+                "etiquetado": tiene_etiquetas,
+            }
+        )
+
+    return resultado

@@ -58,6 +58,11 @@ const router = createRouter({
           path: 'muestreo',
           name: 'Muestreo',
           component: MuestreoView,
+        },
+        {
+          path: 'muestreo/:ip/nuevo',
+          name: 'RegistrarHumedad',
+          component: () => import('@/views/muestreo/RegistrarHumedadView.vue'),
         }
       ],
     },
