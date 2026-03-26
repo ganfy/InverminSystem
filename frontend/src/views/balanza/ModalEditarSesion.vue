@@ -97,9 +97,9 @@
         </div>
       </div>
     </div>
-  </template>
+</template>
 
-  <script setup lang="ts">
+<script setup lang="ts">
   const props = defineProps<{
     modalData: any;
     guardando: boolean;
@@ -111,4 +111,16 @@
 
   function onBlurProv() { setTimeout(() => { props.modalData.dropProv = false }, 150) }
   function onBlurAcop() { setTimeout(() => { props.modalData.dropAcop = false }, 150) }
-  </script>
+</script>
+
+<style scoped>
+/* ── Modal edición ───────────────────────────────────────── */
+.seccion-edit { margin-bottom: 1.25rem; }
+.seccion-edit-titulo {
+  font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: .18em;
+  color: var(--color-gold); margin-bottom: .75rem;
+  padding-bottom: .3rem; border-bottom: 1px solid var(--color-border);
+}
+.field-disabled { opacity: .4; cursor: not-allowed; }
+
+</style>

@@ -91,6 +91,35 @@
 .btn-secondary:hover:not(:disabled) { background: var(--color-gold-bg); }
 .btn-secondary:disabled              { opacity: 0.6; cursor: not-allowed; }
 
+.btn-danger {
+  padding: 0.75rem 1.5rem;
+  background: rgba(165, 71, 61, 0.1);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  color: var(--color-error);
+  font-family: var(--font-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  text-transform: uppercase;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-error);
+  color: var(--color-bg);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .error-msg {
   color: var(--color-error);
   font-size: var(--text-md);
@@ -440,24 +469,24 @@ font-size: var(--text-xs);
    Botones cuadrados de acción en tablas.
 ────────────────────────────────────────────────────────────── */
 .btn-icon {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  padding: 0;
-  flex-shrink: 0;
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-muted) !important;
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: var(--radius-sm) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
 }
 
-.btn-icon:enabled:hover         { border-color: var(--color-gold);    color: var(--color-gold); }
-.btn-icon.danger:enabled:hover  { border-color: var(--color-error);   color: var(--color-error); }
-.btn-icon.warn:enabled:hover    { border-color: var(--color-warning);  color: var(--color-warning); }
+.btn-icon:enabled:hover         { border-color: var(--color-gold) !important;    color: var(--color-gold) !important; }
+.btn-icon.danger:enabled:hover  { border-color: var(--color-error) !important;   color: var(--color-error) !important; }
+.btn-icon.warn:enabled:hover    { border-color: var(--color-warning) !important;  color: var(--color-warning) !important; }
 .btn-icon.success:enabled:hover { border-color: var(--color-success);  color: var(--color-success); }
 
 /* ─── FORM GRID ───────────────────────────────────────────────

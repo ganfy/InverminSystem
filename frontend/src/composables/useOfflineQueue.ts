@@ -18,7 +18,7 @@ import { ref } from 'vue'
 import type { SesionLista, SesionDetalle } from '@/api/balanza'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -115,6 +115,19 @@ export type LoteEditable = {
     ip?: string
   }
 
+export interface MuestreoQueueData {
+    offline_id: string
+    ip: string
+    datos: {
+        intento: number
+        peso_humedo: number
+        peso_seco: number
+        observaciones: string | null
+        fecha_muestreo: string
+    }
+    synced: boolean
+    sync_error: string | null
+}
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -152,6 +165,10 @@ async function openDB(): Promise<IDBDatabase> {
 
             if (oldVersion < 5) {
                 db.createObjectStore('sesiones_cache', { keyPath: 'id' })
+            }
+            if (oldVersion < 6) {
+                db.createObjectStore('muestreos_q', { keyPath: 'offline_id' })
+                db.createObjectStore('lotes_muestreo_cache', { keyPath: 'ip' }) // Para cachear los lotes pendientes que vienen de balanza
             }
         }
 
@@ -543,4 +560,36 @@ export async function guardarListaSesionesCache(sesiones: SesionLista[]): Promis
 export async function obtenerListaSesionesCache(): Promise<SesionLista[]> {
     const cached = await get<{ id: string, data: SesionLista[] }>('sesiones_cache', 'lista_dashboard')
     return cached ? cached.data : []
+}
+
+// ==========================================
+// MÓDULO: MUESTREO (OFFLINE QUEUE)
+// ==========================================
+
+export async function encolarMuestreoOffline(muestreo: MuestreoQueueData): Promise<void> {
+    await put('muestreos_q', muestreo)
+}
+
+export async function obtenerMuestreosPendientes(): Promise<MuestreoQueueData[]> {
+    const todos = await getAll<MuestreoQueueData>('muestreos_q')
+    return todos.filter(m => !m.synced)
+}
+
+export async function marcarMuestreoSynced(offlineId: string): Promise<void> {
+    const m = await get<MuestreoQueueData>('muestreos_q', offlineId)
+    if (!m) return
+    await put('muestreos_q', { ...m, synced: true, sync_error: null })
+}
+
+export async function marcarMuestreoError(offlineId: string, error: string): Promise<void> {
+    const m = await get<MuestreoQueueData>('muestreos_q', offlineId)
+    if (!m) return
+    await put('muestreos_q', { ...m, sync_error: error })
+}
+
+export async function limpiarMuestreosSynced(): Promise<void> {
+    const todos = await getAll<MuestreoQueueData>('muestreos_q')
+    for (const m of todos.filter(x => x.synced)) {
+        await del('muestreos_q', m.offline_id)
+    }
 }

@@ -35,10 +35,15 @@ import {
     marcarLoteOnlineError,
     marcarLoteOnlineSynced,
     limpiarLotesOnlineSynced,
+    obtenerMuestreosPendientes,
+    marcarMuestreoError,
+    marcarMuestreoSynced,
+    limpiarMuestreosSynced,
     type LoteOnlineData,
     siguienteIP,
     encolarSesion,
 } from '@/composables/useOfflineQueue'
+import { muestreoApi } from '@/api/muestreo'
 
 // ── Modo offline forzado (solo desarrollo) ─────────────────
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
@@ -233,6 +238,27 @@ export function useSync() {
         }
       }
 
+    async function sincronizarMuestreos(): Promise<void> {
+        const pendientes = await obtenerMuestreosPendientes()
+        if (pendientes.length === 0) return
+
+        try {
+            const resp = await muestreoApi.syncBatch(pendientes)
+
+            for (const resultado of resp.resultados) {
+                if (resultado.error) {
+                    await marcarMuestreoError(resultado.offline_id, resultado.error)
+                    // Podríamos lanzar un toast aquí si queremos avisar al usuario
+                } else {
+                    await marcarMuestreoSynced(resultado.offline_id)
+                }
+            }
+            await limpiarMuestreosSynced()
+        } catch (err) {
+            console.error('[useSync] Error sincronizando muestreos:', err)
+        }
+    }
+
     async function sincronizar(): Promise<void> {
         if (sincronizando.value || !isOnline()) return
 
@@ -331,6 +357,9 @@ export function useSync() {
 
             // 3. finalizaciones híbridas
             await sincronizarFinalizaciones()
+
+            // 4. muestreos offline
+            await sincronizarMuestreos()
 
             // Siempre marcar timestamp — es la señal de "sync completó" para los watchers
             ultimoSync.value = new Date().toLocaleString('es-PE')

@@ -5,6 +5,7 @@ import LoginView from '@/views/auth/LoginView.vue'
 import BalanzaView from '@/views/balanza/BalanzaView.vue'
 import RegistrarCamionView from '@/views/balanza/RegistrarCamionView.vue'
 import SesionView from '@/views/balanza/SesionView.vue'
+import MuestreoView from '@/views/muestreo/MuestreoView.vue'
 
 import UnauthorizedView from '@/views/auth/UnauthorizedView.vue'
 
@@ -53,6 +54,11 @@ const router = createRouter({
           name: 'SesionBalanza',
           component: SesionView,
         },
+        {
+          path: 'muestreo',
+          name: 'Muestreo',
+          component: MuestreoView,
+        }
       ],
     },
     {

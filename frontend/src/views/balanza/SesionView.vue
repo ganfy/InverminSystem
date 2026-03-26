@@ -867,86 +867,22 @@ watch(() => route.params.id, (newId, oldId) => {
 .neto-resumen strong { color: var(--color-gold-light); }
 .btn-registrar { width: 100%; }
 
-/* ── Lotes ───────────────────────────────────────────────── */
-.lote-card {
-  background: var(--color-bg-card); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); margin-bottom: .75rem; overflow: hidden;
-}
-.lote-en-proceso { border-color: rgba(207, 151, 61, 0.5); }
-.lote-eliminado  { opacity: .45; }
-.lote-card-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: .6rem 1rem; background: var(--color-gold-bg);
-  border-bottom: 1px solid var(--color-border);
-}
-.lote-ip { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-gold); }
-.lote-acciones { display: flex; align-items: center; gap: .4rem; }
-.btn-icon-danger:enabled:hover { color: var(--color-error); border-color: var(--color-error); }
-.badge-lote-estado {
-  font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: .1em;
-  padding: .2rem .5rem; border-radius: var(--radius-sm);
-}
-
-/* Mapeando a tus variables globales de color */
-.lc-completado   { background: var(--color-success-bg);  color: var(--color-success); border: 1px solid var(--color-success); }
-.lc-en-proceso   { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid var(--color-warning); }
-.badge-eliminado { background: var(--color-error-bg);  color: var(--color-error);   border: 1px solid var(--color-error); }
-
-.lote-card-body {
-  padding: .75rem 1rem; display: grid;
-  grid-template-columns: 1fr 1fr; gap: .3rem .75rem;
-}
-.lote-fila { display: flex; gap: .4rem; align-items: baseline; }
-.lote-neto { grid-column: 1 / -1; margin-top: .2rem; }
-.lote-dato-label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); min-width: 45px; }
-.lote-dato-val   { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text); }
-.neto-val        { font-size: var(--text-lg); color: var(--color-gold-light); font-weight: 600; }
-.badge-propio    { font-size: var(--text-xs); padding: .15rem .4rem; background: var(--color-gold-bg); border-radius: 3px; color: var(--color-gold); }
-.lote-card-footer {
-  padding: .5rem 1rem; border-top: 1px solid var(--color-border);
-  display: flex; justify-content: flex-end; gap: .5rem;
-}
-.badge-local-lote {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: .1em;
-  background: var(--color-offline-bg);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-radius: 3px;
-  padding: 1px 5px;
-}
-.btn-sm { padding: .3rem .7rem; font-size: var(--text-sm); }
-.lotes-eliminados { margin-top: .5rem; font-size: var(--text-md); color: var(--color-text-muted); }
-.lotes-eliminados summary { cursor: pointer; padding: .3rem 0; }
-
-/* ── Modal edición ───────────────────────────────────────── */
-.seccion-edit { margin-bottom: 1.25rem; }
-.seccion-edit-titulo {
-  font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: .18em;
-  color: var(--color-gold); margin-bottom: .75rem;
-  padding-bottom: .3rem; border-bottom: 1px solid var(--color-border);
-}
-.field-disabled { opacity: .4; cursor: not-allowed; }
-
-/* ── Otros ───────────────────────────────────────────────── */
-.elim-aviso { font-size: var(--text-md); color: var(--color-error); margin: 0; }
+/* ── BARRA INFERIOR ─────────────────────────────────── */
 .bottom-bar {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-top: 1rem; border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap; /* Permite que bajen si la pantalla es muy estrecha */
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+  margin-top: 1rem;
 }
-.bottom-bar-acciones { display: flex; gap: .75rem; }
-.estado-tabla { padding: 2rem; text-align: center; color: var(--color-text-muted); }
-.form-faltantes {
-  display: flex; align-items: center; gap: 0.4rem;
-  font-family: var(--font-mono); font-size: var(--text-sm);
-  color: var(--color-warning); background: rgba(207, 151, 61, 0.08);
-  border: 1px solid rgba(207, 151, 61, 0.3); border-radius: var(--radius-sm);
-  padding: 0.4rem 0.75rem; margin-bottom: 0.5rem;
-}
-.faltante-icono { font-size: var(--text-base); }
-.btn-incompleto {
-  border-color: var(--color-warning) !important;
-  box-shadow: 0 0 0 1px var(--color-warning);
+
+.bottom-bar-acciones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 </style>

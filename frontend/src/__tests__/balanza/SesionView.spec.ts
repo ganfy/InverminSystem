@@ -108,7 +108,7 @@ describe('SesionView.vue - Lógica de Balanza y Justificación', () => {
         await inputsPeso[1].setValue(10.000) // Tara
 
         // La UI debe detectar la anomalía y exigir justificación
-        expect(wrapper.text()).toContain('⚠ Ingreso Manual: Justificación requerida')
+        expect(wrapper.text()).toContain('Ingreso Manual: Justificación requerida')
 
         // Si intenta registrar, debe bloquearlo indicando el faltante
         await wrapper.find('.btn-registrar').trigger('click')

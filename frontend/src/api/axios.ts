@@ -17,63 +17,75 @@ api.interceptors.request.use((config) => {
 })
 
 // Refresh automático si el token expiró
+// frontend/src/api/axios.ts
+
 let isRefreshing = false
 let queue: Array<(token: string) => void> = []
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalRequest = error.config
 
-    if (error.response?.status === 401) {
-      const authStore = useAuthStore()
-      authStore.clearTokens()
-      router.push({ name: 'Login' })
-    }
-
-    // 2. Si el backend dice "Prohibido" (El usuario no tiene el rol necesario)
+    // Si el backend dice "Prohibido" (El usuario no tiene el rol necesario)
     if (error.response?.status === 403) {
       router.push({ name: 'Unauthorized' })
-    }
-
-    const original = error.config
-
-    if (error.response?.status !== 401 || original._retry) {
       return Promise.reject(error)
     }
 
-    original._retry = true
+    // Si es un 401 (No autorizado / Token expirado) y NO hemos reintentado ya esta petición
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
 
-    if (isRefreshing) {
-      // Encolar requests mientras se refresca
-      return new Promise((resolve) => {
-        queue.push((token) => {
-          original.headers.Authorization = `Bearer ${token}`
-          resolve(api(original))
+      // Si el request fallido fue el intento de hacer refresh, significa que el refresh token
+      // expiró o es inválido. Aquí SÍ debemos cerrar sesión definitivamente.
+      if (originalRequest.url.includes('/auth/refresh')) {
+        const authStore = useAuthStore()
+        authStore.clearTokens()
+        router.push({ name: 'Login' })
+        return Promise.reject(error)
+      }
+
+      if (isRefreshing) {
+        // Si ya hay un refresh en curso, encolamos las demás peticiones que vayan llegando
+        return new Promise((resolve) => {
+          queue.push((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+            resolve(api(originalRequest))
+          })
         })
-      })
+      }
+
+      isRefreshing = true
+
+      try {
+        const store = useAuthStore()
+        // Intentar renovar los tokens silenciosamente
+        await store.refresh()
+        const newToken = store.accessToken!
+
+        // Ejecutar las peticiones encoladas con el nuevo token
+        queue.forEach((cb) => cb(newToken))
+        queue = []
+
+        // Reintentar la petición original que falló con el 401
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        return api(originalRequest)
+
+      } catch (refreshError) {
+        // Si el refresh() lanza error (ej. refresh token vencido), limpiamos y mandamos al login
+        const store = useAuthStore()
+        store.clearTokens()
+        queue = []
+        router.push({ name: 'Login' })
+        return Promise.reject(refreshError)
+      } finally {
+        isRefreshing = false
+      }
     }
 
-    isRefreshing = true
-
-    try {
-      const store = useAuthStore()
-      await store.refresh()
-      const newToken = store.accessToken!
-
-      queue.forEach((cb) => cb(newToken))
-      queue = []
-
-      original.headers.Authorization = `Bearer ${newToken}`
-      return api(original)
-    } catch {
-      // Refresh falló — limpiar sesión y redirigir a login
-      const store = useAuthStore()
-      store.clearTokens()
-      window.location.href = '/login'
-      return Promise.reject(error)
-    } finally {
-      isRefreshing = false
-    }
+    // Si es cualquier otro error, simplemente lo devolvemos
+    return Promise.reject(error)
   }
 )
 
