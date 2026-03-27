@@ -20,22 +20,46 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Limpiar datos de prueba primero
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+
+    def drop_fk(table_name, column_name):
+        for fk in insp.get_foreign_keys(table_name):
+            if column_name in fk["constrained_columns"]:
+                op.drop_constraint(fk["name"], table_name, type_="foreignkey")
+                return
+
+    def drop_uq(table_name, column_name):
+        # 1. Intentamos el método tradicional (Funciona en Postgres)
+        try:
+            for uq in insp.get_unique_constraints(table_name):
+                if column_name in uq["column_names"]:
+                    op.drop_constraint(uq["name"], table_name, type_="unique")
+                    return
+        except NotImplementedError:
+            pass  # SQL Server no lo soporta, pasamos al Plan B
+
+        # 2. Plan B: Buscarlo entre los índices (Funciona en SQL Server)
+        for ix in insp.get_indexes(table_name):
+            if column_name in ix["column_names"] and ix["unique"]:
+                try:
+                    op.drop_constraint(ix["name"], table_name, type_="unique")
+                except Exception:
+                    op.drop_index(ix["name"], table_name)
+                return
+
     op.execute("DELETE FROM parametros_comerciales")
 
-    # Quitar FK y columna actual
-    op.drop_constraint(
-        "parametros_comerciales_acopiador_id_fkey", "parametros_comerciales", type_="foreignkey"
-    )
-    op.drop_constraint(
-        "parametros_comerciales_acopiador_id_key", "parametros_comerciales", type_="unique"
-    )
+    # Eliminación dinámica
+    drop_fk("parametros_comerciales", "acopiador_id")
+    drop_uq("parametros_comerciales", "acopiador_id")
+
     op.drop_column("parametros_comerciales", "acopiador_id")
 
-    # Agregar nueva columna y FK
     op.add_column("parametros_comerciales", sa.Column("provacop_id", sa.Integer, nullable=False))
+
     op.create_foreign_key(
-        "parametros_comerciales_provacop_id_fkey",
+        "fk_paramcomerciales_provacop",
         "parametros_comerciales",
         "proveedor_acopiador",
         ["provacop_id"],
@@ -43,28 +67,9 @@ def upgrade() -> None:
         ondelete="CASCADE",
     )
     op.create_unique_constraint(
-        "parametros_comerciales_provacop_id_key", "parametros_comerciales", ["provacop_id"]
+        "uq_paramcomerciales_provacop", "parametros_comerciales", ["provacop_id"]
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "parametros_comerciales_provacop_id_key", "parametros_comerciales", type_="unique"
-    )
-    op.drop_constraint(
-        "parametros_comerciales_provacop_id_fkey", "parametros_comerciales", type_="foreignkey"
-    )
-    op.drop_column("parametros_comerciales", "provacop_id")
-
-    op.add_column("parametros_comerciales", sa.Column("acopiador_id", sa.Integer, nullable=False))
-    op.create_foreign_key(
-        "parametros_comerciales_acopiador_id_fkey",
-        "parametros_comerciales",
-        "entidades",
-        ["acopiador_id"],
-        ["id"],
-        ondelete="NO ACTION",
-    )
-    op.create_unique_constraint(
-        "parametros_comerciales_acopiador_id_key", "parametros_comerciales", ["acopiador_id"]
-    )
+    pass

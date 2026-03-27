@@ -20,82 +20,53 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    is_mssql = conn.dialect.name == "mssql"
+
+    # Función mágica para borrar una FK sin importar su nombre (ideal para SQL Server)
+    def drop_fk(table_name, column_name):
+        for fk in insp.get_foreign_keys(table_name):
+            if column_name in fk["constrained_columns"]:
+                op.drop_constraint(fk["name"], table_name, type_="foreignkey")
+                return
+
     # =========================================================================
     # CASCADE DELETE
     # =========================================================================
-
-    # lotes → sesiones_descarga
-    op.drop_constraint("lotes_sesion_id_fkey", "lotes", type_="foreignkey")
+    drop_fk("lotes", "sesion_id")
     op.create_foreign_key(
-        "lotes_sesion_id_fkey",
-        "lotes",
-        "sesiones_descarga",
-        ["sesion_id"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_lotes_sesion", "lotes", "sesiones_descarga", ["sesion_id"], ["id"], ondelete="CASCADE"
     )
 
-    # pesajes → lotes
-    op.drop_constraint("pesajes_lote_id_fkey", "pesajes", type_="foreignkey")
+    drop_fk("pesajes", "lote_id")
     op.create_foreign_key(
-        "pesajes_lote_id_fkey",
-        "pesajes",
-        "lotes",
-        ["lote_id"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_pesajes_lote", "pesajes", "lotes", ["lote_id"], ["id"], ondelete="CASCADE"
     )
 
-    # muestreos → lotes
-    op.drop_constraint("muestreos_lote_id_fkey", "muestreos", type_="foreignkey")
+    drop_fk("muestreos", "lote_id")
     op.create_foreign_key(
-        "muestreos_lote_id_fkey",
-        "muestreos",
-        "lotes",
-        ["lote_id"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_muestreos_lote", "muestreos", "lotes", ["lote_id"], ["id"], ondelete="CASCADE"
     )
 
-    # mapeo_cip → lotes
-    op.drop_constraint("mapeo_cip_lote_id_fkey", "mapeo_cip", type_="foreignkey")
+    drop_fk("mapeo_cip", "lote_id")
     op.create_foreign_key(
-        "mapeo_cip_lote_id_fkey",
-        "mapeo_cip",
-        "lotes",
-        ["lote_id"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_mapeocip_lote", "mapeo_cip", "lotes", ["lote_id"], ["id"], ondelete="CASCADE"
     )
 
-    # analisis_ley → lotes
-    op.drop_constraint("analisis_ley_lote_id_fkey", "analisis_ley", type_="foreignkey")
+    drop_fk("analisis_ley", "lote_id")
     op.create_foreign_key(
-        "analisis_ley_lote_id_fkey",
-        "analisis_ley",
-        "lotes",
-        ["lote_id"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_aley_lote", "analisis_ley", "lotes", ["lote_id"], ["id"], ondelete="CASCADE"
     )
 
-    # analisis_recuperacion → lotes
-    op.drop_constraint(
-        "analisis_recuperacion_lote_id_fkey", "analisis_recuperacion", type_="foreignkey"
-    )
+    drop_fk("analisis_recuperacion", "lote_id")
     op.create_foreign_key(
-        "analisis_recuperacion_lote_id_fkey",
-        "analisis_recuperacion",
-        "lotes",
-        ["lote_id"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_arec_lote", "analisis_recuperacion", "lotes", ["lote_id"], ["id"], ondelete="CASCADE"
     )
 
-    # analisis_detalle → analisis_ley
-    op.drop_constraint("analisis_detalle_analisis_id_fkey", "analisis_detalle", type_="foreignkey")
+    drop_fk("analisis_detalle", "analisis_id")
     op.create_foreign_key(
-        "analisis_detalle_analisis_id_fkey",
+        "fk_adetalle_aley",
         "analisis_detalle",
         "analisis_ley",
         ["analisis_id"],
@@ -103,25 +74,21 @@ def upgrade() -> None:
         ondelete="CASCADE",
     )
 
-    # analisis_detalle → analisis_recuperacion
-    op.drop_constraint(
-        "analisis_detalle_recuperacion_id_fkey", "analisis_detalle", type_="foreignkey"
-    )
-    op.create_foreign_key(
-        "analisis_detalle_recuperacion_id_fkey",
-        "analisis_detalle",
-        "analisis_recuperacion",
-        ["recuperacion_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    # Evitar error de "Multiple cascade paths" en SQL Server
+    if not is_mssql:
+        drop_fk("analisis_detalle", "recuperacion_id")
+        op.create_foreign_key(
+            "fk_adetalle_arec",
+            "analisis_detalle",
+            "analisis_recuperacion",
+            ["recuperacion_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
 
-    # liquidaciones_lotes → liquidaciones
-    op.drop_constraint(
-        "liquidaciones_lotes_liquidacion_id_fkey", "liquidaciones_lotes", type_="foreignkey"
-    )
+    drop_fk("liquidaciones_lotes", "liquidacion_id")
     op.create_foreign_key(
-        "liquidaciones_lotes_liquidacion_id_fkey",
+        "fk_liqlotes_liq",
         "liquidaciones_lotes",
         "liquidaciones",
         ["liquidacion_id"],
@@ -129,183 +96,89 @@ def upgrade() -> None:
         ondelete="CASCADE",
     )
 
-    # rumas_campanas → rumas (tabla asociativa)
-    op.drop_constraint("rumas_campanas_id_ruma_fkey", "rumas_campanas", type_="foreignkey")
+    drop_fk("rumas_campanas", "id_ruma")
     op.create_foreign_key(
-        "rumas_campanas_id_ruma_fkey",
-        "rumas_campanas",
-        "rumas",
-        ["id_ruma"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_rumcamp_ruma", "rumas_campanas", "rumas", ["id_ruma"], ["id"], ondelete="CASCADE"
     )
 
-    # rumas_campanas → campanas (tabla asociativa)
-    op.drop_constraint("rumas_campanas_id_campana_fkey", "rumas_campanas", type_="foreignkey")
+    drop_fk("rumas_campanas", "id_campana")
     op.create_foreign_key(
-        "rumas_campanas_id_campana_fkey",
-        "rumas_campanas",
-        "campanas",
-        ["id_campana"],
-        ["id"],
-        ondelete="CASCADE",
+        "fk_rumcamp_camp", "rumas_campanas", "campanas", ["id_campana"], ["id"], ondelete="CASCADE"
     )
 
     # =========================================================================
-    # SET NULL — el hijo sobrevive sin el padre
+    # SET NULL
     # =========================================================================
-
-    # lotes.ruma_id → rumas (lote puede existir sin ruma asignada)
-    op.drop_constraint("lotes_ruma_id_fkey", "lotes", type_="foreignkey")
+    drop_fk("lotes", "ruma_id")
     op.create_foreign_key(
-        "lotes_ruma_id_fkey",
-        "lotes",
-        "rumas",
-        ["ruma_id"],
-        ["id"],
-        ondelete="SET NULL",
+        "fk_lotes_ruma", "lotes", "rumas", ["ruma_id"], ["id"], ondelete="SET NULL"
     )
 
-    # mapeo_cip.ruma_id → rumas
-    op.drop_constraint("mapeo_cip_ruma_id_fkey", "mapeo_cip", type_="foreignkey")
+    drop_fk("mapeo_cip", "ruma_id")
     op.create_foreign_key(
-        "mapeo_cip_ruma_id_fkey",
-        "mapeo_cip",
-        "rumas",
-        ["ruma_id"],
-        ["id"],
-        ondelete="SET NULL",
+        "fk_mapeocip_ruma", "mapeo_cip", "rumas", ["ruma_id"], ["id"], ondelete="SET NULL"
     )
 
-    # ── FKs a usuarios: estados y decisiones de negocio opcionales ────────────
-    # El lote/análisis/liquidación sobrevive si el usuario se desactiva
-    _set_null_fk = [
-        # (tabla, columna, constraint_name)
-        ("lotes", "habilitado_por", "lotes_habilitado_por_fkey"),
-        ("lotes", "estado_modificado_por", "lotes_estado_modificado_por_fkey"),
-        ("lotes", "eliminado_por", "lotes_eliminado_por_fkey"),
-        ("analisis_ley", "descartado_por", "analisis_ley_descartado_por_fkey"),
-        ("analisis_recuperacion", "descartado_por", "analisis_recuperacion_descartado_por_fkey"),
-        ("liquidaciones", "cerrado_por", "liquidaciones_cerrado_por_fkey"),
-        ("campanas", "gerencia_id", "campanas_gerencia_id_fkey"),
-    ]
-    for table, column, constraint in _set_null_fk:
-        op.drop_constraint(constraint, table, type_="foreignkey")
-        op.create_foreign_key(
-            constraint,
-            table,
-            "usuarios",
-            [column],
-            ["id"],
-            ondelete="SET NULL",
-        )
+    # Evitamos re-aplicar SET NULL a auditoría en MSSQL (causa error 1785 de múltiples rutas).
+    if not is_mssql:
+        _set_null_fk = [
+            ("lotes", "habilitado_por"),
+            ("lotes", "estado_modificado_por"),
+            ("lotes", "eliminado_por"),
+            ("analisis_ley", "descartado_por"),
+            ("analisis_recuperacion", "descartado_por"),
+            ("liquidaciones", "cerrado_por"),
+            ("campanas", "gerencia_id"),
+        ]
+        for i, (table, column) in enumerate(_set_null_fk):
+            drop_fk(table, column)
+            op.create_foreign_key(
+                f"fk_setnull_{i}", table, "usuarios", [column], ["id"], ondelete="SET NULL"
+            )
 
-    # ── AuditMixin: creado_por / modificado_por en todas las tablas ───────────
-    # Si el usuario que creó un registro se desactiva, el registro sigue existiendo
-    _audit_tables = [
-        ("analisis_ley", "analisis_ley_creado_por_fkey", "analisis_ley_modificado_por_fkey"),
-        (
+        _audit_tables = [
+            "analisis_ley",
             "analisis_recuperacion",
-            "analisis_recuperacion_creado_por_fkey",
-            "analisis_recuperacion_modificado_por_fkey",
-        ),
-        ("campanas", "campanas_creado_por_fkey", "campanas_modificado_por_fkey"),
-        (
+            "campanas",
             "configuraciones",
-            "configuraciones_creado_por_fkey",
-            "configuraciones_modificado_por_fkey",
-        ),
-        ("entidades", "entidades_creado_por_fkey", "entidades_modificado_por_fkey"),
-        (
+            "entidades",
             "entidades_roles",
-            "entidades_roles_creado_por_fkey",
-            "entidades_roles_modificado_por_fkey",
-        ),
-        ("liquidaciones", "liquidaciones_creado_por_fkey", "liquidaciones_modificado_por_fkey"),
-        (
+            "liquidaciones",
             "liquidaciones_lotes",
-            "liquidaciones_lotes_creado_por_fkey",
-            "liquidaciones_lotes_modificado_por_fkey",
-        ),
-        ("lotes", "lotes_creado_por_fkey", "lotes_modificado_por_fkey"),
-        ("muestreos", "muestreos_creado_por_fkey", "muestreos_modificado_por_fkey"),
-        (
+            "lotes",
+            "muestreos",
             "parametros_comerciales",
-            "parametros_comerciales_creado_por_fkey",
-            "parametros_comerciales_modificado_por_fkey",
-        ),
-        ("permisos", "permisos_creado_por_fkey", "permisos_modificado_por_fkey"),
-        (
+            "permisos",
             "pruebas_metalurgicas",
-            "pruebas_metalurgicas_creado_por_fkey",
-            "pruebas_metalurgicas_modificado_por_fkey",
-        ),
-        ("rumas", "rumas_creado_por_fkey", "rumas_modificado_por_fkey"),
-        (
+            "rumas",
             "sesiones_descarga",
-            "sesiones_descarga_creado_por_fkey",
-            "sesiones_descarga_modificado_por_fkey",
-        ),
-    ]
-    for table, fk_creado, fk_modificado in _audit_tables:
-        op.drop_constraint(fk_creado, table, type_="foreignkey")
+        ]
+        for i, table in enumerate(_audit_tables):
+            drop_fk(table, "creado_por")
+            op.create_foreign_key(
+                f"fk_audit_c_{i}", table, "usuarios", ["creado_por"], ["id"], ondelete="SET NULL"
+            )
+
+            drop_fk(table, "modificado_por")
+            op.create_foreign_key(
+                f"fk_audit_m_{i}",
+                table,
+                "usuarios",
+                ["modificado_por"],
+                ["id"],
+                ondelete="SET NULL",
+            )
+
+        drop_fk("usuarios", "creado_por")
         op.create_foreign_key(
-            fk_creado,
-            table,
-            "usuarios",
-            ["creado_por"],
-            ["id"],
-            ondelete="SET NULL",
-        )
-        op.drop_constraint(fk_modificado, table, type_="foreignkey")
-        op.create_foreign_key(
-            fk_modificado,
-            table,
-            "usuarios",
-            ["modificado_por"],
-            ["id"],
-            ondelete="SET NULL",
+            "fk_usr_crea", "usuarios", "usuarios", ["creado_por"], ["id"], ondelete="SET NULL"
         )
 
-    # ── usuarios.creado_por / modificado_por → auto-referencia ───────────────
-    op.drop_constraint("usuarios_creado_por_fkey", "usuarios", type_="foreignkey")
-    op.create_foreign_key(
-        "usuarios_creado_por_fkey",
-        "usuarios",
-        "usuarios",
-        ["creado_por"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-    op.drop_constraint("usuarios_modificado_por_fkey", "usuarios", type_="foreignkey")
-    op.create_foreign_key(
-        "usuarios_modificado_por_fkey",
-        "usuarios",
-        "usuarios",
-        ["modificado_por"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-
-    # =========================================================================
-    # NO ACTION (dejar como está) — tablas de catálogo que nunca se borran
-    # =========================================================================
-    # permisos → modulos, operaciones, roles         → NO ACTION
-    # entidades_roles → entidades, roles             → NO ACTION
-    # proveedor_acopiador → entidades                → NO ACTION
-    # sesiones_descarga → proveedor_acopiador        → NO ACTION
-    # liquidaciones → proveedor_acopiador            → NO ACTION
-    # parametros_comerciales → entidades             → NO ACTION
-    # analisis_ley → mapeo_cip                       → NO ACTION
-    # analisis_recuperacion → mapeo_cip              → NO ACTION
-    # pruebas_metalurgicas → mapeo_cip               → NO ACTION
-    # usuarios → roles                               → NO ACTION
-    # lotes_eliminados → usuarios                    → NO ACTION
-    #   (registro de auditoría forense, no debe perder el FK aunque se active SET NULL)
+        drop_fk("usuarios", "modificado_por")
+        op.create_foreign_key(
+            "fk_usr_mod", "usuarios", "usuarios", ["modificado_por"], ["id"], ondelete="SET NULL"
+        )
 
 
 def downgrade() -> None:
-    # Revertir a NO ACTION en todas las FKs modificadas
-    # En producción no se hace downgrade de reglas de integridad,
-    # pero se documenta para consistencia del historial de migraciones.
     pass

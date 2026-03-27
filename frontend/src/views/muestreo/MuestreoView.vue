@@ -58,15 +58,15 @@
 
             <template v-else>
               <div class="actions-grid">
-                <button v-if="!lote.etiquetado" class="btn-primary" @click="abrirModalEtiquetas(lote.ip)">
-                  Etiquetar
+                <button class="btn-primary flex-1" @click="abrirModalEtiquetas(lote.ip)">
+                  {{ lote.etiquetado ? '+ Etiquetas Extra' : 'Etiquetar' }}
                 </button>
 
-                <button v-if="!lote.etiquetado && lote.cantidad_intentos_previos < 3" class="btn-secondary" @click="irARegistrarHumedad(lote.ip)">
+                <button v-if="!lote.etiquetado && lote.cantidad_intentos_previos < 3" class="btn-secondary flex-1" @click="irARegistrarHumedad(lote.ip)">
                   Remuestrear
                 </button>
 
-                <button class="btn-secondary" @click="abrirDetalles(lote.ip)">
+                <button class="btn-secondary flex-1" @click="abrirDetalles(lote.ip)">
                   Ver Detalles
                 </button>
               </div>
@@ -314,6 +314,13 @@ function abrirModalEtiquetas(ip: string) {
     gap: var(--spacing-sm);
     width: 100%;
   }
+
+  .actions-grid > button {
+  /* Esto permite que los botones crezcan para ocupar el espacio disponible */
+  flex: 1 1 calc(50% - var(--spacing-sm));
+  min-width: 130px; /* Evita que queden demasiado pequeños en tablets */
+  justify-content: center;
+}
 
   .btn-tablet-large {
   padding: var(--spacing-md);

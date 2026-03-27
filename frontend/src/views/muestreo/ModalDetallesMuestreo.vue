@@ -31,7 +31,7 @@
                   <th>P. HÚMEDO</th>
                   <th>P. SECO</th>
                   <th>% HUMEDAD</th>
-                </tr>
+                  <th>OBSERVACIONES</th> </tr>
               </thead>
               <tbody>
                 <tr v-for="item in historial" :key="item.id">
@@ -39,8 +39,11 @@
                   <td class="td-fecha">{{ formatearFecha(item.creado_en) }}</td>
                   <td class="td-mono">{{ item.peso_humedo }}g</td>
                   <td class="td-mono">{{ item.peso_seco }}g</td>
-                  <td class="td-mono" style="color: var(--color-gold); font-weight: bold;">
+                  <td class="td-mono highlight-gold">
                     {{ item.porcentaje_humedad }}%
+                  </td>
+                  <td class="td-obs" :title="item.observaciones || ''">
+                    {{ item.observaciones || '---' }}
                   </td>
                 </tr>
               </tbody>
@@ -104,5 +107,14 @@ function formatearFecha(iso: string) {
 .highlight-gold {
   color: var(--color-gold);
   font-weight: bold;
+}
+
+.td-obs {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
 }
 </style>

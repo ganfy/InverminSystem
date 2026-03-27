@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { muestreoApi, type LoteMuestreo, type MuestreoCreate } from '@/api/muestreo'
+import { muestreoApi, type LoteMuestreo, type MapeoCIPOut, type MuestreoCreate } from '@/api/muestreo'
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
 import {
@@ -53,6 +53,8 @@ export const useMuestreoStore = defineStore('muestreo', () => {
 
         guardando.value = true
         try {
+            const fechaAhora = new Date().toISOString()
+
             if (sync.online.value) {
                 // ONLINE: Mandar directo al backend
                 await muestreoApi.registrarMuestreo(ipLote, datos)
@@ -66,7 +68,7 @@ export const useMuestreoStore = defineStore('muestreo', () => {
                     ip: ipLote,
                     datos: {
                         ...datos,
-                        fecha_muestreo: new Date().toISOString(),
+                        fecha_muestreo: fechaAhora,
                         observaciones: datos.observaciones ?? null
                     },
                     synced: false,
@@ -74,6 +76,41 @@ export const useMuestreoStore = defineStore('muestreo', () => {
                 })
                 ui.toast(`Sin red: Intento ${datos.intento} guardado en la tablet`, 'warning')
             }
+
+            // 1. Buscar el lote en memoria
+            const idxPendiente = lotesPendientes.value.findIndex(l => l.ip === ipLote)
+            let loteActualizado: LoteMuestreo | null = null
+
+            if (idxPendiente !== -1) {
+                // Estaba pendiente, lo movemos a completados
+                const lote = lotesPendientes.value[idxPendiente]
+                if (lote) {
+                    loteActualizado = lote
+                    loteActualizado.estado_muestreo = 'COMPLETADO'
+                    loteActualizado.fecha_muestreo = fechaAhora
+                    loteActualizado.cantidad_intentos_previos = datos.intento
+                    lotesPendientes.value.splice(idxPendiente, 1)
+                    lotesCompletados.value.unshift(loteActualizado)
+                }
+            } else {
+                // Ya estaba en completados (remuestreo)
+                const idxCompletado = lotesCompletados.value.findIndex(l => l.ip === ipLote)
+                if (idxCompletado !== -1) {
+                    const lote = lotesCompletados.value[idxCompletado]
+                    if (lote) {
+                        loteActualizado = lote
+                        loteActualizado.fecha_muestreo = fechaAhora
+                        loteActualizado.cantidad_intentos_previos = datos.intento
+                    }
+                }
+            }
+
+            // 2. Persistir este nuevo estado en IndexedDB para la navegación
+            if (loteActualizado) {
+                const lotesLimpios = JSON.parse(JSON.stringify([...lotesPendientes.value, ...lotesCompletados.value]))
+                await guardarLotesMuestreoCache(lotesLimpios)
+            }
+
             return true
 
         } catch (e: any) {
@@ -108,18 +145,27 @@ export const useMuestreoStore = defineStore('muestreo', () => {
     }
 
     /**
+     * Obtiene los códigos CIP generados para un lote específico.
+     */
+    async function obtenerCodigosCip(ipLote: string): Promise<MapeoCIPOut[] | null> {
+        try {
+            return await muestreoApi.obtenerEtiquetas(ipLote)
+        } catch (e: any) {
+            console.error(e)
+            return null
+        }
+    }
+
+    // Recuerda exportar `obtenerCodigosCip` en el return final del store.
+
+    /**
      * Calcula qué número de intento le toca a un lote de forma segura.
      */
     async function calcularProximoIntento(ipLote: string): Promise<number> {
         const lote = lotesPendientes.value.find(l => l.ip === ipLote) ||
             lotesCompletados.value.find(l => l.ip === ipLote)
 
-        const intentosBackend = lote?.cantidad_intentos_previos || 0
-
-        const muestreosPendientes = await obtenerMuestreosPendientes()
-        const intentosOffline = muestreosPendientes.filter(m => m.ip === ipLote).length
-
-        return intentosBackend + intentosOffline + 1
+        return (lote?.cantidad_intentos_previos || 0) + 1
     }
 
     /**
@@ -160,5 +206,6 @@ export const useMuestreoStore = defineStore('muestreo', () => {
         generarCodigosCip,
         calcularProximoIntento,
         cargarLotes,
+        obtenerCodigosCip
     }
 })

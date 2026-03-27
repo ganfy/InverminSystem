@@ -1,6 +1,6 @@
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.models.models import Lote, Muestreo, Usuario
+from app.models.models import Lote, MapeoCIP, Muestreo, Usuario
 from app.schemas.muestreo import (
     GenerarCipsRequest,
     MapeoCIPOut,
@@ -20,9 +20,7 @@ router = APIRouter(prefix="/muestreo", tags=["Muestreo"])
 # ==========================================
 # 1. REGISTRO INDIVIDUAL (ONLINE)
 # ==========================================
-@router.post(
-    "/lotes/{ip_lote}/muestreos", response_model=MuestreoOut, status_code=status.HTTP_201_CREATED
-)
+@router.post("/lotes/{ip_lote}", response_model=MuestreoOut, status_code=status.HTTP_201_CREATED)
 def registrar_muestreo(
     ip_lote: str,
     datos: MuestreoCreate,
@@ -38,7 +36,7 @@ def registrar_muestreo(
 # ==========================================
 # 2. SINCRONIZACIÓN BATCH (OFFLINE A ONLINE)
 # ==========================================
-@router.post("/muestreos/sync", response_model=SyncMuestreosResponse)
+@router.post("/sync", response_model=SyncMuestreosResponse)
 def sync_muestreos_offline(
     payload: SyncMuestreosRequest,
     db: Session = Depends(get_db),
@@ -72,7 +70,9 @@ def sync_muestreos_offline(
 # 3. GENERACIÓN DE CÓDIGOS (CIP)
 # ==========================================
 @router.post(
-    "/lotes/{ip_lote}/cips", response_model=list[MapeoCIPOut], status_code=status.HTTP_201_CREATED
+    "/lotes/{ip_lote}/etiquetas",
+    response_model=list[MapeoCIPOut],
+    status_code=status.HTTP_201_CREATED,
 )
 def generar_cips(
     ip_lote: str,
@@ -83,9 +83,33 @@ def generar_cips(
     """
     Genera códigos CIP anónimos y seguros (Muestreo Ciego) para las muestras de laboratorio.
     """
-    return sample_service.generar_cips_para_lote(
-        db=db, ip_lote=ip_lote, cantidad=solicitud.cantidad
-    )
+    try:
+        return sample_service.generar_cips_para_lote(
+            db=db, ip_lote=ip_lote, cantidad=solicitud.cantidad
+        )
+    except HTTPException:
+        # Si es un error de negocio controlado (ej. 404), lo dejamos pasar
+        raise
+    except Exception as e:
+        # Si algo explota (ej. error de SQL), forzamos la liberación de la base de datos
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error inesperado al generar etiquetas: {str(e)}",
+        ) from e
+
+
+@router.get(
+    "/lotes/{ip_lote}/etiquetas", response_model=list[MapeoCIPOut], status_code=status.HTTP_200_OK
+)
+def listar_cips_lote(ip_lote: str, db: Session = Depends(get_db)):
+    """Devuelve los códigos CIP ya generados para un lote (Reimpresión / Vista)."""
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).all()
+    return cips
 
 
 @router.get("/lotes", status_code=status.HTTP_200_OK)

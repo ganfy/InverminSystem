@@ -31,7 +31,9 @@ def upgrade() -> None:
     op.drop_index(op.f("idx_liquidaciones_provacop"), table_name="liquidaciones")
     op.add_column(
         "liquidaciones_lotes",
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
     )
     op.add_column("liquidaciones_lotes", sa.Column("modificado_en", sa.DateTime(), nullable=True))
     op.add_column("liquidaciones_lotes", sa.Column("creado_por", sa.Integer(), nullable=True))

@@ -29,7 +29,9 @@ def upgrade() -> None:
         sa.Column("tipo_documento", sa.String(length=30), nullable=False),
         sa.Column("nombre_original", sa.String(length=255), nullable=False),
         sa.Column("ruta_archivo", sa.String(length=500), nullable=False),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),

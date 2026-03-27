@@ -61,7 +61,7 @@ export const muestreoApi = {
      * Registra un muestreo individual estando online.
      */
     async registrarMuestreo(ipLote: string, datos: MuestreoCreate): Promise<MuestreoOut> {
-        const response = await api.post<MuestreoOut>(`/muestreo/lotes/${ipLote}/muestreos`, datos)
+        const response = await api.post<MuestreoOut>(`/muestreo/lotes/${ipLote}`, datos)
         return response.data
     },
 
@@ -77,7 +77,7 @@ export const muestreoApi = {
      * Genera los códigos CIP (Muestreo Ciego) para el laboratorio.
      */
     async generarCips(ipLote: string, cantidad: number = 2): Promise<MapeoCIPOut[]> {
-        const response = await api.post<MapeoCIPOut[]>(`/muestreo/lotes/${ipLote}/cips`, {
+        const response = await api.post<MapeoCIPOut[]>(`/muestreo/lotes/${ipLote}/etiquetas`, {
             cantidad,
             laboratorio: 'Por definir'
         })
@@ -90,6 +90,14 @@ export const muestreoApi = {
     async obtenerLotes(): Promise<LoteMuestreo[]> {
         // Ajusta la ruta según tu backend real
         const response = await api.get<LoteMuestreo[]>('/muestreo/lotes')
+        return response.data
+    },
+
+    /**
+     * Obtiene las etiquetas CIP generadas para un lote específico.
+     */
+    async obtenerEtiquetas(ipLote: string): Promise<MapeoCIPOut[]> {
+        const response = await api.get<MapeoCIPOut[]>(`/muestreo/lotes/${ipLote}/etiquetas`)
         return response.data
     },
 }

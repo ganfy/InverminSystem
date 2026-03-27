@@ -43,6 +43,18 @@
           </div>
         </div>
 
+        <div class="input-group">
+          <label>OBSERVACIONES (Opcional)</label>
+          <div class="input-wrapper">
+            <textarea
+              v-model="observaciones"
+              placeholder="Escriba alguna nota sobre la muestra..."
+              rows="2"
+              class="textarea-observaciones"
+            ></textarea>
+          </div>
+        </div>
+
         <div class="result-box">
           <label>% HUMEDAD</label>
           <div class="result-value">
@@ -53,11 +65,12 @@
       </div>
 
       <div class="actions-footer">
-        <button class="btn-primary ready btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="() => guardar()">
-          {{ store.guardando ? 'Guardando...' : 'Guardar' }}
+        <button class="btn-primary ready btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="() => guardar(false)">
+          {{ store.guardando ? 'Guardando...' : 'Guardar y Salir' }}
         </button>
-        <button class="btn-secondary btn-tablet-xl" @click="remuestrear">
-          Remuestrear
+
+        <button v-if="intentoActual < maxIntentos" class="btn-secondary btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="() => guardar(true)">
+          Guardar y Remuestrear
         </button>
       </div>
     </div>
@@ -78,6 +91,7 @@ const ipLote = route.params.ip as string
 
 const pesoHumedo = ref<number | null>(null)
 const pesoSeco = ref<number | null>(null)
+const observaciones = ref<string>('')
 const intentoActual = ref(1)
 const maxIntentos = 3
 
@@ -104,18 +118,14 @@ onMounted(async () => {
   }
 })
 
-const remuestrear = () => {
-  pesoHumedo.value = null
-  pesoSeco.value = null
-}
-
 const guardar = async (esRemuestreo = false) => {
   if (!puedeGuardar.value) return
 
   const exito = await store.registrarHumedad(ipLote, {
     intento: intentoActual.value,
     peso_humedo: pesoHumedo.value!,
-    peso_seco: pesoSeco.value!
+    peso_seco: pesoSeco.value!,
+    observaciones: observaciones.value.trim() || null,
   })
 
   if (exito) {
@@ -123,7 +133,7 @@ const guardar = async (esRemuestreo = false) => {
       // Flujo: REMUESTREAR
       pesoHumedo.value = null
       pesoSeco.value = null
-      // Recalculamos matemáticamente el próximo intento (Aumenta el contador)
+      observaciones.value = ''
       intentoActual.value = await store.calcularProximoIntento(ipLote)
       ui.toast(`Intento guardado. Proceda con el intento ${intentoActual.value}/${maxIntentos}`, 'success')
     } else {
@@ -297,5 +307,24 @@ const volver = () => {
   border-radius: var(--radius-md);
   font-weight: bold;
   text-transform: uppercase;
+}
+
+.textarea-observaciones {
+  width: 100%;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: var(--font-main);
+  font-size: var(--text-base);
+  padding: var(--spacing-md);
+  resize: vertical;
+  min-height: 80px;
+}
+
+.textarea-observaciones:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 2px var(--color-gold-bg);
 }
 </style>

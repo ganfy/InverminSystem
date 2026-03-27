@@ -20,40 +20,28 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE pesajes DROP CONSTRAINT IF EXISTS ck_pesajes_peso_final_mayor_inicial")
-
-    op.execute("ALTER TABLE pesajes DROP COLUMN IF EXISTS peso_neto")
-    op.execute(
-        """
-        ALTER TABLE pesajes
-        ADD COLUMN peso_neto DECIMAL(10,2)
-            GENERATED ALWAYS AS (peso_inicial - peso_final) STORED
-        """
-    )
-
-    op.execute(
-        """
-        ALTER TABLE pesajes
-        ADD CONSTRAINT ck_pesajes_bruto_mayor_tara
-            CHECK (peso_inicial > peso_final)
-        """
-    )
+    conn = op.get_bind()
+    if conn.dialect.name == "mssql":
+        op.execute(
+            "IF OBJECT_ID('ck_pesajes_peso_final_mayor_inicial', 'C') IS NOT NULL ALTER TABLE pesajes DROP CONSTRAINT ck_pesajes_peso_final_mayor_inicial"
+        )
+        op.execute("ALTER TABLE pesajes DROP COLUMN peso_neto")
+        op.execute("ALTER TABLE pesajes ADD peso_neto AS (peso_inicial - peso_final) PERSISTED")
+        op.execute(
+            "ALTER TABLE pesajes ADD CONSTRAINT ck_pesajes_bruto_mayor_tara CHECK (peso_inicial > peso_final)"
+        )
+    else:
+        op.execute(
+            "ALTER TABLE pesajes DROP CONSTRAINT IF EXISTS ck_pesajes_peso_final_mayor_inicial"
+        )
+        op.execute("ALTER TABLE pesajes DROP COLUMN IF EXISTS peso_neto")
+        op.execute(
+            "ALTER TABLE pesajes ADD COLUMN peso_neto DECIMAL(10,2) GENERATED ALWAYS AS (peso_inicial - peso_final) STORED"
+        )
+        op.execute(
+            "ALTER TABLE pesajes ADD CONSTRAINT ck_pesajes_bruto_mayor_tara CHECK (peso_inicial > peso_final)"
+        )
 
 
 def downgrade() -> None:
-    op.execute("ALTER TABLE pesajes DROP CONSTRAINT IF EXISTS ck_pesajes_bruto_mayor_tara")
-    op.execute("ALTER TABLE pesajes DROP COLUMN IF EXISTS peso_neto")
-    op.execute(
-        """
-        ALTER TABLE pesajes
-        ADD COLUMN peso_neto DECIMAL(10,2)
-            GENERATED ALWAYS AS (peso_final - peso_inicial) STORED
-        """
-    )
-    op.execute(
-        """
-        ALTER TABLE pesajes
-        ADD CONSTRAINT ck_pesajes_peso_final_mayor_inicial
-            CHECK (peso_final > peso_inicial)
-        """
-    )
+    pass

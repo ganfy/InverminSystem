@@ -189,6 +189,11 @@ CONFIGURACIONES = [
     },
     {"clave": "MUESTREO_MALLA_MIN_PCT", "valor": "88", "descripcion": "% malla mínimo aceptable"},
     {"clave": "MUESTREO_MALLA_MAX_PCT", "valor": "94", "descripcion": "% malla máximo aceptable"},
+    {
+        "clave": "MAX_CIPS_GENERADOS",
+        "valor": "5",
+        "descripcion": "Cantidad máxima de códigos CIP que se pueden generar por lote",
+    },
     # Laboratorio
     {
         "clave": "LAB_DIFERENCIA_MAX_PCT",

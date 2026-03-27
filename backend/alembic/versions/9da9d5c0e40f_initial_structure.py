@@ -65,7 +65,9 @@ def upgrade() -> None:
         sa.Column("rol_id", sa.Integer(), nullable=False),
         sa.Column("email", sa.String(length=100), nullable=True),
         sa.Column("activo", sa.Boolean(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -97,7 +99,9 @@ def upgrade() -> None:
         sa.Column("total_toneladas", sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column("total_rumas", sa.Integer(), nullable=True),
         sa.Column("gerencia_id", sa.Integer(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -122,7 +126,9 @@ def upgrade() -> None:
         sa.Column("clave", sa.String(length=100), nullable=False),
         sa.Column("valor", sa.String(length=200), nullable=False),
         sa.Column("descripcion", sa.String(length=200), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -148,7 +154,9 @@ def upgrade() -> None:
         sa.Column("telefono", sa.String(length=20), nullable=True),
         sa.Column("email", sa.String(length=100), nullable=True),
         sa.Column("activo", sa.Boolean(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -169,7 +177,10 @@ def upgrade() -> None:
         sa.Column("ip", sa.String(length=20), nullable=False),
         sa.Column("eliminado_por", sa.Integer(), nullable=False),
         sa.Column(
-            "fecha_eliminacion", sa.DateTime(), server_default=sa.text("now()"), nullable=True
+            "fecha_eliminacion",
+            sa.DateTime(),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
+            nullable=True,
         ),
         sa.Column("motivo", sa.Text(), nullable=True),
         sa.Column("datos_originales", sa.Text(), nullable=False),
@@ -186,7 +197,9 @@ def upgrade() -> None:
         sa.Column("modulo_id", sa.Integer(), nullable=False),
         sa.Column("operacion_id", sa.Integer(), nullable=False),
         sa.Column("permitido", sa.Boolean(), nullable=False),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -220,10 +233,12 @@ def upgrade() -> None:
         sa.Column("codigo", sa.String(length=20), nullable=False),
         sa.Column("codigo_ant", sa.String(length=20), nullable=True),
         sa.Column(
-            "fecha_creacion", sa.Date(), server_default=sa.text("CURRENT_DATE"), nullable=True
+            "fecha_creacion", sa.Date(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=True
         ),
         sa.Column("estado", sa.String(length=20), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -245,7 +260,9 @@ def upgrade() -> None:
         sa.Column("entidad_id", sa.Integer(), nullable=False),
         sa.Column("rol_id", sa.Integer(), nullable=False),
         sa.Column("activo", sa.Boolean(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -284,7 +301,9 @@ def upgrade() -> None:
         sa.Column("gasto_consumo", sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column("maquila", sa.Numeric(precision=5, scale=2), nullable=True),
         sa.Column("comision", sa.Numeric(precision=5, scale=2), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -345,7 +364,9 @@ def upgrade() -> None:
         sa.Column("cerrado_por", sa.Integer(), nullable=True),
         sa.Column("fecha_cierre", sa.DateTime(), nullable=True),
         sa.Column("pdf_url", sa.Text(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -380,7 +401,9 @@ def upgrade() -> None:
         sa.Column("guia_remision", sa.String(length=50), nullable=True),
         sa.Column("guia_transporte", sa.String(length=50), nullable=True),
         sa.Column("estado", sa.String(length=20), nullable=False),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -414,7 +437,9 @@ def upgrade() -> None:
         sa.Column("habilitado_por", sa.Integer(), nullable=True),
         sa.Column("estado_modificado_por", sa.Integer(), nullable=True),
         sa.Column("fecha_modificacion_estado", sa.DateTime(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -516,7 +541,9 @@ def upgrade() -> None:
         ),
         sa.Column("tms_calculado", sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column("observaciones", sa.Text(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -545,7 +572,9 @@ def upgrade() -> None:
         sa.Column("peso_neto", sa.Numeric(precision=10, scale=2), nullable=False),
         sa.Column("numero_ticket", sa.String(length=50), nullable=True),
         sa.Column("fecha_inicio", sa.DateTime(), nullable=True),
-        sa.Column("fecha_fin", sa.DateTime(), server_default=sa.text("now()"), nullable=True),
+        sa.Column(
+            "fecha_fin", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=True
+        ),
         sa.Column("granel", sa.Boolean(), nullable=True),
         sa.ForeignKeyConstraint(
             ["lote_id"],
@@ -573,7 +602,9 @@ def upgrade() -> None:
         sa.Column("descartado_por", sa.Integer(), nullable=True),
         sa.Column("fecha_descarte", sa.DateTime(), nullable=True),
         sa.Column("justificacion_descarte", sa.Text(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -621,7 +652,9 @@ def upgrade() -> None:
         sa.Column("descartado_por", sa.Integer(), nullable=True),
         sa.Column("fecha_descarte", sa.DateTime(), nullable=True),
         sa.Column("justificacion_descarte", sa.Text(), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
@@ -659,7 +692,9 @@ def upgrade() -> None:
         sa.Column("adicion_nacn", sa.Numeric(precision=10, scale=4), nullable=True),
         sa.Column("adicion_naoh", sa.Numeric(precision=10, scale=4), nullable=True),
         sa.Column("gasto_agno3", sa.Numeric(precision=10, scale=4), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
