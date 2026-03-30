@@ -145,6 +145,16 @@ async function handleLogout() {
   await authStore.logout()
   router.push('/login')
 }
+
+watch(() => online.value, (isOnline) => {
+  if (!isOnline) {
+    // Si se va el internet, le aplicamos la clase al <body> del navegador (no solo a la app)
+    document.body.classList.add('modo-offline')
+  } else {
+    // Si regresa, se la quitamos
+    document.body.classList.remove('modo-offline')
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -403,7 +413,7 @@ async function handleLogout() {
   top: 0;
   left: 0;
   right: 0;
-  height: 6px; /* Grosor de la línea superior */
+  height: 7px; /* Grosor de la línea superior */
   /* Patrón de franjas rojas y transparentes/oscuras */
   background: repeating-linear-gradient(
     45deg,
@@ -414,15 +424,8 @@ async function handleLogout() {
   );
   z-index: 9999; /* Asegura que esté por encima de todo */
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(211, 47, 47, 0.4);
+  box-shadow: 0 2px 8px rgba(161, 33, 33, 0.4);
   animation: slide-bg 2s linear infinite; /* Pequeña animación opcional */
-}
-
-/* 2. Tinte rojizo sutil en el contenido principal */
-.app-layout--offline .main-content {
-  background-color: rgba(211, 47, 47, 0.03);
-  /* Asegúrate de que el contenedor principal tenga transición para que el cambio sea suave */
-  transition: background-color 0.3s ease;
 }
 
 /* Animación sutil para la cinta de precaución */

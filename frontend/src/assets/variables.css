@@ -31,7 +31,8 @@
   --color-warning-bg: rgba(207, 151, 61, 0.12);
 
   --color-offline: #f59e0b;
-  --color-offline-bg: rgb(252, 32, 3);
+  --color-offline-bg: rgb(221, 66, 45);
+  --color-offline-total-bg: rgba(148, 50, 37, 0.158);
 
   /* Tipografía */
   --font-main:          'Rajdhani', sans-serif;
