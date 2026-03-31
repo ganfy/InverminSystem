@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     # 1. Obtener todos los lotes activos
-    lotes_db = db.query(Lote).filter(not Lote.eliminado).all()
+    lotes_db = db.query(Lote).filter(Lote.eliminado.is_(False)).all()
 
     kpis = DashboardKPIs()
     lotes_resumen = []
@@ -16,7 +16,6 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         pesaje = db.query(Pesaje).filter(Pesaje.lote_id == lote.id).first()
         if pesaje and pesaje.peso_inicial and pesaje.peso_final:
             if pesaje.peso_inicial > pesaje.peso_final:
-                # CORRECCIÓN AQUÍ: Convertimos el resultado a float explícitamente
                 tmh = float(pesaje.peso_inicial - pesaje.peso_final)
 
         kpis.tmh_stock += tmh
@@ -34,7 +33,6 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         )
 
         if muestreo and muestreo.peso_humedo and muestreo.peso_seco:
-            # CORRECCIÓN AQUÍ: Convertimos a float por si acaso también vienen como Decimal
             ph = float(muestreo.peso_humedo)
             ps = float(muestreo.peso_seco)
 

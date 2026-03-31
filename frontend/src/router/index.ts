@@ -6,6 +6,9 @@ import BalanzaView from '@/views/balanza/BalanzaView.vue'
 import RegistrarCamionView from '@/views/balanza/RegistrarCamionView.vue'
 import SesionView from '@/views/balanza/SesionView.vue'
 import MuestreoView from '@/views/muestreo/MuestreoView.vue'
+import RegistrarHumedadView from '@/views/muestreo/RegistrarHumedadView.vue'
+import PruebasView from '@/views/pruebas/PruebasView.vue'
+import RegistrarPruebasView from '@/views/pruebas/RegistrarPruebasView.vue'
 
 import UnauthorizedView from '@/views/auth/UnauthorizedView.vue'
 
@@ -60,9 +63,20 @@ const router = createRouter({
           component: MuestreoView,
         },
         {
-          path: 'muestreo/:ip/nuevo',
+          path: 'muestreo/:ip/registrar',
           name: 'RegistrarHumedad',
           component: () => import('@/views/muestreo/RegistrarHumedadView.vue'),
+        },
+        {
+          path: 'pruebas',
+          name: 'PruebasMetalurgicas',
+          component: PruebasView,
+        },
+        {
+          path: 'pruebas/:ip/registrar',
+          name: 'RegistrarPrueba',
+          component: RegistrarPruebasView,
+
         }
       ],
     },

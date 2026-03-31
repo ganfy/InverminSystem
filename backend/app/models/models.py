@@ -394,6 +394,12 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
         foreign_keys="LiquidacionLote.lote_id",
         back_populates="lote",
     )
+    prueba_metalurgica = relationship(
+        "PruebaMetalurgica",
+        foreign_keys="PruebaMetalurgica.lote_id",
+        back_populates="lote",
+        uselist=False,
+    )
     modificador_estado = relationship("Usuario", foreign_keys=[estado_modificado_por])
 
     __table_args__ = (UniqueConstraint("sesion_id", "numero_lote", name="uq_lote_sesion_numero"),)
@@ -543,11 +549,6 @@ class MapeoCIP(Base):
         foreign_keys="AnalisisRecuperacion.cip",
         back_populates="mapeo_cip",
     )
-    prueba_metalurgica = relationship(
-        "PruebaMetalurgica",
-        back_populates="mapeo_cip",
-        uselist=False,
-    )
 
 
 # =============================================================================
@@ -670,8 +671,6 @@ class AnalisisRecuperacion(AuditMixin, Base):
 class PruebaMetalurgica(AuditMixin, Base):
     """
     Preparación de muestras para análisis metalúrgico (RF-PM-001).
-
-    S
     Alerta de negocio (en service): malla_porcentaje fuera de [88, 94] → WARNING.
     AuditMixin: creado_en, creado_por, modificado_en, modificado_por.
     """
@@ -679,7 +678,7 @@ class PruebaMetalurgica(AuditMixin, Base):
     __tablename__ = "pruebas_metalurgicas"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
+    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
     fecha_ingreso = Column(DateTime, nullable=False)
     malla_porcentaje = Column(Numeric(5, 2))
     porcentaje_nacn = Column(Numeric(5, 2))
@@ -696,7 +695,7 @@ class PruebaMetalurgica(AuditMixin, Base):
             return self.fecha_ingreso + timedelta(hours=48)
         return None
 
-    mapeo_cip = relationship("MapeoCIP", back_populates="prueba_metalurgica")
+    lote = relationship("Lote", back_populates="prueba_metalurgica")
 
 
 # =============================================================================

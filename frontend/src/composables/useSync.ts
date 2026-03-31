@@ -39,11 +39,16 @@ import {
     marcarMuestreoError,
     marcarMuestreoSynced,
     limpiarMuestreosSynced,
+    obtenerPruebasPendientes,
+    marcarPruebaError,
+    marcarPruebaSynced,
+    limpiarPruebasSynced,
     type LoteOnlineData,
     siguienteIP,
     encolarSesion,
 } from '@/composables/useOfflineQueue'
 import { muestreoApi } from '@/api/muestreo'
+import { pruebasApi } from '@/api/pruebas'
 
 // ── Modo offline forzado (solo desarrollo) ─────────────────
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
@@ -259,6 +264,46 @@ export function useSync() {
         }
     }
 
+    async function sincronizarPruebas(): Promise<void> {
+        const pendientes = await obtenerPruebasPendientes()
+        if (pendientes.length === 0) return
+
+        try {
+            const payloadLimpio = pendientes.map(p => {
+                const d = p.datos;
+                const parseNum = (val: any) => (val === '' || val === null || val === undefined) ? null : Number(val);
+
+                return {
+                    offline_id: p.offline_id,
+                    ip: p.ip,
+                    datos: {
+                        malla_porcentaje: parseNum(d.malla_porcentaje),
+                        porcentaje_nacn: parseNum(d.porcentaje_nacn),
+                        ph_inicial: parseNum(d.ph_inicial),
+                        ph_final: parseNum(d.ph_final),
+                        adicion_nacn: parseNum(d.adicion_nacn),
+                        adicion_naoh: parseNum(d.adicion_naoh),
+                        gasto_agno3: parseNum(d.gasto_agno3),
+                        fecha_ingreso: d.fecha_ingreso || new Date().toISOString()
+                    }
+                }
+            })
+
+            const resp = await pruebasApi.syncBatch(payloadLimpio)
+
+            for (const resultado of resp.resultados) {
+                if (resultado.error) {
+                    await marcarPruebaError(resultado.offline_id, resultado.error)
+                } else {
+                    await marcarPruebaSynced(resultado.offline_id)
+                }
+            }
+            await limpiarPruebasSynced()
+        } catch (err) {
+            console.error('[useSync] Error sincronizando pruebas metalúrgicas:', err)
+        }
+    }
+
     async function sincronizar(): Promise<void> {
         if (sincronizando.value || !isOnline()) return
 
@@ -360,6 +405,9 @@ export function useSync() {
 
             // 4. muestreos offline
             await sincronizarMuestreos()
+
+            // 5. pruebas metalúrgicas offline
+            await sincronizarPruebas()
 
             // Siempre marcar timestamp — es la señal de "sync completó" para los watchers
             ultimoSync.value = new Date().toLocaleString('es-PE')

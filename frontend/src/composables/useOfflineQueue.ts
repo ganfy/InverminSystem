@@ -19,7 +19,7 @@ import type { SesionLista, SesionDetalle } from '@/api/balanza'
 import type { LoteMuestreo } from '@/api/muestreo'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 6
+const DB_VERSION = 7
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -129,6 +129,24 @@ export interface MuestreoQueueData {
     synced: boolean
     sync_error: string | null
 }
+
+export interface PruebaQueueData {
+    offline_id: string
+    ip: string
+    datos: {
+        malla_porcentaje: number | null
+        porcentaje_nacn: number | null
+        ph_inicial: number | null
+        ph_final: number | null
+        adicion_nacn: number | null
+        adicion_naoh: number | null
+        gasto_agno3: number | null
+        fecha_ingreso: string
+    }
+    synced: boolean
+    sync_error: string | null
+}
+
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -170,6 +188,9 @@ async function openDB(): Promise<IDBDatabase> {
             if (oldVersion < 6) {
                 db.createObjectStore('muestreos_q', { keyPath: 'offline_id' })
                 db.createObjectStore('lotes_muestreo_cache', { keyPath: 'ip' }) // Para cachear los lotes pendientes que vienen de balanza
+            }
+            if (oldVersion < 7) {
+                db.createObjectStore('pruebas_q', { keyPath: 'offline_id' })
             }
         }
 
@@ -360,8 +381,20 @@ export async function limpiarSynced(): Promise<number> {
 }
 
 export async function contarPendientes(): Promise<number> {
-    const pendientes = await obtenerSesionesPendientes()
-    return pendientes.length
+    try {
+        const [sesiones, lotes, fin, pruebas] = await Promise.all([
+            getAll<SesionOfflineData>('sesiones_q').catch(() => []),
+            getAll<LoteOnlineData>('lotes_online_q').catch(() => []),
+            getAll<FinalizacionPendiente>('finalizaciones_q').catch(() => []),
+            getAll<PruebaQueueData>('pruebas_q').catch(() => [])
+        ])
+        return sesiones.filter(s => !s.synced).length +
+            lotes.filter(l => !l.synced).length +
+            fin.length +
+            pruebas.filter(p => !p.synced).length
+    } catch (e) {
+        return 0
+    }
 }
 
 
@@ -611,4 +644,36 @@ export async function guardarLotesMuestreoCache(lotes: LoteMuestreo[]): Promise<
 
 export async function obtenerLotesMuestreoCache(): Promise<LoteMuestreo[]> {
     return getAll<LoteMuestreo>('lotes_muestreo_cache')
+}
+
+// ==========================================
+// MÓDULO: PRUEBAS METALÚRGICAS (OFFLINE)
+// ==========================================
+
+export async function encolarPruebaOffline(prueba: PruebaQueueData): Promise<void> {
+    await put('pruebas_q', prueba)
+}
+
+export async function obtenerPruebasPendientes(): Promise<PruebaQueueData[]> {
+    const todas = await getAll<PruebaQueueData>('pruebas_q')
+    return todas.filter(p => !p.synced)
+}
+
+export async function marcarPruebaSynced(offlineId: string): Promise<void> {
+    const p = await get<PruebaQueueData>('pruebas_q', offlineId)
+    if (!p) return
+    await put('pruebas_q', { ...p, synced: true, sync_error: null })
+}
+
+export async function marcarPruebaError(offlineId: string, error: string): Promise<void> {
+    const p = await get<PruebaQueueData>('pruebas_q', offlineId)
+    if (!p) return
+    await put('pruebas_q', { ...p, sync_error: error })
+}
+
+export async function limpiarPruebasSynced(): Promise<void> {
+    const todas = await getAll<PruebaQueueData>('pruebas_q')
+    for (const p of todas.filter(x => x.synced)) {
+        await del('pruebas_q', p.offline_id)
+    }
 }
