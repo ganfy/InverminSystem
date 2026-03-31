@@ -23,7 +23,7 @@
                 <span class="step-num">{{ seccionActual > i ? '✓' : i + 1 }}</span>
               </button>
             </div>
-            <button class="modal-close" @click="cerrar">✕</button>
+            <button class="modal-close" @click="cerrar"><X :size="18" /></button>
           </div>
 
           <!-- Nombre de sección -->
@@ -320,7 +320,7 @@
               class="btn-secondary"
               @click="seccionActual--"
               :disabled="guardando"
-            >← Anterior</button>
+            ><ArrowLeft :size="16" style="margin-right: 4px;" /> Anterior</button>
             <span class="footer-spacer" />
             <button class="btn-secondary" @click="cerrar" :disabled="guardando">
               Cancelar

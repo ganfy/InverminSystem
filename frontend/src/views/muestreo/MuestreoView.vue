@@ -40,8 +40,8 @@
             </p>
 
             <p class="data-row">
-              <span class="td-label-gold">PESO TMH:</span>
-              <span class="td-value-mono highlight">{{ lote.peso_neto ? lote.peso_neto.toFixed(2) : '0.00' }} TM</span>
+              <span class="td-label-gold">PESO ({{ getUnidadPorModulo('MUESTREO') }}):</span>
+              <span class="td-value-mono highlight">{{ formatPesoPorModulo(lote.peso_neto, 'MUESTREO') }}</span>
             </p>
             <p class="data-row">
               <span class="td-label-gold">SACOS:</span>
@@ -95,6 +95,7 @@ import { useRouter } from 'vue-router'
 import { useMuestreoStore } from '@/stores/muestreo'
 import ModalDetallesMuestreo from './ModalDetallesMuestreo.vue'
 import ModalEtiquetas from './ModalEtiquetas.vue'
+import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'
 
 const router = useRouter()
 const store = useMuestreoStore()

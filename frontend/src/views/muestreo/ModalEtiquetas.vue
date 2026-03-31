@@ -1,11 +1,11 @@
 <template>
-  <div class="modal-overlay no-print" @click.self="emit('close')">
+  <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal modal-md">
       <header class="modal-header">
         <div class="modal-title-group">
           <h2>Etiquetado CIP: <span class="gold">{{ ipLote }}</span></h2>
         </div>
-        <button class="modal-close" @click="emit('close')">✕</button>
+        <button class="modal-close" @click="emit('close')"><X :size="20" /></button>
       </header>
 
       <div class="modal-body">
@@ -15,7 +15,7 @@
         </div>
 
         <div v-else-if="error === 'offline'" class="aviso-offline">
-          <span class="aviso-icono">📡</span>
+          <span class="aviso-icono"><WifiOff :size="24" class="aviso-icono" /></span>
           <p class="aviso-texto">
             <strong>Sin conexión.</strong> No se pueden consultar ni generar códigos seguros en modo offline.
           </p>
@@ -75,6 +75,7 @@ import { useMuestreoStore } from '@/stores/muestreo'
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
 import type { MapeoCIPOut } from '@/api/muestreo'
+import { X, WifiOff } from 'lucide-vue-next'
 
 const props = defineProps<{ ipLote: string }>()
 const emit = defineEmits(['close', 'etiquetado'])
@@ -174,9 +175,68 @@ const dibujarCodigosBarras = async () => {
 }
 
 const ejecutarImpresion = () => {
-  // Llama al sistema nativo de impresión de la tablet/navegador
-  // El CSS @media print se encarga de ocultar todo menos las etiquetas
-  window.print()
+  // 1. Capturamos el HTML generado de las etiquetas (con los SVGs ya dibujados)
+  const areaImpresion = document.getElementById('area-impresion');
+  if (!areaImpresion) return;
+  const contenidoHtml = areaImpresion.innerHTML;
+
+  // 2. Definimos el CSS exclusivo para esta nueva pestaña de impresión
+  const printCss = `
+    @page { size: A4 portrait; margin: 15mm; }
+    body { font-family: sans-serif; margin: 0; padding: 0; background: white; color: black; }
+    #area-impresion {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15mm 10mm;
+      width: 100%;
+    }
+    .etiqueta-print {
+      border: 1px dashed #666;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 82mm;
+      height: 45mm;
+      box-sizing: border-box;
+      padding: 5mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      page-break-inside: avoid;
+    }
+    .etiqueta-title { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0.2rem; }
+    .etiqueta-subtitle { font-size: 0.55rem; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 0.2rem; width: 100%; text-align: center; }
+    .barcode-visual { max-width: 100%; height: 35px; margin: 0.5rem 0; transform: scaleY(1.3); }
+    .etiqueta-codigo { font-family: monospace; font-size: 1.1rem; font-weight: 900; letter-spacing: 0.05em; }
+  `;
+
+  // 3. Construimos el documento HTML limpio (Igual que en balanza.ts)
+  const htmlDocument = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Impresión de Etiquetas CIP</title>
+      <style>${printCss}</style>
+    </head>
+    <body>
+      <div id="area-impresion">
+        ${contenidoHtml}
+      </div>
+      <script>
+        window.addEventListener('load', function() {
+          setTimeout(function() { window.print(); }, 250);
+        });
+      <\/script>
+    <\/body>
+    <\/html>
+  `;
+
+  // 4. Abrimos en una nueva pestaña usando un Blob (Estrategia Balanza)
+  const blob = new Blob([htmlDocument], { type: 'text/html; charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 
 const formatearFecha = (isoDate: string | undefined | null) => {
@@ -214,43 +274,5 @@ const formatearFecha = (isoDate: string | undefined | null) => {
 
 @media (max-width: 560px) {
   .grid-etiquetas { grid-template-columns: 1fr; }
-}
-</style>
-
-<style>
-@media print {
-  /* 1. Ocultamos el header, fondo, botones y resto del ERP */
-  body * {
-    visibility: hidden;
-  }
-
-  .no-print, .modal-header, .modal-footer, .instruccion {
-    display: none !important;
-  }
-
-  /* 2. Solo hacemos visible el grid de etiquetas y sus hijos */
-  #area-impresion, #area-impresion * {
-    visibility: visible;
-  }
-
-  /* 3. Posicionamos las etiquetas en la esquina superior izquierda del papel */
-  #area-impresion {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 10mm; /* Espacio físico entre etiquetas */
-  }
-
-  /* 4. Ajustes finos para impresoras térmicas/láser */
-  .etiqueta-print {
-    box-shadow: none !important;
-    border: 1px solid #000 !important;
-    width: 80mm; /* Tamaño estándar de ticket/etiqueta ancha */
-    margin: 0 auto;
-    padding: 5mm;
-  }
 }
 </style>

@@ -9,31 +9,31 @@
             title="Editar lote"
             :disabled="!isOnline && lote.id !== -1"
             @click="$emit('editar', lote)"
-          >✎</button>
+          ><Pencil :size="14" /></button>
           <button
             v-if="isAdmin || lote.id === -1"
             class="btn-icon btn-icon-danger btn-secondary"
             title="Eliminar lote"
             :disabled="!isOnline && lote.id !== -1"
             @click="$emit('eliminar', lote)"
-          >✕</button>
+          ><Trash :size="14" /></button>
 
-          <span v-if="lote.local_only" class="badge-local-lote" title="Pendiente de sincronizar">⚡ LOCAL</span>
+          <span v-if="lote.local_only" class="badge-local-lote" title="Pendiente de sincronizar"><WifiOff :size="12" style="margin-right: 4px;" /> LOCAL</span>
           <span class="badge-lote-estado" :class="loteEstadoClass(lote)">{{ loteEstadoLabel(lote) }}</span>
         </div>
       </div>
       <div class="lote-card-body">
         <div class="lote-fila">
           <span class="lote-dato-label">BRUTO:</span>
-          <span class="lote-dato-val">{{ lote.pesaje?.peso_inicial != null ? fmtTm(lote.pesaje.peso_inicial) + ' TM' : '…' }}</span>
+          <span class="lote-dato-val">{{ lote.pesaje?.peso_inicial != null ? formatPesoPorModulo(lote.pesaje.peso_inicial, 'BALANZA', 3) : '…' }}</span>
         </div>
         <div class="lote-fila">
           <span class="lote-dato-label">TARA:</span>
-          <span class="lote-dato-val">{{ lote.pesaje?.peso_final != null ? fmtTm(lote.pesaje.peso_final) + ' TM' : '…' }}</span>
+          <span class="lote-dato-val">{{ lote.pesaje?.peso_final != null ? formatPesoPorModulo(lote.pesaje.peso_final, 'BALANZA', 3) : '…' }}</span>
         </div>
         <div class="lote-fila lote-neto">
           <span class="lote-dato-label">NETO:</span>
-          <span class="lote-dato-val neto-val">{{ lote.peso_neto != null ? fmtTm(lote.peso_neto) + ' TM' : '…' }}</span>
+          <span class="lote-dato-val neto-val">{{ lote.peso_neto != null ? formatPesoPorModulo(lote.peso_neto, 'BALANZA', 3) : '…' }}</span>
         </div>
         <div v-if="lote.pesaje?.sacos" class="lote-fila">
           <span class="lote-dato-label">SACOS:</span>
@@ -44,14 +44,16 @@
         </div>
       </div>
       <div class="lote-card-footer">
-        <button class="btn-secondary btn-sm" @click="$emit('verTicket', lote)" title="Ver ticket antes de imprimir">👁 Ver ticket</button>
-        <button class="btn-secondary btn-sm" @click="$emit('imprimirTicket', lote)" title="Imprimir ticket">🖨 Imprimir</button>
+        <button class="btn-secondary btn-sm" @click="$emit('verTicket', lote)" title="Ver ticket antes de imprimir"><Eye :size="14" style="margin-right: 4px;" /> Ver ticket</button>
+        <button class="btn-secondary btn-sm" @click="$emit('imprimirTicket', lote)" title="Imprimir ticket"><Printer :size="14" style="margin-right: 4px;" /> Imprimir</button>
       </div>
     </div>
   </template>
 
   <script setup lang="ts">
   import type { LoteDetalle } from '@/api/balanza'
+  import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'
+  import { Pencil, Trash2, WifiOff, Eye, Printer, Trash } from 'lucide-vue-next'
 
   defineProps<{
     lote: LoteDetalle
@@ -61,7 +63,6 @@
 
   defineEmits(['editar', 'eliminar', 'verTicket', 'imprimirTicket'])
 
-  function fmtTm(n: number | string) { return Number(n).toFixed(3) }
   function loteEstadoClass(lote: LoteDetalle) { return lote.pesaje?.peso_final != null ? 'lc-completado' : 'lc-en-proceso' }
   function loteEstadoLabel(lote: LoteDetalle) { return lote.pesaje?.peso_final != null ? 'Completado' : 'En proceso' }
   </script>

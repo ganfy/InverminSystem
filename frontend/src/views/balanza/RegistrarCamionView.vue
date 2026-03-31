@@ -136,7 +136,7 @@
     <!-- ── Barra inferior ─────────────────────────────────── -->
     <div class="bottom-bar">
       <button class="btn-secondary btn-volver" @click="router.push({ name: 'Balanza' })">
-        ← Volver
+        <ArrowLeft :size="16" style="margin-right: 4px;" /> Volver
       </button>
       <button
         class="btn-primary ready"

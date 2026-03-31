@@ -36,8 +36,8 @@
             exact-active-class="nav-item--active"
             @click="sidebarOpen = false"
           >
-            <span class="nav-icon">{{ item.icon }}</span>
-            <span>{{ item.label }}</span>
+          <component :is="item.icon" :size="20" class="nav-icon" />
+          <span>{{ item.label }}</span>
           </RouterLink>
         </template>
       </nav>
@@ -64,6 +64,7 @@
         :ips-restantes="ipsRestantes"
         :ultimo-sync="ultimoSync"
         :error-sync="errorSync"
+        :mostrar-ips="isBalanzaRoute"
         @sync="sincronizar"
         style="margin-left: auto; margin-right: 1rem;"
       />
@@ -96,6 +97,7 @@ import type { NavSection } from '@/router/nav'
 const authStore = useAuthStore()
 const router    = useRouter()
 const route     = useRoute()
+const isBalanzaRoute = computed(() => route.path.startsWith('/balanza'))
 
 const {
   online,

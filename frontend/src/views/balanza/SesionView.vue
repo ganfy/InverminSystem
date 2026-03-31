@@ -45,7 +45,7 @@
       </div>
       <div class="header-right">
         <!-- [OFFLINE] indicador -->
-        <span v-if="esOffline" class="badge-offline-header">⚡ OFFLINE</span>
+        <span v-if="esOffline" class="badge-offline-header"><WifiOff :size="12" style="margin-right: 4px;" /> OFFLINE</span>
 
         <div class="lote-badge" :class="estadoClass(sesion?.estado ?? '')">
           <template v-if="lotesActivos.length > 0">
@@ -59,13 +59,13 @@
           :disabled="!online && sesionIdNum !== -1"
           :title="(!online && sesionIdNum !== -1) ? 'Solo puedes editar sesiones del servidor con internet' : 'Editar datos de transporte o proveedor'"
           @click="abrirEditarSesion"
-        >✎ Editar sesión</button>
+        ><Pencil :size="14" style="margin-right: 4px;" /> Editar sesión</button>
       </div>
     </div>
 
     <!-- [OFFLINE] aviso documentos no subidos -->
     <div v-if="esOffline" class="aviso-offline">
-      <span class="aviso-icono">⚠</span>
+      <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
       <div class="aviso-texto">
         <strong>Modo sin conexión</strong> — Los documentos adjuntos en el formulario
         anterior <em>no se pudieron subir</em>. Estarán disponibles para agregar
@@ -76,7 +76,7 @@
 
     <!-- Online con pendientes: advertencia de bloqueo -->
     <div v-if="!esOffline && store.lotesHybridPendientes > 0" class="aviso-offline aviso-hybrid">
-      <span class="aviso-icono">⚠</span>
+      <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
       <div class="aviso-texto">
         <strong>{{ store.lotesHybridPendientes }} lote(s) sin sincronizar</strong>
         — Finalizar no estará disponible hasta reconectar y sincronizar.
@@ -85,7 +85,7 @@
 
     <!-- Offline con pendientes: solo informativo -->
     <div v-if="esOffline && store.lotesHybridPendientes > 0" class="aviso-offline aviso-hybrid">
-      <span class="aviso-icono">⚡</span>
+      <span class="aviso-icono"><WifiOff :size="20" class="aviso-icono" /></span>
       <div class="aviso-texto">
         <strong>{{ store.lotesHybridPendientes }} lote(s) se sincronizarán al reconectar.</strong>
       </div>
@@ -142,16 +142,13 @@
             :config="balanzaConfig"
             class="mb-4"
           />
-          <div class="pesaje-display">
+          <div class="pesaje-display"
+          :placeholder="unidadBalanza">
             <div class="peso-display-label">PESO ACTUAL EN BALANZA</div>
-            <input
-              class="peso-display-input"
-              min="0"
-              v-model.number="pesoActual"
-              placeholder="0.000"
-            />
-            <span class="peso-display-unit">TM</span>
+            <input class="peso-display-input" min="0" v-model.number="pesoActual" placeholder="0.000" />
+            <span class="peso-display-unit">{{ unidadBalanza }}</span>
           </div>
+
           <div class="pesaje-campos">
             <div class="campo-peso">
               <label class="campo-peso-label">BRUTO (camión cargado)</label>
@@ -160,11 +157,11 @@
                   class="field-input"
                   type="number" step="0.001" min="0"
                   v-model.number="loteForm.peso_inicial"
-                  placeholder="TM"
+                  :placeholder="unidadBalanza"
                   @input="isManualBruto = true"
                 />
                 <button class="btn-capturar" title="Capturar peso actual como BRUTO" @click="capturarBruto">
-                  ↓ Capturar
+                  <ArrowDownToLine :size="14" style="margin-right: 4px;" /> Capturar
                 </button>
               </div>
             </div>
@@ -175,24 +172,24 @@
                   class="field-input"
                   type="number" step="0.001" min="0"
                   v-model.number="loteForm.peso_final"
-                  placeholder="TM"
+                  :placeholder="unidadBalanza"
                   @input="isManualTara = true"
                 />
                 <button class="btn-capturar" title="Capturar peso actual como TARA" @click="capturarTara">
-                  ↓ Capturar
+                  <ArrowDownToLine :size="14" style="margin-right: 4px;" /> Capturar
                 </button>
               </div>
             </div>
           </div>
           <p v-if="pesoError" class="error-msg" style="margin:.25rem 0">{{ pesoError }}</p>
           <div class="pesaje-resumen">
-            <span>BRUTO: <strong>{{ loteForm.peso_inicial ? fmtTm(loteForm.peso_inicial) + ' TM' : '—' }}</strong></span>
-            <span>TARA: <strong>{{ loteForm.peso_final ? fmtTm(loteForm.peso_final) + ' TM' : '—' }}</strong></span>
-            <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? fmtTm(pesoNeto) + ' TM' : '—' }}</strong></span>
+            <span>BRUTO: <strong>{{ loteForm.peso_inicial ? loteForm.peso_inicial.toFixed(3) + ' ' + unidadBalanza : '—' }}</strong></span>
+            <span>TARA: <strong>{{ loteForm.peso_final ? loteForm.peso_final.toFixed(3) + ' ' + unidadBalanza : '—' }}</strong></span>
+            <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? pesoNeto.toFixed(3) + ' ' + unidadBalanza : '—' }}</strong></span>
           </div>
 
           <div v-if="requiereJustificacion" class="field" style="margin-bottom: 1rem; text-align: left;">
-            <label class="field-label" style="color: var(--color-warning);">⚠ Ingreso Manual: Justificación requerida</label>
+            <label class="field-label" style="color: var(--color-warning);"><AlertTriangle :size="20" class="aviso-icono" /> Ingreso Manual: Justificación requerida</label>
             <textarea
               class="field-input"
               rows="2"
@@ -202,13 +199,13 @@
           </div>
 
           <div v-else-if="esRegistroManual && !balanzaDisponible" class="aviso-offline" style="margin-bottom: 1rem; padding: 0.5rem 0.75rem;">
-            <span class="aviso-icono" style="font-size: var(--text-base);">ℹ️</span>
+            <Info :size="20" class="aviso-icono" />
             <div class="aviso-texto" style="font-size: var(--text-sm);">
               Balanza desconectada. Se registrará justificación automática.
             </div>
           </div>
           <div v-if="mostrarFaltantes && loteFormFaltantes.length > 0" class="form-faltantes">
-            <span class="faltante-icono">⚠</span>
+            <span class="faltante-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
             Falta: {{ loteFormFaltantes.join(' · ') }}
           </div>
           <button
@@ -253,11 +250,11 @@
           </div>
         </details>
       </div></div><div class="bottom-bar">
-      <button class="btn-secondary" @click="router.push({ name: 'Balanza' })">← Volver</button>
+      <button class="btn-secondary" @click="router.push({ name: 'Balanza' })"><ArrowLeft :size="16" style="margin-right: 4px;" /> Volver</button>
       <div class="bottom-bar-acciones">
-        <button v-if="lotesActivos.length > 0" class="btn-secondary" @click="store.imprimirTicketsSesion()" title="Imprimir todos los tickets">🖨 Tickets sesión</button>
-        <button v-if="sesion?.estado === 'EN_PROCESO'" class="btn-secondary" :disabled="esOffline" @click="pausar">⏸ Pausar</button>
-        <button v-if="sesion?.estado === 'PAUSADO'" class="btn-secondary" :disabled="esOffline" @click="reanudar">▶ Reanudar</button>
+        <button v-if="lotesActivos.length > 0" class="btn-secondary" @click="store.imprimirTicketsSesion()" title="Imprimir todos los tickets"><Printer :size="14" style="margin-right: 4px;" /> Tickets sesión</button>
+        <button v-if="sesion?.estado === 'EN_PROCESO'" class="btn-secondary" :disabled="esOffline" @click="pausar"><Pause :size="14" style="margin-right: 4px;" /> Pausar</button>
+        <button v-if="sesion?.estado === 'PAUSADO'" class="btn-secondary" :disabled="esOffline" @click="reanudar"><Play :size="14" style="margin-right: 4px;" /> Reanudar</button>
         <button v-if="sesion?.estado !== 'COMPLETO'" class="btn-primary ready" :disabled="store.guardando || lotesActivos.length === 0 || (!esOffline && store.lotesHybridPendientes > 0)" @click="finalizar">
           <span v-if="store.guardando" class="spinner" />
           <span v-else>{{ esOffline ? 'Finalizar (offline) →' : 'Finalizar y generar tickets →' }}</span>
@@ -310,6 +307,20 @@ import ModalEditarLote from './ModalEditarLote.vue'
 import ModalEliminarLote from './ModalEliminarLote.vue'
 import type { LoteDetalle, ProvAcopDropdown } from '@/api/balanza'
 import { balanzaApi } from '@/api/balanza'
+import { formatPesoPorModulo, getUnidadPorModulo, convertirParaInput, convertirParaBD } from '@/utils/units'
+import {
+  WifiOff,
+  Pencil,
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowLeft,
+  Printer,
+  Pause,
+  Play,
+  Info
+} from 'lucide-vue-next'
+
+const unidadBalanza = computed(() => getUnidadPorModulo('BALANZA'))
 
 const globalSetTimeout = setTimeout
 
@@ -357,7 +368,6 @@ watch(ultimoSync, async () => {
     preFillTipoMaterial()
     preFillSacosGranel()
     preFillBruto()
-    ui.toast('Datos actualizados tras recuperar conexión.', 'info')
   }
 })
 
@@ -432,7 +442,8 @@ function preFillBruto() {
   if (activos.length > 0) {
     const ultimo = activos[activos.length - 1]
     if (ultimo?.pesaje?.peso_final != null) {
-      loteForm.peso_inicial = Number(ultimo.pesaje.peso_final)
+      // LO CONVERTIMOS DE TM A LA UNIDAD VISUAL
+      loteForm.peso_inicial = convertirParaInput(Number(ultimo.pesaje.peso_final), 'BALANZA')
     }
   }
 }
@@ -515,8 +526,8 @@ async function registrarLote() {
     {
       tipo_material: tipoMaterial.value,
       pesaje: {
-        peso_inicial: loteForm.peso_inicial!,
-        peso_final:   loteForm.peso_final!,
+        peso_inicial: convertirParaBD(loteForm.peso_inicial, 'BALANZA')!,
+        peso_final:   convertirParaBD(loteForm.peso_final, 'BALANZA')!,
         sacos:        granel.value ? null : (sacos.value || null),
         granel:       granel.value,
         fecha_inicio: fechaBruto.value ?? undefined,
@@ -687,8 +698,8 @@ function abrirEditarLote(lote: LoteDetalle) {
     error: '',
     form: {
       tipo_material: lote.tipo_material ?? '',
-      peso_inicial:  lote.pesaje ? Number(lote.pesaje.peso_inicial) : null,
-      peso_final:    lote.pesaje ? Number(lote.pesaje.peso_final)   : null,
+      peso_inicial:  lote.pesaje ? convertirParaInput(Number(lote.pesaje.peso_inicial), 'BALANZA') : null,
+      peso_final:    lote.pesaje ? convertirParaInput(Number(lote.pesaje.peso_final), 'BALANZA')   : null,
       sacos:         lote.pesaje?.sacos ?? null,
       granel:        lote.pesaje?.granel ?? false,
       justificacion_manual: '',
@@ -708,8 +719,8 @@ async function guardarEditarLote() {
   const targetSesionId = sesionIdRaw.value.startsWith('offline-') ? sesionIdRaw.value : sesionIdNum.value;
   const ok = await store.editarLote(targetSesionId, editLoteModal.loteId, {
     tipo_material: f.tipo_material,
-    peso_inicial:  f.peso_inicial ?? undefined,
-    peso_final:    f.peso_final   ?? undefined,
+    peso_inicial:  convertirParaBD(f.peso_inicial, 'BALANZA') ?? undefined,
+    peso_final:    convertirParaBD(f.peso_final, 'BALANZA')   ?? undefined,
     sacos:         f.sacos,
     granel:        f.granel,
     es_manual:     true,

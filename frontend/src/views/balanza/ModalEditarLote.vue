@@ -3,7 +3,7 @@
       <div class="modal">
         <div class="modal-header">
           <h2>EDITAR LOTE {{ modalData.ip }}</h2>
-          <button class="btn-cerrar" @click="$emit('close')">✕</button>
+          <button class="btn-cerrar" @click="$emit('close')"><X :size="18" />X :size="18" /></button>
         </div>
         <div class="modal-body">
           <div class="form-grid">
@@ -16,11 +16,11 @@
               </select>
             </div>
             <div class="field">
-              <label class="field-label">BRUTO / peso_inicial (TM)</label>
+              <label class="field-label">BRUTO / peso_inicial ({{ getUnidadPorModulo('BALANZA') }})</label>
               <input class="field-input" type="number" step="0.001" v-model.number="modalData.form.peso_inicial" />
             </div>
             <div class="field">
-              <label class="field-label">TARA / peso_final (TM)</label>
+              <label class="field-label">TARA / peso_final ({{ getUnidadPorModulo('BALANZA') }})</label>
               <input class="field-input" type="number" step="0.001" v-model.number="modalData.form.peso_final" />
             </div>
             <div class="field">
@@ -51,6 +51,9 @@
   </template>
 
   <script setup lang="ts">
+
+  import { getUnidadPorModulo } from '@/utils/units'
+
   defineProps<{ modalData: any; guardando: boolean }>()
   defineEmits(['close', 'save'])
   </script>

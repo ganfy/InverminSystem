@@ -4,11 +4,14 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import { useSync } from '@/composables/useSync'
 import { balanzaApi } from '@/api/balanza'
+import { muestreoApi } from '@/api/muestreo'
 import { useUiStore } from '@/stores/ui'
 import {
     encolarSesion,
     guardarBloqueIP,
     obtenerSesionesPendientes,
+    encolarMuestreoOffline,
+    obtenerMuestreosPendientes,
     type SesionOfflineData
 } from '@/composables/useOfflineQueue'
 
@@ -156,5 +159,48 @@ describe('useSync - Manager de Sincronización', () => {
                 'info'
             )
         }, 10000)
+    })
+
+    describe('Escenario 6: Sincronización de Muestreo Offline', () => {
+        it('debe enviar la cola de muestreos pendientes al recuperar la red', async () => {
+            // 1. Mockeamos la API de forma segura
+            const syncSpy = vi.spyOn(muestreoApi, 'syncBatch').mockResolvedValueOnce({
+                resultados: [{ offline_id: 'muestreo-off-1', error: null }]
+            })
+
+            // 2. Encolamos un muestreo usando tu estructura exacta de IndexedDB
+            await encolarMuestreoOffline({
+                offline_id: 'muestreo-off-1',
+                ip: 'IP-0099',
+                datos: {
+                    intento: 1,
+                    peso_humedo: 12.5,
+                    peso_seco: 11.2,
+                    observaciones: null,
+                    fecha_muestreo: new Date().toISOString()
+                },
+                synced: false,
+                sync_error: null
+            })
+
+            // 3. Simulamos que vuelve el internet
+            vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+            wrapper = mount(TestComponent)
+            window.dispatchEvent(new Event('online'))
+
+            // 4. Damos tiempo a IndexedDB para procesar las promesas
+            await flushPromises()
+            await delay(100)
+            await flushPromises()
+
+            // 5. Comprobamos que el Manager llamó a la API correctamente
+            expect(syncSpy).toHaveBeenCalledTimes(1)
+
+            // 6. Verificamos que la cola local quedó vacía (se sincronizó y se borró)
+            const pendientesPostSync = await obtenerMuestreosPendientes()
+            expect(pendientesPostSync).toHaveLength(0)
+
+            syncSpy.mockRestore()
+        })
     })
 })

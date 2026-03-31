@@ -3,7 +3,7 @@
       <div class="modal modal-lg">
         <div class="modal-header">
           <h2>EDITAR SESIÓN</h2>
-          <button class="btn-cerrar" @click="$emit('close')">✕</button>
+          <button class="btn-cerrar" @click="$emit('close')"><X :size="18" /></button>
         </div>
         <div class="modal-body">
           <div class="seccion-edit">

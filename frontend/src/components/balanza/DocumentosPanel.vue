@@ -66,7 +66,7 @@
               {{ label }}
             </option>
           </select>
-          <button class="btn-remove-pending" @click="archivosPendientes.splice(idx, 1)">✕</button>
+          <button class="btn-remove-pending" @click="archivosPendientes.splice(idx, 1)"><X :size="18" /></button>
         </div>
         <div class="pendientes-actions">
           <button class="btn-cancel" @click="archivosPendientes = []">Cancelar</button>
@@ -152,7 +152,7 @@
             </svg>
             Formulario pre-llenado
           </span>
-          <button class="btn-reextraer" @click="limpiarExtraccion">✕ Limpiar</button>
+          <button class="btn-reextraer" @click="limpiarExtraccion"><X :size="18" /> Limpiar</button>
         </div>
 
         <div class="campos-grid">

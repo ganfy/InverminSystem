@@ -71,7 +71,7 @@
       <div class="modal">
         <div class="modal-header">
           <h2>{{ modoEditar ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
-          <button class="btn-cerrar" @click="cerrarModal">✕</button>
+          <button class="btn-cerrar" @click="cerrarModal"><X :size="18" /></button>
         </div>
 
         <div class="modal-body">
@@ -124,7 +124,7 @@
       <div class="modal modal-sm">
         <div class="modal-header">
           <h2>Reset contraseña</h2>
-          <button class="btn-cerrar" @click="resetVisible = false">✕</button>
+          <button class="btn-cerrar" @click="resetVisible = false"><X :size="18" /></button>
         </div>
         <div class="modal-body">
           <p class="reset-usuario">Usuario: <strong>{{ usuarioReset?.username }}</strong></p>

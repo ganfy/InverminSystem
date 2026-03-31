@@ -1,7 +1,7 @@
 <template>
     <div class="sync-indicator" :class="rootClass" :title="tooltip">
       <!-- Dot de estado -->
-      <span class="sync-dot" :class="dotClass" />
+      <span class="sync-dot" :class="dotClass"></span>
 
       <!-- Texto principal -->
       <span class="sync-label">{{ labelText }}</span>
@@ -12,7 +12,7 @@
       </span>
 
       <!-- Spinner cuando sincroniza -->
-      <span v-if="sincronizando" class="sync-spinner" />
+      <span v-if="sincronizando" class="sync-spinner"></span>
 
       <!-- Botón manual de sync (solo si hay pendientes y hay red) -->
       <button
@@ -20,12 +20,13 @@
         class="sync-btn-manual"
         title="Sincronizar ahora"
         @click.stop="$emit('sync')"
-      >↑</button>
+      ><RefreshCw :size="12" /></button>
     </div>
   </template>
 
   <script setup lang="ts">
   import { computed } from 'vue'
+  import { AlertTriangle, RefreshCw } from 'lucide-vue-next'
 
   interface Props {
     online: boolean
@@ -34,9 +35,12 @@
     ipsRestantes: number
     ultimoSync: string | null
     errorSync: string | null
+    mostrarIps?: boolean
   }
 
-  const props = defineProps<Props>()
+  const props = withDefaults(defineProps<Props>(), {
+    mostrarIps: false
+  })
   defineEmits<{ sync: [] }>()
 
   const rootClass = computed(() => ({
@@ -45,26 +49,29 @@
     'sync--offline':      !props.online,
     'sync--error':        !!props.errorSync,
     'sync--sincronizando': props.sincronizando,
-    'sync--warning': !props.online && props.ipsRestantes > 0 && props.ipsRestantes <= 10,
+    'sync--warning':      !props.online && props.mostrarIps && props.ipsRestantes > 0 && props.ipsRestantes <= 10,
   }))
 
   const dotClass = computed(() => ({
     'dot--green':  props.online && props.pendientes === 0 && !props.errorSync,
     'dot--amber': (props.online && props.pendientes > 0) ||
-              (!props.online && props.ipsRestantes <= 10 && props.ipsRestantes > 0),
-    'dot--red':   !props.online && (props.ipsRestantes === 0 || !!props.errorSync),
+            (!props.online && props.mostrarIps && props.ipsRestantes <= 10 && props.ipsRestantes > 0),
+    'dot--red':   !props.online && (!props.mostrarIps || props.ipsRestantes === 0 || !!props.errorSync),
     'dot--pulse':  props.sincronizando,
   }))
 
   const labelText = computed(() => {
     if (props.sincronizando) return 'Sincronizando…'
     if (!props.online) {
-    if (props.ipsRestantes === 0)  return 'Sin IPs — reconectar'
-    if (props.ipsRestantes <= 10)  return `⚠ Solo ${props.ipsRestantes} IPs disp.`
-    return `Offline · ${props.ipsRestantes} IPs disp.`
-}
+      if (props.mostrarIps) {
+        if (props.ipsRestantes === 0)  return 'Sin IPs — reconectar'
+        if (props.ipsRestantes <= 10)  return `Solo ${props.ipsRestantes} IPs disp.`
+        return `Offline · ${props.ipsRestantes} IPs disp.`
+      }
+      return 'Offline'
+    }
     if (props.pendientes > 0) return `${props.pendientes} pendiente${props.pendientes > 1 ? 's' : ''}`
-    return 'En línea'
+      return 'En línea'
   })
 
   const tooltip = computed(() => {
@@ -73,7 +80,7 @@
     if (props.pendientes)   lines.push(`${props.pendientes} sesión(es) sin sincronizar`)
     if (props.errorSync)    lines.push(`Error: ${props.errorSync}`)
     if (props.ultimoSync)   lines.push(`Último sync: ${props.ultimoSync}`)
-    if (props.ipsRestantes) lines.push(`IPs disponibles offline: ${props.ipsRestantes}`)
+    if (props.ipsRestantes && props.mostrarIps) lines.push(`IPs disponibles offline: ${props.ipsRestantes}`)
     return lines.join('\n') || 'Sistema sincronizado'
   })
   </script>
@@ -101,15 +108,17 @@
   .sync--warning { background: rgba(220,160,20,.1); border-color: rgba(220,160,20,.3); color: var(--color-warning); }
 
   /* Dot */
-  .sync-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .dot--green { background: #4ecf7a; }
-  .dot--amber { background: var(--color-warning); }
-  .dot--red   { background: var(--color-error); }
+/* Dot */
+.sync-dot {
+  display: block; /* Obliga al navegador a darle volumen */
+  width: 8px; /* Un pelín más grande para que destaque */
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot--green { background-color: #4ecf7a !important; }
+.dot--amber { background-color: var(--color-warning, #dca014) !important; }
+.dot--red   { background-color: var(--color-error, #dc3c3c) !important; }
 
   @keyframes pulse-dot {
     0%, 100% { opacity: 1; }

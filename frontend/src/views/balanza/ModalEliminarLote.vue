@@ -3,7 +3,7 @@
       <div class="modal modal-sm">
         <div class="modal-header">
           <h2>Eliminar {{ modalData.ip }}</h2>
-          <button class="btn-cerrar" @click="$emit('close')">✕</button>
+          <button class="btn-cerrar" @click="$emit('close')"><X :size="18" /></button>
         </div>
         <div class="modal-body">
           <p class="elim-aviso">Acción irreversible — queda registrado en auditoría.</p>

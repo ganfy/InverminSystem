@@ -10,7 +10,7 @@
     <!-- ── [OFFLINE] Sesiones pendientes de sincronizar ──── -->
     <div v-if="sesionesOffline.length > 0 || sesionesHybrid.length > 0" class="offline-section">
       <div class="offline-section-header">
-        <span class="offline-section-titulo">⚡ SIN SINCRONIZAR</span>
+        <span class="offline-section-titulo"><WifiOff :size="20" class="aviso-icono" /> SIN SINCRONIZAR</span>
         <span class="offline-section-count">{{ sesionesOffline.length }} sesión(es) local(es)</span>
       </div>
       <div class="tabla-wrapper">

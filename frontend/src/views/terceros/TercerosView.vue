@@ -12,7 +12,7 @@
         class="btn-primary ready"
         @click="abrirCrear"
       >
-        + Registrar
+      <PlusCircle :size="18" /> Registrar
       </button>
     </div>
 
@@ -27,6 +27,7 @@
       </div>
 
       <div class="field filtro-busqueda">
+        <Search :size="18" />
         <input
           v-model="busqueda"
           class="field-input"
@@ -46,7 +47,7 @@
     </div>
 
     <div v-else-if="store.error" class="estado-error">
-      <span>✕ {{ store.error }}</span>
+      <span><X :size="18" /> {{ store.error }}</span>
       <button class="btn-link" @click="cargar">Reintentar</button>
     </div>
 
@@ -99,7 +100,7 @@
                     class="btn-accion"
                     title="Editar"
                     @click="abrirEditar(t.id)"
-                  >✎</button>
+                  ><Edit3 :size="16" /></button>
 
                   <!-- Activar / Desactivar -->
                   <button
