@@ -144,7 +144,7 @@
         @click="continuar"
       >
         <span v-if="store.guardando" class="spinner" />
-        <span v-else>Continuar →</span>
+        <span v-else>Continuar <ArrowRight :size="16" /></span>
       </button>
     </div>
   </div>
@@ -159,6 +159,7 @@ import { balanzaApi } from '@/api/balanza'
 import type { ProvAcopDropdown } from '@/api/balanza'
 import type { TipoDocumento } from '@/types/balanza'
 import DocumentosPanel from '@/components/balanza/DocumentosPanel.vue'
+import { ArrowRight } from 'lucide-vue-next'
 
 const router = useRouter()
 const store  = useBalanzaStore()

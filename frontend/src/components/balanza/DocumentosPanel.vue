@@ -1,7 +1,7 @@
 <template>
     <section class="documentos-panel">
       <div class="panel-header">
-        <h3 class="panel-title">📎 Documentos de ingreso</h3>
+        <h3 class="panel-title"><Clipboard :size="20" /> Documentos de ingreso</h3>
         <span v-if="archivosLocales.length" class="doc-count">
           {{ archivosLocales.length }} archivo(s)
         </span>
@@ -12,11 +12,7 @@
 
       <!-- ── Aviso modo pre-sesión ────────────────────────────────────────────── -->
       <div v-if="!sesionId" class="aviso-presion">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 20 20" aria-hidden="true" style="vertical-align: middle;">
-          <circle cx="10" cy="10" r="9" stroke="#0ea5e9" stroke-width="2" fill="#e0f2fe"/>
-          <rect x="9" y="8" width="2" height="6" rx="1" fill="#0ea5e9"/>
-          <rect x="9" y="5" width="2" height="2" rx="1" fill="#0ea5e9"/>
-        </svg>
+        <Info :size="18" class="aviso-icono" />
         <p>
           Sube los documentos del camión (GRR, GRT, licencia). Puedes subir un PDF
           con múltiples páginas o archivos separados. Luego extrae los datos para
@@ -43,10 +39,7 @@
           @change="onFileChange"
         />
         <div class="upload-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#0ea5e9" d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1z"/>
-            <path fill="#0ea5e9" d="M4 17a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1z"/>
-          </svg>
+          <Upload :size="24" />
         </div>
         <p class="upload-text">Arrastra archivos aquí o haz clic para seleccionar</p>
         <p class="upload-hint">PDF (una o varias páginas), JPG o PNG · Máximo 10 MB por archivo</p>
@@ -79,7 +72,9 @@
       <!-- ── Lista: archivos locales (pre-sesión) ──────────────────────────────── -->
       <div v-if="!sesionId && archivosLocales.length" class="doc-list">
         <div v-for="(item, idx) in archivosLocales" :key="idx" class="doc-row">
-          <span class="doc-icon">{{ iconFor(item.tipo) }}</span>
+          <span class="doc-icon">
+            <component :is="iconFor(item.tipo)" :size="20" stroke-width="1.5" color="var(--color-text-muted)" />
+          </span>
           <div class="doc-info">
             <span class="doc-nombre">{{ item.file.name }}</span>
             <span class="doc-tipo">{{ TIPO_LABELS[item.tipo] }}</span>
@@ -88,26 +83,32 @@
             class="btn-icon btn-danger"
             title="Quitar"
             @click="quitarLocal(idx)"
-          >🗑</button>
+          ><FileMinus :size="18" /></button>
         </div>
       </div>
 
       <!-- ── Lista: documentos del servidor (post-sesión) ─────────────────────── -->
       <div v-if="sesionId && documentosServidor.length" class="doc-list">
         <div v-for="doc in documentosServidor" :key="doc.id" class="doc-row">
-          <span class="doc-icon">{{ iconFor(doc.tipo_documento) }}</span>
+          <span class="doc-icon">
+            <component :is="iconFor(doc.tipo_documento)" :size="20" stroke-width="1.5" color="var(--color-text-muted)" />
+          </span>
           <div class="doc-info">
             <span class="doc-nombre">{{ doc.nombre_original }}</span>
             <span class="doc-tipo">{{ TIPO_LABELS[doc.tipo_documento as TipoDocumento] }}</span>
           </div>
           <div class="doc-actions">
-            <button class="btn-icon" title="Descargar" @click="descargar(doc)">⬇</button>
+            <button class="btn-icon" title="Descargar" @click="descargar(doc)">
+              <Download :size="18" />
+            </button>
             <button
               v-if="puedeEliminar"
               class="btn-icon btn-danger"
               title="Eliminar"
               @click="confirmarEliminar(doc)"
-            >🗑</button>
+            >
+              <Trash2 :size="18" />
+            </button>
           </div>
         </div>
       </div>
@@ -126,15 +127,9 @@
           :disabled="extrayendo"
           @click="extraer"
         >
-          <svg v-if="extrayendo" class="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="#0ea5e9" stroke-width="3" opacity="0.25"/>
-            <path d="M22 12a10 10 0 0 1-10 10" stroke="#0ea5e9" stroke-width="3" stroke-linecap="round"/>
-          </svg>
-          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="7" stroke="#0ea5e9" stroke-width="2"/>
-            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          {{ extrayendo ? 'Analizando documentos...' : 'Extraer datos del camión' }}
+          <Loader2 v-if="extrayendo" :size="18" class="spinner" />
+          <WandSparkles v-else :size="18" />
+          <span>{{ extrayendo ? 'Analizando documentos...' : 'Extraer datos del camión' }}</span>
         </button>
         <p class="extraccion-hint">
           Lee automáticamente placa, conductor, guías y más de los documentos adjuntos.
@@ -146,10 +141,7 @@
       <div v-if="datosExtraidos" class="extraccion-resultado">
         <div class="resultado-header">
           <span class="resultado-titulo">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 20 20" style="vertical-align: middle; margin-right: 0.4em;">
-              <circle cx="10" cy="10" r="9" stroke="#22c55e" stroke-width="2" fill="#dcfce7"/>
-              <path d="M6 10.5l3 3 5-5" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <CircleCheckBig :size="20" class="resultado-icono" />
             Formulario pre-llenado
           </span>
           <button class="btn-reextraer" @click="limpiarExtraccion"><X :size="18" /> Limpiar</button>
@@ -165,14 +157,7 @@
         </div>
 
         <div v-if="datosExtraidos.peso_declarado_tm" class="peso-info">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 20 20" style="vertical-align: middle; margin-right: 0.3em;">
-            <g>
-              <ellipse cx="10" cy="17" rx="7" ry="1.2" fill="#fde68a"/>
-              <rect x="9" y="4" width="2" height="9" rx="1" fill="#f59e42"/>
-              <path d="M5 8c0 2.5-2 5-2 5s-2-2.5-2-5a2 2 0 1 1 4 0zm12 0c0 2.5-2 5-2 5s-2-2.5-2-5a2 2 0 1 1 4 0z" fill="#fde68a" stroke="#f59e42" stroke-width="1"/>
-              <circle cx="10" cy="4" r="1.2" fill="#f59e42"/>
-            </g>
-          </svg>
+          <Brackets :size="18" class="peso-icono" />
           <span>
             Peso declarado en documentos:
             <strong>{{ datosExtraidos.peso_declarado_tm }} TM</strong>
@@ -181,7 +166,7 @@
         </div>
 
         <p class="resultado-aviso">
-          ↑ Revisa los datos en el formulario y corrígelos si es necesario antes de continuar.
+          <ArrowUp :size="18" /> Revisa los datos en el formulario y corrígelos si es necesario antes de continuar.
         </p>
       </div>
     </section>
@@ -194,6 +179,25 @@
   import { balanzaApi } from '@/api/balanza'
   import { useSync } from '@/composables/useSync'
   import type { DocumentoRespuesta, DatosExtraidos, TipoDocumento } from '@/types/balanza'
+  import {
+    X,
+    Info,
+    Upload,
+    FileMinus,
+    Brackets,
+    Clipboard,
+    CircleCheckBig,
+    Download,
+    Trash2,
+    FileText,
+    Truck,
+    IdCard,
+    ClipboardList,
+    Paperclip,
+    WandSparkles,
+    Loader2,
+    ArrowUp,
+  } from 'lucide-vue-next'
 
   // ── Props & emits ─────────────────────────────────────────────────────────────
   const props = defineProps<{
@@ -440,11 +444,13 @@
 
   // ── Utils ─────────────────────────────────────────────────────────────────────
   function iconFor(tipo: string) {
-    const icons: Record<string, string> = {
-      GUIA_REMISION: '📄', GUIA_TRANSPORTE: '🚚',
-      LICENCIA_CONDUCIR: '🪪', OTRO: '📋',
+    const icons: Record<string, any> = {
+      GUIA_REMISION: FileText,
+      GUIA_TRANSPORTE: Truck,
+      LICENCIA_CONDUCIR: IdCard,
+      OTRO: ClipboardList,
     }
-    return icons[tipo] ?? '📎'
+    return icons[tipo] ?? Paperclip
   }
   </script>
 
@@ -514,7 +520,8 @@
   .upload-text {
     margin: 0 0 0.2rem;
     color: var(--color-text);
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
+    font-family: inherit;
   }
   .upload-hint {
     margin: 0;
@@ -531,6 +538,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
+    font-family: inherit;
   }
   .pendientes-title {
     margin: 0;
@@ -545,7 +553,7 @@
   }
   .pendiente-nombre {
     flex: 1;
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -559,13 +567,14 @@
     background: var(--color-bg-card);
     color: var(--color-text);
     font-size: var(--text-md);
+    font-family: inherit;
   }
   .btn-remove-pending {
     background: none;
     border: none;
     color: var(--color-text-muted);
     cursor: pointer;
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
     padding: 0.2rem 0.35rem;
     border-radius: 4px;
   }
@@ -582,7 +591,8 @@
     border-radius: var(--radius-sm);
     background: none;
     cursor: pointer;
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
+    font-family: inherit;
     color: var(--color-text-muted);
   }
   .btn-upload {
@@ -591,9 +601,10 @@
     border-radius: var(--radius-sm);
     background: var(--color-gold);
     color: #000;
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
     font-weight: 600;
     cursor: pointer;
+    font-family: inherit;
   }
 
   /* ── Lista de archivos ───────────────────────────────────────*/
@@ -619,7 +630,7 @@
     min-width: 0;
   }
   .doc-nombre {
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
     font-weight: 500;
     color: var(--color-text);
     overflow: hidden;
@@ -642,7 +653,7 @@
   .empty-msg {
     text-align: center;
     color: var(--color-text-muted);
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
     margin: 0;
     padding: 0.5rem 0;
   }
@@ -669,6 +680,7 @@
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
     align-self: flex-start;
+    font-family: inherit;
   }
   .btn-extraer:hover:not(:disabled) {
     background: var(--color-gold);
@@ -736,7 +748,7 @@
     display: flex;
     gap: 0.5rem;
     align-items: flex-start;
-    font-size: var(--text-md)rem;
+    font-size: var(--text-md);
     color: var(--color-text);
     background: var(--color-gold-bg);
     border-radius: var(--radius-sm);

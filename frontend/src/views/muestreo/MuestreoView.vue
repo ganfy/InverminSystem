@@ -94,8 +94,9 @@
 
             <template v-else>
               <div class="actions-grid">
-                <button class="btn-primary flex-1" @click="abrirModalEtiquetas(lote.ip)">
-                  {{ lote.etiquetado ? '+ Etiquetas Extra' : 'Etiquetar' }}
+                <button class="btn-primary flex-1 btn-con-icono" @click="abrirModalEtiquetas(lote.ip)">
+                  <Plus v-if="lote.etiquetado" :size="18" />
+                  <span>{{ lote.etiquetado ? 'Etiquetas Extra' : 'Etiquetar' }}</span>
                 </button>
 
                 <button v-if="!lote.etiquetado && lote.cantidad_intentos_previos < 3" class="btn-secondary flex-1" @click="irARegistrarHumedad(lote.ip)">
@@ -121,6 +122,7 @@
       v-if="modalEtiquetasIp"
       :ip-lote="modalEtiquetasIp"
       @close="modalEtiquetasIp = null"
+      @etiquetado="onEtiquetasGeneradas"
     />
     </div>
   </template>
@@ -133,7 +135,9 @@ import ModalDetallesMuestreo from './ModalDetallesMuestreo.vue'
 import ModalEtiquetas from './ModalEtiquetas.vue'
 import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'
 import {
-  WifiOff
+  WifiOff,
+    AlertTriangle,
+    Plus,
 } from 'lucide-vue-next'
 
 
@@ -147,11 +151,15 @@ const lotesPendientesEtiquetado = computed(() => {
 function calcularEstadoSLA(lote: any) {
   if (!lote.fecha_ingreso_prueba) return null;
 
-  const ingreso = new Date(lote.fecha_ingreso_prueba);
+  const utcStr = (lote.fecha_ingreso_prueba.includes('+') || lote.fecha_ingreso_prueba.endsWith('Z'))
+    ? lote.fecha_ingreso_prueba
+    : lote.fecha_ingreso_prueba + 'Z';
+
+  const ingreso = new Date(utcStr);
   const ahora = new Date();
+
   const horasTranscurridas = (ahora.getTime() - ingreso.getTime()) / (1000 * 60 * 60);
 
-  // Usamos los valores centralizados que vienen del backend
   const { h_min, h_max } = lote.sla_config || { h_min: 48, h_max: 72 };
 
   if (horasTranscurridas < h_min) {
@@ -180,9 +188,10 @@ onMounted(async () => {
 
 function formatearFecha(isoString?: string | null): string {
   if (!isoString) return '---'
-  const fecha = new Date(isoString)
-  const fechaPart = fecha.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const horaPart = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const utc = (isoString.includes('+') || isoString.endsWith('Z')) ? isoString : isoString + 'Z'
+  const fecha = new Date(utc)
+  const fechaPart = fecha.toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric' })
+  const horaPart = fecha.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false })
   return `${fechaPart}, ${horaPart}`
 }
 
@@ -198,6 +207,10 @@ const modalEtiquetasIp = ref<string | null>(null)
 
 function abrirModalEtiquetas(ip: string) {
   modalEtiquetasIp.value = ip
+}
+
+async function onEtiquetasGeneradas() {
+  await store.cargarLotes()
 }
 </script>
 

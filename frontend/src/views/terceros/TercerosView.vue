@@ -9,10 +9,11 @@
       </div>
       <button
         v-if="puedeCrear"
-        class="btn-primary ready"
+        class="btn-primary ready btn-con-icono"
         @click="abrirCrear"
       >
-      <PlusCircle :size="18" /> Registrar
+        <PlusCircle :size="18" />
+        <span>Registrar</span>
       </button>
     </div>
 
@@ -36,7 +37,7 @@
       </div>
 
       <button class="btn-secondary btn-refresh" @click="cargar" title="Actualizar">
-        <span :class="['refresh-icon', { spinning: store.cargando }]">⟳</span>
+        <span :class="['refresh-icon', { spinning: store.cargando }]"><RotateCcw :size="18" /></span>
       </button>
     </div>
 
@@ -67,9 +68,12 @@
           </thead>
           <tbody>
             <tr v-if="listaFiltrada.length === 0">
-              <td colspan="6" class="tabla-vacia">
-                <CircleX :size="32" class="tabla-vacia-icon" />
-                <span>{{ busqueda ? 'Sin resultados para esa búsqueda' : 'No hay terceros registrados' }}</span>
+              <td colspan="6">
+                <div class="tabla-vacia">
+                  <FolderSearch :size="32" class="tabla-vacia-icon" />
+                <span>{{ (busqueda || filtroActivo !== undefined) ? 'Sin resultados para esa búsqueda' : 'No hay terceros registrados' }}</span>
+                </div>
+
               </td>
             </tr>
             <tr
@@ -110,8 +114,8 @@
                     :title="t.activo ? 'Desactivar' : 'Activar'"
                     @click="toggleEstado(t)"
                   >
-                    <PowerOff v-if="t.activo" :size="16" />
-                    <Power v-else :size="16" />
+                  <Ban v-if="t.activo" :size="16" />
+                  <CheckCircle v-else :size="16" />
                   </button>
                 </div>
               </td>
@@ -150,10 +154,13 @@ import {
   Power,
   PowerOff,
   Edit3,
-  CircleX,
+  FolderSearch,
   X,
   Search,
-  PlusCircle
+  PlusCircle,
+  RotateCcw,
+  Ban,
+  CheckCircle,
 } from 'lucide-vue-next'
 // ── Stores ────────────────────────────────────────────────────────────────────
 const store = useTercerosStore()
@@ -434,6 +441,13 @@ font-size: var(--text-xs);
   justify-content: center;
   transition: all 0.15s;
   font-family: var(--font-mono);
+}
+
+.btn-con-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .btn-accion:hover          { border-color: var(--color-gold); color: var(--color-gold); }

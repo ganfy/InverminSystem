@@ -46,7 +46,7 @@
                 <button
                   class="btn-icon"
                   @click="router.push({ name: 'SesionBalanza', params: { id: s.offline_id } })"
-                >✎</button>
+                ><Edit3 :size="16"/></button>
               </td>
             </tr>
             <tr
@@ -66,7 +66,7 @@
               <td class="td-acciones" @click.stop>
                 <button class="btn-icon"
                   @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })">
-                  ✎
+                  <Edit3 :size="16"/>
                 </button>
               </td>
             </tr>
@@ -127,7 +127,7 @@
               <span v-if="tienePendientes(s.id)" class="badge-local" title="Tiene lotes locales sin subir">SYNC PEND.</span>
             </td>
             <td class="td-acciones" @click.stop>
-              <button class="btn-icon" @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })">✎</button>
+              <button class="btn-icon" @click="router.push({ name: 'SesionBalanza', params: { id: s.id } })"><Edit3 :size="16"/></button>
             </td>
           </tr>
         </tbody>
@@ -152,7 +152,7 @@ import type { SesionOfflineData } from '@/composables/useOfflineQueue'
 import { watch } from 'vue'
 import { useSync } from '@/composables/useSync'
 import {
-  WifiOff
+  WifiOff, Edit3,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -270,8 +270,8 @@ let timer: ReturnType<typeof setTimeout> | null = null
 function aplicarFiltros() {
   store.cargarSesiones({
     estado:      filtros.estado      || undefined,
-    fecha_desde: filtros.fecha_desde || undefined,
-    fecha_hasta: filtros.fecha_hasta || undefined,
+    fecha_desde: filtros.fecha_desde ? `${filtros.fecha_desde}T00:00:00` : undefined,
+    fecha_hasta: filtros.fecha_hasta ? `${filtros.fecha_hasta}T23:59:59` : undefined, // Para incluir todo el día
     busqueda:    filtros.busqueda    || undefined,
   })
 }

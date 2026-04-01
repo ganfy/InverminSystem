@@ -29,8 +29,16 @@
             <tr v-for="p in pruebasOffline" :key="p.offline_id" class="fila-offline" style="border-bottom: 1px solid var(--color-border);">
               <td class="td-mono font-bold" style="padding: 1rem; color: var(--color-gold);">{{ p.ip }}</td>
               <td class="td-fecha">{{ formatearFechaLocal(p.datos.fecha_ingreso) }}</td>
-              <td class="td-mono">{{ p.datos.malla_porcentaje != null ? Number(p.datos.malla_porcentaje).toFixed(3) : '---' }}</td>
-              <td class="td-mono">{{ p.datos.gasto_agno3 != null ? Number(p.datos.gasto_agno3).toFixed(3) : '---' }}</td>
+              <td class="td-mono">
+                {{ (p.datos.malla_porcentaje != null)
+                    ? Number(p.datos.malla_porcentaje).toFixed(3)
+                    : '---' }}
+              </td>
+              <td class="td-mono">
+                {{ (p.datos.gasto_agno3 != null)
+                    ? Number(p.datos.gasto_agno3).toFixed(3)
+                    : '---' }}
+              </td>
               <td>
                 <span class="badge-estado" style="background-color: rgba(220,160,20,0.1); color: var(--color-warning);">PENDIENTE</span>
                 <span class="badge-local" v-if="p.sync_error" style="background: rgba(220,60,60,.15); color: #dc3c3c; border-color: #dc3c3c;" :title="p.sync_error">ERROR</span>

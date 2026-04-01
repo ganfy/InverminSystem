@@ -1,7 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
 
-from app.models.models import Configuracion, Lote, MapeoCIP, Muestreo, SesionDescarga
+from app.models.models import (
+    Configuracion,
+    Lote,
+    MapeoCIP,
+    Muestreo,
+    PruebaMetalurgica,
+    SesionDescarga,
+)
 from app.schemas.muestreo import MuestreoCreate
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -151,10 +158,11 @@ def obtener_lotes_para_muestreo(db: Session):
     sla_map = {c.clave: int(c.valor) for c in config_horas}
     h_min = sla_map.get("sla_metalurgia_horas", 48)
     h_max = sla_map.get("sla_limite_plazo_horas", 72)
+
     lotes_db = (
         db.query(Lote)
         .join(Lote.sesion)
-        .outerjoin(Lote.prueba_metalurgica)
+        # .outerjoin(Lote.prueba_metalurgica) # Opcional, ya que hacemos la consulta abajo
         .filter(SesionDescarga.estado == "COMPLETO")
         .all()
     )
@@ -170,6 +178,7 @@ def obtener_lotes_para_muestreo(db: Session):
         if lote.sesion and lote.sesion.provacop and lote.sesion.provacop.proveedor:
             proveedor_nombre = lote.sesion.provacop.proveedor.razon_social
 
+        # Historial de Muestreos (Humedad)
         intentos = (
             db.query(Muestreo)
             .filter(Muestreo.lote_id == lote.id)
@@ -181,19 +190,25 @@ def obtener_lotes_para_muestreo(db: Session):
             intentos[0].creado_en.isoformat() if intentos and intentos[0].creado_en else None
         )
 
+        # PRUEBAS METALÚRGICAS
+        prueba = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).first()
+        prueba_completada = True if prueba else False
+        fecha_ingreso_prueba = (
+            prueba.fecha_ingreso.isoformat() if prueba and prueba.fecha_ingreso else None
+        )
+
+        # ETIQUETAS Y ESTADOS
         tiene_etiquetas = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).first() is not None
         estado_muestreo = "COMPLETADO" if intentos_previos > 0 else "PENDIENTE"
 
-        fecha_ingreso_prueba = (
-            lote.prueba_metalurgica.fecha_ingreso.isoformat() if lote.prueba_metalurgica else None
-        )
-        tiene_etiquetas = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).first() is not None
+        # SLA Logic
+        pendiente_sla = prueba_completada and (not tiene_etiquetas)
 
         resultado.append(
             {
                 "ip": lote.ip,
                 "fecha_recepcion": lote.creado_en.isoformat() if lote.creado_en else None,
-                "fecha_muestreo": fecha_ultimo_muestreo,  # <-- ¡Aquí agregamos la fecha!
+                "fecha_muestreo": fecha_ultimo_muestreo,
                 "peso_neto": float(peso_neto),
                 "sacos": sacos,
                 "proveedor_razon_social": proveedor_nombre,
@@ -201,9 +216,10 @@ def obtener_lotes_para_muestreo(db: Session):
                 "cantidad_intentos_previos": intentos_previos,
                 "tiene_humedad": intentos_previos > 0,
                 "etiquetado": tiene_etiquetas,
+                "prueba_completada": prueba_completada,
                 "fecha_ingreso_prueba": fecha_ingreso_prueba,
                 "sla_config": {"h_min": h_min, "h_max": h_max},
-                "pendiente_sla": fecha_ingreso_prueba is not None and not tiene_etiquetas,
+                "pendiente_sla": pendiente_sla,
             }
         )
 
