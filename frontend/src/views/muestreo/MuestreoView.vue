@@ -4,6 +4,42 @@
         <h1 class="page-title">Muestreo</h1>
       </div>
 
+      <div v-if="featureControlTiemposPrueba && lotesPendientesEtiquetado.length > 0" class="sla-container">
+  <h3 class="td-label-gold">CONTROL SLA: PENDIENTES DE ETIQUETADO</h3>
+  <table class="sla-table">
+    <thead>
+      <tr>
+        <th>LOTE</th>
+        <th>INICIO PRUEBA</th>
+        <th>TIEMPO</th>
+        <th>ESTADO</th>
+        <th>ACCIONES</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="lote in lotesPendientesEtiquetado" :key="lote.ip">
+        <td class="td-value-mono">{{ lote.ip }}</td>
+        <td>{{ formatearFecha(lote.fecha_ingreso_prueba) }}</td>
+        <td class="td-value-mono">{{ Math.floor(calcularEstadoSLA(lote)?.horas ?? 0) }}h</td>
+        <td>
+          <span :class="['sla-badge', calcularEstadoSLA(lote)?.clase]">
+            {{ calcularEstadoSLA(lote)?.texto }}
+          </span>
+        </td>
+        <td>
+          <button
+            class="btn-primary"
+            :disabled="!calcularEstadoSLA(lote)?.habilitado"
+            @click="abrirModalEtiquetas(lote.ip)"
+          >
+            Etiquetar
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
       <div class="tabs-container">
         <button class="tab-btn" :class="{ active: tabActual === 'PENDIENTES' }" @click="tabActual = 'PENDIENTES'">
           Pendientes <span class="tab-badge">{{ store.lotesPendientes.length }}</span>
@@ -96,9 +132,36 @@ import { useMuestreoStore } from '@/stores/muestreo'
 import ModalDetallesMuestreo from './ModalDetallesMuestreo.vue'
 import ModalEtiquetas from './ModalEtiquetas.vue'
 import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'
+import {
+  WifiOff
+} from 'lucide-vue-next'
+
 
 const router = useRouter()
 const store = useMuestreoStore()
+
+const featureControlTiemposPrueba = ref(true) // Esto debería venir de una configuración o store centralizada de features
+const lotesPendientesEtiquetado = computed(() => {
+    return store.lotesCompletados.filter(l => l.pendiente_sla);
+});
+function calcularEstadoSLA(lote: any) {
+  if (!lote.fecha_ingreso_prueba) return null;
+
+  const ingreso = new Date(lote.fecha_ingreso_prueba);
+  const ahora = new Date();
+  const horasTranscurridas = (ahora.getTime() - ingreso.getTime()) / (1000 * 60 * 60);
+
+  // Usamos los valores centralizados que vienen del backend
+  const { h_min, h_max } = lote.sla_config || { h_min: 48, h_max: 72 };
+
+  if (horasTranscurridas < h_min) {
+    return { clase: 'sla-espera', texto: 'EN METALURGIA', habilitado: false, horas: horasTranscurridas };
+  } else if (horasTranscurridas <= h_max) {
+    return { clase: 'sla-plazo', texto: 'LISTO (EN PLAZO)', habilitado: true, horas: horasTranscurridas };
+  } else {
+    return { clase: 'sla-retraso', texto: 'RETRASADO', habilitado: true, horas: horasTranscurridas };
+  }
+}
 
 const tabActual = ref<'PENDIENTES' | 'COMPLETADOS'>('PENDIENTES')
 
@@ -328,5 +391,57 @@ function abrirModalEtiquetas(ip: string) {
   font-size: var(--text-base);
   justify-content: center;
   font-weight: bold;
+}
+
+/* =========================================
+   ESTILOS DE LA TABLA SLA
+   ========================================= */
+.sla-container {
+  margin-bottom: var(--spacing-xl);
+  background: var(--color-bg-card);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-gold-bg);
+}
+
+.sla-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-md);
+}
+
+.sla-table th {
+  text-align: left;
+  color: var(--color-gold);
+  font-size: var(--text-xs);
+  padding: var(--spacing-sm);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.sla-table td {
+  padding: var(--spacing-md) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sla-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* Colores del Semáforo */
+.sla-espera { background: var(--color-bg-input); color: var(--color-text-dim); }
+.sla-plazo { background: var(--color-success-bg); color: var(--color-success); }
+.sla-retraso {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
 }
 </style>

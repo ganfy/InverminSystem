@@ -151,6 +151,9 @@ import { obtenerSesionesPendientes,
 import type { SesionOfflineData } from '@/composables/useOfflineQueue'
 import { watch } from 'vue'
 import { useSync } from '@/composables/useSync'
+import {
+  WifiOff
+} from 'lucide-vue-next'
 
 const router = useRouter()
 const store  = useBalanzaStore()

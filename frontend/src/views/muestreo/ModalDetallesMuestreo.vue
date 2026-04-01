@@ -63,6 +63,10 @@ import { ref, onMounted } from 'vue'
 import api from '@/api/axios'
 import type { MuestreoOut } from '@/api/muestreo'
 import { useSync } from '@/composables/useSync'
+import {
+  AlertTriangle,
+  X
+} from 'lucide-vue-next'
 
 const props = defineProps<{ ipLote: string }>()
 const emit = defineEmits(['close'])

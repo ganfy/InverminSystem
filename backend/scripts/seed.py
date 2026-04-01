@@ -223,6 +223,17 @@ CONFIGURACIONES = [
         "descripcion": "Nombre de la planta/sede",
     },
     {"clave": "empresa_ruc", "valor": "20601910587", "descripcion": "RUC de la empresa"},
+    # Pruebas Metalúrgicas
+    {
+        "clave": "Tiempo_espera_prueba_metalurgica_horas",
+        "valor": "48",
+        "descripcion": "Tiempo de espera en horas para considerar una prueba metalúrgica como retrasada",
+    },
+    {
+        "clave": "Prueba_metalurgica_máximo_plazo_horas",
+        "valor": "72",
+        "descripcion": "Tiempo máximo en horas para completar una prueba metalúrgica antes de alertar de incumplimiento",
+    },
 ]
 # ── Runner ────────────────────────────────────────────────────────────────────
 

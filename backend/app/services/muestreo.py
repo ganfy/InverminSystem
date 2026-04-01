@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from app.models.models import Lote, MapeoCIP, Muestreo, SesionDescarga
+from app.models.models import Configuracion, Lote, MapeoCIP, Muestreo, SesionDescarga
 from app.schemas.muestreo import MuestreoCreate
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -141,7 +141,23 @@ def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 2) -> list
 
 
 def obtener_lotes_para_muestreo(db: Session):
-    lotes_db = db.query(Lote).join(Lote.sesion).filter(SesionDescarga.estado == "COMPLETO").all()
+    config_horas = (
+        db.query(Configuracion)
+        .filter(Configuracion.clave.in_(["sla_metalurgia_horas", "sla_limite_plazo_horas"]))
+        .all()
+    )
+
+    # Valores por defecto si no existen en la BD
+    sla_map = {c.clave: int(c.valor) for c in config_horas}
+    h_min = sla_map.get("sla_metalurgia_horas", 48)
+    h_max = sla_map.get("sla_limite_plazo_horas", 72)
+    lotes_db = (
+        db.query(Lote)
+        .join(Lote.sesion)
+        .outerjoin(Lote.prueba_metalurgica)
+        .filter(SesionDescarga.estado == "COMPLETO")
+        .all()
+    )
 
     resultado = []
 
@@ -154,7 +170,6 @@ def obtener_lotes_para_muestreo(db: Session):
         if lote.sesion and lote.sesion.provacop and lote.sesion.provacop.proveedor:
             proveedor_nombre = lote.sesion.provacop.proveedor.razon_social
 
-        # NUEVO: Obtener intentos y la fecha del último
         intentos = (
             db.query(Muestreo)
             .filter(Muestreo.lote_id == lote.id)
@@ -169,6 +184,11 @@ def obtener_lotes_para_muestreo(db: Session):
         tiene_etiquetas = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).first() is not None
         estado_muestreo = "COMPLETADO" if intentos_previos > 0 else "PENDIENTE"
 
+        fecha_ingreso_prueba = (
+            lote.prueba_metalurgica.fecha_ingreso.isoformat() if lote.prueba_metalurgica else None
+        )
+        tiene_etiquetas = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).first() is not None
+
         resultado.append(
             {
                 "ip": lote.ip,
@@ -181,6 +201,9 @@ def obtener_lotes_para_muestreo(db: Session):
                 "cantidad_intentos_previos": intentos_previos,
                 "tiene_humedad": intentos_previos > 0,
                 "etiquetado": tiene_etiquetas,
+                "fecha_ingreso_prueba": fecha_ingreso_prueba,
+                "sla_config": {"h_min": h_min, "h_max": h_max},
+                "pendiente_sla": fecha_ingreso_prueba is not None and not tiene_etiquetas,
             }
         )
 

@@ -89,7 +89,7 @@ const ui = useUiStore()
 
 const ipLote = route.params.ip as string
 
-const pesoHumedo = ref<number | null>(null)
+const pesoHumedo = ref<number | null>(200)
 const pesoSeco = ref<number | null>(null)
 const observaciones = ref<string>('')
 const intentoActual = ref(1)
@@ -131,7 +131,7 @@ const guardar = async (esRemuestreo = false) => {
   if (exito) {
     if (esRemuestreo && intentoActual.value < maxIntentos) {
       // Flujo: REMUESTREAR
-      pesoHumedo.value = null
+      pesoHumedo.value = 200
       pesoSeco.value = null
       observaciones.value = ''
       intentoActual.value = await store.calcularProximoIntento(ipLote)

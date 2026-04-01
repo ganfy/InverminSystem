@@ -68,7 +68,7 @@
           <tbody>
             <tr v-if="listaFiltrada.length === 0">
               <td colspan="6" class="tabla-vacia">
-                <span class="tabla-vacia-icon">◎</span>
+                <CircleX :size="32" class="tabla-vacia-icon" />
                 <span>{{ busqueda ? 'Sin resultados para esa búsqueda' : 'No hay terceros registrados' }}</span>
               </td>
             </tr>
@@ -110,7 +110,8 @@
                     :title="t.activo ? 'Desactivar' : 'Activar'"
                     @click="toggleEstado(t)"
                   >
-                    {{ t.activo ? '⊘' : '⊙' }}
+                    <PowerOff v-if="t.activo" :size="16" />
+                    <Power v-else :size="16" />
                   </button>
                 </div>
               </td>
@@ -145,7 +146,15 @@ import { useAuthStore }     from '@/stores/auth'
 import { useUiStore }       from '@/stores/ui'
 import TerceroFormModal     from './TerceroFormModal.vue'
 import type { TerceroLista, TerceroRespuesta } from '@/api/terceros'
-
+import {
+  Power,
+  PowerOff,
+  Edit3,
+  CircleX,
+  X,
+  Search,
+  PlusCircle
+} from 'lucide-vue-next'
 // ── Stores ────────────────────────────────────────────────────────────────────
 const store = useTercerosStore()
 const auth  = useAuthStore()

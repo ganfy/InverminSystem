@@ -54,6 +54,12 @@ export interface LoteMuestreo {
     cantidad_intentos_previos: number
     tiene_humedad: boolean
     etiquetado: boolean
+    fecha_ingreso_prueba: string | null
+    sla_config: {
+        h_min: number
+        h_max: number
+    }
+    pendiente_sla: boolean
 }
 
 export const muestreoApi = {

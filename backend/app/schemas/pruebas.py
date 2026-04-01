@@ -33,6 +33,7 @@ class PruebaMetalurgicaOut(PruebaMetalurgicaBase):
 class LotePruebaList(BaseModel):
     ip: str
     fecha_recepcion: datetime | None = None
+    fecha_ingreso: datetime | None = None
     fecha_salida: datetime | None = None
     malla_porcentaje: float | None = None
     gasto_agno3: float | None = None

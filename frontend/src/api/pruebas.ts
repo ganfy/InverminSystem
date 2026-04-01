@@ -20,6 +20,7 @@ export interface PruebaMetalurgicaOut extends PruebaMetalurgicaCreate {
 export interface LotePruebaList {
     ip: string
     fecha_recepcion: string | null
+    fecha_ingreso: string | null
     fecha_salida: string | null
     malla_porcentaje: number | null
     gasto_agno3: number | null
@@ -47,5 +48,18 @@ export const pruebasApi = {
     async syncBatch(pruebas: PruebaOfflineItem[]): Promise<any> {
         const response = await api.post('/pruebas/sync', { pruebas })
         return response.data
+    },
+
+    async obtenerDetallePrueba(ipLote: string) {
+        try {
+            const response = await api.get(`/pruebas/lotes/${ipLote}`)
+            return response.data
+        } catch (error: any) {
+            // Si el backend responde 404, significa que no hay datos aún (es nueva)
+            if (error.response && error.response.status === 404) {
+                return null
+            }
+            throw error
+        }
     }
 }

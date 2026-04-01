@@ -6,11 +6,12 @@ from app.models.models import Usuario
 from app.schemas.pruebas import (
     LotePruebaList,
     PruebaMetalurgicaCreate,
+    PruebaMetalurgicaOut,
     SyncPruebasRequest,
     SyncPruebasResponse,
 )
 from app.services import pruebas as pruebas_service
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/pruebas", tags=["Pruebas Metalúrgicas"])
@@ -47,3 +48,14 @@ def registrar_prueba(
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get(
+    "/lotes/{ip_lote}", response_model=PruebaMetalurgicaOut
+)  # Ajusta el response_model al tuyo
+def obtener_detalle_prueba(ip_lote: str, db: Session = Depends(get_db)):
+    prueba = pruebas_service.obtener_prueba_por_ip(db, ip_lote)
+    if not prueba:
+        # Devolvemos un 404 para que el Frontend sepa que está vacío y es una prueba NUEVA
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prueba no iniciada")
+    return prueba

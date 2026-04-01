@@ -1,112 +1,117 @@
 <template>
-    <div class="page-container">
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Pruebas Metalúrgicas</h1>
-          <p class="page-subtitle">Gestión y registro de análisis de preparación</p>
-        </div>
-      </header>
-
-      <div v-if="pruebasOffline.length > 0" class="offline-section">
-        <div class="offline-section-header">
-          <span class="offline-section-titulo">
-            <WifiOff :size="20" class="aviso-icono" style="vertical-align: middle; margin-right: 5px;"/> SIN SINCRONIZAR
-          </span>
-          <span class="offline-section-count">{{ pruebasOffline.length }} prueba(s) local(es)</span>
-        </div>
-        <div class="tabla-wrapper">
-          <table class="tabla" style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="text-align: left; border-bottom: 2px solid var(--color-border);">
-                <th style="padding: 1rem;">IP</th>
-                <th>Fecha Registro Local</th>
-                <th>Malla (%)</th>
-                <th>Gasto AgNO3</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in pruebasOffline" :key="p.offline_id" class="fila-offline" style="border-bottom: 1px solid var(--color-border);">
-                <td class="td-mono font-bold" style="padding: 1rem; color: var(--color-gold);">{{ p.ip }}</td>
-                <td class="td-fecha">{{ formatearFechaLocal(p.datos.fecha_ingreso) }}</td>
-                <td class="td-mono">{{ p.datos.malla_porcentaje != null ? Number(p.datos.malla_porcentaje).toFixed(3) : '---' }}</td>
-                <td class="td-mono">{{ p.datos.gasto_agno3 != null ? Number(p.datos.gasto_agno3).toFixed(3) : '---' }}</td>
-                <td>
-                  <span class="badge-estado" style="background-color: rgba(220,160,20,0.1); color: var(--color-warning);">PENDIENTE</span>
-                  <span class="badge-local" v-if="p.sync_error" style="background: rgba(220,60,60,.15); color: #dc3c3c; border-color: #dc3c3c;" :title="p.sync_error">ERROR</span>
-                  <span class="badge-local" v-else>LOCAL</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+  <div class="page-container">
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Pruebas Metalúrgicas</h1>
+        <p class="page-subtitle">Gestión y registro de análisis de preparación</p>
       </div>
+    </header>
 
-      <div class="filtros-bar card" style="margin-bottom: 1rem; padding: 1rem; display: flex; gap: 1rem; align-items: flex-end;">
-        <div class="field" style="margin-bottom: 0;">
-          <label class="field-label">Estado</label>
-          <select class="field-input field-select" v-model="filtroEstado">
-            <option value="Todos">Todos los estados</option>
-            <option value="PENDIENTE">PENDIENTE</option>
-            <option value="EN PROCESO">EN PROCESO</option>
-            <option value="COMPLETO">COMPLETO</option>
-          </select>
-        </div>
-        <div class="field" style="flex: 1; margin-bottom: 0;">
-          <label class="field-label">Búsqueda</label>
-          <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="Buscar por IP..." />
-        </div>
+    <div v-if="pruebasOffline.length > 0" class="offline-section">
+      <div class="offline-section-header">
+        <span class="offline-section-titulo">
+          <WifiOff :size="20" class="aviso-icono" style="vertical-align: middle; margin-right: 5px;"/> SIN SINCRONIZAR
+        </span>
+        <span class="offline-section-count">{{ pruebasOffline.length }} prueba(s) local(es)</span>
       </div>
-
-      <div v-if="cargando && pruebas.length === 0" class="estado-tabla" style="text-align: center; padding: 2rem;">
-        <span class="spinner-sm"></span> Cargando pruebas metalúrgicas...
-      </div>
-
-      <div v-else class="tabla-wrapper card">
+      <div class="tabla-wrapper">
         <table class="tabla" style="width: 100%; border-collapse: collapse;">
           <thead>
             <tr style="text-align: left; border-bottom: 2px solid var(--color-border);">
               <th style="padding: 1rem;">IP</th>
-              <th>Fecha Recepción</th>
-              <th>Fecha Salida</th>
+              <th>Fecha Registro Local</th>
               <th>Malla (%)</th>
               <th>Gasto AgNO3</th>
               <th>Estado</th>
-              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            <tr class="row-hover" v-for="prueba in pruebasFiltradas" :key="prueba.ip" style="border-bottom: 1px solid var(--color-border);">
-              <td class="td-mono font-bold" style="padding: 1rem; color: var(--color-gold);">{{ prueba.ip }}</td>
-              <td class="td-fecha">{{ formatearFecha(prueba.fecha_recepcion) }}</td>
-              <td class="td-fecha">{{ formatearFecha(prueba.fecha_salida) }}</td>
-              <td class="td-mono">{{ prueba.malla_porcentaje != null ? Number(prueba.malla_porcentaje).toFixed(3) : '---' }}</td>
-              <td class="td-mono">{{ prueba.gasto_agno3 != null ? Number(prueba.gasto_agno3).toFixed(3) : '---' }}</td>
+            <tr v-for="p in pruebasOffline" :key="p.offline_id" class="fila-offline" style="border-bottom: 1px solid var(--color-border);">
+              <td class="td-mono font-bold" style="padding: 1rem; color: var(--color-gold);">{{ p.ip }}</td>
+              <td class="td-fecha">{{ formatearFechaLocal(p.datos.fecha_ingreso) }}</td>
+              <td class="td-mono">{{ p.datos.malla_porcentaje != null ? Number(p.datos.malla_porcentaje).toFixed(3) : '---' }}</td>
+              <td class="td-mono">{{ p.datos.gasto_agno3 != null ? Number(p.datos.gasto_agno3).toFixed(3) : '---' }}</td>
               <td>
-                <span :class="obtenerClaseEstado(prueba.estado)">
-                  {{ prueba.estado }}
-                </span>
-              </td>
-              <td class="td-acciones">
-                <button
-                  class="btn-primary"
-                  style="padding: 0.2rem 0.6rem; font-size: 0.75rem;"
-                  @click="irARegistrar(prueba.ip)"
-                >
-                  Registrar
-                </button>
-              </td>
-            </tr>
-            <tr v-if="pruebasFiltradas.length === 0">
-              <td colspan="7" style="text-align: center; padding: 2rem; color: var(--color-text-muted);">
-                No se encontraron registros de pruebas en el servidor.
+                <span class="badge-estado" style="background-color: rgba(220,160,20,0.1); color: var(--color-warning);">PENDIENTE</span>
+                <span class="badge-local" v-if="p.sync_error" style="background: rgba(220,60,60,.15); color: #dc3c3c; border-color: #dc3c3c;" :title="p.sync_error">ERROR</span>
+                <span class="badge-local" v-else>LOCAL</span>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
-  </template>
+
+    <div class="filtros-bar card" style="margin-bottom: 1rem; padding: 1rem; display: flex; gap: 1rem; align-items: flex-end;">
+      <div class="field" style="margin-bottom: 0;">
+        <label class="field-label">Estado</label>
+        <select class="field-input field-select" v-model="filtroEstado">
+          <option value="Todos">Todos los estados</option>
+          <option value="PENDIENTE">PENDIENTE</option>
+          <option value="EN PROCESO">EN PROCESO</option>
+          <option value="COMPLETO">COMPLETO</option>
+        </select>
+      </div>
+      <div class="field" style="flex: 1; margin-bottom: 0;">
+        <label class="field-label">Búsqueda</label>
+        <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="Buscar por IP..." />
+      </div>
+    </div>
+
+    <div v-if="cargando && pruebas.length === 0" class="estado-tabla" style="text-align: center; padding: 2rem;">
+      <span class="spinner-sm"></span> Cargando pruebas metalúrgicas...
+    </div>
+
+    <div v-else class="tabla-wrapper card">
+      <table class="tabla" style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align: left; border-bottom: 2px solid var(--color-border);">
+            <th style="padding: 1rem;">IP</th>
+            <th>Fecha Recepción</th>
+            <th>Ingreso a Rodillos</th>
+            <th>Fin Proyectado</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row-hover" v-for="prueba in pruebasFiltradas" :key="prueba.ip" style="border-bottom: 1px solid var(--color-border);">
+            <td style="padding: 1rem;" class="td-value-mono">{{ prueba.ip }}</td>
+
+              <td>{{ prueba.fecha_recepcion ? formatearFecha(prueba.fecha_recepcion) : '---' }}</td>
+
+              <td>{{ prueba.fecha_ingreso ? formatearFecha(prueba.fecha_ingreso) : '---' }}</td>
+
+              <td class="td-value-mono highlight">
+                {{ prueba.fecha_salida ? formatearFecha(prueba.fecha_salida) : '---' }}
+              </td>
+
+            <td>
+              <span :class="['badge-estado', getEstadoRodillos(prueba).clase_badge]">
+                {{ getEstadoRodillos(prueba).estado }}
+              </span>
+            </td>
+
+            <td>
+              <button
+                class="btn-primary btn-sm"
+                :disabled="getEstadoRodillos(prueba).boton_deshabilitado"
+                @click="manejarAccionPrueba(prueba)"
+              >
+                {{ getEstadoRodillos(prueba).texto_boton }}
+              </button>
+            </td>
+          </tr>
+          <tr v-if="pruebasFiltradas.length === 0">
+            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--color-text-muted);">
+              No se encontraron registros de pruebas en el servidor.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>
 
   <script setup lang="ts">
   import { ref, computed, onMounted, watch } from 'vue'
@@ -222,19 +227,68 @@ watch(ultimoSync, async () => {
     } catch (e) { return '---' }
   }
 
-  const obtenerClaseEstado = (estado: string) => {
-    switch (estado) {
-      case 'COMPLETO': return 'badge-estado completado'
-      case 'EN PROCESO': return 'badge-estado en-proceso'
-      case 'PENDIENTE': return 'badge-estado pendiente'
-      default: return 'badge-estado'
-    }
-  }
-
   const irARegistrar = (ip: any) => {
     if (!ip) return
     router.push({ name: 'RegistrarPrueba', params: { ip: String(ip) } })
   }
+
+  const manejarAccionPrueba = (prueba: any) => {
+    const estado = getEstadoRodillos(prueba)
+    if (estado.estado === 'PENDIENTE') {
+      irARegistrar(prueba.ip)
+    } else if (estado.estado === 'COMPLETADO') {
+      router.push({ name: 'RegistrarPrueba', params: { ip: String(prueba.ip) } })
+    }
+  }
+
+  function getEstadoRodillos(lote: any) {
+  // Ahora usamos la variable exacta que manda el backend
+  const ingreso = lote.fecha_ingreso;
+
+  if (!ingreso) {
+    return {
+      estado: 'PENDIENTE',
+      clase_badge: 'pendiente',
+      texto_boton: 'Iniciar Prueba',
+      boton_deshabilitado: false
+    };
+  }
+
+  const normalizarZonaHoraria = (fechaStr: string) => {
+    return (fechaStr.includes('+') || fechaStr.endsWith('Z')) ? fechaStr : fechaStr + 'Z';
+  };
+
+  const ingresoN = new Date(normalizarZonaHoraria(ingreso));
+  let salida;
+  const salidaBackend = lote.fecha_salida || lote.fecha_salida_prueba;
+
+  if (salidaBackend) {
+    salida = new Date(normalizarZonaHoraria(salidaBackend));
+  } else {
+    salida = new Date(ingresoN);
+    salida.setHours(salida.getHours() + 48); // Respaldo matemático de +48h
+  }
+
+  const ahora = new Date();
+
+  if (ahora < salida) {
+    const horasRestantes = Math.ceil((salida.getTime() - ahora.getTime()) / (1000 * 60 * 60));
+    return {
+      estado: 'EN PROCESO',
+      clase_badge: 'en-proceso',
+      texto_boton: `Rodando... (${horasRestantes}h rest.)`,
+      boton_deshabilitado: true
+    };
+  }
+
+  return {
+    estado: 'COMPLETADO',
+    clase_badge: 'completado',
+    texto_boton: 'Registrar Fin / Ver',
+    boton_deshabilitado: false
+  };
+}
+
   </script>
 
   <style scoped>

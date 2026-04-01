@@ -78,7 +78,7 @@
   </template>
 
   <script setup lang="ts">
-  import { ref, computed } from 'vue'
+  import { ref, computed, onMounted } from 'vue'
   import { useRouter, useRoute } from 'vue-router'
   import { useUiStore } from '@/stores/ui'
   import { useSync } from '@/composables/useSync'
@@ -107,7 +107,42 @@
     gasto_agno3: null as number | null,
   })
 
+  const cargandoDatos = ref(false)
   const guardando = ref(false)
+
+  onMounted(async () => {
+    cargandoDatos.value = true
+    try {
+      // 1. Preguntamos al servidor si ya hay datos
+      const datosGuardados = await pruebasApi.obtenerDetallePrueba(ipActual)
+
+      // 2. Si existen datos, prellenamos el formulario
+      if (datosGuardados) {
+        // Extraemos solo lo que nos importa
+        form.value = {
+          // Asegúrate de formatear la fecha correctamente para tu input type="datetime-local" si lo usas
+          malla_porcentaje: datosGuardados.malla_porcentaje,
+          porcentaje_nacn: datosGuardados.porcentaje_nacn,
+          ph_inicial: datosGuardados.ph_inicial,
+          ph_final: datosGuardados.ph_final,
+          adicion_nacn: datosGuardados.adicion_nacn,
+          adicion_naoh: datosGuardados.adicion_naoh,
+          gasto_agno3: datosGuardados.gasto_agno3
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando la prueba:", error)
+      // Aquí puedes disparar una notificación de error si quieres
+    } finally {
+      cargandoDatos.value = false
+    }
+  })
+
+  // Función útil de utilidad para datetime-local
+  function formatearFechaInput(fechaIso: string) {
+    // Corta los milisegundos y la Z para que los inputs HTML5 lo acepten
+    return fechaIso.slice(0, 16)
+  }
 
   const mostrarWarningMalla = computed(() => {
     if (form.value.malla_porcentaje === null || form.value.malla_porcentaje === undefined) return false
