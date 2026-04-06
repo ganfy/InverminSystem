@@ -162,7 +162,7 @@ def check_permiso(modulo: str, operacion: str):
 
         rol_codigo = current_user.rol.codigo if current_user.rol else None
 
-        # Admin tiene acceso total — no consultar la tabla
+        # Admin tiene acceso total - no consultar la tabla
         if rol_codigo == RolSistema.ADMIN:
             return current_user
 

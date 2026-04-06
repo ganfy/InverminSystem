@@ -19,7 +19,7 @@ Fuentes de datos por prioridad:
     Wheel pre-compilado con MuPDF embebido. Convierte PDFs a imágenes
     SIN necesitar poppler. Funciona en Windows/Linux/Mac con solo pip.
 
-  tesseract (motor OCR — único binario requerido):
+  tesseract (motor OCR - único binario requerido):
     Linux/servidor : apt install tesseract-ocr
     Windows dev    : instalar desde https://github.com/UB-Mannheim/tesseract/wiki
                      Luego añadir al .env:
@@ -142,7 +142,7 @@ def eliminar_documento(db: Session, sesion_id: int, doc_id: int) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  OCR — extracción de texto
+#  OCR - extracción de texto
 #
 #  PDF → imagen : pymupdf  (pip install pymupdf)
 #                 Wheel pre-compilado, incluye MuPDF. Sin poppler.
@@ -166,7 +166,7 @@ def _pdf_a_imagenes_pil(ruta: Path) -> list:
     except ImportError as e:
         raise RuntimeError(
             "Instala pymupdf: pip install pymupdf\n"
-            "(reemplaza a pdf2image+poppler — no requiere binarios externos)"
+            "(reemplaza a pdf2image+poppler - no requiere binarios externos)"
         ) from e
 
     doc = fitz.open(str(ruta))
@@ -320,7 +320,7 @@ def _normalizar_guia(serie: str, numero: str) -> str:
 def _extraer_de_ticket_invermin(texto: str) -> dict:
     """
     Extrae del ticket propio de INVERMIN PAITITI.
-    Formato muy estructurado — OCR excelente en esta página.
+    Formato muy estructurado - OCR excelente en esta página.
     Ejemplo real:
         Placa       : C9P-908  Carreta : 0
         Conductor   : [Q22094676] MENDOZA CAJAMARCA PERCY MARTIN
@@ -337,7 +337,7 @@ def _extraer_de_ticket_invermin(texto: str) -> dict:
 
     # Carreta: "Carreta : 7" (ignorar 0 o guion = sin carreta)
     m = re.search(r"[Cc]arreta\s*:\s*(\S+)", texto)
-    if m and m.group(1) not in ("0", "-", "—"):
+    if m and m.group(1) not in ("0", "-", "-"):
         r["carreta"] = m.group(1).strip()
 
     # Conductor: "Conductor : [Q22094676] MENDOZA CAJAMARCA PERCY MARTIN"
@@ -454,7 +454,7 @@ def _extraer_de_grr(texto: str) -> dict:
 
 def _extraer_de_grt(texto: str) -> dict:
     """
-    GRT (Guía de Remisión Transportista) — escaneada, OCR variable.
+    GRT (Guía de Remisión Transportista) - escaneada, OCR variable.
     Extrae guia_transporte y confirma placa/conductor como fallback.
 
     Ejemplo real: "0002  N° 0004072"
@@ -482,7 +482,7 @@ def _extraer_de_grt(texto: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Función principal — extracción desde rutas guardadas
+#  Función principal - extracción desde rutas guardadas
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -579,7 +579,7 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
     resultado["documentos_detectados"] = list(dict.fromkeys(t for _, t in bloques if t != "OTRO"))
 
     # ── Aplicar por prioridad ──────────────────────────────────────────────────
-    # 1. Ticket INVERMIN — fuente más confiable para todos los campos
+    # 1. Ticket INVERMIN - fuente más confiable para todos los campos
     for texto, tipo in bloques:
         if tipo != "TICKET_INVERMIN":
             continue
@@ -596,7 +596,7 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
             if datos.get(k) and not resultado[k]:
                 resultado[k] = datos[k]
 
-    # 2. GRR — complementa o rellena lo que falta
+    # 2. GRR - complementa o rellena lo que falta
     for texto, tipo in bloques:
         if tipo != "GUIA_REMISION":
             continue
@@ -612,7 +612,7 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
             if datos.get(k) and not resultado[k]:
                 resultado[k] = datos[k]
 
-    # 3. GRT — solo guia_transporte y placa como último recurso
+    # 3. GRT - solo guia_transporte y placa como último recurso
     for texto, tipo in bloques:
         if tipo != "GUIA_TRANSPORTE":
             continue

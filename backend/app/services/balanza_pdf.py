@@ -1,7 +1,7 @@
 """
-Service — Generación de Ticket PDF (RF-BAL-003)
+Service - Generación de Ticket PDF (RF-BAL-003)
 
-Motor: xhtml2pdf (pisa) — puro Python, sin dependencias nativas.
+Motor: xhtml2pdf (pisa) - puro Python, sin dependencias nativas.
 Instalar: pip install xhtml2pdf
 
 Funciones públicas:
@@ -45,7 +45,7 @@ def _get_config(db: Session) -> dict[str, str]:
 
 
 # =============================================================================
-# DTO interno — campos 1:1 con el ticket físico
+# DTO interno - campos 1:1 con el ticket físico
 # =============================================================================
 
 
@@ -85,7 +85,7 @@ def _fecha_fmt(dt: datetime | None) -> str:
 
 
 def _val(valor: str | None, fallback: str = "-") -> str:
-    """Devuelve valor limpio o fallback — evita que queden {{ }} en el HTML."""
+    """Devuelve valor limpio o fallback - evita que queden {{ }} en el HTML."""
     if valor is None:
         return fallback
     v = valor.strip()
@@ -251,7 +251,7 @@ def _cargar_lote(db: Session, sesion_id: int, lote_id: int) -> Lote:
     lote = (
         db.query(Lote)
         .options(*_eager_opts())
-        .filter(Lote.id == lote_id, Lote.sesion_id == sesion_id, Lote.eliminado.is_(False))
+        .filter(Lote.id == lote_id, Lote.sesion_id == sesion_id, Lote.eliminado == 0)
         .first()
     )
     if not lote:
@@ -263,7 +263,7 @@ def _cargar_lotes_sesion(db: Session, sesion_id: int) -> list[Lote]:
     lotes = (
         db.query(Lote)
         .options(*_eager_opts())
-        .filter(Lote.sesion_id == sesion_id, Lote.eliminado.is_(False))
+        .filter(Lote.sesion_id == sesion_id, Lote.eliminado == 0)
         .order_by(Lote.numero_lote)
         .all()
     )

@@ -1,5 +1,5 @@
 """
-Router — Módulo Balanza
+Router - Módulo Balanza
 Endpoints para sesiones de descarga, lotes, y tickets PDF.
 
 Permisos (RBAC del documento):
@@ -130,7 +130,7 @@ def editar_sesion(
 ):
     """
     Edita la cabecera de una sesión: proveedor/acopiador y datos de transporte.
-    PATCH parcial — solo se actualizan los campos enviados.
+    PATCH parcial - solo se actualizan los campos enviados.
     Si provacop_id cambia, se valida que la relación exista.
     """
     try:
@@ -279,7 +279,7 @@ async def extraer_datos_preview(
     archivos: list[UploadFile] = File(...),
     current_user=Depends(check_permiso("BALANZA", "READ")),
 ):
-    """Extrae datos de archivos sin sesión — para pre-llenar el form de registro."""
+    """Extrae datos de archivos sin sesión - para pre-llenar el form de registro."""
     try:
         return doc_svc.extraer_datos_archivos_directos(archivos)
     except ValueError as e:
@@ -356,7 +356,7 @@ def eliminar_documento(
     db: Session = Depends(get_db),
 ):
     """
-    Elimina un documento adjunto (solo Admin y Gerencia — RBAC).
+    Elimina un documento adjunto (solo Admin y Gerencia - RBAC).
     Borra el archivo de disco y el registro de BD.
     """
     try:
@@ -458,7 +458,7 @@ def preview_ticket(
 ):
     """
     Devuelve el HTML del ticket para visualizar en el navegador.
-    El cliente abre esta URL en una nueva pestaña — el usuario ve el ticket
+    El cliente abre esta URL en una nueva pestaña - el usuario ve el ticket
     y puede imprimirlo con Ctrl+P o guardarlo desde el navegador.
     No genera ni almacena ningún archivo en el servidor.
     """
@@ -470,7 +470,7 @@ def preview_ticket(
 
 
 # =============================================================================
-# MODO OFFLINE — ENDPOINTS AUXILIARES PARA FRONTEND
+# MODO OFFLINE - ENDPOINTS AUXILIARES PARA FRONTEND
 # =============================================================================
 
 # ── RF-BAL-005: Reserva de bloque IP ──────────────────────

@@ -17,8 +17,8 @@ export interface ProvAcopDropdown {
 }
 
 export interface PesajeCrear {
-  peso_inicial: number   // BRUTO — camión cargado (primer pesaje)
-  peso_final: number     // TARA  — camión vacío   (segundo pesaje tras descarga)
+  peso_inicial: number   // BRUTO - camión cargado (primer pesaje)
+  peso_final: number     // TARA  - camión vacío   (segundo pesaje tras descarga)
   sacos?: number | null
   granel?: boolean
   fecha_inicio?: string | null
@@ -224,7 +224,7 @@ export const balanzaApi = {
     return api.delete(`/balanza/${sesionId}/lotes/${loteId}`, { data: datos }).then(() => undefined)
   },
 
-  // Ticket PDF — retorna Blob para descarga con auth
+  // Ticket PDF - retorna Blob para descarga con auth
   async ticketBlob(sesionId: number, loteId: number): Promise<Blob> {
     const r = await api.get(`/balanza/${sesionId}/lotes/${loteId}/ticket`, {
       responseType: 'blob',

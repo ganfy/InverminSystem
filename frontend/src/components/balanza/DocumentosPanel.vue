@@ -151,7 +151,7 @@
           <div v-for="campo in camposVisibles" :key="campo.key" class="campo-item">
             <label class="campo-label">{{ campo.label }}</label>
             <div class="campo-valor" :class="{ 'no-encontrado': !campo.valor }">
-              {{ campo.valor || '—' }}
+              {{ campo.valor || '-' }}
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@
           <span>
             Peso declarado en documentos:
             <strong>{{ datosExtraidos.peso_declarado_tm }} TM</strong>
-            <em class="peso-hint"> (referencia — el peso válido es el del ticket de balanza)</em>
+            <em class="peso-hint"> (referencia - el peso válido es el del ticket de balanza)</em>
           </span>
         </div>
 
@@ -206,7 +206,7 @@
 
   const emit = defineEmits<{
     /**
-     * Datos extraídos — pre-llena el formulario del padre inmediatamente.
+     * Datos extraídos - pre-llena el formulario del padre inmediatamente.
      * Se emite automáticamente al terminar la extracción.
      */
     (e: 'aplicar', datos: Partial<Record<string, string | null>>): void
@@ -415,7 +415,7 @@
       datosExtraidos.value = resultado
 
       // ── Auto-aplicar al formulario del padre ────────────────────────────────
-      // No hace falta un botón "Aplicar" separado — se pre-llena inmediatamente
+      // No hace falta un botón "Aplicar" separado - se pre-llena inmediatamente
       // y el usuario lo revisa/edita en el propio formulario.
       const campos: Partial<Record<string, string | null>> = {}
       if (resultado.placa)           campos.placa           = resultado.placa
@@ -429,7 +429,7 @@
       emit('aplicar', campos)
 
       const n = Object.keys(campos).length
-      ui.toast(`${n} campo(s) pre-llenados — revisa y edita si es necesario`)
+      ui.toast(`${n} campo(s) pre-llenados - revisa y edita si es necesario`)
 
     } catch (err: any) {
       ui.toast(err?.response?.data?.detail ?? 'No se pudo extraer datos de los documentos')

@@ -117,7 +117,7 @@ def refresh(
     if not user:
         raise invalid_exc
 
-    # Revocar el refresh token usado — evita reutilización
+    # Revocar el refresh token usado - evita reutilización
     expires_at = datetime.fromtimestamp(payload["exp"], tz=UTC)
     revoke_token(jti, expires_at, db)
 

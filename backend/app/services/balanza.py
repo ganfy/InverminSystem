@@ -1,5 +1,5 @@
 """
-Service — Módulo Balanza
+Service - Módulo Balanza
 CRUD de sesiones de descarga, lotes y consulta de relaciones proveedor-acopiador.
 
 Para la generación de tickets PDF ver: app/services/balanza_pdf.py
@@ -148,7 +148,7 @@ def _cargar_sesion(db: Session, sesion_id: int) -> SesionDescarga:
 
 # =============================================================================
 # IP SECUENCIAL  (RF-BAL-002)
-# Formato: IP-XXXX — contador global, reinicia cada año calendario.
+# Formato: IP-XXXX - contador global, reinicia cada año calendario.
 # =============================================================================
 
 
@@ -598,7 +598,7 @@ def listar_provacop_activos(
         db.query(ProveedorAcopiador, proveedor_alias, acopiador_alias)
         .join(proveedor_alias, ProveedorAcopiador.proveedor_id == proveedor_alias.id)
         .join(acopiador_alias, ProveedorAcopiador.acopiador_id == acopiador_alias.id)
-        .filter(proveedor_alias.activo.is_(True))
+        .filter(proveedor_alias.activo == 1)
     )
 
     if busqueda:

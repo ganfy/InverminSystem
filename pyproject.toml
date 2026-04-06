@@ -49,12 +49,12 @@ select = [
 ]
 ignore = [
     "E501", # ruff format ya se encarga del ancho de línea
-    "B008",   # Depends() en defaults — patrón estándar FastAPI
+    "B008",   # Depends() en defaults - patrón estándar FastAPI
     "F403",   # star imports en __init__.py de modelos
     "F405",   # nombres de star imports
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "backend/alembic/*" = ["F401"]
-"backend/alembic/env.py" = ["E402"]   # imports después de os.environ — necesario en alembic
+"backend/alembic/env.py" = ["E402"]   # imports después de os.environ - necesario en alembic
 "backend/app/models/base.py" = ["N805"]   # declared_attr usa cls, no self

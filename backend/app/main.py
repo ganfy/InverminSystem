@@ -1,5 +1,5 @@
 """
-INVERMIN PAITITI S.A.C. — Sistema Comercial Minero
+INVERMIN PAITITI S.A.C. - Sistema Comercial Minero
 Backend principal FastAPI.
 """
 

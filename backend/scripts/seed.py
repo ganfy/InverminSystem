@@ -59,7 +59,7 @@ OPERACIONES = [
 ]
 
 # Matriz de permisos: (rol, modulo, operacion) → permitido
-# Basado en RF-SYS-001 — Matriz de Permisos por Módulo
+# Basado en RF-SYS-001 - Matriz de Permisos por Módulo
 # True = permitido, False = denegado
 # (VIEW también incluye solo-lectura)
 PERMISOS = [

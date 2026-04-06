@@ -572,7 +572,7 @@ class AnalisisLey(AuditMixin, Base):
     lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
     laboratorio = Column(String(50), nullable=False)
-    tipo_analisis = Column(String(20), nullable=False)  # sin default — siempre explícito
+    tipo_analisis = Column(String(20), nullable=False)  # sin default - siempre explícito
     material = Column(String(10), default="Au")
     ley_fino = Column(Numeric(10, 4))
     ley_grueso = Column(Numeric(10, 4))

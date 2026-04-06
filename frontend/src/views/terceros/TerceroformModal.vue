@@ -69,7 +69,7 @@
                 </div>
                 <span v-if="errores.ruc" class="field-error">{{ errores.ruc }}</span>
                 <span v-if="proveedorEncontrado" class="field-hint" style="color:var(--color-success)">
-                    Proveedor existente — datos pre-cargados. Se creará una nueva relación comercial.
+                    Proveedor existente - datos pre-cargados. Se creará una nueva relación comercial.
                 </span>
                 <span v-if="editando" class="field-hint">No modificable</span>
                 </div>
@@ -114,7 +114,7 @@
               <div v-if="editando" class="acopiador-readonly">
                 <p class="acopiador-readonly-label">ACOPIADOR ASIGNADO</p>
                 <p class="acopiador-readonly-nombre">
-                  {{ terceroOriginal?.acopiador?.razon_social ?? '—' }}
+                  {{ terceroOriginal?.acopiador?.razon_social ?? '-' }}
                   <span v-if="terceroOriginal?.acopiador?.es_propio" class="badge-propio">PROPIO</span>
                 </p>
                 <p class="acopiador-readonly-hint">El acopiador no puede modificarse una vez asignado.</p>
@@ -137,7 +137,7 @@
                     </button>
                 </div>
 
-                <!-- Dropdown — solo si eligió Con Acopiador -->
+                <!-- Dropdown - solo si eligió Con Acopiador -->
                 <template v-if="form.tipo_acopiador !== 'sin_acopiador'">
                     <div class="field" style="margin-top:1.25rem">
                     <label class="field-label">Acopiador *</label>
@@ -147,7 +147,7 @@
                         :class="{ error: errores.acopiador_id }"
                         @change="onAcopiadorChange"
                     >
-                        <option :value="null" disabled>— Seleccione un acopiador —</option>
+                        <option :value="null" disabled>- Seleccione un acopiador -</option>
                         <option v-for="a in store.acopiadores" :key="a.id" :value="a.id">
                         {{ a.razon_social }} {{ a.ruc ? `(${a.ruc})` : '' }}
                         </option>
@@ -205,7 +205,7 @@
 
               <div v-if="soloLecturaParams" class="params-readonly-notice">
                 <span class="params-icon">👁</span>
-                <span>Solo lectura — Tu rol no permite editar parámetros comerciales.</span>
+                <span>Solo lectura - Tu rol no permite editar parámetros comerciales.</span>
               </div>
 
               <div class="params-grupo">
@@ -213,28 +213,28 @@
                 <div class="form-grid">
                   <div class="field">
                     <label class="field-label">Umbral Recup. Bajo (%)</label>
-                    <input v-model.number="form.params.umbral_recup_bajo" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.umbral_recup_bajo" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.umbral_recup_bajo" class="field-error">
                         {{ errores.umbral_recup_bajo }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Umbral Recup. Medio (%)</label>
-                    <input v-model.number="form.params.umbral_recup_medio" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.umbral_recup_medio" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.umbral_recup_medio" class="field-error">
                         {{ errores.umbral_recup_medio }}
                     </span>
                 </div>
                   <div class="field">
                     <label class="field-label">Ley Inferior</label>
-                    <input v-model.number="form.params.lim_ley_inferior" type="number" step="0.001" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.lim_ley_inferior" type="number" step="0.001" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.lim_ley_inferior" class="field-error">
                         {{ errores.lim_ley_inferior }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Ley Superior</label>
-                    <input v-model.number="form.params.lim_ley_superior" type="number" step="0.001" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.lim_ley_superior" type="number" step="0.001" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.lim_ley_superior" class="field-error">
                         {{ errores.lim_ley_superior }}
                     </span>
@@ -247,35 +247,35 @@
                 <div class="form-grid">
                   <div class="field">
                     <label class="field-label">Gasto Acopio (US$/TM)</label>
-                    <input v-model.number="form.params.gasto_acopio" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.gasto_acopio" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.gasto_acopio" class="field-error">
                         {{ errores.gasto_acopio }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Gasto Consumo</label>
-                    <input v-model.number="form.params.gasto_consumo" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.gasto_consumo" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.gasto_consumo" class="field-error">
                         {{ errores.gasto_consumo }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Maquila (%)</label>
-                    <input v-model.number="form.params.maquila" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.maquila" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.maquila" class="field-error">
                         {{ errores.maquila }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Comisión (%)</label>
-                    <input v-model.number="form.params.comision" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.comision" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.comision" class="field-error">
                         {{ errores.comision }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Riesgo Comercial</label>
-                    <input v-model.number="form.params.riesgo_comercial" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.riesgo_comercial" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.riesgo_comercial" class="field-error">
                         {{ errores.riesgo_comercial }}
                     </span>
@@ -288,21 +288,21 @@
                 <div class="form-grid">
                   <div class="field">
                     <label class="field-label">Límite Ley Comercial</label>
-                    <input v-model.number="form.params.lim_ley_comercial" type="number" step="0.001" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.lim_ley_comercial" type="number" step="0.001" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.lim_ley_comercial" class="field-error">
                         {{ errores.lim_ley_comercial }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">Descuento Ley Comercial</label>
-                    <input v-model.number="form.params.dscto_ley_comercial" type="number" step="0.001" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.dscto_ley_comercial" type="number" step="0.001" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.dscto_ley_comercial" class="field-error">
                         {{ errores.dscto_ley_comercial }}
                     </span>
                   </div>
                   <div class="field">
                     <label class="field-label">% Ley Comercial</label>
-                    <input v-model.number="form.params.porcentaje_ley_comercial" type="number" step="0.01" class="field-input" placeholder="—" :disabled="soloLecturaParams" />
+                    <input v-model.number="form.params.porcentaje_ley_comercial" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.porcentaje_ley_comercial" class="field-error">
                         {{ errores.porcentaje_ley_comercial }}
                     </span>
@@ -447,7 +447,7 @@ const errores        = ref<Record<string, string>>({})
 
 // ── Watchers ─────────────────────────────────────────────────────────────────
 
-// Debounce — busca cuando el RUC tiene 11 dígitos
+// Debounce - busca cuando el RUC tiene 11 dígitos
 watch(() => form.value.ruc, async (ruc) => {
   if (editando.value) return
   proveedorEncontrado.value = false
@@ -482,7 +482,7 @@ watch(() => props.visible, async (v) => {
   await store.cargarAcopiadores()
 
   if (props.terceroId !== null) {
-    // Modo edición — cargar datos del tercero
+    // Modo edición - cargar datos del tercero
     try {
       const t = await store.obtener(props.terceroId)
       terceroOriginal.value = t
@@ -501,7 +501,7 @@ watch(() => props.visible, async (v) => {
       cerrar()
     }
   } else {
-    // Modo crear — resetear
+    // Modo crear - resetear
     terceroOriginal.value = null
     form.value = {
       razon_social: '', ruc: '', referencia: '',

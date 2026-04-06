@@ -32,7 +32,7 @@ export interface IPBlock {
 }
 
 export interface TKBlock {
-    id: 'tk'          // clave fija — un solo registro
+    id: 'tk'          // clave fija - un solo registro
     desde: number
     hasta: number
     usado: number
@@ -89,7 +89,7 @@ export interface SesionOfflineData {
 }
 
 export interface LoteOnlineData {
-    offline_id: string        // UUID local — clave de idempotencia
+    offline_id: string        // UUID local - clave de idempotencia
     sesion_id: number         // ID real en servidor
     tipo_material: string
     ip: string
@@ -170,7 +170,7 @@ async function openDB(): Promise<IDBDatabase> {
             }
 
             if (oldVersion < 2) {
-                // bloque de tickets — un único registro con keyPath 'id' = 'tk'
+                // bloque de tickets - un único registro con keyPath 'id' = 'tk'
                 db.createObjectStore('tk_block', { keyPath: 'id' })
             }
 

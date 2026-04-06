@@ -6,7 +6,7 @@
           <button class="btn-cerrar" @click="$emit('close')"><X :size="18" /></button>
         </div>
         <div class="modal-body">
-          <p class="elim-aviso">Acción irreversible — queda registrado en auditoría.</p>
+          <p class="elim-aviso">Acción irreversible - queda registrado en auditoría.</p>
           <p v-if="modalData.error" class="error-msg">{{ modalData.error }}</p>
         </div>
         <div class="modal-footer">

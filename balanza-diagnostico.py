@@ -1,6 +1,6 @@
 """
 =============================================================
-  INVERMIN PAITITI S.A.C. — Diagnóstico de Balanza
+  INVERMIN PAITITI S.A.C. - Diagnóstico de Balanza
   Ejecutar: python balanza_diagnostico.py
   Requisito: pip install pyserial
 =============================================================
@@ -109,7 +109,7 @@ def probar_puerto(puerto, config):
 
 
 def diagnosticar():
-    separador("DIAGNÓSTICO DE BALANZA — INVERMIN PAITITI")
+    separador("DIAGNÓSTICO DE BALANZA - INVERMIN PAITITI")
     print(f"  Fecha   : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  Sistema : {sys.platform}")
     print(f"  Python  : {sys.version.split()[0]}")
@@ -179,7 +179,7 @@ def diagnosticar():
                     {
                         "config": cfg_str,
                         "exito": False,
-                        "error": "Timeout — sin datos",
+                        "error": "Timeout - sin datos",
                     }
                 )
 

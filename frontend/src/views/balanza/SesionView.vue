@@ -5,12 +5,12 @@
       <div class="header-info">
         <div class="header-campo">
           <span class="header-label">PROVEEDOR:</span>
-          <span class="header-valor">{{ sesion?.proveedor_razon_social ?? '—' }}</span>
+          <span class="header-valor">{{ sesion?.proveedor_razon_social ?? '-' }}</span>
         </div>
         <div class="header-campo">
           <span class="header-label">ACOPIADOR:</span>
           <span class="header-valor">
-            {{ sesion?.es_propio ? '(auto-acopio)' : (sesion?.acopiador_razon_social ?? '—') }}
+            {{ sesion?.es_propio ? '(auto-acopio)' : (sesion?.acopiador_razon_social ?? '-') }}
           </span>
         </div>
         <div class="header-campo">
@@ -20,12 +20,12 @@
             class="field-input header-select"
             v-model="tipoMaterial"
           >
-            <option value="">— seleccionar —</option>
+            <option value="">- seleccionar -</option>
             <option value="Mineral">Mineral</option>
             <option value="Llampo">Llampo</option>
             <option value="M.Llampo">M.Llampo</option>
           </select>
-          <span v-else class="header-valor">{{ tipoMaterial || '—' }}</span>
+          <span v-else class="header-valor">{{ tipoMaterial || '-' }}</span>
         </div>
         <div v-if="sesion?.estado === 'EN_PROCESO'" class="header-campo">
           <span class="header-label">N° SACOS:</span>
@@ -67,7 +67,7 @@
     <div v-if="esOffline" class="aviso-offline">
       <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
       <div class="aviso-texto">
-        <strong>Modo sin conexión</strong> — Los documentos adjuntos en el formulario
+        <strong>Modo sin conexión</strong> - Los documentos adjuntos en el formulario
         anterior <em>no se pudieron subir</em>. Estarán disponibles para agregar
         manualmente al sincronizar esta sesión.
         Editar sesión, pausar y ticket PDF no están disponibles hasta sincronizar.
@@ -79,7 +79,7 @@
       <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
       <div class="aviso-texto">
         <strong>{{ store.lotesHybridPendientes }} lote(s) sin sincronizar</strong>
-        — Finalizar no estará disponible hasta reconectar y sincronizar.
+        - Finalizar no estará disponible hasta reconectar y sincronizar.
       </div>
     </div>
 
@@ -101,37 +101,37 @@
           <div class="transp-grid">
             <div class="transp-fila">
               <span class="transp-label">PLACA:</span>
-              <span class="transp-val">{{ sesion?.placa ?? '—' }}</span>
+              <span class="transp-val">{{ sesion?.placa ?? '-' }}</span>
             </div>
             <div class="transp-fila">
               <span class="transp-label">CARRETA:</span>
-              <span class="transp-val">{{ sesion?.carreta || '—' }}</span>
+              <span class="transp-val">{{ sesion?.carreta || '-' }}</span>
             </div>
             <div class="transp-fila transp-full">
               <span class="transp-label">CONDUCTOR:</span>
-              <span class="transp-val">{{ sesion?.conductor || '—' }}</span>
+              <span class="transp-val">{{ sesion?.conductor || '-' }}</span>
             </div>
             <div class="transp-fila transp-full">
               <span class="transp-label">TRANSPORTISTA:</span>
-              <span class="transp-val">{{ sesion?.transportista || '—' }}</span>
+              <span class="transp-val">{{ sesion?.transportista || '-' }}</span>
             </div>
             <div class="transp-fila transp-full">
               <span class="transp-label">RAZÓN SOCIAL:</span>
-              <span class="transp-val">{{ sesion?.razon_social || '—' }}</span>
+              <span class="transp-val">{{ sesion?.razon_social || '-' }}</span>
             </div>
             <div class="transp-fila">
               <span class="transp-label">G. REM:</span>
-              <span class="transp-val td-mono">{{ sesion?.guia_remision || '—' }}</span>
+              <span class="transp-val td-mono">{{ sesion?.guia_remision || '-' }}</span>
             </div>
             <div class="transp-fila">
               <span class="transp-label">G. TRANSP:</span>
-              <span class="transp-val td-mono">{{ sesion?.guia_transporte || '—' }}</span>
+              <span class="transp-val td-mono">{{ sesion?.guia_transporte || '-' }}</span>
             </div>
           </div>
         </div>
         <!-- Pesaje activo (solo EN_PROCESO) -->
         <div v-if="sesion?.estado === 'EN_PROCESO'" class="card card-pesaje">
-          <div class="card-titulo">PESAJE — NUEVO LOTE</div>
+          <div class="card-titulo">PESAJE - NUEVO LOTE</div>
           <BalanzaIndicator
             :peso-display="pesoDisplay"
             :unidad="unidad"
@@ -183,9 +183,9 @@
           </div>
           <p v-if="pesoError" class="error-msg" style="margin:.25rem 0">{{ pesoError }}</p>
           <div class="pesaje-resumen">
-            <span>BRUTO: <strong>{{ loteForm.peso_inicial ? loteForm.peso_inicial.toFixed(3) + ' ' + unidadBalanza : '—' }}</strong></span>
-            <span>TARA: <strong>{{ loteForm.peso_final ? loteForm.peso_final.toFixed(3) + ' ' + unidadBalanza : '—' }}</strong></span>
-            <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? pesoNeto.toFixed(3) + ' ' + unidadBalanza : '—' }}</strong></span>
+            <span>BRUTO: <strong>{{ loteForm.peso_inicial ? loteForm.peso_inicial.toFixed(3) + ' ' + unidadBalanza : '-' }}</strong></span>
+            <span>TARA: <strong>{{ loteForm.peso_final ? loteForm.peso_final.toFixed(3) + ' ' + unidadBalanza : '-' }}</strong></span>
+            <span class="neto-resumen">NETO: <strong>{{ pesoNeto > 0 ? pesoNeto.toFixed(3) + ' ' + unidadBalanza : '-' }}</strong></span>
           </div>
 
           <div v-if="requiereJustificacion" class="field" style="margin-bottom: 1rem; text-align: left;">
@@ -392,7 +392,7 @@ watch(peso, (nuevoPeso) => {
   }
 })
 
-// ── Tipo material — global para todos los lotes ────────────
+// ── Tipo material - global para todos los lotes ────────────
 const tipoMaterial = ref('')
 
 // ── Sacos / Granel ─────────────────────────────────────────

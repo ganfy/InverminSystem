@@ -268,7 +268,7 @@ function aplicarDatosExtraidos(datos: Partial<Record<string, string | null>>) {
   const rucExtraido = datos.ruc_proveedor?.trim()
   const rsExtraida  = datos.razon_social?.trim().toLowerCase()
 
-  // Buscar primero por RUC (coincidencia exacta — más fiable)
+  // Buscar primero por RUC (coincidencia exacta - más fiable)
   let coincidencia = rucExtraido
     ? provsUnicos.value.find(p => p.proveedor_ruc === rucExtraido)
     : undefined

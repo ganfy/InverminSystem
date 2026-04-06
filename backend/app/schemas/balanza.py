@@ -1,5 +1,5 @@
 """
-Schemas Pydantic — Módulo Balanza
+Schemas Pydantic - Módulo Balanza
 Cubre: SesionDescarga, Lote, Pesaje, LoteEliminado (auditoría).
 """
 
@@ -26,8 +26,8 @@ ESTADOS_LOTE_ELIMINABLES = ("RECEPCIONADO", "LIQUIDADO", "FACTURADO")
 class PesajeCrear(BaseModel):
     """Datos de pesaje enviados al crear un lote."""
 
-    peso_inicial: Decimal  # TM — BRUTO (camión cargado, primer pesaje)
-    peso_final: Decimal  # TM — TARA  (camión vacío, segundo pesaje tras descarga)
+    peso_inicial: Decimal  # TM - BRUTO (camión cargado, primer pesaje)
+    peso_final: Decimal  # TM - TARA  (camión vacío, segundo pesaje tras descarga)
     sacos: int | None = None
     granel: bool = False
     fecha_inicio: datetime | None = None  # si no viene, el servicio usa now()
@@ -100,7 +100,7 @@ class LoteEditar(BaseModel):
     """
 
     tipo_material: str | None = None
-    peso_inicial: Decimal | None = None  # BRUTO — si se envía, validar con peso_final
+    peso_inicial: Decimal | None = None  # BRUTO - si se envía, validar con peso_final
     peso_final: Decimal | None = None  # TARA
     sacos: int | None = None
     granel: bool | None = None
@@ -139,7 +139,7 @@ class LoteResumen(BaseModel):
 
 
 class LoteDetalle(LoteResumen):
-    """Lote completo con datos de pesaje — para vista de sesión."""
+    """Lote completo con datos de pesaje - para vista de sesión."""
 
     pesaje: PesajeRespuesta | None = None
     habilitado_ruma: bool

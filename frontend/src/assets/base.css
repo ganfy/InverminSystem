@@ -311,7 +311,7 @@ font-size: var(--text-sm);
 }
 
 /* ─── PAGE CONTAINER ─────────────────────────────────────────
-   Usar en el root de cada vista. No añade padding propio —
+   Usar en el root de cada vista. No añade padding propio -
    .main-content ya tiene el padding global del layout.
 ────────────────────────────────────────────────────────────── */
 .page-container {

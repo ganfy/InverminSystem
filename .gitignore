@@ -42,3 +42,9 @@ __screenshots__/
 .env
 .env.*
 !.env.example
+
+# .exe de balanza agent
+build/
+BalanzaAgent.spec
+
+app-balanza

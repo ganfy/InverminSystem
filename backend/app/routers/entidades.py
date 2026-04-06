@@ -39,7 +39,7 @@ def crear_tercero(
 ):
     """
     Crea un proveedor con su acopiador y parámetros comerciales.
-    Todo en una sola operación — refleja la pantalla 'Registrar tercero'.
+    Todo en una sola operación - refleja la pantalla 'Registrar tercero'.
     """
     try:
         return svc.crear_tercero(db, datos, usuario_id=current_user.id)
@@ -54,7 +54,7 @@ def listar_acopiadores(
 ):
     """
     Lista acopiadores activos para poblar el dropdown en la UI.
-    Endpoint separado y liviano — no incluye parámetros.
+    Endpoint separado y liviano - no incluye parámetros.
     """
     return svc.listar_acopiadores(db)
 
@@ -81,7 +81,7 @@ def buscar_por_ruc(
 ):
     """
     Busca un proveedor por RUC para auto-completar el formulario.
-    Retorna null si no existe — no es un error.
+    Retorna null si no existe - no es un error.
     """
     return svc.buscar_por_ruc(db, ruc)
 
@@ -92,7 +92,7 @@ def obtener_tercero(
     current_user=Depends(check_permiso("TERCEROS", "VIEW")),
     db: Session = Depends(get_db),
 ):
-    """Detalle completo de un tercero — pantalla de edición."""
+    """Detalle completo de un tercero - pantalla de edición."""
     try:
         return svc.obtener_tercero(db, entidad_id)
     except ValueError as e:
@@ -135,7 +135,7 @@ def desactivar_tercero(
     current_user=Depends(check_permiso("TERCEROS", "UPDATE")),
     db: Session = Depends(get_db),
 ):
-    """Desactiva un tercero — soft delete."""
+    """Desactiva un tercero - soft delete."""
     try:
         return svc.cambiar_estado(db, entidad_id, activo=False, usuario_id=current_user.id)
     except ValueError as e:

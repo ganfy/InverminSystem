@@ -1,6 +1,6 @@
 """
 Service de gestión de terceros (proveedores/acopiadores).
-Lógica de negocio pura — sin dependencias de FastAPI.
+Lógica de negocio pura - sin dependencias de FastAPI.
 """
 
 from uuid import uuid4
@@ -266,7 +266,7 @@ def crear_tercero(
         db.flush()
     # Si ya existe: reutilizar sin modificar sus datos
 
-    # Asignar rol PROVEEDOR (idempotente — no duplica si ya lo tiene)
+    # Asignar rol PROVEEDOR (idempotente - no duplica si ya lo tiene)
     _asignar_rol(db, proveedor, RolEntidad.PROVEEDOR)
 
     # Acopiador
@@ -384,8 +384,8 @@ def listar_acopiadores(db: Session) -> list[dict]:
         .join(Rol, Rol.id == EntidadRol.rol_id)
         .filter(
             Rol.codigo == RolEntidad.ACOPIADOR,
-            EntidadRol.activo.is_(True),
-            Entidad.activo.is_(True),
+            EntidadRol.activo == 1,
+            Entidad.activo == 1,
         )
         .order_by(Entidad.razon_social)
         .all()

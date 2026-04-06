@@ -85,11 +85,11 @@
               <td class="col-nombre">
                 <span class="nombre-text">{{ t.razon_social }}</span>
               </td>
-              <td class="col-mono">{{ t.ruc ?? '—' }}</td>
-              <td class="col-ref">{{ t.referencia ?? '—' }}</td>
+              <td class="col-mono">{{ t.ruc ?? '-' }}</td>
+              <td class="col-ref">{{ t.referencia ?? '-' }}</td>
               <td class="col-acopiador">
                 <span v-if="t.acopiador" class="acopiador-tag">{{ t.acopiador }}</span>
-                <span v-else class="texto-vacio">—</span>
+                <span v-else class="texto-vacio">-</span>
               </td>
               <td>
                 <span class="badge-estado" :class="t.activo ? 'activo' : 'inactivo'">

@@ -10,7 +10,7 @@
       <!-- Lectura de peso -->
       <div class="balanza-peso-wrapper">
         <span class="balanza-peso" :class="{ 'balanza-peso--inestable': !estable && conectado }">
-          {{ wsConectado && conectado ? pesoDisplay : '—' }}
+          {{ wsConectado && conectado ? pesoDisplay : '-' }}
         </span>
         <span class="balanza-unidad">{{ unidad }}</span>
       </div>
@@ -23,7 +23,7 @@
 
       <!-- Error detalle -->
       <p v-if="error && !wsConectado" class="balanza-error-msg">
-        Agente no disponible — verificar que script esté corriendo
+        Agente no disponible - verificar que script esté corriendo
       </p>
       <p v-else-if="error" class="balanza-error-msg">
         {{ error }}

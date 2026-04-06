@@ -64,7 +64,7 @@
     if (props.sincronizando) return 'Sincronizando…'
     if (!props.online) {
       if (props.mostrarIps) {
-        if (props.ipsRestantes === 0)  return 'Sin IPs — reconectar'
+        if (props.ipsRestantes === 0)  return 'Sin IPs - reconectar'
         if (props.ipsRestantes <= 10)  return `Solo ${props.ipsRestantes} IPs disp.`
         return `Offline · ${props.ipsRestantes} IPs disp.`
       }

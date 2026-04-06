@@ -1,6 +1,6 @@
 """
 =============================================================
-  INVERMIN PAITITI S.A.C. — Agente Local de Balanza
+  INVERMIN PAITITI S.A.C. - Agente Local de Balanza
   Versión: 1.0
 
   Instalación (una sola vez):
@@ -313,7 +313,7 @@ async def procesar_comando(ws, cmd: dict):
 
 async def main():
     log.info("=" * 55)
-    log.info("  INVERMIN PAITITI — Agente Balanza v1.0")
+    log.info("  INVERMIN PAITITI - Agente Balanza v1.0")
     log.info(f"  Puerto : {COM_PORT} @ {BAUD_RATE} baud")
     log.info(f"  WS     : ws://{WS_HOST}:{WS_PORT}")
     log.info(f"  Decimales configurados: {DECIMAL_PLACES}")

@@ -1,6 +1,6 @@
 """
 Service de gestión de usuarios.
-Lógica de negocio pura — sin dependencias de FastAPI.
+Lógica de negocio pura - sin dependencias de FastAPI.
 Errores como ValueError para que el router los convierta a HTTPException.
 """
 
@@ -124,7 +124,7 @@ def resetear_password(
     modificado_por: int,
 ) -> None:
     """
-    Reset de password por Admin — no requiere password actual.
+    Reset de password por Admin - no requiere password actual.
     """
     usuario = obtener_usuario(db, usuario_id)
     usuario.password_hash = hash_password(password_nuevo)

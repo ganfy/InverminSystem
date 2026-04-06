@@ -1,5 +1,5 @@
 """
-Schemas de usuarios — gestión administrativa.
+Schemas de usuarios - gestión administrativa.
 Solo accesible por Admin (RF-SYS-001 módulo ADMINISTRACIÓN).
 """
 

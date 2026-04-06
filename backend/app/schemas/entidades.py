@@ -24,7 +24,7 @@ class TipoAcopiador(str, Enum):
 class ParametrosSchema(BaseModel):
     """
     Parámetros comerciales por relación proveedor-acopiador.
-    Todos opcionales en edición — solo se actualizan los que vienen.
+    Todos opcionales en edición - solo se actualizan los que vienen.
     """
 
     # Umbrales de recuperación
@@ -72,7 +72,7 @@ class AcopiadorResumen(BaseModel):
 
 
 class TerceroRespuesta(BaseModel):
-    """Detalle completo de un tercero — pantalla de edición."""
+    """Detalle completo de un tercero - pantalla de edición."""
 
     id: int
     razon_social: str

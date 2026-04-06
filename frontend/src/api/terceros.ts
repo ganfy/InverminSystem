@@ -1,5 +1,5 @@
 /**
- * API service — Módulo Terceros (Proveedores/Acopiadores)
+ * API service - Módulo Terceros (Proveedores/Acopiadores)
  * Refleja los endpoints de backend/app/routers/entidades.py
  */
 

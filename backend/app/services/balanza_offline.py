@@ -4,8 +4,8 @@ app/services/balanza_offline.py
 Lógica offline para el módulo Balanza (RF-BAL-005).
 
 Dos responsabilidades:
-  1. reservar_bloque_ip()  — reserva un rango de IPs para uso offline.
-  2. sincronizar_batch()   — recibe sesiones+lotes creados offline y los persiste.
+  1. reservar_bloque_ip()  - reserva un rango de IPs para uso offline.
+  2. sincronizar_batch()   - recibe sesiones+lotes creados offline y los persiste.
 
 La tabla `configuracion` ya existe con claves:
   - proximo_ip          → siguiente número IP disponible (int como string)
@@ -71,7 +71,7 @@ def reservar_bloque_ip(db: Session) -> BloqueIPRespuesta:
     tamano = int(_get_config(db, "tamano_bloque_ip", "50"))
     hasta = desde + tamano - 1
 
-    # Actualizar contador global — siguiente bloque comenzará en hasta+1
+    # Actualizar contador global - siguiente bloque comenzará en hasta+1
     _set_config(db, "proximo_ip", str(hasta + 1))
     db.flush()
 
@@ -146,7 +146,7 @@ def sincronizar_batch(
 
     Orden de procesamiento: sesiones → lotes → pesajes.
     Si un item ya existe (IP duplicado, sesión ya synced), se marca como
-    `ya_existia=True` y se continúa — nunca se aborta el batch completo.
+    `ya_existia=True` y se continúa - nunca se aborta el batch completo.
 
     Retorna mapping temp_id → resultado para que el frontend actualice su
     IndexedDB local.

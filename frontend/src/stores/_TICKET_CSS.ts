@@ -86,7 +86,7 @@ export const _TICKET_CSS_MULTI = `
   }
 }
 
-/* ── Impresión: A4 portrait — 2 tickets por hoja ────────── */
+/* ── Impresión: A4 portrait - 2 tickets por hoja ────────── */
 @media print {
   @page { size: A4 portrait; margin: 5mm 8mm; }
   html, body { margin: 0; padding: 0; background: #fff; }

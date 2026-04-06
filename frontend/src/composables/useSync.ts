@@ -148,7 +148,7 @@ export function useSync() {
             })
             ipsRestantes.value = bloque.tamano
         } catch (err) {
-            // No propagar — si falla, seguimos con el bloque que había en IndexedDB
+            // No propagar - si falla, seguimos con el bloque que había en IndexedDB
             console.warn('[useSync] No se pudo reservar bloque IP:', err)
         }
     }
@@ -409,7 +409,7 @@ export function useSync() {
             // 5. pruebas metalúrgicas offline
             await sincronizarPruebas()
 
-            // Siempre marcar timestamp — es la señal de "sync completó" para los watchers
+            // Siempre marcar timestamp - es la señal de "sync completó" para los watchers
             ultimoSync.value = new Date().toLocaleString('es-PE')
 
             if (await bloqueAgotado()) await renovarBloqueIP()

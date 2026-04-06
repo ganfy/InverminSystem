@@ -1,5 +1,5 @@
 """
-Enumeraciones del sistema — fuente única de verdad para estados y tipos.
+Enumeraciones del sistema - fuente única de verdad para estados y tipos.
 
 Reglas:
 - Todo estado o tipo que aparezca en la BD como string tiene su enum aquí.
@@ -185,7 +185,7 @@ class MetodoPago(str, Enum):
 
 class RolSistema(str, Enum):
     """
-    Roles de usuario del sistema — controlan acceso RBAC.
+    Roles de usuario del sistema - controlan acceso RBAC.
     Separados de RolEntidad (roles comerciales de proveedores/acopiadores).
     """
 
@@ -212,7 +212,7 @@ class Operacion(str, Enum):
 
 
 # =============================================================================
-# HELPER — para generar check constraints desde enums
+# HELPER - para generar check constraints desde enums
 # =============================================================================
 
 

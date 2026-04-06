@@ -103,7 +103,6 @@ PARAMETROS_PRUEBA = [
         {
             "umbral_recup_bajo": 75.00,
             "umbral_recup_medio": 85.00,
-            "umbral_recup_alto": 92.00,
             "lim_ley_comercial": 0.500,
             "dscto_ley_comercial": 0.010,
             "porcentaje_ley_comercial": 0.950,
@@ -121,7 +120,6 @@ PARAMETROS_PRUEBA = [
         {
             "umbral_recup_bajo": 72.00,
             "umbral_recup_medio": 83.00,
-            "umbral_recup_alto": 90.00,
             "lim_ley_comercial": 0.450,
             "dscto_ley_comercial": 0.015,
             "porcentaje_ley_comercial": 0.940,
@@ -139,7 +137,6 @@ PARAMETROS_PRUEBA = [
         {  # auto-acopiador
             "umbral_recup_bajo": 80.00,
             "umbral_recup_medio": 88.00,
-            "umbral_recup_alto": 94.00,
             "lim_ley_comercial": 0.600,
             "dscto_ley_comercial": 0.008,
             "porcentaje_ley_comercial": 0.960,
@@ -277,7 +274,7 @@ def reset_dev_data(db):
     db.execute(text("TRUNCATE proveedor_acopiador CASCADE"))
     db.execute(text("TRUNCATE entidades_roles CASCADE"))
 
-    # Usuarios de prueba — solo los del seed, no admin
+    # Usuarios de prueba - solo los del seed, no admin
     usernames = [u["username"] for u in USUARIOS_PRUEBA]
     rucs = [e["ruc"] for e in ENTIDADES_PRUEBA]
 

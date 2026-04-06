@@ -1,5 +1,5 @@
 /**
- * Store Pinia — Módulo Terceros
+ * Store Pinia - Módulo Terceros
  * Gestiona estado de lista, carga y operaciones CRUD de proveedores.
  */
 
@@ -38,7 +38,7 @@ export const useTercerosStore = defineStore('terceros', () => {
     try {
       acopiadores.value = await tercerosApi.listarAcopiadores()
     } catch {
-      // silencioso — no bloquea UI
+      // silencioso - no bloquea UI
     }
   }
 

@@ -110,7 +110,7 @@ def desactivar_usuario(
     db: Session = Depends(get_db),
 ):
     """
-    Desactiva un usuario — soft delete.
+    Desactiva un usuario - soft delete.
     No se puede desactivar a uno mismo.
     Solo Admin.
     """
@@ -129,7 +129,7 @@ def resetear_password(
     db: Session = Depends(get_db),
 ):
     """
-    Reset de password por Admin — no requiere password actual.
+    Reset de password por Admin - no requiere password actual.
     Body: { "password_nuevo": "..." }
     """
     try:

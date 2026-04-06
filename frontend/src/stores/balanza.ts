@@ -114,7 +114,7 @@ function loteOnlineADetalle(lote: LoteOnlineData): LoteDetalle {
   }
 }
 
-// ── Ticket HTML — replica ticket_balanza.html del servidor ─
+// ── Ticket HTML - replica ticket_balanza.html del servidor ─
 
 function _fmtPeso(v: number | null | undefined): string {
   return v != null ? Number(v).toFixed(3) : '-'
@@ -370,10 +370,10 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
       for (const lote of deEstaSesion) {
         if (ipsServidor.has(lote.ip)) {
-          // El servidor ya lo tiene — limpiar IndexedDB
+          // El servidor ya lo tiene - limpiar IndexedDB
           await eliminarLoteOnline(lote.offline_id)
         } else {
-          // El servidor aún no lo tiene — mostrar como local_only
+          // El servidor aún no lo tiene - mostrar como local_only
           sesion.lotes.push(loteOnlineADetalle(lote))
         }
       }
@@ -525,7 +525,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
 
     sesionActual.value = sesionOptimista
-    ui.toast('Sin red — sesión guardada localmente. Se sincronizará al reconectar.', 'warning')
+    ui.toast('Sin red - sesión guardada localmente. Se sincronizará al reconectar.', 'warning')
     return sesionOptimista
   }
 
@@ -596,7 +596,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     guardando.value = true
     try {
       if (esOfflineId(sesionIdRaw)) {
-        // Sesión 100% offline — marcar en sesiones_q
+        // Sesión 100% offline - marcar en sesiones_q
         const pendientes = await obtenerSesionesPendientes()
         const sesionLocal = pendientes.find(s => s.offline_id === sesionIdRaw)
         if (!sesionLocal) { ui.toast('Sesión offline no encontrada', 'error'); return }
@@ -607,7 +607,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
         }
         ui.toast('Sesión finalizada localmente. Se sincronizará al reconectar.', 'warning')
       } else {
-        // Sesión híbrida (ID real, lotes offline) — marcar en memoria + cola
+        // Sesión híbrida (ID real, lotes offline) - marcar en memoria + cola
         const sesionId = Number(sesionIdRaw)
         await encolarFinalizacion(sesionId, {
           placa: sesionActual.value?.placa ?? '',
@@ -765,7 +765,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     const loteOptimista = loteOfflineADetalle(loteOffline)
     if (sesionActual.value) sesionActual.value.lotes.push(loteOptimista)
 
-    ui.toast(`Lote ${ip} guardado localmente — sin red.`, 'warning')
+    ui.toast(`Lote ${ip} guardado localmente - sin red.`, 'warning')
     return loteOptimista
   }
 
@@ -916,7 +916,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
     const lotes = s.lotes.filter(l => !l.eliminado)
     if (!lotes.length) { ui.toast('Sin lotes para imprimir', 'warning'); return }
     const cuerpos = lotes.map(l => `<div class="ticket">${_ticketCuerpo(l, s)}</div>`).join('\n')
-    _abrirVentana(_buildTicketHtml(_TICKET_CSS_MULTI, cuerpos, `Tickets sesión — ${lotes.length} lote(s)`, true))
+    _abrirVentana(_buildTicketHtml(_TICKET_CSS_MULTI, cuerpos, `Tickets sesión - ${lotes.length} lote(s)`, true))
   }
 
   // ── Tickets offline ────────────────────────────────────────
@@ -942,10 +942,10 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
   function previsualizarTicketOffline(lote: LoteDetalle) {
     if (!sesionActual.value) { ui.toast('No hay sesión activa', 'error'); return }
-    // Sin script de print — el usuario lo lanza con Ctrl+P o el botón del navegador
+    // Sin script de print - el usuario lo lanza con Ctrl+P o el botón del navegador
     const html = `<!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8"/>
-    <title>Preview — Ticket ${lote.ip}</title>
+    <title>Preview - Ticket ${lote.ip}</title>
     <style>${_TICKET_CSS}</style></head><body>
     ${_ticketCuerpo(lote, sesionActual.value)}
     </body></html>`
@@ -966,7 +966,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
 
     const html = `<!DOCTYPE html><html lang="es"><head>
       <meta charset="UTF-8"/>
-      <title>Tickets sesión — ${lotes.length} lote(s)</title>
+      <title>Tickets sesión - ${lotes.length} lote(s)</title>
       <style>${_TICKET_CSS}</style></head><body>
       ${cuerpos.join('\n')}
       <script>

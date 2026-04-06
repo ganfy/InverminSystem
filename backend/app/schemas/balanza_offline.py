@@ -15,7 +15,7 @@ class BloqueIPRespuesta(BaseModel):
     desde: int  # primer número disponible
     hasta: int  # último número del bloque
     tamano: int  # cantidad de IPs reservados
-    formato: str  # "IP-{n:04d}" — el frontend aplica este patrón
+    formato: str  # "IP-{n:04d}" - el frontend aplica este patrón
     anio: int  # año calendario en curso
 
 
@@ -41,7 +41,7 @@ class CacheProvacopsRespuesta(BaseModel):
     ts_servidor: str  # ISO timestamp para saber cuándo cachear
 
 
-# ── Sync batch — request ───────────────────────────────────
+# ── Sync batch - request ───────────────────────────────────
 
 
 class PesajeOffline(BaseModel):
@@ -84,7 +84,7 @@ class SyncBatchRequest(BaseModel):
     sesiones: list[SesionOffline]
 
 
-# ── Sync batch — response ──────────────────────────────────
+# ── Sync batch - response ──────────────────────────────────
 
 
 class SyncItemResultado(BaseModel):

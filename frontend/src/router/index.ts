@@ -6,7 +6,6 @@ import BalanzaView from '@/views/balanza/BalanzaView.vue'
 import RegistrarCamionView from '@/views/balanza/RegistrarCamionView.vue'
 import SesionView from '@/views/balanza/SesionView.vue'
 import MuestreoView from '@/views/muestreo/MuestreoView.vue'
-import RegistrarHumedadView from '@/views/muestreo/RegistrarHumedadView.vue'
 import PruebasView from '@/views/pruebas/PruebasView.vue'
 import RegistrarPruebasView from '@/views/pruebas/RegistrarPruebasView.vue'
 
@@ -18,7 +17,7 @@ const router = createRouter({
     {
       path: '/login',
       name: 'Login',
-      component: () => LoginView,
+      component: LoginView,
       meta: { public: true },
     },
     {

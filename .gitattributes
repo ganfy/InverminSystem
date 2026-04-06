@@ -1,7 +1,7 @@
 # Normalizar line endings a LF en el repo, CRLF en Windows al checkout
 * text=auto eol=lf
 
-# Binarios — no tocar
+# Binarios - no tocar
 *.png binary
 *.jpg binary
 *.pdf binary

@@ -8,7 +8,7 @@
 
 import { ref, onMounted, onUnmounted } from 'vue'
 
-// Dirección del agente local — en producción siempre es localhost
+// Dirección del agente local - en producción siempre es localhost
 // (el agente corre en la misma PC que el operador)
 const WS_URL = import.meta.env.VITE_BALANZA_WS_URL ?? 'ws://localhost:8765'
 
@@ -35,7 +35,7 @@ export interface BalanzaState {
 
 export function useBalanza() {
     const peso = ref<number | null>(null)
-    const pesoDisplay = ref<string>('—')
+    const pesoDisplay = ref<string>('-')
     const unidad = ref<string>('KG')
     const estable = ref<boolean>(false)
     const conectado = ref<boolean>(false)   // serial
@@ -101,7 +101,7 @@ export function useBalanza() {
             case 'peso':
             case 'estado_inicial':
                 peso.value = (msg.peso as number) ?? null
-                pesoDisplay.value = (msg.peso_display as string) ?? '—'
+                pesoDisplay.value = (msg.peso_display as string) ?? '-'
                 unidad.value = (msg.unidad as string) ?? 'KG'
                 estable.value = (msg.estable as boolean) ?? false
                 conectado.value = (msg.conectado as boolean) ?? false
@@ -109,10 +109,10 @@ export function useBalanza() {
                 break
 
             case 'captura':
-                // El frontend solicitó captura puntual — emitir evento
+                // El frontend solicitó captura puntual - emitir evento
                 _capturaResolver?.({
                     peso: (msg.peso as number) ?? null,
-                    pesoDisplay: (msg.peso_display as string) ?? '—',
+                    pesoDisplay: (msg.peso_display as string) ?? '-',
                     estable: (msg.estable as boolean) ?? false,
                 })
                 _capturaResolver = null
@@ -124,7 +124,7 @@ export function useBalanza() {
                 break
 
             case 'pong':
-                // heartbeat OK — no hacer nada
+                // heartbeat OK - no hacer nada
                 break
         }
     }

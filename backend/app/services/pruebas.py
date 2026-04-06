@@ -19,13 +19,12 @@ def obtener_lista_pruebas(db: Session):
             Lote.ip,
             Lote.creado_en.label("fecha_recepcion"),
             PruebaMetalurgica.fecha_ingreso,
-            PruebaMetalurgica.fecha_salida,
             PruebaMetalurgica.malla_porcentaje,
             PruebaMetalurgica.gasto_agno3,
             PruebaMetalurgica.id.label("prueba_id"),
         )
         .outerjoin(PruebaMetalurgica, PruebaMetalurgica.lote_id == Lote.id)
-        .filter(or_(Lote.eliminado.is_(False), Lote.eliminado.is_(None)))
+        .filter(or_(Lote.eliminado == 0, Lote.eliminado.is_(None)))
         .all()
     )
 

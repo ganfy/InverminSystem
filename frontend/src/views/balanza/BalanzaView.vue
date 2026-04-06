@@ -115,9 +115,9 @@
           >
             <td class="td-mono">{{ formatFecha(s.fecha_ingreso) }}</td>
             <td>{{ s.proveedor_razon_social }}</td>
-            <td class="td-muted">{{ s.es_propio ? '—' : s.acopiador_razon_social }}</td>
+            <td class="td-muted">{{ s.es_propio ? '-' : s.acopiador_razon_social }}</td>
             <td class="td-mono td-placa">{{ s.placa }}</td>
-            <td class="td-mono td-muted">{{ s.guia_remision || '—' }}</td>
+            <td class="td-mono td-muted">{{ s.guia_remision || '-' }}</td>
             <td class="td-mono">
               <span :class="s.lotes_activos < s.total_lotes ? 'lotes-parcial' : ''">{{ s.lotes_activos }}</span>
               <span class="td-muted"> / {{ s.total_lotes }}</span>
@@ -294,7 +294,7 @@ function formatFecha(iso: string) {
   })
 }
 function formatFechaLocal(iso: string) {
-  // Las fechas offline son locales (sin sufijo Z) — no convertir TZ
+  // Las fechas offline son locales (sin sufijo Z) - no convertir TZ
   return new Date(iso).toLocaleString('es-PE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
