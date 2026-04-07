@@ -76,7 +76,19 @@ const router = createRouter({
           name: 'RegistrarPrueba',
           component: RegistrarPruebasView,
 
-        }
+        },
+        {
+          path: '/laboratorio',
+          name: 'LaboratorioDashboard',
+          component: () => import('../views/laboratorio/LaboratorioDashboardView.vue'),
+          meta: { requiresAuth: true }
+        },
+        {
+          path: '/laboratorio/registrar',
+          name: 'LaboratorioRegistrar',
+          component: () => import('../views/laboratorio/RegistrarAnalisisView.vue'),
+          meta: { requiresAuth: true }
+        },
       ],
     },
     {

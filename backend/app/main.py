@@ -8,7 +8,16 @@ from contextlib import asynccontextmanager
 from app.core.config import get_settings
 from app.core.database import SessionLocal, check_db_connection
 from app.core.security import cleanup_expired_tokens
-from app.routers import auth, balanza, dashboard, entidades, muestreo, pruebas, usuarios
+from app.routers import (
+    auth,
+    balanza,
+    dashboard,
+    entidades,
+    laboratorio,
+    muestreo,
+    pruebas,
+    usuarios,
+)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -74,7 +83,7 @@ app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(balanza.router, prefix="/api/v1")
 app.include_router(muestreo.router, prefix="/api/v1")
 app.include_router(pruebas.router, prefix="/api/v1")
-# app.include_router(laboratorio.router, prefix="/api/v1")
+app.include_router(laboratorio.router, prefix="/api/v1")
 # app.include_router(liquidaciones.router, prefix="/api/v1")
 
 
