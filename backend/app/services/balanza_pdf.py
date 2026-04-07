@@ -251,7 +251,7 @@ def _cargar_lote(db: Session, sesion_id: int, lote_id: int) -> Lote:
     lote = (
         db.query(Lote)
         .options(*_eager_opts())
-        .filter(Lote.id == lote_id, Lote.sesion_id == sesion_id, Lote.eliminado == 0)
+        .filter(Lote.id == lote_id, Lote.sesion_id == sesion_id, ~Lote.eliminado)
         .first()
     )
     if not lote:
@@ -263,7 +263,7 @@ def _cargar_lotes_sesion(db: Session, sesion_id: int) -> list[Lote]:
     lotes = (
         db.query(Lote)
         .options(*_eager_opts())
-        .filter(Lote.sesion_id == sesion_id, Lote.eliminado == 0)
+        .filter(Lote.sesion_id == sesion_id, ~Lote.eliminado)
         .order_by(Lote.numero_lote)
         .all()
     )

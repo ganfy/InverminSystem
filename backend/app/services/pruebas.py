@@ -24,7 +24,7 @@ def obtener_lista_pruebas(db: Session):
             PruebaMetalurgica.id.label("prueba_id"),
         )
         .outerjoin(PruebaMetalurgica, PruebaMetalurgica.lote_id == Lote.id)
-        .filter(or_(Lote.eliminado == 0, Lote.eliminado.is_(None)))
+        .filter(or_(~Lote.eliminado, Lote.eliminado.is_(None)))
         .all()
     )
 

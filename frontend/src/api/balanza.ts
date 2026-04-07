@@ -247,8 +247,8 @@ export const balanzaApi = {
 
   // Documentos de sesión
   async listarDocumentos(sesionId: number): Promise<DocumentoRespuesta[]> {
-    const { data } = await axios.get<DocumentoRespuesta[]>(
-      `/api/balanza/${sesionId}/documentos`
+    const { data } = await api.get<DocumentoRespuesta[]>(
+      `/balanza/${sesionId}/documentos`
     )
     return data
   },
@@ -262,8 +262,8 @@ export const balanzaApi = {
     form.append('archivo', archivo)
     form.append('tipo_documento', tipo)
 
-    const { data } = await axios.post<DocumentoRespuesta>(
-      `/api/balanza/${sesionId}/documentos`,
+    const { data } = await api.post<DocumentoRespuesta>(
+      `/balanza/${sesionId}/documentos`,
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
@@ -271,7 +271,7 @@ export const balanzaApi = {
   },
 
   async descargarDocumento(sesionId: number, docId: number): Promise<void> {
-    const response = await axios.get(`/api/balanza/${sesionId}/documentos/${docId}/download`, {
+    const response = await api.get(`/balanza/${sesionId}/documentos/${docId}/download`, {
       responseType: 'blob',
     })
     const blob = new Blob([response.data], { type: response.data.type })
@@ -281,12 +281,12 @@ export const balanzaApi = {
   },
 
   async eliminarDocumento(sesionId: number, docId: number): Promise<void> {
-    await axios.delete(`/api/balanza/${sesionId}/documentos/${docId}`)
+    await api.delete(`/balanza/${sesionId}/documentos/${docId}`)
   },
 
   async extraerDatosDocumentos(sesionId: number): Promise<DatosExtraidos> {
-    const { data } = await axios.post<DatosExtraidos>(
-      `/api/balanza/${sesionId}/documentos/extraer`
+    const { data } = await api.post<DatosExtraidos>(
+      `/balanza/${sesionId}/documentos/extraer`
     )
     return data
   },

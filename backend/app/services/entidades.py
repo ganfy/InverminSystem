@@ -384,8 +384,8 @@ def listar_acopiadores(db: Session) -> list[dict]:
         .join(Rol, Rol.id == EntidadRol.rol_id)
         .filter(
             Rol.codigo == RolEntidad.ACOPIADOR,
-            EntidadRol.activo == 1,
-            Entidad.activo == 1,
+            EntidadRol.activo,
+            Entidad.activo,
         )
         .order_by(Entidad.razon_social)
         .all()

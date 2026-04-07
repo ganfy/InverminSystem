@@ -78,10 +78,7 @@ _configurar_tesseract()
 
 
 def subir_documento(
-    db: Session,
-    sesion_id: int,
-    archivo: UploadFile,
-    tipo_documento: str,
+    db: Session, sesion_id: int, archivo: UploadFile, tipo_documento: str, usuario_id: int
 ) -> SesionDocumento:
     contenido = archivo.file.read()
     if len(contenido) > MAX_FILE_SIZE:
@@ -91,7 +88,7 @@ def subir_documento(
     if ext not in TIPOS_PERMITIDOS:
         raise ValueError(f"Tipo no permitido: .{ext}")
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()
     carpeta = STORAGE_PATH / "sesiones" / str(ahora.year) / f"{ahora.month:02d}" / str(sesion_id)
     carpeta.mkdir(parents=True, exist_ok=True)
 
@@ -102,11 +99,9 @@ def subir_documento(
     doc = SesionDocumento(
         sesion_id=sesion_id,
         nombre_original=archivo.filename or nombre_guardado,
-        nombre_guardado=nombre_guardado,
-        ruta=str(ruta),
+        ruta_archivo=str(ruta),
         tipo_documento=tipo_documento,
-        mime_type=archivo.content_type or f"application/{ext}",
-        tamanio=len(contenido),
+        creado_por=usuario_id,
     )
     db.add(doc)
     db.commit()
@@ -117,13 +112,26 @@ def subir_documento(
 def listar_documentos(db: Session, sesion_id: int) -> list[SesionDocumento]:
     return (
         db.query(SesionDocumento)
-        .filter(
-            SesionDocumento.sesion_id == sesion_id,
-            ~SesionDocumento.eliminado,
-        )
+        .filter(SesionDocumento.sesion_id == sesion_id)
         .order_by(SesionDocumento.id)
         .all()
     )
+
+
+def obtener_archivo(db: Session, sesion_id: int, doc_id: int) -> tuple[Path, str]:
+    doc = (
+        db.query(SesionDocumento)
+        .filter(SesionDocumento.id == doc_id, SesionDocumento.sesion_id == sesion_id)
+        .first()
+    )
+    if not doc:
+        raise ValueError("Documento no encontrado")
+
+    ruta_real = Path(doc.ruta_archivo)
+    if not ruta_real.exists():
+        raise ValueError("El archivo físico no se encuentra en el servidor")
+
+    return ruta_real, doc.nombre_original
 
 
 def eliminar_documento(db: Session, sesion_id: int, doc_id: int) -> None:
@@ -138,6 +146,26 @@ def eliminar_documento(db: Session, sesion_id: int, doc_id: int) -> None:
     if not doc:
         raise ValueError("Documento no encontrado")
     doc.eliminado = True
+    db.commit()
+
+
+def eliminar_documento_físico(db: Session, sesion_id: int, doc_id: int) -> None:
+    doc = (
+        db.query(SesionDocumento)
+        .filter(SesionDocumento.id == doc_id, SesionDocumento.sesion_id == sesion_id)
+        .first()
+    )
+    if not doc:
+        raise ValueError("Documento no encontrado")
+
+    ruta_real = Path(doc.ruta_archivo)
+    if ruta_real.exists():
+        try:
+            ruta_real.unlink()
+        except OSError:
+            pass
+
+    db.delete(doc)
     db.commit()
 
 

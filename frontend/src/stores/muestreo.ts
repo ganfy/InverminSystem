@@ -61,7 +61,7 @@ export const useMuestreoStore = defineStore('muestreo', () => {
                 ui.toast(`Intento ${datos.intento} guardado en el servidor`, 'success')
             } else {
                 // OFFLINE: Guardar en IndexedDB
-                const offlineId = `muestreo-off-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+                const offlineId = `muestreo-off-${crypto.randomUUID()}`
 
                 await encolarMuestreoOffline({
                     offline_id: offlineId,

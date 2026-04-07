@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Base de datos
-    # "postgresql" para desarrollo local Docker
-    # "mssql" para producción Azure SQL Server
+    # "postgresql" para desarrollo local Docker !!!
+    # "mssql" para producción Azure SQL Server !!!
+    # TODO DEBE SER COMPATIBLE CON AMBOS EN DESARROLLO LOCAL (docker-compose) Y PRODUCCIÓN (Azure SQL)
     db_engine: str = "postgresql"
     db_server: str
     db_port: int = 5432  # 5432 postgres | 1433 sqlserver

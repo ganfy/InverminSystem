@@ -277,7 +277,7 @@ def editar_lote(
 @router.post("/documentos/extraer-preview", response_model=DatosExtraidos)
 async def extraer_datos_preview(
     archivos: list[UploadFile] = File(...),
-    current_user=Depends(check_permiso("BALANZA", "READ")),
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
 ):
     """Extrae datos de archivos sin sesión - para pre-llenar el form de registro."""
     try:
@@ -373,7 +373,7 @@ def eliminar_documento(
 )
 def extraer_datos(
     sesion_id: int,
-    current_user=Depends(check_permiso("BALANZA", "READ")),
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """
@@ -382,7 +382,7 @@ def extraer_datos(
     los campos de la sesión.
     """
     try:
-        return doc_svc.extraer_datos_documentos(db, sesion_id)
+        return doc_svc.extraer_datos_sesion(db, sesion_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:

@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
+from app.models.enums import EstadoSesion
 from app.models.models import (
     Configuracion,
     Lote,
@@ -163,7 +164,7 @@ def obtener_lotes_para_muestreo(db: Session):
         db.query(Lote)
         .join(Lote.sesion)
         # .outerjoin(Lote.prueba_metalurgica) # Opcional, ya que hacemos la consulta abajo
-        .filter(SesionDescarga.estado == "COMPLETO")
+        .filter(SesionDescarga.estado == EstadoSesion.COMPLETO)
         .all()
     )
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     # 1. Obtener todos los lotes activos
-    lotes_db = db.query(Lote).filter(Lote.eliminado == 0).all()
+    lotes_db = db.query(Lote).filter(~Lote.eliminado).all()
 
     kpis = DashboardKPIs()
     lotes_resumen = []
