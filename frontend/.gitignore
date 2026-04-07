@@ -31,6 +31,10 @@ coverage
 # Cypress
 */cypress/videos/
 */cypress/screenshots/
+**/__pycache__/
+*.py[cod]
+*__pycache__/
+*.cpython-*-pyc
 
 # Vitest
 __screenshots__/
