@@ -1,52 +1,78 @@
 import api from './axios'
 import type {
-    AnalisisLeyCreate, AnalisisLeyOut,
-    AnalisisRecuperacionCreate, AnalisisRecuperacionOut,
-    MuestraLaboratorioItem
+    AnalisisLeyCreate,
+    AnalisisLeyOut,
+    AnalisisRecuperacionCreate,
+    AnalisisRecuperacionOut,
+    CIPAnalisisOut,
+    LoteLabOut,
+    DescartarRequest,
+    SyncLaboratorioRequest,
+    SyncLaboratorioResponse,
 } from '@/types/laboratorio'
 
 export const laboratorioApi = {
-    // --- LEY (Fire Assay) ---
+
+    // ── Vista por CIP (Laboratorista + Comercial) ─────────────────────────────
+    async listarCips(): Promise<CIPAnalisisOut[]> {
+        const { data } = await api.get('/laboratorio/cips')
+        return data
+    },
+
+    // ── Vista por Lote/IP (solo Comercial/Gerencia/Admin) ─────────────────────
+    async listarLotes(): Promise<LoteLabOut[]> {
+        const { data } = await api.get('/laboratorio/lotes')
+        return data
+    },
+
+    async detalleLote(ip: string): Promise<LoteLabOut> {
+        const { data } = await api.get(`/laboratorio/lotes/${ip}`)
+        return data
+    },
+
+    // ── Análisis de Ley ───────────────────────────────────────────────────────
     async registrarLey(datos: AnalisisLeyCreate): Promise<AnalisisLeyOut> {
-        const response = await api.post('/laboratorio/ley', datos)
-        return response.data
+        const { data } = await api.post('/laboratorio/ley', datos)
+        return data
     },
 
-    async subirCertificadoLey(analisisId: number, archivo: File): Promise<{ mensaje: string, url: string }> {
-        const formData = new FormData()
-        formData.append('archivo', archivo)
+    async descartarLey(analisisId: number, req: DescartarRequest): Promise<AnalisisLeyOut> {
+        const { data } = await api.patch(`/laboratorio/ley/${analisisId}/descartar`, req)
+        return data
+    },
 
-        const response = await api.post(`/laboratorio/ley/${analisisId}/certificado`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+    async subirCertificadoLey(analisisId: number, archivo: File): Promise<{ certificado_url: string }> {
+        const form = new FormData()
+        form.append('archivo', archivo)
+        const { data } = await api.post(`/laboratorio/ley/${analisisId}/certificado`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
         })
-        return response.data
+        return data
     },
 
-    // --- RECUPERACIÓN (Botella) ---
+    // ── Análisis de Recuperación ──────────────────────────────────────────────
     async registrarRecuperacion(datos: AnalisisRecuperacionCreate): Promise<AnalisisRecuperacionOut> {
-        const response = await api.post('/laboratorio/recuperacion', datos)
-        return response.data
+        const { data } = await api.post('/laboratorio/recuperacion', datos)
+        return data
     },
 
-    async subirCertificadoRecuperacion(analisisId: number, archivo: File): Promise<{ mensaje: string, url: string }> {
-        const formData = new FormData()
-        formData.append('archivo', archivo)
+    async descartarRecuperacion(analisisId: number, req: DescartarRequest): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.patch(`/laboratorio/recuperacion/${analisisId}/descartar`, req)
+        return data
+    },
 
-        const response = await api.post(`/laboratorio/recuperacion/${analisisId}/certificado`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+    async subirCertificadoRecuperacion(analisisId: number, archivo: File): Promise<{ certificado_url: string }> {
+        const form = new FormData()
+        form.append('archivo', archivo)
+        const { data } = await api.post(`/laboratorio/recuperacion/${analisisId}/certificado`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
         })
-        return response.data
+        return data
     },
 
-    // --- SYNC OFFLINE ---
-    async sincronizarBatch(payload: any): Promise<any> {
-        const response = await api.post('/laboratorio/offline/sync', payload)
-        return response.data
-    },
-
-
-    async obtenerMuestras(): Promise<MuestraLaboratorioItem[]> {
-        const response = await api.get('/laboratorio/muestras')
-        return response.data
+    // ── Sync Offline ──────────────────────────────────────────────────────────
+    async sincronizarBatch(payload: SyncLaboratorioRequest): Promise<SyncLaboratorioResponse> {
+        const { data } = await api.post('/laboratorio/sync', payload)
+        return data
     },
 }

@@ -11,7 +11,6 @@ from app.core.security import cleanup_expired_tokens
 from app.routers import (
     auth,
     balanza,
-    dashboard,
     entidades,
     laboratorio,
     muestreo,
@@ -73,17 +72,15 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(auth.router, prefix="/api/v1")
+PREFIX = "/api/v1"
 
-app.include_router(usuarios.router, prefix="/api/v1")
-app.include_router(entidades.router, prefix="/api/v1")
-app.include_router(dashboard.router, prefix="/api/v1")
-
-# A medida que se agreguen módulos:
-app.include_router(balanza.router, prefix="/api/v1")
-app.include_router(muestreo.router, prefix="/api/v1")
-app.include_router(pruebas.router, prefix="/api/v1")
-app.include_router(laboratorio.router, prefix="/api/v1")
+app.include_router(auth.router, prefix=PREFIX)
+app.include_router(usuarios.router, prefix=PREFIX)
+app.include_router(balanza.router, prefix=PREFIX)
+app.include_router(entidades.router, prefix=PREFIX)
+app.include_router(muestreo.router, prefix=PREFIX)
+app.include_router(pruebas.router, prefix=PREFIX)
+app.include_router(laboratorio.router, prefix=PREFIX)
 # app.include_router(liquidaciones.router, prefix="/api/v1")
 
 
