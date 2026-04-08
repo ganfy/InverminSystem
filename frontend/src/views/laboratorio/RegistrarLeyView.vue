@@ -4,9 +4,6 @@
       <header class="page-header">
         <div>
           <h1 class="page-title">Registro Análisis Newmont</h1>
-          <p class="page-subtitle" style="color:var(--color-gold);font-family:var(--font-mono)">
-            {{ nInforme || '...' }}
-          </p>
         </div>
         <div style="display:flex;gap:0.75rem">
           <button class="btn-secondary" @click="router.back()">← Volver</button>
@@ -30,7 +27,7 @@
             <input class="field-input" :value="materialInfo" disabled />
           </div>
           <div class="field">
-            <label class="field-label">MATERIAL (Au/Ag):</label>
+            <label class="field-label">MINERAL (Au/Ag):</label>
             <select class="field-select" v-model="form.material">
               <option value="Au">Au</option>
               <option value="Ag">Ag</option>
@@ -44,10 +41,6 @@
         <h2 class="card-titulo">DATOS DEL ENSAYO</h2>
         <div class="form-grid">
           <div class="field">
-            <label class="field-label">N° INFORME:</label>
-            <input class="field-input" v-model="nInforme" placeholder="Ej: LQ IP202601-0105" />
-          </div>
-          <div class="field">
             <label class="field-label">FECHA INGRESO:</label>
             <input type="date" class="field-input" v-model="form.fecha_analisis" />
           </div>
@@ -57,40 +50,24 @@
           </div>
           <div class="field">
             <label class="field-label">MÉTODO:</label>
-            <select class="field-select" v-model="metodo">
-              <option>Newmont</option>
-              <option>Paititi</option>
-              <option>Quantum</option>
-              <option>Otro</option>
-            </select>
+            <input v-model="metodo" readonly class="input-disabled">
+          </input>
           </div>
           <div class="field">
             <label class="field-label">PUNTO:</label>
             <select class="field-select" v-model="punto">
               <option>Cabeza</option>
               <option>Cola</option>
+              <option>Líquido</option>
             </select>
           </div>
           <div class="field">
             <label class="field-label">SOLICITUD:</label>
-            <input class="field-input" :value="'Análisis de sólidos por Au'" disabled />
+            <input class="field-input" :value="'Análisis de sólidos por ' + form.material" disabled />
           </div>
           <div class="field">
             <label class="field-label">TIPO DE ANÁLISIS:</label>
             <input class="field-input" :value="'Fire Assay - Gravimétrico'" disabled />
-          </div>
-          <div class="field">
-            <label class="field-label">TIPO ANÁLISIS (sistema):</label>
-            <select class="field-select" v-model="form.tipo_analisis">
-              <option value="planta">Planta (Paititi)</option>
-              <option value="externo">Externo</option>
-              <option value="minero">Minero</option>
-              <option value="dirimencia">Dirimencia</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="field-label">LABORATORIO:</label>
-            <input class="field-input" v-model="form.laboratorio" placeholder="Newmont" />
           </div>
         </div>
       </section>
@@ -156,7 +133,6 @@
   const materialInfo = ref('Mineral')
 
   // ── Campos del formulario ─────────────────────────────────────────────────────
-  const nInforme   = ref('')
   const descripcion = ref('Polveado')
   const metodo     = ref('Newmont')
   const punto      = ref('Cabeza')

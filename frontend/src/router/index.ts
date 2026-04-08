@@ -13,68 +13,97 @@ import RegistrarLeyView from '@/views/laboratorio/RegistrarLeyView.vue'
 import RegistrarRecuperacionView from '@/views/laboratorio/RegistrarRecuperacionView.vue'
 import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
 import UnauthorizedView from '@/views/auth/UnauthorizedView.vue'
+import DashboardView from '@/views/dashboard/DashboardView.vue'
+import MainLayout from '@/layouts/MainLayout.vue' // Importamos el Layout
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ── Auth ────────────────────────────────────────────────────────────────
+    // ── Ruta Pública ──
     { path: '/login', name: 'Login', component: LoginView },
-    { path: '/unauthorized', name: 'Unauthorized', component: UnauthorizedView, meta: { requiresAuth: true } },
 
-    // ── Balanza ─────────────────────────────────────────────────────────────
-    { path: '/balanza', name: 'Balanza', component: BalanzaView, meta: { requiresAuth: true } },
-    { path: '/balanza/nueva', name: 'NuevaSesion', component: RegistrarCamionView, meta: { requiresAuth: true } },
-    { path: '/balanza/:id', name: 'SesionDetalle', component: SesionView, meta: { requiresAuth: true } },
-
-    // ── Muestreo ────────────────────────────────────────────────────────────
-    { path: '/muestreo', name: 'Muestreo', component: MuestreoView, meta: { requiresAuth: true } },
-
-    // ── Pruebas Metalúrgicas ─────────────────────────────────────────────────
-    { path: '/pruebas', name: 'Pruebas', component: PruebasView, meta: { requiresAuth: true } },
-    { path: '/pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView, meta: { requiresAuth: true } },
-
-    // ── Laboratorio ──────────────────────────────────────────────────────────
+    // ── Rutas Protegidas (Con Menú Lateral) ──
     {
-      path: '/laboratorio',
-      name: 'Laboratorio',
-      component: LaboratorioView,
+      path: '/',
+      component: MainLayout,
       meta: { requiresAuth: true },
-    },
-    {
-      // Laboratorista registra ley desde su CIP
-      path: '/laboratorio/ley/:cip',
-      name: 'RegistrarLey',
-      component: RegistrarLeyView,
-      meta: { requiresAuth: true },
-    },
-    {
-      // Laboratorista registra recuperación desde su CIP
-      path: '/laboratorio/recuperacion/:cip',
-      name: 'RegistrarRecuperacion',
-      component: RegistrarRecuperacionView,
-      meta: { requiresAuth: true },
-    },
-    {
-      // Comercial/Gerencia/Admin ven detalle por IP de lote
-      path: '/laboratorio/lote/:ip',
-      name: 'DetalleLote',
-      component: DetalleLoteView,
-      meta: { requiresAuth: true },
+      children: [
+        // Dashboard principal
+        { path: 'dashboard', name: 'Dashboard', component: DashboardView },
+
+        // Balanza
+        { path: 'balanza', name: 'Balanza', component: BalanzaView },
+        { path: 'balanza/nueva', name: 'NuevaSesion', component: RegistrarCamionView },
+        { path: 'balanza/:id', name: 'SesionDetalle', component: SesionView },
+
+        // Muestreo
+        { path: 'muestreo', name: 'Muestreo', component: MuestreoView },
+
+        // Pruebas
+        { path: 'pruebas', name: 'Pruebas', component: PruebasView },
+        { path: 'pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView },
+
+        // Laboratorio
+        { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView },
+        { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView },
+        { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView },
+        { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
+
+        // Error
+        { path: 'unauthorized', name: 'Unauthorized', component: UnauthorizedView },
+
+        // Redirección dinámica según rol al entrar a la raíz "/"
+        {
+          path: '',
+          redirect: () => {
+            const auth = useAuthStore()
+            if (!auth.accessToken) return '/login'
+
+            const rol = auth.user?.rol
+            switch (rol) {
+              case 'Admin':
+              case 'Gerencia':
+              case 'Comercial':
+                return '/dashboard'
+              case 'Balanza':
+                return '/balanza'
+              case 'Muestreo':
+                return '/muestreo'
+              case 'Laboratorista':
+                return '/laboratorio'
+              default:
+                return '/login'
+            }
+          }
+        }
+      ]
     },
 
-    // ── Redirect raíz ────────────────────────────────────────────────────────
-    { path: '/', redirect: '/login' },
+    // ── Comodín para 404 ──
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
-// ── Guard de autenticación ────────────────────────────────────────────────────
-router.beforeEach((to) => {
-  if (!to.meta.requiresAuth) return true
-
+// ── Guard de autenticación ──
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!auth.accessToken) return { name: 'Login' }
 
-  // Proteger detalle de lote solo para roles que pueden ver IPs
+  // Si la ruta requiere auth y no hay token
+  if (to.meta.requiresAuth && !auth.accessToken) {
+    return { name: 'Login' }
+  }
+
+  // Si hay token pero no hay datos de usuario (ej. refresh F5), los cargamos
+  if (auth.accessToken && !auth.user && to.name !== 'Login') {
+    try {
+      await auth.fetchMe()
+    } catch {
+      auth.clearTokens()
+      return { name: 'Login' }
+    }
+  }
+
+  // Protección específica de DetalleLote
   if (to.name === 'DetalleLote') {
     const rol = auth.user?.rol ?? ''
     const permitidos = ['Admin', 'Gerencia', 'Comercial']

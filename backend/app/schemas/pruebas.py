@@ -1,9 +1,11 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel
 
+# ── Base CRUD ─────────────────────────────────────────────────────────────────
 
-# --- Base y Operaciones CRUD ---
+
 class PruebaMetalurgicaBase(BaseModel):
     malla_porcentaje: float | None = None
     porcentaje_nacn: float | None = None
@@ -22,14 +24,16 @@ class PruebaMetalurgicaCreate(PruebaMetalurgicaBase):
 class PruebaMetalurgicaOut(PruebaMetalurgicaBase):
     id: int
     lote_id: int
+    cip: str | None = None
     fecha_salida: datetime | None = None
     creado_por: int | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
-# --- Esquema para la Tabla Principal ---
+# ── Lista principal ───────────────────────────────────────────────────────────
+
+
 class LotePruebaList(BaseModel):
     ip: str
     fecha_recepcion: datetime | None = None
@@ -37,10 +41,42 @@ class LotePruebaList(BaseModel):
     fecha_salida: datetime | None = None
     malla_porcentaje: float | None = None
     gasto_agno3: float | None = None
-    estado: str
+    estado: str  # PENDIENTE | EN PROCESO | COMPLETADO
+    # Etiquetado
+    cip_asignado: str | None = None  # CIP de recuperación (si fue etiquetado)
+    etiquetado: bool = False
 
 
-# --- Esquemas para la Sincronización Offline ---
+# ── Etiquetado (nuevo) ────────────────────────────────────────────────────────
+
+
+class EtiquetadoPruebaOut(BaseModel):
+    ip: str
+    cip: str
+    mensaje: str = "Etiqueta de recuperación generada"
+
+
+# ── Pruebas listas para recuperación (nuevo) ─────────────────────────────────
+
+
+class PruebaRecuperacionItem(BaseModel):
+    """
+    Prueba COMPLETADO cuyo lote ya tiene ley planta calculada.
+    Se usa en Laboratorio para pre-llenar ley_cabeza en análisis de recuperación.
+    """
+
+    ip: str
+    cip: str  # CIP de la prueba (para recuperación)
+    lote_id: int
+    proveedor: str
+    fecha_salida: datetime | None  # cuando se completaron las 48h
+    ley_cabeza: Decimal  # ley planta promediada por Comercial
+    tiene_analisis_recuperacion: bool = False
+
+
+# ── Sync Offline ──────────────────────────────────────────────────────────────
+
+
 class PruebaOfflineItem(BaseModel):
     offline_id: str
     ip: str

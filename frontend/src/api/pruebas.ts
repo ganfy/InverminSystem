@@ -14,6 +14,7 @@ export interface PruebaMetalurgicaCreate {
 export interface PruebaMetalurgicaOut extends PruebaMetalurgicaCreate {
     id: number
     lote_id: number
+    cip: string | null
     fecha_salida: string | null
 }
 
@@ -24,7 +25,26 @@ export interface LotePruebaList {
     fecha_salida: string | null
     malla_porcentaje: number | null
     gasto_agno3: number | null
-    estado: 'PENDIENTE' | 'EN PROCESO' | 'COMPLETO'
+    estado: 'PENDIENTE' | 'EN PROCESO' | 'COMPLETADO'
+    // Etiquetado (nuevo)
+    cip_asignado: string | null
+    etiquetado: boolean
+}
+
+export interface EtiquetadoPruebaOut {
+    ip: string
+    cip: string
+    mensaje: string
+}
+
+export interface PruebaRecuperacionItem {
+    ip: string
+    cip: string
+    lote_id: number
+    proveedor: string
+    fecha_salida: string | null
+    ley_cabeza: number
+    tiene_analisis_recuperacion: boolean
 }
 
 export interface PruebaOfflineItem {
@@ -34,32 +54,41 @@ export interface PruebaOfflineItem {
 }
 
 export const pruebasApi = {
+
     async obtenerListaPruebas(): Promise<LotePruebaList[]> {
-        const response = await api.get<LotePruebaList[]>('/pruebas/lista')
-        return response.data
+        const { data } = await api.get('/pruebas/lista')
+        return data
     },
 
-    // Cambiamos el parámetro a 'ip'
-    async registrarPrueba(ip: string, datos: PruebaMetalurgicaCreate): Promise<any> {
-        const response = await api.post(`/pruebas/${ip}`, datos)
-        return response.data
+    async registrarPrueba(ip: string, datos: PruebaMetalurgicaCreate): Promise<PruebaMetalurgicaOut> {
+        const { data } = await api.post(`/pruebas/${ip}`, datos)
+        return data
+    },
+
+    async obtenerDetallePrueba(ipLote: string): Promise<PruebaMetalurgicaOut | null> {
+        try {
+            const { data } = await api.get(`/pruebas/${ipLote}`)
+            return data
+        } catch (e: any) {
+            if (e?.response?.status === 404) return null
+            throw e
+        }
+    },
+
+    /** Genera CIP de recuperación para una prueba COMPLETADO */
+    async etiquetar(ip: string): Promise<EtiquetadoPruebaOut> {
+        const { data } = await api.post(`/pruebas/${ip}/etiquetar`)
+        return data
+    },
+
+    /** Pruebas COMPLETADO con ley_cabeza disponible para análisis de recuperación */
+    async paraRecuperacion(): Promise<PruebaRecuperacionItem[]> {
+        const { data } = await api.get('/pruebas/para-recuperacion')
+        return data
     },
 
     async syncBatch(pruebas: PruebaOfflineItem[]): Promise<any> {
-        const response = await api.post('/pruebas/sync', { pruebas })
-        return response.data
+        const { data } = await api.post('/pruebas/sync', { pruebas })
+        return data
     },
-
-    async obtenerDetallePrueba(ipLote: string) {
-        try {
-            const response = await api.get(`/pruebas/lotes/${ipLote}`)
-            return response.data
-        } catch (error: any) {
-            // Si el backend responde 404, significa que no hay datos aún (es nueva)
-            if (error.response && error.response.status === 404) {
-                return null
-            }
-            throw error
-        }
-    }
 }

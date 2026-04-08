@@ -7,7 +7,6 @@ from app.models.models import (
     Lote,
     MapeoCIP,
     Muestreo,
-    PruebaMetalurgica,
     SesionDescarga,
 )
 from app.schemas.muestreo import MuestreoCreate
@@ -191,19 +190,12 @@ def obtener_lotes_para_muestreo(db: Session):
             intentos[0].creado_en.isoformat() if intentos and intentos[0].creado_en else None
         )
 
-        # PRUEBAS METALÚRGICAS
-        prueba = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).first()
-        prueba_completada = True if prueba else False
-        fecha_ingreso_prueba = (
-            prueba.fecha_ingreso.isoformat() if prueba and prueba.fecha_ingreso else None
-        )
-
         # ETIQUETAS Y ESTADOS
         tiene_etiquetas = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).first() is not None
         estado_muestreo = "COMPLETADO" if intentos_previos > 0 else "PENDIENTE"
 
         # SLA Logic
-        pendiente_sla = prueba_completada and (not tiene_etiquetas)
+        pendiente_sla = (estado_muestreo == "COMPLETADO") and (not tiene_etiquetas)
 
         resultado.append(
             {
@@ -217,8 +209,6 @@ def obtener_lotes_para_muestreo(db: Session):
                 "cantidad_intentos_previos": intentos_previos,
                 "tiene_humedad": intentos_previos > 0,
                 "etiquetado": tiene_etiquetas,
-                "prueba_completada": prueba_completada,
-                "fecha_ingreso_prueba": fecha_ingreso_prueba,
                 "sla_config": {"h_min": h_min, "h_max": h_max},
                 "pendiente_sla": pendiente_sla,
             }

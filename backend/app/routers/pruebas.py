@@ -1,12 +1,11 @@
-# backend/app/routers/pruebas.py
-
 from app.core.database import get_db
-from app.core.deps import get_current_user
-from app.models.models import Usuario
+from app.core.deps import check_permiso
 from app.schemas.pruebas import (
+    EtiquetadoPruebaOut,
     LotePruebaList,
     PruebaMetalurgicaCreate,
     PruebaMetalurgicaOut,
+    PruebaRecuperacionItem,
     SyncPruebasRequest,
     SyncPruebasResponse,
 )
@@ -18,44 +17,101 @@ router = APIRouter(prefix="/pruebas", tags=["Pruebas Metalúrgicas"])
 
 
 @router.get("/lista", response_model=list[LotePruebaList])
-def listar_pruebas(db: Session = Depends(get_db)):
-    """
-    Lista todos los lotes activos y su estado en las pruebas metalúrgicas.
-    """
+def listar_pruebas(
+    current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Lista todos los lotes y su estado en pruebas metalúrgicas."""
     return pruebas_service.obtener_lista_pruebas(db)
 
 
-@router.post("/sync", response_model=SyncPruebasResponse)
-def sync_pruebas_batch(
-    request: SyncPruebasRequest,
+@router.get("/{ip_lote}", response_model=PruebaMetalurgicaOut)
+def obtener_detalle_prueba(
+    ip_lote: str,
+    current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
 ):
-    return pruebas_service.sync_batch(db, request.pruebas, current_user.id)
+    prueba = pruebas_service.obtener_prueba_por_ip(db, ip_lote)
+    if not prueba:
+        raise HTTPException(status_code=404, detail="No hay prueba metalúrgica para este lote")
+    return prueba
 
 
-@router.post("/{ip}")
+@router.post("/{ip_lote}", response_model=PruebaMetalurgicaOut, status_code=status.HTTP_201_CREATED)
 def registrar_prueba(
-    ip: str,
+    ip_lote: str,
     datos: PruebaMetalurgicaCreate,
+    current_user=Depends(check_permiso("PRUEBAS", "CREATE")),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        prueba, warning = pruebas_service.registrar_prueba(db, ip, datos, current_user.id)
-        return {"data": prueba, "warning": warning}
+        prueba, warning = pruebas_service.registrar_prueba(db, ip_lote, datos, current_user.id)
+        db.commit()
+        response = PruebaMetalurgicaOut.model_validate(prueba)
+        if warning:
+            response.__pydantic_extra__ = {"warning": warning}
+        return response
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+# ── Etiquetado (nuevo) ────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/{ip_lote}/etiquetar",
+    response_model=EtiquetadoPruebaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Genera CIP de recuperación para una prueba completada",
+)
+def etiquetar_prueba(
+    ip_lote: str,
+    current_user=Depends(check_permiso("PRUEBAS", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera y asigna un CIP de recuperación a la prueba metalúrgica del lote.
+    Solo disponible cuando la prueba tiene 48h completadas.
+    Roles: TécnicoMuestreo, Admin.
+    """
+    try:
+        resultado = pruebas_service.etiquetar_prueba(db, ip_lote, current_user.id)
+        db.commit()
+        return resultado
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+# ── Pruebas listas para recuperación (nuevo) ─────────────────────────────────
+
+
 @router.get(
-    "/lotes/{ip_lote}", response_model=PruebaMetalurgicaOut
-)  # Ajusta el response_model al tuyo
-def obtener_detalle_prueba(ip_lote: str, db: Session = Depends(get_db)):
-    prueba = pruebas_service.obtener_prueba_por_ip(db, ip_lote)
-    if not prueba:
-        # Devolvemos un 404 para que el Frontend sepa que está vacío y es una prueba NUEVA
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prueba no iniciada")
-    return prueba
+    "/para-recuperacion",
+    response_model=list[PruebaRecuperacionItem],
+    summary="Pruebas completadas con ley planta disponible (listas para análisis de recuperación)",
+)
+def pruebas_para_recuperacion(
+    current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna pruebas COMPLETADO + CIP asignado + ley_cabeza pre-calculada.
+    Usado por Laboratorio para pre-llenar el formulario de recuperación.
+    Visible para Laboratorista, Comercial, Admin.
+    """
+    return pruebas_service.obtener_pruebas_para_recuperacion(db)
+
+
+# ── Sync Offline ──────────────────────────────────────────────────────────────
+
+
+@router.post("/sync", response_model=SyncPruebasResponse)
+def sync_pruebas(
+    payload: SyncPruebasRequest,
+    current_user=Depends(check_permiso("PRUEBAS", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """Sincroniza pruebas registradas offline."""
+    return pruebas_service.sync_batch(db, payload.pruebas, current_user.id)
