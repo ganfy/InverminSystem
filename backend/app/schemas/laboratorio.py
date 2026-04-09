@@ -44,6 +44,8 @@ class AnalisisLeyOut(BaseModel):
 
 
 class AnalisisRecuperacionCreate(BaseModel):
+    """Para registro manual directo (laboratorio externo via certificado, o lab propio sin pending)."""
+
     cip: str
     laboratorio: str
     ley_cabeza: Decimal = Field(..., gt=0)
@@ -53,16 +55,36 @@ class AnalisisRecuperacionCreate(BaseModel):
     fecha_analisis: date | None = None
 
 
+class CompletarRecuperacionRequest(BaseModel):
+    """Para que laboratorista complete un pending (ley_cola + ley_liquido)."""
+
+    ley_cola: Decimal = Field(..., ge=0)
+    ley_liquido: Decimal | None = None
+    fecha_analisis: date | None = None
+
+
+class EnviarRecuperacionInternaRequest(BaseModel):
+    """
+    Comercial crea un registro pendiente de recuperación para el laboratorio interno.
+    El CIP debe ser de tipo RecuperacionInterno.
+    Si el lote tiene solo 1 CIP interno, se puede omitir (se usa automáticamente).
+    """
+
+    cip: str | None = None  # None → sistema elige el único RecuperacionInterno del lote
+    laboratorio: str = "Laboratorio Interno"
+
+
 class AnalisisRecuperacionOut(BaseModel):
     id: int
     lote_id: int
     lote_ip: str | None = None
     cip: str | None
     laboratorio: str
-    ley_cabeza: Decimal
-    ley_cola: Decimal
+    ley_cabeza: Decimal | None
+    ley_cola: Decimal | None
     ley_liquido: Decimal | None
     recuperacion: Decimal | None
+    estado: str  # PENDIENTE | COMPLETADO
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
@@ -88,14 +110,22 @@ class CIPAnalisisOut(BaseModel):
     lote_ip: str | None = None  # None para Laboratorista, IP real para Comercial
     fecha_envio: date | None
     tipo_muestra: str | None
-    laboratorio_destino: str | None  # laboratorio en mapeo_cip
-    estado_ley: str  # PENDIENTE | COMPLETADO
-    estado_recuperacion: str
+    laboratorio_destino: str | None
+    estado_ley: str  # PENDIENTE | COMPLETADO (para CIPs tipo Laboratorio)
+    estado_recuperacion: str  # PENDIENTE | COMPLETADO (para CIPs tipo Recuperacion*)
     analisis_ley: list[AnalisisLeyOut] = []
     analisis_recuperacion: list[AnalisisRecuperacionOut] = []
 
 
 # ── Vista Comercial: por Lote/IP ──────────────────────────────────────────────
+
+
+class CIPResumen(BaseModel):
+    """Resumen de un CIP con su tipo para la vista de Comercial."""
+
+    codigo_cip: str
+    tipo_muestra: str | None
+    laboratorio: str | None
 
 
 class LoteLabOut(BaseModel):
@@ -104,7 +134,10 @@ class LoteLabOut(BaseModel):
     proveedor: str
     material: str | None
     fecha_recepcion: datetime | None
-    cips: list[str]
+    cips: list[str]  # todos los CIPs del lote (compatibilidad)
+    cips_detalle: list[CIPResumen] = []  # CIPs con tipo para UI
+    ley_planta: Decimal | None = None  # calculada on-the-fly
+    ley_minero: Decimal | None = None  # del análisis tipo minero vigente
     analisis_ley: list[AnalisisLeyOut]
     analisis_recuperacion: list[AnalisisRecuperacionOut]
     tiene_dirimencia: bool

@@ -2,13 +2,17 @@
 Permisos RBAC (desde seed.py):
   LABORATORIO VIEW   → Laboratorista, Comercial, Gerencia, Admin
   LABORATORIO CREATE → Laboratorista, Comercial, Admin
-  LABORATORIO UPDATE → Comercial, Admin  (certificados)
+  LABORATORIO UPDATE → Comercial, Admin  (certificados, completar pendientes, enviar a recuperación)
   LABORATORIO DELETE → Comercial, Gerencia, Admin  (descartar)
 
 Separación de vistas:
   GET /laboratorio/cips           → Laboratorista/todos (no incluye IP por defecto)
   GET /laboratorio/lotes          → Comercial+ (incluye IP, organizado por lote)
   GET /laboratorio/lotes/{ip}     → Comercial+ (detalle completo por lote)
+
+Flujo de recuperación interna:
+  POST /laboratorio/lotes/{ip}/enviar-recuperacion  → Comercial crea PENDIENTE con snapshot ley_cabeza
+  PATCH /laboratorio/recuperacion/{id}/completar    → Laboratorista ingresa ley_cola + ley_liquido
 """
 
 from app.core.database import get_db
@@ -21,7 +25,9 @@ from app.schemas.laboratorio import (
     AnalisisRecuperacionCreate,
     AnalisisRecuperacionOut,
     CIPAnalisisOut,
+    CompletarRecuperacionRequest,
     DescartarRequest,
+    EnviarRecuperacionInternaRequest,
     LoteLabOut,
     SyncLaboratorioRequest,
     SyncLaboratorioResponse,
@@ -36,7 +42,6 @@ _ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
 
 
 def _puede_ver_ip(current_user) -> bool:
-    """Determina si el rol del usuario puede ver IPs (confidencialidad CIP)."""
     rol = current_user.rol.codigo if current_user.rol else None
     return rol in {r.value for r in _ROLES_COMERCIAL}
 
@@ -50,9 +55,10 @@ def listar_cips(
     db: Session = Depends(get_db),
 ):
     """
-    Lista todos los CIPs generados con su estado de análisis.
+    Lista todos los CIPs con su estado de análisis.
     Laboratorista: no recibe IPs (confidencialidad muestreo ciego).
     Comercial/Gerencia/Admin: recibe lote_ip en cada CIP.
+    CIPs de recuperación PENDIENTE aparecen destacados para laboratorista.
     """
     incluir_ip = _puede_ver_ip(current_user)
     return svc.obtener_cips_laboratorio(db, incluir_ip=incluir_ip)
@@ -66,7 +72,7 @@ def listar_lotes(
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
-    """Lista lotes con análisis. Solo Comercial/Gerencia/Admin (ven IPs)."""
+    """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
     return svc.obtener_lotes_laboratorio(db)
 
 
@@ -93,7 +99,7 @@ def registrar_ley(
     db: Session = Depends(get_db),
 ):
     """
-    Registra un análisis de ley (Fire Assay triple sampling) para un CIP.
+    Registra un análisis de ley (Fire Assay triple sampling) para un CIP tipo Laboratorio.
     Accesible por Laboratorista y Comercial.
     """
     try:
@@ -114,10 +120,6 @@ def descartar_ley(
     current_user=Depends(check_permiso("LABORATORIO", "DELETE")),
     db: Session = Depends(get_db),
 ):
-    """
-    Descarta/invalida un análisis de ley. Requiere justificación.
-    Comercial lo usa para solicitar remuestreo al marcar como descartado.
-    """
     try:
         resultado = svc.descartar_analisis_ley(
             db, analisis_id, datos.justificacion, current_user.id
@@ -136,7 +138,6 @@ async def subir_certificado_ley(
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
-    """Adjunta el PDF/imagen del certificado a un análisis de ley. Solo Comercial+."""
     try:
         url = svc.subir_certificado(db, analisis_id, archivo, tipo="ley")
         db.commit()
@@ -146,7 +147,65 @@ async def subir_certificado_ley(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-# ── Registrar Análisis de Recuperación ───────────────────────────────────────
+# ── Flujo de recuperación interna ────────────────────────────────────────────
+
+
+@router.post(
+    "/lotes/{ip}/enviar-recuperacion",
+    response_model=AnalisisRecuperacionOut,
+    status_code=201,
+    summary="Comercial crea registro PENDIENTE de recuperación para laboratorio interno",
+)
+def enviar_recuperacion_interna(
+    ip: str,
+    datos: EnviarRecuperacionInternaRequest = EnviarRecuperacionInternaRequest(),
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Crea un análisis de recuperación en estado PENDIENTE.
+    - Snapshot de ley_cabeza = ley planta calculada en este momento.
+    - El laboratorista lo completa con ley_cola y ley_liquido.
+    - Requiere que el lote tenga CIPs de RecuperacionInterno y análisis de ley vigentes.
+    Solo Comercial/Gerencia/Admin.
+    """
+    try:
+        nuevo = svc.enviar_recuperacion_interna(db, ip, datos, current_user.id)
+        db.commit()
+        lote = db.query(Lote).filter(Lote.id == nuevo.lote_id).first()
+        ip_lote = lote.ip if lote else None
+        return svc._rec_out(nuevo, ip_lote)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.patch(
+    "/recuperacion/{analisis_id}/completar",
+    response_model=AnalisisRecuperacionOut,
+    summary="Laboratorista completa un análisis de recuperación PENDIENTE",
+)
+def completar_recuperacion(
+    analisis_id: int,
+    datos: CompletarRecuperacionRequest,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Ingresa ley_cola y ley_liquido en un análisis PENDIENTE.
+    La recuperación se calcula automáticamente.
+    Accesible por Laboratorista, Comercial, Admin.
+    """
+    try:
+        resultado = svc.completar_recuperacion(db, analisis_id, datos, current_user.id)
+        db.commit()
+        return svc._rec_out(resultado)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+# ── Registro directo de recuperación (flujo externo / sin pending) ────────────
 
 
 @router.post("/recuperacion", response_model=AnalisisRecuperacionOut, status_code=201)
@@ -155,7 +214,11 @@ def registrar_recuperacion(
     current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
     db: Session = Depends(get_db),
 ):
-    """Registra un análisis de recuperación (Prueba de Botella) para un CIP."""
+    """
+    Registro directo COMPLETADO de recuperación (sin pending previo).
+    Usado para: certificados de laboratorio externo donde Comercial ingresa todos los datos.
+    El CIP debe ser de tipo RecuperacionExterno o RecuperacionInterno.
+    """
     try:
         nuevo = svc.registrar_analisis_recuperacion(db, datos, usuario_id=current_user.id)
         db.commit()
@@ -174,7 +237,6 @@ def descartar_recuperacion(
     current_user=Depends(check_permiso("LABORATORIO", "DELETE")),
     db: Session = Depends(get_db),
 ):
-    """Descarta un análisis de recuperación. Comercial/Gerencia/Admin."""
     try:
         resultado = svc.descartar_analisis_recuperacion(
             db, analisis_id, datos.justificacion, current_user.id
@@ -193,7 +255,6 @@ async def subir_certificado_recuperacion(
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
-    """Adjunta certificado a un análisis de recuperación. Solo Comercial+."""
     try:
         url = svc.subir_certificado(db, analisis_id, archivo, tipo="recuperacion")
         db.commit()

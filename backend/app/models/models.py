@@ -28,6 +28,7 @@ from app.models.enums import (
     EstadoCampana,
     EstadoLiquidacion,
     EstadoLote,
+    EstadoRecuperacion,
     EstadoRuma,
     EstadoSesion,
     OrigenDatos,
@@ -644,8 +645,15 @@ class AnalisisRecuperacion(AuditMixin, Base):
     ley_liquido = Column(Numeric(10, 4))
     recuperacion = Column(
         Numeric(5, 2),
-        Computed("((ley_cabeza - ley_cola) / ley_cabeza) * 100", persisted=True),
+        Computed(
+            "CASE "
+            "WHEN ley_cabeza IS NOT NULL AND ley_cola IS NOT NULL AND ley_cabeza > 0 "
+            "THEN ((ley_cabeza - ley_cola) * 100.0) / ley_cabeza "
+            "ELSE NULL END",
+            persisted=True,
+        ),
     )
+    estado = Column(String(20), default=EstadoRecuperacion.COMPLETADO, nullable=False)
     origen_datos = Column(String(20), default=OrigenDatos.MANUAL)
     fecha_analisis = Column(Date)
     certificado_url = Column(Text)

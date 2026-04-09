@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
+from app.models.enums import TipoMuestra
 from pydantic import BaseModel
 
 # ── Base CRUD ─────────────────────────────────────────────────────────────────
@@ -24,7 +25,8 @@ class PruebaMetalurgicaCreate(PruebaMetalurgicaBase):
 class PruebaMetalurgicaOut(PruebaMetalurgicaBase):
     id: int
     lote_id: int
-    cip: str | None = None
+    # cip ya no existe en el modelo - se obtiene desde mapeo_cip
+    cips_recuperacion: list[str] = []  # CIPs de recuperación generados para este lote
     fecha_salida: datetime | None = None
     creado_por: int | None = None
 
@@ -42,35 +44,40 @@ class LotePruebaList(BaseModel):
     malla_porcentaje: float | None = None
     gasto_agno3: float | None = None
     estado: str  # PENDIENTE | EN PROCESO | COMPLETADO
-    # Etiquetado
-    cip_asignado: str | None = None  # CIP de recuperación (si fue etiquetado)
+    cip_asignado: str | None = None  # primer CIP de recuperación (si fue etiquetado)
     etiquetado: bool = False
 
 
-# ── Etiquetado (nuevo) ────────────────────────────────────────────────────────
+# ── Etiquetado ────────────────────────────────────────────────────────────────
+
+
+class EtiquetarPruebaRequest(BaseModel):
+    tipo: TipoMuestra = TipoMuestra.RECUPERACION_INTERNO
 
 
 class EtiquetadoPruebaOut(BaseModel):
     ip: str
     cip: str
+    tipo: TipoMuestra
     mensaje: str = "Etiqueta de recuperación generada"
 
 
-# ── Pruebas listas para recuperación (nuevo) ─────────────────────────────────
+# ── Pruebas listas para recuperación ─────────────────────────────────────────
 
 
 class PruebaRecuperacionItem(BaseModel):
     """
-    Prueba COMPLETADO cuyo lote ya tiene ley planta calculada.
-    Se usa en Laboratorio para pre-llenar ley_cabeza en análisis de recuperación.
+    Prueba COMPLETADO cuyo lote ya tiene ley planta calculable.
+    Comercial usa esto para crear el registro pendiente de recuperación
+    en el laboratorio interno.
     """
 
     ip: str
-    cip: str  # CIP de la prueba (para recuperación)
+    cip: str  # CIP de recuperación interno
     lote_id: int
     proveedor: str
-    fecha_salida: datetime | None  # cuando se completaron las 48h
-    ley_cabeza: Decimal  # ley planta promediada por Comercial
+    fecha_salida: datetime | None
+    ley_cabeza: Decimal  # ley planta calculada (snapshot al crear pending)
     tiene_analisis_recuperacion: bool = False
 
 

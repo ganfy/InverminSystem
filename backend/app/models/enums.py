@@ -82,6 +82,19 @@ class EstadoAnalisis(str, Enum):
     DESCARTADO = "DESCARTADO"
 
 
+class EstadoRecuperacion(str, Enum):
+    """
+    Estado de un análisis de recuperación.
+    PENDIENTE: creado por Comercial con snapshot de ley_cabeza, esperando que
+               laboratorista ingrese ley_cola y ley_liquido.
+    COMPLETADO: datos completos ingresados (manual por laboratorista o via certificado externo).
+    El descarte se maneja por vigente=False (igual que AnalisisLey).
+    """
+
+    PENDIENTE = "PENDIENTE"
+    COMPLETADO = "COMPLETADO"
+
+
 class EstadoComprobante(str, Enum):
     EMITIDA = "EMITIDA"
     PARCIALMENTE_PAGADA = (
@@ -126,6 +139,22 @@ class TipoMaterial(str, Enum):
     MINERAL = "MINERAL"
     LLAMPO = "LLAMPO"
     MLLAMPO = "MLLAMPO"
+
+
+class TipoMuestra(str, Enum):
+    """
+    Tipo de muestra que representa un MapeoCIP.
+    - Laboratorio:          CIPs generados por muestreo para análisis de LEY.
+                            Laboratoristas externos nunca ven el IP, solo el CIP.
+    - RecuperacionInterno:  CIP generado por pruebas metalúrgicas (botella 48h)
+                            para análisis de recuperación por el lab interno.
+    - RecuperacionExterno:  CIP generado por pruebas metalúrgicas para envío
+                            a laboratorio externo. Comercial sube el certificado.
+    """
+
+    LABORATORIO = "Laboratorio"
+    RECUPERACION_INTERNO = "RecuperacionInterno"
+    RECUPERACION_EXTERNO = "RecuperacionExterno"
 
 
 class TipoAnalisis(str, Enum):
