@@ -148,7 +148,9 @@ def obtener_cips_laboratorio(
         )
         analisis_rec = (
             db.query(AnalisisRecuperacion)
-            .filter(AnalisisRecuperacion.cip == cip.codigo_cip)
+            .filter(
+                AnalisisRecuperacion.cip == cip.codigo_cip,
+            )
             .order_by(AnalisisRecuperacion.id)
             .all()
         )
