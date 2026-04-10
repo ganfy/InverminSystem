@@ -5,8 +5,10 @@ import type {
     AnalisisRecuperacionCreate,
     AnalisisRecuperacionOut,
     CIPAnalisisOut,
-    LoteLabOut,
+    CompletarRecuperacionRequest,
     DescartarRequest,
+    EnviarRecuperacionInternaRequest,
+    LoteLabOut,
     SyncLaboratorioRequest,
     SyncLaboratorioResponse,
 } from '@/types/laboratorio'
@@ -50,7 +52,25 @@ export const laboratorioApi = {
         return data
     },
 
-    // ── Análisis de Recuperación ──────────────────────────────────────────────
+    // ── Flujo recuperación interna (Comercial crea pending) ───────────────────
+    async enviarRecuperacion(
+        ip: string,
+        datos: EnviarRecuperacionInternaRequest = {},
+    ): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/enviar-recuperacion`, datos)
+        return data
+    },
+
+    // ── Laboratorista completa un pending ─────────────────────────────────────
+    async completarRecuperacion(
+        analisisId: number,
+        datos: CompletarRecuperacionRequest,
+    ): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.patch(`/laboratorio/recuperacion/${analisisId}/completar`, datos)
+        return data
+    },
+
+    // ── Registro directo (externo via certificado) ────────────────────────────
     async registrarRecuperacion(datos: AnalisisRecuperacionCreate): Promise<AnalisisRecuperacionOut> {
         const { data } = await api.post('/laboratorio/recuperacion', datos)
         return data
@@ -65,6 +85,24 @@ export const laboratorioApi = {
         const form = new FormData()
         form.append('archivo', archivo)
         const { data } = await api.post(`/laboratorio/recuperacion/${analisisId}/certificado`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    async extraerCertificadoLey(archivo: File): Promise<Record<string, any>> {
+        const form = new FormData()
+        form.append('archivo', archivo)
+        const { data } = await api.post('/laboratorio/certificado/extraer-ley', form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    async extraerCertificadoRecuperacion(archivo: File): Promise<Record<string, any>> {
+        const form = new FormData()
+        form.append('archivo', archivo)
+        const { data } = await api.post('/laboratorio/certificado/extraer-recuperacion', form, {
             headers: { 'Content-Type': 'multipart/form-data' },
         })
         return data

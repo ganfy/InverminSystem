@@ -34,6 +34,7 @@ from app.schemas.laboratorio import (
 )
 from app.services import laboratorio as svc
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import UploadFile as FastAPIFile
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/laboratorio", tags=["Laboratorio"])
@@ -262,6 +263,28 @@ async def subir_certificado_recuperacion(
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/certificado/extraer-ley")
+async def extraer_certificado_ley(
+    archivo: UploadFile = FastAPIFile(...),
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+):
+    """OCR de certificado PDF → devuelve campos pre-llenados para análisis de ley."""
+    contenido = await archivo.read()
+    resultado = svc.extraer_certificado_ley(contenido, archivo.filename or "cert.pdf")
+    return resultado
+
+
+@router.post("/certificado/extraer-recuperacion")
+async def extraer_certificado_recuperacion(
+    archivo: UploadFile = FastAPIFile(...),
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+):
+    """OCR de certificado PDF → devuelve campos pre-llenados para análisis de recuperación."""
+    contenido = await archivo.read()
+    resultado = svc.extraer_certificado_recuperacion(contenido, archivo.filename or "cert.pdf")
+    return resultado
 
 
 # ── Sync Offline ─────────────────────────────────────────────────────────────

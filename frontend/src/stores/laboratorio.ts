@@ -4,28 +4,34 @@ import { laboratorioApi } from '@/api/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import type {
-    CIPAnalisisOut,
-    LoteLabOut,
     AnalisisLeyCreate,
     AnalisisRecuperacionCreate,
+    AnalisisRecuperacionOut,
+    CIPAnalisisOut,
+    CompletarRecuperacionRequest,
+    EnviarRecuperacionInternaRequest,
+    LoteLabOut,
 } from '@/types/laboratorio'
 
 export const useLaboratorioStore = defineStore('laboratorio', () => {
     const ui = useUiStore()
     const auth = useAuthStore()
 
-    // ── Estado ────────────────────────────────────────────────────────────────
     const cips = ref<CIPAnalisisOut[]>([])
     const lotes = ref<LoteLabOut[]>([])
     const cargando = ref(false)
 
-    // ── Permiso de ver IP (rol-aware) ─────────────────────────────────────────
     const puedeVerIP = computed(() => {
         const r = auth.user?.rol ?? ''
         return ['Admin', 'Gerencia', 'Comercial'].includes(r)
     })
 
     const esLaboratorista = computed(() => auth.user?.rol === 'Laboratorista')
+
+    const puedeImportarCert = computed(() => {
+        const r = auth.user?.rol ?? ''
+        return ['Admin', 'Gerencia', 'Comercial'].includes(r)
+    })
 
     // ── Carga ─────────────────────────────────────────────────────────────────
     async function cargarCips() {
@@ -59,16 +65,11 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
-    // ── Registro de análisis ──────────────────────────────────────────────────
-    async function registrarLey(
-        datos: AnalisisLeyCreate,
-        archivo?: File | null,
-    ): Promise<boolean> {
+    // ── Análisis de Ley ───────────────────────────────────────────────────────
+    async function registrarLey(datos: AnalisisLeyCreate, archivo?: File | null): Promise<boolean> {
         try {
             const nuevo = await laboratorioApi.registrarLey(datos)
-            if (archivo) {
-                await laboratorioApi.subirCertificadoLey(nuevo.id, archivo)
-            }
+            if (archivo) await laboratorioApi.subirCertificadoLey(nuevo.id, archivo)
             ui.toast('Análisis de ley registrado', 'success')
             return true
         } catch (e: any) {
@@ -77,15 +78,47 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
+    // ── Flujo recuperación interna ────────────────────────────────────────────
+    // Comercial crea el pending con snapshot de ley_cabeza
+    async function enviarRecuperacion(
+        ip: string,
+        datos: EnviarRecuperacionInternaRequest = {},
+    ): Promise<AnalisisRecuperacionOut | null> {
+        try {
+            const nuevo = await laboratorioApi.enviarRecuperacion(ip, datos)
+            ui.toast('Enviado a laboratorio para análisis de recuperación', 'success')
+            return nuevo
+        } catch (e: any) {
+            ui.toast(e?.response?.data?.detail ?? 'Error al enviar a recuperación', 'error')
+            return null
+        }
+    }
+
+    // Laboratorista completa el pending
+    async function completarRecuperacion(
+        analisisId: number,
+        datos: CompletarRecuperacionRequest,
+        archivo?: File | null,
+    ): Promise<boolean> {
+        try {
+            const resultado = await laboratorioApi.completarRecuperacion(analisisId, datos)
+            if (archivo) await laboratorioApi.subirCertificadoRecuperacion(resultado.id, archivo)
+            ui.toast('Análisis de recuperación completado', 'success')
+            return true
+        } catch (e: any) {
+            ui.toast(e?.response?.data?.detail ?? 'Error al completar recuperación', 'error')
+            return false
+        }
+    }
+
+    // Registro directo COMPLETADO (externo via certificado)
     async function registrarRecuperacion(
         datos: AnalisisRecuperacionCreate,
         archivo?: File | null,
     ): Promise<boolean> {
         try {
             const nuevo = await laboratorioApi.registrarRecuperacion(datos)
-            if (archivo) {
-                await laboratorioApi.subirCertificadoRecuperacion(nuevo.id, archivo)
-            }
+            if (archivo) await laboratorioApi.subirCertificadoRecuperacion(nuevo.id, archivo)
             ui.toast('Análisis de recuperación registrado', 'success')
             return true
         } catch (e: any) {
@@ -94,7 +127,7 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
-    // ── Descartar análisis ────────────────────────────────────────────────────
+    // ── Descartar ─────────────────────────────────────────────────────────────
     async function descartarLey(analisisId: number, justificacion: string): Promise<boolean> {
         const ok = await ui.showConfirm({
             title: 'Descartar análisis',
@@ -131,7 +164,7 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
-    // ── Subir certificado ─────────────────────────────────────────────────────
+    // ── Certificados ──────────────────────────────────────────────────────────
     async function subirCertificadoLey(analisisId: number, archivo: File): Promise<boolean> {
         try {
             await laboratorioApi.subirCertificadoLey(analisisId, archivo)
@@ -158,8 +191,10 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         cips, lotes, cargando,
         puedeVerIP, esLaboratorista,
         cargarCips, cargarLotes, cargarDetalleLote,
-        registrarLey, registrarRecuperacion,
+        registrarLey,
+        enviarRecuperacion, completarRecuperacion, registrarRecuperacion,
         descartarLey, descartarRecuperacion,
         subirCertificadoLey, subirCertificadoRecuperacion,
+        puedeImportarCert,
     }
 })

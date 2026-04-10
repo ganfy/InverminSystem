@@ -14,7 +14,10 @@ import RegistrarRecuperacionView from '@/views/laboratorio/RegistrarRecuperacion
 import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
 import UnauthorizedView from '@/views/auth/UnauthorizedView.vue'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
-import MainLayout from '@/layouts/MainLayout.vue' // Importamos el Layout
+import MainLayout from '@/layouts/MainLayout.vue'
+import RegistrarHumedadView from '@/views/muestreo/RegistrarHumedadView.vue'
+import ImportarCertificadoLeyView from '@/views/laboratorio/ImportarCertificadoLeyView.vue'
+import ImportarCertificadoRecuperacionView from '@/views/laboratorio/ImportarCertificadoRecView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -38,6 +41,7 @@ const router = createRouter({
 
         // Muestreo
         { path: 'muestreo', name: 'Muestreo', component: MuestreoView },
+        { path: 'muestreo/:ip', name: 'RegistrarHumedad', component: RegistrarHumedadView },
 
         // Pruebas
         { path: 'pruebas', name: 'Pruebas', component: PruebasView },
@@ -48,7 +52,8 @@ const router = createRouter({
         { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView },
         { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView },
         { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
-
+        { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView },
+        { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView },
         // Error
         { path: 'unauthorized', name: 'Unauthorized', component: UnauthorizedView },
 

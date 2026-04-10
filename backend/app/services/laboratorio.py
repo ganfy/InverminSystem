@@ -5,6 +5,9 @@ Dos flujos diferenciados por rol:
 """
 
 import os
+import re
+import shutil
+import tempfile
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -204,16 +207,19 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     except AttributeError:
         proveedor = "-"
 
-    mapeo_cips = lote.mapeo_cip or []
-    cips = [m.codigo_cip for m in mapeo_cips]
-    cips_detalle = [
-        CIPResumen(
-            codigo_cip=m.codigo_cip,
-            tipo_muestra=m.tipo_muestra,
-            laboratorio=m.laboratorio,
-        )
-        for m in mapeo_cips
-    ]
+    _mcip = lote.mapeo_cip  # single object or None (uselist=False)
+    cips = [_mcip.codigo_cip] if _mcip else []
+    cips_detalle = (
+        [
+            CIPResumen(
+                codigo_cip=_mcip.codigo_cip,
+                tipo_muestra=_mcip.tipo_muestra,
+                laboratorio=_mcip.laboratorio,
+            )
+        ]
+        if _mcip
+        else []
+    )
 
     analisis_ley = (
         db.query(AnalisisLey).filter(AnalisisLey.lote_id == lote.id).order_by(AnalisisLey.id).all()
@@ -543,6 +549,236 @@ def subir_certificado(db: Session, analisis_id: int, archivo: UploadFile, tipo: 
     a.certificado_url = ruta
     db.flush()
     return ruta
+
+
+def extraer_certificado_ley(archivo_bytes: bytes, filename: str) -> dict:
+    """
+    Extrae campos de un certificado PDF de análisis de ley.
+    Retorna dict con campos encontrados (None si no detectado).
+    """
+    texto = _pdf_to_text(archivo_bytes, filename)
+
+    def _find(patterns, txt=texto):
+        for p in patterns:
+            m = re.search(p, txt, re.IGNORECASE)
+            if m:
+                try:
+                    return m.group(1).strip()
+                except IndexError:
+                    return m.group(0).strip()
+        return None
+
+    def _find_float(patterns):
+        v = _find(patterns)
+        if v is None:
+            return None
+        try:
+            return float(v.replace(",", "."))
+        except ValueError:
+            return None
+
+    cip = _find(
+        [
+            r"CIP[-\s]*([\w\-]+)",
+            r"C\.I\.P\.?\s*:?\s*([\w\-]+)",
+            r"CODIGO\s+MUESTRA\s*:?\s*([\w\-]+)",
+            r"MUESTRA\s*:?\s*(CIP[-\w]+)",
+        ]
+    )
+
+    laboratorio = _find(
+        [
+            r"LABORATORIO\s*:?\s*([A-Z][A-Za-z\s]+?)(?:\n|$)",
+            r"LAB\s*:?\s*([A-Z][A-Za-z\s]+?)(?:\n|$)",
+        ]
+    )
+
+    n_informe = _find(
+        [
+            r"N[°º]?\s*INFORME\s*:?\s*([\w\-\/]+)",
+            r"INFORME\s+N[°º]?\s*([\w\-\/]+)",
+            r"REPORT\s*N[°º]?\s*([\w\-\/]+)",
+            r"LQ\s+([\w\-]+)",
+        ]
+    )
+
+    fecha_analisis = _find(
+        [
+            r"FECHA\s+AN[AÁ]LISIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+            r"DATE\s+OF\s+ANALYSIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+            r"FECHA\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+        ]
+    )
+
+    ley_final = _find_float(
+        [
+            r"LEY\s+AU\s+OZ[\/\s]*TC\s*:?\s*([\d]+[.,][\d]+)",
+            r"AU\s+OZ[\/\s]*TC\s*:?\s*([\d]+[.,][\d]+)",
+            r"OZ[\/\s]TC\s*:?\s*([\d]+[.,][\d]+)",
+            r"RESULT[ADO]*\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+
+    ley_grueso = _find_float(
+        [
+            r"MESH\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+            r"MALLA\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+            r"\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+
+    ley_fino = _find_float(
+        [
+            r"MESH\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+            r"MALLA\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+            r"-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+
+    # Normalizar fecha a YYYY-MM-DD si es posible
+    fecha_norm = None
+    if fecha_analisis:
+        for sep in ["-", "/"]:
+            parts = fecha_analisis.split(sep)
+            if len(parts) == 3:
+                d, m_p, y = parts
+                if len(y) == 2:
+                    y = "20" + y
+                try:
+                    fecha_norm = f"{y}-{int(m_p):02d}-{int(d):02d}"
+                except ValueError:
+                    pass
+                break
+
+    return {
+        "cip": cip,
+        "laboratorio": laboratorio,
+        "n_informe": n_informe,
+        "fecha_analisis": fecha_norm or fecha_analisis,
+        "ley_final": ley_final,  # oz/tc total
+        "ley_grueso": ley_grueso,  # mesh +140/150
+        "ley_fino": ley_fino,  # mesh -140/150
+        "texto_raw": texto[:500],  # para debug
+    }
+
+
+def extraer_certificado_recuperacion(archivo_bytes: bytes, filename: str) -> dict:
+    """Extrae campos de certificado de análisis de recuperación."""
+    texto = _pdf_to_text(archivo_bytes, filename)
+
+    def _find_float(patterns):
+        for p in patterns:
+            m = re.search(p, texto, re.IGNORECASE)
+            if m:
+                try:
+                    return float(m.group(1).replace(",", "."))
+                except (ValueError, IndexError):
+                    pass
+        return None
+
+    def _find(patterns):
+        for p in patterns:
+            m = re.search(p, texto, re.IGNORECASE)
+            if m:
+                try:
+                    return m.group(1).strip()
+                except IndexError:
+                    return m.group(0).strip()
+        return None
+
+    cip = _find([r"CIP[-\s]*([\w\-]+)", r"C\.I\.P\.?\s*:?\s*([\w\-]+)"])
+    laboratorio = _find([r"LABORATORIO\s*:?\s*([A-Z][A-Za-z\s]+?)(?:\n|$)"])
+    n_informe = _find([r"N[°º]?\s*INFORME\s*:?\s*([\w\-\/]+)", r"AREC[-\s]*([\d]+)"])
+
+    fecha = _find([r"FECHA\s+AN[AÁ]LISIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})"])
+    fecha_norm = None
+    if fecha:
+        for sep in ["-", "/"]:
+            parts = fecha.split(sep)
+            if len(parts) == 3:
+                d, m_p, y = parts
+                if len(y) == 2:
+                    y = "20" + y
+                try:
+                    fecha_norm = f"{y}-{int(m_p):02d}-{int(d):02d}"
+                except ValueError:
+                    pass
+                break
+
+    ley_cabeza = _find_float(
+        [
+            r"LEY\s+CABEZA\s*:?\s*([\d]+[.,][\d]+)",
+            r"CABEZA\s*:?\s*([\d]+[.,][\d]+)",
+            r"HEAD\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+    ley_cola = _find_float(
+        [
+            r"LEY\s+COLA\s*:?\s*([\d]+[.,][\d]+)",
+            r"COLA\s*:?\s*([\d]+[.,][\d]+)",
+            r"TAIL\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+    ley_liquido = _find_float(
+        [
+            r"LEY\s+L[IÍ]QUIDO\s*:?\s*([\d]+[.,][\d]+)",
+            r"L[IÍ]QUIDO\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+    recuperacion = _find_float(
+        [
+            r"RECUPERACI[OÓ]N\s*:?\s*([\d]+[.,][\d]+)\s*%",
+            r"RECOVERY\s*:?\s*([\d]+[.,][\d]+)",
+            r"%\s+RECUP\s*:?\s*([\d]+[.,][\d]+)",
+        ]
+    )
+
+    return {
+        "cip": cip,
+        "laboratorio": laboratorio,
+        "n_informe": n_informe,
+        "fecha_analisis": fecha_norm or fecha,
+        "ley_cabeza": ley_cabeza,
+        "ley_cola": ley_cola,
+        "ley_liquido": ley_liquido,
+        "recuperacion": recuperacion,
+        "texto_raw": texto[:500],
+    }
+
+
+def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
+    """Extract text from PDF bytes using pymupdf, fallback to tesseract OCR."""
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        ruta = tmp / filename
+        ruta.write_bytes(archivo_bytes)
+        try:
+            import fitz
+
+            doc = fitz.open(str(ruta))
+            textos = []
+            for page in doc:
+                t = page.get_text()
+                if t.strip():
+                    textos.append(t)
+                else:
+                    # scanned page → render and OCR
+                    try:
+                        import pytesseract
+                        from PIL import Image
+
+                        mat = fitz.Matrix(2.0, 2.0)
+                        pix = page.get_pixmap(matrix=mat)
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        textos.append(pytesseract.image_to_string(img, lang="spa+eng"))
+                    except Exception:
+                        pass
+            doc.close()
+            return "\n".join(textos)
+        except Exception:
+            return ""
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

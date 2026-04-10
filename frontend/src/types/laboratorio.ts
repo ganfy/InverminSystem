@@ -1,6 +1,7 @@
-// ── Enums alineados con backend ───────────────────────────────────────────────
 export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia'
 export type OrigenDatos = 'manual' | 'certificado'
+export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO'
+export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno'
 
 // ── Análisis de Ley ───────────────────────────────────────────────────────────
 export interface AnalisisLeyCreate {
@@ -45,6 +46,17 @@ export interface AnalisisRecuperacionCreate {
     fecha_analisis?: string
 }
 
+export interface CompletarRecuperacionRequest {
+    ley_cola: number
+    ley_liquido?: number | null
+    fecha_analisis?: string
+}
+
+export interface EnviarRecuperacionInternaRequest {
+    cip?: string | null   // null → sistema elige el único RecuperacionInterno
+    laboratorio?: string
+}
+
 export interface AnalisisRecuperacionOut {
     id: number
     lote_id: number
@@ -55,6 +67,7 @@ export interface AnalisisRecuperacionOut {
     ley_cola: number
     ley_liquido?: number | null
     recuperacion?: number | null
+    estado: EstadoRecuperacion   // PENDIENTE | COMPLETADO
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
@@ -68,15 +81,21 @@ export interface CIPAnalisisOut {
     lote_id: number
     lote_ip?: string | null
     fecha_envio?: string | null
-    tipo_muestra?: string | null
+    tipo_muestra?: TipoMuestra | null
     laboratorio_destino?: string | null
     estado_ley: 'PENDIENTE' | 'COMPLETADO'
-    estado_recuperacion: 'PENDIENTE' | 'COMPLETADO'
+    estado_recuperacion: 'PENDIENTE' | 'COMPLETADO' | 'SIN_DATOS'
     analisis_ley: AnalisisLeyOut[]
     analisis_recuperacion: AnalisisRecuperacionOut[]
 }
 
 // ── Vista Comercial: por Lote/IP ──────────────────────────────────────────────
+export interface CIPResumen {
+    codigo_cip: string
+    tipo_muestra?: TipoMuestra | null
+    laboratorio?: string | null
+}
+
 export interface LoteLabOut {
     ip: string
     lote_id: number
@@ -84,6 +103,9 @@ export interface LoteLabOut {
     material?: string | null
     fecha_recepcion?: string | null
     cips: string[]
+    cips_detalle: CIPResumen[]
+    ley_planta?: number | null      // calculada on-the-fly (promedio vigentes)
+    ley_minero?: number | null      // del análisis tipo minero vigente
     analisis_ley: AnalisisLeyOut[]
     analisis_recuperacion: AnalisisRecuperacionOut[]
     tiene_dirimencia: boolean

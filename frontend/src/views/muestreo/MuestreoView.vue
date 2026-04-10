@@ -4,42 +4,6 @@
         <h1 class="page-title">Muestreo</h1>
       </div>
 
-      <div v-if="featureControlTiemposPrueba && lotesPendientesEtiquetado.length > 0" class="sla-container">
-  <h3 class="td-label-gold">CONTROL SLA: PENDIENTES DE ETIQUETADO</h3>
-  <table class="sla-table">
-    <thead>
-      <tr>
-        <th>LOTE</th>
-        <th>INICIO PRUEBA</th>
-        <th>TIEMPO</th>
-        <th>ESTADO</th>
-        <th>ACCIONES</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="lote in lotesPendientesEtiquetado" :key="lote.ip">
-        <td class="td-value-mono">{{ lote.ip }}</td>
-        <td>{{ formatearFecha(lote.fecha_ingreso_prueba) }}</td>
-        <td class="td-value-mono">{{ Math.floor(calcularEstadoSLA(lote)?.horas ?? 0) }}h</td>
-        <td>
-          <span :class="['sla-badge', calcularEstadoSLA(lote)?.clase]">
-            {{ calcularEstadoSLA(lote)?.texto }}
-          </span>
-        </td>
-        <td>
-          <button
-            class="btn-primary"
-            :disabled="!calcularEstadoSLA(lote)?.habilitado"
-            @click="abrirModalEtiquetas(lote.ip)"
-          >
-            Etiquetar
-          </button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-
       <div class="tabs-container">
         <button class="tab-btn" :class="{ active: tabActual === 'PENDIENTES' }" @click="tabActual = 'PENDIENTES'">
           Pendientes <span class="tab-badge">{{ store.lotesPendientes.length }}</span>
@@ -94,10 +58,6 @@
 
             <template v-else>
               <div class="actions-grid">
-                <button class="btn-primary flex-1 btn-con-icono" @click="abrirModalEtiquetas(lote.ip)">
-                  <Plus v-if="lote.etiquetado" :size="18" />
-                  <span>{{ lote.etiquetado ? 'Etiquetas Extra' : 'Etiquetar' }}</span>
-                </button>
 
                 <button v-if="!lote.etiquetado && lote.cantidad_intentos_previos < 3" class="btn-secondary flex-1" @click="irARegistrarHumedad(lote.ip)">
                   Remuestrear
@@ -108,6 +68,11 @@
                 </button>
               </div>
             </template>
+
+            <button class="btn-primary flex-1 btn-con-icono" @click="abrirModalEtiquetas(lote.ip)">
+                <Plus v-if="lote.etiquetado" :size="18" />
+                <span>{{ lote.etiquetado ? 'Etiquetas Extra' : 'Etiquetar' }}</span>
+              </button>
           </div>
         </div>
       </div>

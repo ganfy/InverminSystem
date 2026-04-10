@@ -47,7 +47,7 @@
     <div class="filtros-bar">
       <div class="field" style="min-width:180px">
         <label class="field-label">Estado</label>
-        <select class="field-select" v-model="filtroEstado">
+        <select class="field-select field-sm field-input" v-model="filtroEstado">
           <option value="Todos">Todos los estados</option>
           <option value="PENDIENTE">PENDIENTE</option>
           <option value="EN PROCESO">EN PROCESO</option>
@@ -152,7 +152,7 @@
         <div class="modal-body" style="text-align:center">
           <p class="field-label" style="margin-bottom:0.5rem">LOTE: {{ etiquetaModal.ip }}</p>
           <div class="etiqueta-cip">
-            <span class="etiqueta-title">INVERMIN S.A.C. — RECUPERACIÓN</span>
+            <span class="etiqueta-title">INVERMIN PAITITI S.A.C. — RECUPERACIÓN</span>
             <div :id="`barcode-prueba`" class="barcode-container"></div>
             <span class="etiqueta-codigo">{{ etiquetaModal.cip }}</span>
           </div>
@@ -224,7 +224,8 @@ async function cargarDatos() {
     const data = await pruebasApi.obtenerListaPruebas()
     pruebas.value = Array.isArray(data) ? data : []
   } catch (err: any) {
-    if (online.value) ui.toast('Error al conectar con el servidor', 'error')
+    console.error('Error cargando pruebas:', err)
+    if (online.value && err?.response?.status !== 403) ui.toast('Error al conectar con el servidor', 'error')
     pruebas.value = []
   } finally {
     cargando.value = false
@@ -316,16 +317,16 @@ function verEtiqueta(prueba: LotePruebaList) {
 
 function imprimirEtiqueta(e: { ip: string; cip: string }) {
   const css = `
-    body { font-family: monospace; display:flex; justify-content:center; align-items:center; min-height:100vh; }
-    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:260px; }
+    body { font-family: monospace; display:flex; align-items:center; }
+    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:80%; }
     .et-title { font-size:0.65rem; font-weight:900; letter-spacing:.1em; display:block; margin-bottom:4px; }
     .et-sub { font-size:0.55rem; border-bottom:1px solid #000; padding-bottom:4px; display:block; width:100%; text-align:center; }
-    .et-code { font-size:1.1rem; font-weight:900; margin-top:8px; display:block; }
+    .et-code { font-size:2rem; font-weight:900; margin-top:8px; display:block; }
   `
   const html = `<!DOCTYPE html><html><head><style>${css}</style></head><body>
     <div class="et">
-      <span class="et-title">INVERMIN S.A.C.</span>
-      <span class="et-sub">RECUPERACIÓN — ${e.ip}</span>
+      <span class="et-title">INVERMIN PAITITI S.A.C.</span>
+      <span class="et-sub">RECUPERACIÓN</span>
       <span class="et-code">${e.cip}</span>
     </div>
     <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))<\/script>

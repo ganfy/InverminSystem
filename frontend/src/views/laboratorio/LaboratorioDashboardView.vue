@@ -1,7 +1,6 @@
 <template>
   <div class="page-container">
 
-    <!-- Header -->
     <header class="page-header">
       <div>
         <h1 class="page-title">
@@ -9,7 +8,7 @@
           Laboratorio
         </h1>
         <p class="page-subtitle">
-          {{ tabActual === 'ley' ? 'Análisis de Ley de Newmont' : 'Análisis de Recuperación' }}
+          {{ tabActual === 'ley' ? 'Análisis de Ley' : 'Análisis de Recuperación' }}
         </p>
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
@@ -20,35 +19,25 @@
       </div>
     </header>
 
-    <!-- Tabs: toggle Ley / Recuperación -->
     <div class="tabs-lab">
-      <button
-        class="tab-lab-btn"
-        :class="{ active: tabActual === 'ley' }"
-        @click="tabActual = 'ley'"
-      >
-        Análisis de Ley de Newmont
+      <button class="tab-lab-btn" :class="{ active: tabActual === 'ley' }" @click="tabActual = 'ley'">
+        Análisis de Ley
         <span class="tab-lab-toggle">{{ tabActual === 'ley' ? '︿' : '︾' }}</span>
       </button>
-      <button
-        class="tab-lab-btn"
-        :class="{ active: tabActual === 'rec' }"
-        @click="tabActual = 'rec'"
-      >
+      <button class="tab-lab-btn" :class="{ active: tabActual === 'rec' }" @click="tabActual = 'rec'">
         Análisis de Recuperación
+        <span v-if="pendientesRec > 0" class="badge-count">{{ pendientesRec }}</span>
         <span class="tab-lab-toggle">{{ tabActual === 'rec' ? '︿' : '︾' }}</span>
       </button>
     </div>
 
-    <!-- Filtros -->
     <div class="filtros-bar">
       <div class="field" style="min-width:180px">
         <label class="field-label">ESTADO</label>
-        <select class="field-select" v-model="filtroEstado">
+        <select class="field-select field-sm field-input" v-model="filtroEstado">
           <option value="">Todos los estados</option>
           <option value="PENDIENTE">Pendiente</option>
           <option value="COMPLETADO">Completado</option>
-          <option value="PARCIAL">Parcial</option>
         </select>
       </div>
       <div class="field" style="min-width:160px">
@@ -61,27 +50,26 @@
       </div>
       <div class="field" style="flex:1;min-width:200px">
         <label class="field-label">BÚSQUEDA</label>
-        <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="CIP" />
+        <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="CIP o IP" />
       </div>
     </div>
 
-    <!-- Tabla -->
     <div class="tabla-wrapper">
       <table class="tabla">
         <thead>
           <tr>
-            <th>LOTE (CIP)</th>
-            <!-- IP solo si puede verlo (Comercial/Admin/Gerencia) -->
+            <th>CIP</th>
             <th v-if="store.puedeVerIP">IP</th>
-            <th>FECHA RECEP.</th>
-            <!-- Columnas según tab -->
+            <th>FECHA ENVÍO</th>
             <template v-if="tabActual === 'ley'">
+              <th>LABORATORIO</th>
               <th>MALLA +140</th>
               <th>MALLA -140</th>
               <th>AU OZ/TC</th>
               <th>AU GR/TM</th>
             </template>
             <template v-else>
+              <th>LABORATORIO</th>
               <th>LEY CABEZA</th>
               <th>LEY COLA</th>
               <th>LEY LÍQUIDO</th>
@@ -102,47 +90,49 @@
               <td :colspan="colSpan" class="estado-tabla sin-datos">Sin registros</td>
             </tr>
 
-            <!-- ── Tab LEY ────────────────────────────────────────────── -->
             <template v-if="tabActual === 'ley'">
-              <tr v-for="fila in filasMostrar" :key="fila.cip" :class="{ inactivo: fila.estadoLey === 'DESCARTADO' }">
+              <tr v-for="fila in filasMostrar" :key="fila.cip" :class="{ inactivo: fila.estado === 'DESCARTADO' }">
                 <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                 <td v-if="store.puedeVerIP" class="td-mono">{{ fila.lote_ip ?? '-' }}</td>
                 <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
-                <td>{{ fila.leyMasNum ?? '-' }}</td>
-                <td>{{ fila.leyMenosNum ?? '-' }}</td>
+                <td>{{ fila.laboratorio ?? '-' }}</td>
+                <td>{{ fila.leyMas ?? '-' }}</td>
+                <td>{{ fila.leyMenos ?? '-' }}</td>
                 <td class="td-mono" style="color:var(--color-gold-light)">{{ fila.ozTc ?? '-' }}</td>
                 <td class="td-mono">{{ fila.grTm ?? '-' }}</td>
                 <td>
-                  <span class="badge-estado" :class="badgeClass(fila.estadoLey)">
-                    {{ fila.estadoLey }}
-                  </span>
+                  <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                 </td>
+                <!-- AFTER -->
                 <td class="td-acciones">
                   <button
-                    v-if="fila.estadoLey === 'PENDIENTE'"
+                    v-if="store.esLaboratorista && fila.estado === 'PENDIENTE'"
                     class="btn-primary"
                     style="font-size:0.75rem;padding:0.3rem 0.75rem"
                     @click="irARegistrarLey(fila.cip)"
-                    title="Registrar ley"
                   >Registrar</button>
-                  <!-- Ver detalle: solo Comercial+ que ve IP -->
                   <button
-                    v-if="store.puedeVerIP && fila.lote_ip"
+                    v-if="store.puedeImportarCert && fila.estado === 'PENDIENTE'"
+                    class="btn-primary"
+                    style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                    @click="irAImportarLey(fila.cip)"
+                  >Importar cert.</button>
+                  <button
+                    v-if="store.puedeVerIP && fila.lote_ip && fila.estado === 'COMPLETADO'"
                     class="btn-secondary"
                     style="font-size:0.75rem;padding:0.3rem 0.75rem"
                     @click="irADetalleLote(fila.lote_ip!)"
-                    title="Ver detalle del lote"
                   >Detalle</button>
                 </td>
               </tr>
             </template>
 
-            <!-- ── Tab RECUPERACIÓN ──────────────────────────────────── -->
             <template v-if="tabActual === 'rec'">
               <tr v-for="fila in filasMostrar" :key="fila.cip">
                 <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                 <td v-if="store.puedeVerIP" class="td-mono">{{ fila.lote_ip ?? '-' }}</td>
                 <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
+                <td>{{ fila.laboratorio ?? '-' }}</td>
                 <td>{{ fila.leyCabeza ?? '-' }}</td>
                 <td>{{ fila.leyCola ?? '-' }}</td>
                 <td>{{ fila.leyLiquido ?? '-' }}</td>
@@ -150,24 +140,26 @@
                   {{ fila.recuperacion != null ? fila.recuperacion + '%' : '-' }}
                 </td>
                 <td>
-                  <span class="badge-estado" :class="badgeClass(fila.estadoRec)">
-                    {{ fila.estadoRec }}
-                  </span>
+                  <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                 </td>
                 <td class="td-acciones">
                   <button
-                    v-if="fila.estadoRec === 'PENDIENTE'"
+                    v-if="store.esLaboratorista && fila.estado === 'PENDIENTE'"
                     class="btn-primary"
                     style="font-size:0.75rem;padding:0.3rem 0.75rem"
                     @click="irARegistrarRecuperacion(fila.cip)"
-                    title="Registrar recuperación"
                   >Registrar</button>
                   <button
-                    v-if="store.puedeVerIP && fila.lote_ip"
+                    v-if="store.puedeImportarCert && fila.estado === 'PENDIENTE'"
+                    class="btn-primary"
+                    style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                    @click="irAImportarRec(fila.cip)"
+                  >Importar cert.</button>
+                  <button
+                    v-if="store.puedeVerIP && fila.lote_ip && fila.estado === 'COMPLETADO'"
                     class="btn-secondary"
                     style="font-size:0.75rem;padding:0.3rem 0.75rem"
                     @click="irADetalleLote(fila.lote_ip!)"
-                    title="Ver detalle del lote"
                   >Detalle</button>
                 </td>
               </tr>
@@ -191,77 +183,92 @@ import type { CIPAnalisisOut } from '@/types/laboratorio'
 const router = useRouter()
 const store  = useLaboratorioStore()
 
-const tabActual     = ref<'ley' | 'rec'>('ley')
-const filtroEstado  = ref('')
-const filtroDesde   = ref('')
-const filtroHasta   = ref('')
+const tabActual      = ref<'ley' | 'rec'>('ley')
+const filtroEstado   = ref('')
+const filtroDesde    = ref('')
+const filtroHasta    = ref('')
 const filtroBusqueda = ref('')
 
 onMounted(() => store.cargarCips())
-
 function recargar() { store.cargarCips() }
 
-// ── Columnas dinámicas ────────────────────────────────────────────────────────
 const colSpan = computed(() => {
-  const base = tabActual.value === 'ley' ? 7 : 7
+  const base = tabActual.value === 'ley' ? 9 : 9
   return store.puedeVerIP ? base + 1 : base
 })
 
-// ── Filas con datos calculados ────────────────────────────────────────────────
-interface FilaLey {
+// Cantidad de recuperaciones PENDIENTE (badge en tab)
+const pendientesRec = computed(() =>
+  store.cips.filter(c =>
+    (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') &&
+    c.estado_recuperacion === 'PENDIENTE'
+  ).length
+)
+
+interface Fila {
   cip: string
   lote_ip?: string | null
   fecha_envio?: string | null
+  laboratorio?: string | null
+  estado: string
+  analisisId?: number | null
   // ley
-  leyMasNum?: number | null
-  leyMenosNum?: number | null
+  leyMas?: number | null
+  leyMenos?: number | null
   ozTc?: number | null
   grTm?: number | null
-  estadoLey: string
   // rec
   leyCabeza?: number | null
   leyCola?: number | null
   leyLiquido?: number | null
   recuperacion?: number | null
-  estadoRec: string
 }
 
-function mapCIP(c: CIPAnalisisOut): FilaLey {
-  // Tomar el primer análisis vigente de ley/rec
-  const ley = c.analisis_ley.find(a => a.vigente)
-  const rec = c.analisis_recuperacion.find(a => a.vigente)
-
-  const estadoLey = c.analisis_ley.length === 0 ? 'PENDIENTE'
-    : ley ? 'COMPLETADO' : 'PARCIAL'
-
-  const estadoRec = c.analisis_recuperacion.length === 0 ? 'PENDIENTE'
-    : rec ? 'COMPLETADO' : 'PARCIAL'
-
-  return {
-    cip: c.cip,
-    lote_ip: c.lote_ip,
-    fecha_envio: c.fecha_envio,
-    leyMasNum:  ley?.ley_grueso ?? null,
-    leyMenosNum: ley?.ley_fino ?? null,
-    ozTc: ley?.ley_final ?? null,
-    grTm: ley?.ley_gr_tm ?? null,
-    estadoLey,
-    leyCabeza: rec?.ley_cabeza ?? null,
-    leyCola:   rec?.ley_cola ?? null,
-    leyLiquido: rec?.ley_liquido ?? null,
-    recuperacion: rec?.recuperacion ?? null,
-    estadoRec,
+function mapearCIP(c: CIPAnalisisOut): Fila {
+  if (tabActual.value === 'ley') {
+    const a = c.analisis_ley.find(x => x.vigente) ?? c.analisis_ley[0]
+    return {
+      cip: c.cip,
+      lote_ip: c.lote_ip,
+      fecha_envio: c.fecha_envio,
+      laboratorio: a?.laboratorio ?? c.laboratorio_destino,
+      estado: c.estado_ley,
+      leyMas: a?.ley_grueso ?? null,
+      leyMenos: a?.ley_fino ?? null,
+      ozTc: a?.ley_final ?? null,
+      grTm: a?.ley_gr_tm ?? null,
+    }
+  } else {
+    // Para rec: tomar el PENDIENTE primero, si no el último COMPLETADO vigente
+    const pending = c.analisis_recuperacion.find(x => x.estado === 'PENDIENTE' && x.vigente)
+    const completado = c.analisis_recuperacion.find(x => x.estado === 'COMPLETADO' && x.vigente)
+    const a = pending ?? completado
+    return {
+      cip: c.cip,
+      lote_ip: c.lote_ip,
+      fecha_envio: c.fecha_envio,
+      laboratorio: a?.laboratorio ?? c.laboratorio_destino,
+      estado: c.estado_recuperacion === 'SIN_DATOS' ? 'SIN DATOS' : c.estado_recuperacion,
+      analisisId: pending?.id ?? null,
+      leyCabeza: a?.ley_cabeza ?? null,
+      leyCola: a?.ley_cola ?? null,
+      leyLiquido: a?.ley_liquido ?? null,
+      recuperacion: a?.recuperacion ?? null,
+    }
   }
 }
 
 const filasMostrar = computed(() => {
-  return store.cips
-    .map(mapCIP)
+  // Filtrar CIPs por tipo según tab
+  const cipsFiltrados = store.cips.filter(c => {
+    if (tabActual.value === 'ley') return c.tipo_muestra === 'Laboratorio'
+    return (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno')
+  })
+
+  return cipsFiltrados
+    .map(mapearCIP)
     .filter(f => {
-      if (filtroEstado.value) {
-        const estado = tabActual.value === 'ley' ? f.estadoLey : f.estadoRec
-        if (estado !== filtroEstado.value) return false
-      }
+      if (filtroEstado.value && f.estado !== filtroEstado.value) return false
       if (filtroBusqueda.value) {
         const q = filtroBusqueda.value.toLowerCase()
         if (!f.cip.toLowerCase().includes(q) && !(f.lote_ip ?? '').toLowerCase().includes(q)) return false
@@ -272,24 +279,30 @@ const filasMostrar = computed(() => {
     })
 })
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(d?: string | null) {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', year:'numeric' })
+  return new Date(d).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function badgeClass(estado: string) {
   const m: Record<string, string> = {
     COMPLETADO: 'completo',
-    PENDIENTE:  'pendiente',
-    PARCIAL:    'parcial',
+    PENDIENTE: 'pendiente',
+    'SIN DATOS': 'parcial',
   }
   return m[estado] ?? ''
 }
 
-function irARegistrarLey(cip: string)         { router.push(`/laboratorio/ley/${cip}`) }
+function irARegistrarLey(cip: string)          { router.push(`/laboratorio/ley/${cip}`) }
+// Laboratorista completa recuperacion: lleva el analisis_id como query param
+function irACompletarRecuperacion(cip: string, analisisId: number) {
+  router.push(`/laboratorio/recuperacion/${cip}?id=${analisisId}`)
+}
 function irARegistrarRecuperacion(cip: string) { router.push(`/laboratorio/recuperacion/${cip}`) }
-function irADetalleLote(ip: string)            { router.push(`/laboratorio/lote/${ip}`) }
+function irADetalleLote(ip: string) { router.push(`/laboratorio/lote/${ip}`) }
+function irAImportarLey(cip: string) { router.push(`/laboratorio/importar-ley/${cip}`) }
+function irAImportarRec(cip: string) { router.push(`/laboratorio/importar-rec/${cip}`) }
+
 </script>
 
 <style scoped>
@@ -324,6 +337,17 @@ function irADetalleLote(ip: string)            { router.push(`/laboratorio/lote/
 .tab-lab-toggle {
   font-size: 0.7rem;
   color: var(--color-text-faint);
+}
+
+.badge-count {
+  background: var(--color-error, #ef4444);
+  color: #fff;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  min-width: 1.2rem;
+  text-align: center;
 }
 
 .filtros-bar {
