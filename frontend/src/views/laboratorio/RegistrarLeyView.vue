@@ -28,7 +28,7 @@
           </div>
           <div class="field">
             <label class="field-label">MINERAL (Au/Ag):</label>
-            <select class="field-select" v-model="form.material">
+            <select class="field-select field-sm" v-model="form.material">
               <option value="Au">Au</option>
               <option value="Ag">Ag</option>
             </select>
@@ -55,7 +55,7 @@
           </div>
           <div class="field">
             <label class="field-label">PUNTO:</label>
-            <select class="field-select" v-model="punto">
+            <select class="field-select field-sm" v-model="punto">
               <option>Cabeza</option>
               <option>Cola</option>
               <option>Líquido</option>

@@ -18,7 +18,7 @@
   background: var(--color-bg-input);
   border: 1.8px solid var(--color-border);
   border-radius: var(--radius-sm);
-  color: var(--color-text);
+  color: var(--color-text) !important;
   font-family: var(--font-main);
   font-size: var(--text-base);
   padding: 0.6rem 0.8rem;
@@ -26,6 +26,11 @@
   transition: border-color 0.2s;
   width: 100%;
   box-sizing: border-box;
+}
+
+.field-input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(100%) sepia(100%) saturate(500%) hue-rotate(350deg);
+  cursor: pointer;
 }
 
 .field-select {

@@ -10,7 +10,7 @@ import shutil
 import tempfile
 import uuid
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from app.models.enums import EstadoRecuperacion, OrigenDatos, TipoAnalisis, TipoMuestra
@@ -545,130 +545,27 @@ def subir_certificado(db: Session, analisis_id: int, archivo: UploadFile, tipo: 
     nombre = f"{cip_str}_{uuid.uuid4().hex[:8]}.{ext}"
     (carpeta / nombre).write_bytes(contenido)
 
-    ruta = f"/certificados/{ahora.year}/{ahora.month:02d}/{nombre}"
+    ruta = f"certificados/{ahora.year}/{ahora.month:02d}/{nombre}"
     a.certificado_url = ruta
     db.flush()
     return ruta
 
 
-def extraer_certificado_ley(archivo_bytes: bytes, filename: str) -> dict:
+def extraer_certificado_ley(
+    archivo_bytes: bytes, filename: str, laboratorio_hint: str = ""
+) -> dict:
     """
-    Extrae campos de un certificado PDF de análisis de ley.
-    Retorna dict con campos encontrados (None si no detectado).
+    Extrae campos de un certificado PDF/imagen de análisis de ley.
+    Detección flexible: no depende del laboratorio específico.
+    laboratorio_hint: nombre ingresado por el operador (no se usa para extracción,
+                      solo se devuelve como sugerencia de pre-fill).
     """
     texto = _pdf_to_text(archivo_bytes, filename)
+    t = texto  # alias para legibilidad
 
-    def _find(patterns, txt=texto):
+    def _first_float(*patterns):
         for p in patterns:
-            m = re.search(p, txt, re.IGNORECASE)
-            if m:
-                try:
-                    return m.group(1).strip()
-                except IndexError:
-                    return m.group(0).strip()
-        return None
-
-    def _find_float(patterns):
-        v = _find(patterns)
-        if v is None:
-            return None
-        try:
-            return float(v.replace(",", "."))
-        except ValueError:
-            return None
-
-    cip = _find(
-        [
-            r"CIP[-\s]*([\w\-]+)",
-            r"C\.I\.P\.?\s*:?\s*([\w\-]+)",
-            r"CODIGO\s+MUESTRA\s*:?\s*([\w\-]+)",
-            r"MUESTRA\s*:?\s*(CIP[-\w]+)",
-        ]
-    )
-
-    laboratorio = _find(
-        [
-            r"LABORATORIO\s*:?\s*([A-Z][A-Za-z\s]+?)(?:\n|$)",
-            r"LAB\s*:?\s*([A-Z][A-Za-z\s]+?)(?:\n|$)",
-        ]
-    )
-
-    n_informe = _find(
-        [
-            r"N[°º]?\s*INFORME\s*:?\s*([\w\-\/]+)",
-            r"INFORME\s+N[°º]?\s*([\w\-\/]+)",
-            r"REPORT\s*N[°º]?\s*([\w\-\/]+)",
-            r"LQ\s+([\w\-]+)",
-        ]
-    )
-
-    fecha_analisis = _find(
-        [
-            r"FECHA\s+AN[AÁ]LISIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
-            r"DATE\s+OF\s+ANALYSIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
-            r"FECHA\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
-        ]
-    )
-
-    ley_final = _find_float(
-        [
-            r"LEY\s+AU\s+OZ[\/\s]*TC\s*:?\s*([\d]+[.,][\d]+)",
-            r"AU\s+OZ[\/\s]*TC\s*:?\s*([\d]+[.,][\d]+)",
-            r"OZ[\/\s]TC\s*:?\s*([\d]+[.,][\d]+)",
-            r"RESULT[ADO]*\s*:?\s*([\d]+[.,][\d]+)",
-        ]
-    )
-
-    ley_grueso = _find_float(
-        [
-            r"MESH\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-            r"MALLA\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-            r"\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-        ]
-    )
-
-    ley_fino = _find_float(
-        [
-            r"MESH\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-            r"MALLA\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-            r"-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-        ]
-    )
-
-    # Normalizar fecha a YYYY-MM-DD si es posible
-    fecha_norm = None
-    if fecha_analisis:
-        for sep in ["-", "/"]:
-            parts = fecha_analisis.split(sep)
-            if len(parts) == 3:
-                d, m_p, y = parts
-                if len(y) == 2:
-                    y = "20" + y
-                try:
-                    fecha_norm = f"{y}-{int(m_p):02d}-{int(d):02d}"
-                except ValueError:
-                    pass
-                break
-
-    return {
-        "cip": cip,
-        "laboratorio": laboratorio,
-        "n_informe": n_informe,
-        "fecha_analisis": fecha_norm or fecha_analisis,
-        "ley_final": ley_final,  # oz/tc total
-        "ley_grueso": ley_grueso,  # mesh +140/150
-        "ley_fino": ley_fino,  # mesh -140/150
-        "texto_raw": texto[:500],  # para debug
-    }
-
-
-def extraer_certificado_recuperacion(archivo_bytes: bytes, filename: str) -> dict:
-    """Extrae campos de certificado de análisis de recuperación."""
-    texto = _pdf_to_text(archivo_bytes, filename)
-
-    def _find_float(patterns):
-        for p in patterns:
-            m = re.search(p, texto, re.IGNORECASE)
+            m = re.search(p, t, re.IGNORECASE)
             if m:
                 try:
                     return float(m.group(1).replace(",", "."))
@@ -676,9 +573,9 @@ def extraer_certificado_recuperacion(archivo_bytes: bytes, filename: str) -> dic
                     pass
         return None
 
-    def _find(patterns):
+    def _first_str(*patterns):
         for p in patterns:
-            m = re.search(p, texto, re.IGNORECASE)
+            m = re.search(p, t, re.IGNORECASE)
             if m:
                 try:
                     return m.group(1).strip()
@@ -686,64 +583,195 @@ def extraer_certificado_recuperacion(archivo_bytes: bytes, filename: str) -> dic
                     return m.group(0).strip()
         return None
 
-    cip = _find([r"CIP[-\s]*([\w\-]+)", r"C\.I\.P\.?\s*:?\s*([\w\-]+)"])
-    laboratorio = _find([r"LABORATORIO\s*:?\s*([A-Z][A-Za-z\s]+?)(?:\n|$)"])
-    n_informe = _find([r"N[°º]?\s*INFORME\s*:?\s*([\w\-\/]+)", r"AREC[-\s]*([\d]+)"])
+    # ── N° de informe / certificado ───────────────────────────────────────────
+    # Cubre: "Certificado N°: MSSC 001-34764-RLV", "N° LQ IP202601-0046",
+    #        "INFORME N° AAS-ELDORADO-0226-084", "REPORT N° ...", "Nro. ..."
+    n_informe = _first_str(
+        r"CERTIFICADO\s+(?:DE\s+ENSAYO\s+)?N[°oO\u00ba\.]*\s*:?\s*([\w\s\-\/]+?)(?:\n|$)",
+        r"INFORME\s+(?:DE\s+ENSAYO\s+)?N[°oO\u00ba\.]*\s*:?\s*([\w\s\-\/]+?)(?:\n|$)",
+        r"N[°oO\u00ba\.]+\s+(?:INFORME|LQ|CERT|REPORT|INF)\s*([\w\-\/]+)",
+        r"N[°oO\u00ba\.]+\s*([\w]{2,}[-\/][\w\-\/]+)",  # genérico "N° ABC-123"
+    )
+    if n_informe:
+        n_informe = n_informe.strip().rstrip(".")
 
-    fecha = _find([r"FECHA\s+AN[AÁ]LISIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})"])
-    fecha_norm = None
-    if fecha:
-        for sep in ["-", "/"]:
-            parts = fecha.split(sep)
-            if len(parts) == 3:
-                d, m_p, y = parts
-                if len(y) == 2:
-                    y = "20" + y
+    # ── CIP / código muestra ──────────────────────────────────────────────────
+    # Cubre: "Código Cliente: IP-2793" (Minares), "CODIGO: IP-2620-RM" (Paititi),
+    #        valores en tabla "RLV-83 | IP-2793", "CIP-123456X-A2"
+    # Estrategia: buscar patrón IP-\d+ o CIP-... cerca de palabras clave
+    cip = _first_str(
+        # Explícito con etiqueta
+        r"C[OÓ]DIGO\s+CLIENTE\s*:?\s*([\w\-]+)",
+        r"C[OÓ]DIGO\s+MUESTRA\s*:?\s*([\w\-]+)",
+        r"MUESTRA\s*:?\s*(CIP[-\w]+)",
+        r"C[OÓ]DIGO\s*:?\s*(IP[-\s]?[\d]+(?:\s*[-\s]\s*\w+)?)",
+        # Patrón CIP explícito
+        r"(CIP[-\s]*[\w\-]+)",
+        # Patrón IP en tabla (valor aislado)
+        r"(?:^|\||\s)(IP[-\s]?[\d]{2,5}(?:[-\s]\w{1,4})?)\s*(?:\||$)",
+    )
+    if cip:
+        # Normalizar espacios: "IP 2793" → "IP-2793"
+        cip = re.sub(r"^IP\s+", "IP-", cip.strip())
+
+    # ── Leyes de la muestra ───────────────────────────────────────────────────
+    # ley_grueso = MALLA +140 o +150 (fracción retenida en malla)
+    ley_grueso = _first_float(
+        r"MALLA\s*\+\s*1[45]\d\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
+        r"MESH\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+        r"\+\s*1[45]\d\s*(?:oz/tc)?\s*[:\|]?\s*([\d]+[.,][\d]+)",
+    )
+
+    # ley_fino = MALLA -140 o -150 (fracción pasante)
+    ley_fino = _first_float(
+        r"MALLA\s*-\s*1[45]\d\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
+        r"MESH\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
+        r"-\s*1[45]\d\s*(?:oz/tc)?\s*[:\|]?\s*([\d]+[.,][\d]+)",
+    )
+
+    # ley_final = suma (oz/tc total). Si no aparece explícito, se calculará
+    ley_final = _first_float(
+        r"LEY\s+FINAL\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
+        r"LEY\s+AU\s*(?:OZ/TC|OZ\.TC|OZ/T\.C)\s*:?\s*([\d]+[.,][\d]+)",
+        r"AU\s*(?:OZ/TC|OZ\.TC)\s*:?\s*([\d]+[.,][\d]+)",
+        # En tabla: valor aislado mayor (generalmente la suma es el mayor de la fila)
+    )
+
+    # Si no se encontró ley_final pero sí fino y grueso, calcular
+    if ley_final is None and ley_fino is not None and ley_grueso is not None:
+        ley_final = round(ley_fino + ley_grueso, 4)
+
+    # ley_gr_tm (referencia, no se guarda en BD - backend lo recalcula)
+    ley_gr_tm = _first_float(
+        r"G/TM\s*:?\s*([\d]+[.,][\d]+)",
+        r"GR/TM\s*:?\s*([\d]+[.,][\d]+)",
+        r"G/T\.M\.\s*:?\s*([\d]+[.,][\d]+)",
+    )
+
+    # ── Fecha ─────────────────────────────────────────────────────────────────
+    # Preferir "Fecha Entrega" o "Fecha Análisis"; fallback "Fecha Recepción"
+    fecha_raw = _first_str(
+        r"FECHA\s+(?:DE\s+)?ENTREGA\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+        r"FECHA\s+AN[AÁ]LISIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+        r"FECHA\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+        r"DATE\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+    )
+    fecha_norm = _normalizar_fecha(fecha_raw)
+
+    return {
+        "cip": cip,
+        "n_informe": n_informe,
+        "laboratorio": laboratorio_hint or None,  # operador lo ingresa
+        "fecha_analisis": fecha_norm,
+        "ley_fino": ley_fino,  # malla -140/-150
+        "ley_grueso": ley_grueso,  # malla +140/+150
+        "ley_final": ley_final,  # fino + grueso (calculado o extraído)
+        "ley_gr_tm": ley_gr_tm,  # referencia
+        "texto_raw": texto[:800],
+    }
+
+
+def extraer_certificado_recuperacion(
+    archivo_bytes: bytes, filename: str, laboratorio_hint: str = ""
+) -> dict:
+    """
+    Extrae campos de un certificado de análisis de recuperación (AAS, leyes líquido).
+    Flexible: funciona para El Dorado AAS y otros formatos.
+    El operador provee el laboratorio; aquí solo extraemos valores numéricos.
+    """
+    texto = _pdf_to_text(archivo_bytes, filename)
+    t = texto
+
+    def _first_float(*patterns):
+        for p in patterns:
+            m = re.search(p, t, re.IGNORECASE)
+            if m:
                 try:
-                    fecha_norm = f"{y}-{int(m_p):02d}-{int(d):02d}"
-                except ValueError:
+                    return float(m.group(1).replace(",", "."))
+                except (ValueError, IndexError):
                     pass
-                break
+        return None
 
-    ley_cabeza = _find_float(
-        [
-            r"LEY\s+CABEZA\s*:?\s*([\d]+[.,][\d]+)",
-            r"CABEZA\s*:?\s*([\d]+[.,][\d]+)",
-            r"HEAD\s*:?\s*([\d]+[.,][\d]+)",
-        ]
+    def _first_str(*patterns):
+        for p in patterns:
+            m = re.search(p, t, re.IGNORECASE)
+            if m:
+                try:
+                    return m.group(1).strip()
+                except IndexError:
+                    return m.group(0).strip()
+        return None
+
+    # N° informe
+    n_informe = _first_str(
+        r"CERTIFICADO\s+(?:DE\s+ENSAYO\s+)?N[°oO\u00ba\.]*\s*:?\s*([\w\s\-\/]+?)(?:\n|$)",
+        r"N[°oO\u00ba\.]+\s*([\w]{2,}[-\/][\w\-\/]+)",
     )
-    ley_cola = _find_float(
-        [
-            r"LEY\s+COLA\s*:?\s*([\d]+[.,][\d]+)",
-            r"COLA\s*:?\s*([\d]+[.,][\d]+)",
-            r"TAIL\s*:?\s*([\d]+[.,][\d]+)",
-        ]
+
+    # CIP para recuperación: patrones REE, IP con sufijos
+    cip = _first_str(
+        r"C[OÓ]DIGO\s+CLIENTE\s*:?\s*([\w\-]+)",
+        r"C[OÓ]DIGO\s*:?\s*(IP[-\s]?[\d]+(?:\s*[-\s]\s*\w+)?)",
+        r"(CIP[-\s]*[\w\-]+)",
+        r"(?:^|\||\s)(IP[-\s]?[\d]{2,5}(?:[-\s]\w{1,6})?)\s*(?:\||$)",
     )
-    ley_liquido = _find_float(
-        [
-            r"LEY\s+L[IÍ]QUIDO\s*:?\s*([\d]+[.,][\d]+)",
-            r"L[IÍ]QUIDO\s*:?\s*([\d]+[.,][\d]+)",
-        ]
+
+    # Fecha
+    fecha_raw = _first_str(
+        r"FECHA\s+(?:DE\s+)?ENTREGA\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+        r"FECHA\s+AN[AÁ]LISIS\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
+        r"FECHA\s*:?\s*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})",
     )
-    recuperacion = _find_float(
-        [
-            r"RECUPERACI[OÓ]N\s*:?\s*([\d]+[.,][\d]+)\s*%",
-            r"RECOVERY\s*:?\s*([\d]+[.,][\d]+)",
-            r"%\s+RECUP\s*:?\s*([\d]+[.,][\d]+)",
-        ]
+    fecha_norm = _normalizar_fecha(fecha_raw)
+
+    # Para AAS El Dorado: "Ley Au g/m3" = g/m3 del líquido
+    # Nota: la ley_cabeza viene del sistema (ley planta), no del certificado externo
+    ley_liquido_gm3 = _first_float(
+        r"LEY\s+AU\s+G/M3\s*:?\s*([\d]+[.,][\d]+)",
+        r"G/M3\s*:?\s*([\d]+[.,][\d]+)",
+        r"LEY\s+L[IÍ]QUIDO\s*:?\s*([\d]+[.,][\d]+)",
+    )
+
+    ley_cola = _first_float(
+        r"LEY\s+COLA\s*:?\s*([\d]+[.,][\d]+)",
+        r"COLA\s*:?\s*([\d]+[.,][\d]+)",
+        r"TAIL\s*:?\s*([\d]+[.,][\d]+)",
+    )
+
+    recuperacion = _first_float(
+        r"RECUPERACI[OÓ]N\s*:?\s*([\d]+[.,][\d]+)\s*%",
+        r"RECOVERY\s*:?\s*([\d]+[.,][\d]+)",
+        r"%\s+RECUP\s*:?\s*([\d]+[.,][\d]+)",
     )
 
     return {
         "cip": cip,
-        "laboratorio": laboratorio,
-        "n_informe": n_informe,
-        "fecha_analisis": fecha_norm or fecha,
-        "ley_cabeza": ley_cabeza,
+        "n_informe": n_informe if n_informe else None,
+        "laboratorio": laboratorio_hint or None,
+        "fecha_analisis": fecha_norm,
+        "ley_liquido_gm3": ley_liquido_gm3,  # unidad g/m3 (AAS) - diferente a oz/tc
         "ley_cola": ley_cola,
-        "ley_liquido": ley_liquido,
         "recuperacion": recuperacion,
-        "texto_raw": texto[:500],
+        "texto_raw": texto[:800],
+        # ley_cabeza viene del sistema (snapshot al crear pending), no del certificado
     }
+
+
+def _normalizar_fecha(raw: str | None) -> str | None:
+    """dd/mm/yy o dd-mm-yyyy → YYYY-MM-DD."""
+    if not raw:
+        return None
+    for sep in ["/", "-"]:
+        parts = raw.split(sep)
+        if len(parts) == 3:
+            d, mo, y = parts
+            if len(y) == 2:
+                y = "20" + y
+            try:
+                return f"{y}-{int(mo):02d}-{int(d):02d}"
+            except ValueError:
+                pass
+    return raw
 
 
 def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
@@ -817,3 +845,84 @@ def sincronizar_batch(
         resultados_ley=ley_res,
         resultados_recuperacion=rec_res,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Cálculo de ley comercial según parametros_comerciales
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
+    """
+    Aplica las reglas de parametros_comerciales sobre ley_planta.
+    params: instancia de ParametrosComerciales (puede ser None → sin reglas).
+    Retorna dict con ley_comercial y breakdown para mostrar al Comercial.
+
+    Reglas (en orden):
+    1. Si ley_planta < lim_ley_comercial → restar dscto_ley_comercial
+    2. Si lim_ley_inferior y lim_ley_superior definidos:
+         Si ley_planta < lim_ley_inferior → usar lim_ley_inferior
+         Si ley_planta > lim_ley_superior → usar lim_ley_superior
+    3. Multiplicar por porcentaje_ley_comercial (e.g. 0.95 = 95%)
+    """
+    if params is None:
+        return {
+            "ley_planta": float(ley_planta),
+            "ley_comercial": float(ley_planta),
+            "descuento_aplicado": 0.0,
+            "factor_aplicado": 1.0,
+            "ajuste_rango": False,
+            "sin_parametros": True,
+            "detalle": "Sin parametros comerciales configurados para este proveedor-acopiador",
+        }
+
+    q = Decimal("0.0001")
+    ley = ley_planta
+    descuento = Decimal("0")
+    ajuste_rango = False
+    detalle_pasos = []
+
+    # Regla 1: descuento si ley < límite
+    if params.lim_ley_comercial and params.dscto_ley_comercial:
+        lim = Decimal(str(params.lim_ley_comercial))
+        dscto = Decimal(str(params.dscto_ley_comercial))
+        if ley < lim:
+            descuento = dscto
+            ley = ley - dscto
+            detalle_pasos.append(
+                f"Ley {float(ley_planta):.4f} < limite {float(lim):.3f}: "
+                f"descuento {float(dscto):.4f} → {float(ley):.4f}"
+            )
+
+    # Regla 2: ajuste a rango [inferior, superior]
+    if params.lim_ley_inferior and params.lim_ley_superior:
+        inf = Decimal(str(params.lim_ley_inferior))
+        sup = Decimal(str(params.lim_ley_superior))
+        if ley < inf:
+            ley = inf
+            ajuste_rango = True
+            detalle_pasos.append(f"Ley ajustada a minimo de rango: {float(inf):.4f}")
+        elif ley > sup:
+            ley = sup
+            ajuste_rango = True
+            detalle_pasos.append(f"Ley ajustada a maximo de rango: {float(sup):.4f}")
+
+    # Regla 3: factor porcentual
+    factor = Decimal("1")
+    if params.porcentaje_ley_comercial:
+        factor = Decimal(str(params.porcentaje_ley_comercial))
+        ley_antes = ley
+        ley = (ley * factor).quantize(q, rounding=ROUND_HALF_UP)
+        detalle_pasos.append(
+            f"Factor {float(factor):.3f}: {float(ley_antes):.4f} x {float(factor):.3f} = {float(ley):.4f}"
+        )
+
+    return {
+        "ley_planta": float(ley_planta),
+        "ley_comercial": float(ley),
+        "descuento_aplicado": float(descuento),
+        "factor_aplicado": float(factor),
+        "ajuste_rango": ajuste_rango,
+        "sin_parametros": False,
+        "detalle": " | ".join(detalle_pasos) if detalle_pasos else "Sin ajustes aplicados",
+    }

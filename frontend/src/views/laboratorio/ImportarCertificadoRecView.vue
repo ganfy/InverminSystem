@@ -86,7 +86,7 @@
             </div>
             <div class="field">
               <label class="field-label">MATERIAL:</label>
-              <select class="field-select" v-model="material">
+              <select class="field-select field-sm" v-model="material">
                 <option value="Au">Au</option>
                 <option value="Ag">Ag</option>
               </select>

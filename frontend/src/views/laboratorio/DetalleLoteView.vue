@@ -90,7 +90,7 @@
 
             <div v-if="a.certificado_url" class="lab-field">
               <span class="lf-label">CERTIFICADO:</span>
-              <a :href="a.certificado_url" target="_blank" class="link-cert">Ver PDF</a>
+              <a :href="urlCertificado(a.certificado_url) || ''" target="_blank" class="link-cert">Ver PDF</a>
             </div>
 
             <div class="lab-card-footer" v-if="a.vigente">
@@ -108,6 +108,61 @@
             Sin análisis de ley registrados
           </div>
         </div>
+
+        <!-- ── LEY COMERCIAL CALCULADA ─────────────────────────────────────────── -->
+        <section class="card" v-if="lote.ley_planta != null">
+          <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
+            <span>LEY COMERCIAL (con reglas aplicadas)</span>
+            <button
+              class="btn-primary"
+              style="font-size:0.75rem;padding:0.35rem 0.9rem"
+              @click="generarCertificado"
+              :disabled="generando"
+            >
+              <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
+              Generar certificado PDF
+            </button>
+          </h2>
+
+          <div v-if="cargandoLeyComercial" class="estado-tabla">
+            <span class="spinner" style="margin-right:0.5rem"></span> Calculando...
+          </div>
+
+          <template v-else-if="leyComercialCalc">
+            <div class="lc-grid">
+              <div class="lc-item">
+                <span class="lc-label">LEY PLANTA (promedio vigentes):</span>
+                <span class="lc-valor mono">{{ lote.ley_planta?.toFixed(4) }} oz/TC</span>
+              </div>
+              <div class="lc-item" v-if="lote.ley_minero">
+                <span class="lc-label">LEY MINERO:</span>
+                <span class="lc-valor mono">{{ lote.ley_minero?.toFixed(4) }} oz/TC</span>
+              </div>
+              <div class="lc-item">
+                <span class="lc-label">LEY COMERCIAL (a entregar):</span>
+                <span class="lc-valor mono gold">{{ leyComercialCalc.ley_comercial.toFixed(4) }} oz/TC</span>
+              </div>
+              <div class="lc-item" v-if="leyComercialCalc.descuento_aplicado">
+                <span class="lc-label">DESCUENTO APLICADO:</span>
+                <span class="lc-valor mono">- {{ leyComercialCalc.descuento_aplicado.toFixed(4) }}</span>
+              </div>
+              <div class="lc-item" v-if="leyComercialCalc.factor_aplicado !== 1">
+                <span class="lc-label">FACTOR:</span>
+                <span class="lc-valor mono">× {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
+              </div>
+            </div>
+
+            <div v-if="leyComercialCalc.sin_parametros" class="info-box warning" style="margin-top:0.75rem">
+              ⚠️ Sin parámetros comerciales configurados para este proveedor-acopiador.
+              El certificado se emitirá con la ley planta sin ajustes.
+            </div>
+
+            <div v-if="leyComercialCalc.detalle && !leyComercialCalc.sin_parametros"
+              style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.5rem;font-family:var(--font-mono)">
+              Detalle: {{ leyComercialCalc.detalle }}
+            </div>
+          </template>
+        </section>
 
         <!-- Acciones ley -->
         <div class="acciones-lote">
@@ -156,7 +211,7 @@
 
             <div v-if="a.certificado_url" class="lab-field">
               <span class="lf-label">CERTIFICADO:</span>
-              <a :href="a.certificado_url" target="_blank" class="link-cert">Ver PDF</a>
+              <a :href="urlCertificado(a.certificado_url) || ''" target="_blank" class="link-cert">Ver PDF</a>
             </div>
 
             <div class="lab-card-footer" v-if="a.vigente">
@@ -220,11 +275,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import type { LoteLabOut } from '@/types/laboratorio'
+import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
 
 const router = useRouter()
 const route  = useRoute()
@@ -240,6 +296,12 @@ const tabActual = ref<'ley' | 'rec'>('ley')
 const modalDescartar = ref<{ id: number; tipo: 'ley' | 'rec' } | null>(null)
 const justificacion  = ref('')
 
+
+const cargandoLeyComercial = ref(false)
+const leyComercialCalc = ref<LeyComercialCalc | null>(null)
+const generando = ref(false)
+
+
 // CIPs de recuperación del lote
 const cipRecupInterno = computed(() =>
   lote.value?.cips_detalle.find(c => c.tipo_muestra === 'RecuperacionInterno')?.codigo_cip ?? null
@@ -251,6 +313,31 @@ const cipRecupExterno = computed(() =>
 const tienePendiente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.vigente) ?? false
 )
+
+// Cargar ley comercial cuando cambia a tab ley y hay ley_planta
+watch([tabActual, lote], async ([tab, l]: ['ley' | 'rec', LoteLabOut | null]) => {
+  if (tab === 'ley' && l?.ley_planta != null && !leyComercialCalc.value) {
+    cargandoLeyComercial.value = true
+    try {
+      leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
+    } catch {
+      // silencioso - no es crítico
+    } finally {
+      cargandoLeyComercial.value = false
+    }
+  }
+}, { immediate: true })
+
+async function generarCertificado() {
+  generando.value = true
+  try {
+    await laboratorioApi.descargarCertificadoPdf(ipActual)
+  } catch {
+    ui.toast('Error al generar certificado PDF', 'error')
+  } finally {
+    generando.value = false
+  }
+}
 
 onMounted(async () => {
   cargando.value = true
@@ -339,6 +426,11 @@ async function solicitarRemuestreo() {
     message: `¿Confirmar solicitud de remuestreo para el lote ${ipActual}?`,
   })
   if (ok) ui.toast('Remuestreo solicitado — avise al área de muestreo', 'info')
+}
+
+function urlCertificado(url: string | null | undefined): string | null {
+  if (!url) return null
+  return `/api/v1/laboratorio/archivos/${url}`
 }
 </script>
 
@@ -468,4 +560,33 @@ async function solicitarRemuestreo() {
   border: 1px solid rgba(234,179,8,0.3);
   color: #fbbf24;
 }
+
+.lc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.lc-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lc-label {
+  font-size: 0.68rem;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.lc-valor {
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+
+.lc-valor.mono { font-family: var(--font-mono); }
+.lc-valor.gold { color: var(--color-gold); font-size: var(--text-lg); font-weight: 600; }
 </style>

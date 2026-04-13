@@ -47,7 +47,7 @@
     <div class="filtros-bar">
       <div class="field" style="min-width:180px">
         <label class="field-label">Estado</label>
-        <select class="field-select field-sm field-input" v-model="filtroEstado">
+        <select class="field-select field-sm field-sm field-input" v-model="filtroEstado">
           <option value="Todos">Todos los estados</option>
           <option value="PENDIENTE">PENDIENTE</option>
           <option value="EN PROCESO">EN PROCESO</option>

@@ -15,6 +15,10 @@ Flujo de recuperación interna:
   PATCH /laboratorio/recuperacion/{id}/completar    → Laboratorista ingresa ley_cola + ley_liquido
 """
 
+import io
+import os
+from pathlib import Path
+
 from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.models.enums import RolSistema
@@ -35,6 +39,7 @@ from app.schemas.laboratorio import (
 from app.services import laboratorio as svc
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi import UploadFile as FastAPIFile
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/laboratorio", tags=["Laboratorio"])
@@ -265,26 +270,123 @@ async def subir_certificado_recuperacion(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+# ── OCR: extraer datos del certificado de ley ──────────────────────────────
 @router.post("/certificado/extraer-ley")
 async def extraer_certificado_ley(
     archivo: UploadFile = FastAPIFile(...),
+    laboratorio: str = "",  # operador lo ingresa - no extraído del doc
     current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
 ):
-    """OCR de certificado PDF → devuelve campos pre-llenados para análisis de ley."""
+    """
+    OCR de certificado PDF/imagen de ley.
+    El operador indica el laboratorio manualmente - la extracción es flexible
+    y no depende del formato de un laboratorio específico.
+    Devuelve campos pre-llenados para que el operador verifique/corrija.
+    """
     contenido = await archivo.read()
-    resultado = svc.extraer_certificado_ley(contenido, archivo.filename or "cert.pdf")
+    resultado = svc.extraer_certificado_ley(contenido, archivo.filename or "cert.pdf", laboratorio)
     return resultado
 
 
 @router.post("/certificado/extraer-recuperacion")
 async def extraer_certificado_recuperacion(
     archivo: UploadFile = FastAPIFile(...),
+    laboratorio: str = "",
     current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
 ):
-    """OCR de certificado PDF → devuelve campos pre-llenados para análisis de recuperación."""
+    """
+    OCR de certificado de recuperación (AAS u otro formato).
+    laboratorio: ingresado por el operador.
+    """
     contenido = await archivo.read()
-    resultado = svc.extraer_certificado_recuperacion(contenido, archivo.filename or "cert.pdf")
+    resultado = svc.extraer_certificado_recuperacion(
+        contenido, archivo.filename or "cert.pdf", laboratorio
+    )
     return resultado
+
+
+# ── Ley comercial: preview del cálculo con parametros_comerciales ──────────
+@router.get("/lotes/{ip}/ley-comercial")
+def preview_ley_comercial(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Calcula y devuelve la ley comercial del lote aplicando las reglas
+    de parametros_comerciales del proveedor-acopiador.
+    Solo visible para Comercial, Gerencia, Admin (pueden ver IP).
+    """
+    from app.models.models import ParametrosComerciales
+    from app.services.pruebas import calcular_ley_planta
+
+    lote = db.query(Lote).filter(Lote.ip == ip, ~Lote.eliminado).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    ley_planta = calcular_ley_planta(db, lote.id)
+    if ley_planta is None:
+        raise HTTPException(
+            status_code=422, detail="Sin análisis de ley vigentes para calcular ley planta"
+        )
+
+    try:
+        provacop = lote.sesion.provacop
+        params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
+    except AttributeError:
+        params = None
+
+    return svc.calcular_ley_comercial(ley_planta, params)
+
+
+# ── Generar certificado PDF (formato Paititi) ──────────────────────────────
+@router.get("/lotes/{ip}/certificado-pdf")
+def generar_certificado_pdf(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera el PDF del certificado de ley comercial para entregar al proveedor.
+    Aplica las reglas de parametros_comerciales.
+    Solo Comercial, Gerencia, Admin.
+    """
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = f"certificado_ley_{ip.replace('-', '_')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+# Obtener certificado
+
+
+@router.get("/archivos/{ruta_archivo:path}")
+def descargar_archivo(
+    ruta_archivo: str,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+):
+    """Sirve archivos del storage (certificados) con autenticación."""
+    storage = Path(os.getenv("STORAGE_PATH", "storage"))
+    ruta_completa = storage / ruta_archivo
+    # Prevenir path traversal
+    try:
+        ruta_completa.resolve().relative_to(storage.resolve())
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail="Acceso denegado") from e
+    if not ruta_completa.exists():
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    return FileResponse(ruta_completa)
 
 
 # ── Sync Offline ─────────────────────────────────────────────────────────────

@@ -13,6 +13,39 @@ import type {
     SyncLaboratorioResponse,
 } from '@/types/laboratorio'
 
+export interface ExtraerLeyResult {
+    cip: string | null
+    n_informe: string | null
+    laboratorio: string | null
+    fecha_analisis: string | null
+    ley_fino: number | null      // malla -140/-150
+    ley_grueso: number | null    // malla +140/+150
+    ley_final: number | null     // fino + grueso (extraído o calculado)
+    ley_gr_tm: number | null     // referencia gr/TM
+    texto_raw: string
+}
+
+export interface ExtraerRecResult {
+    cip: string | null
+    n_informe: string | null
+    laboratorio: string | null
+    fecha_analisis: string | null
+    ley_liquido_gm3: number | null  // AAS g/m3
+    ley_cola: number | null
+    recuperacion: number | null
+    texto_raw: string
+}
+
+export interface LeyComercialCalc {
+    ley_planta: number
+    ley_comercial: number
+    descuento_aplicado: number
+    factor_aplicado: number
+    ajuste_rango: boolean
+    sin_parametros: boolean
+    detalle: string
+}
+
 export const laboratorioApi = {
 
     // ── Vista por CIP (Laboratorista + Comercial) ─────────────────────────────
@@ -90,15 +123,6 @@ export const laboratorioApi = {
         return data
     },
 
-    async extraerCertificadoLey(archivo: File): Promise<Record<string, any>> {
-        const form = new FormData()
-        form.append('archivo', archivo)
-        const { data } = await api.post('/laboratorio/certificado/extraer-ley', form, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        return data
-    },
-
     async extraerCertificadoRecuperacion(archivo: File): Promise<Record<string, any>> {
         const form = new FormData()
         form.append('archivo', archivo)
@@ -106,6 +130,43 @@ export const laboratorioApi = {
             headers: { 'Content-Type': 'multipart/form-data' },
         })
         return data
+    },
+
+    async extraerCertificadoLey(archivo: File, laboratorio: string = ''): Promise<ExtraerLeyResult> {
+        const fd = new FormData()
+        fd.append('archivo', archivo)
+        const params = laboratorio ? `?laboratorio=${encodeURIComponent(laboratorio)}` : ''
+        const { data } = await api.post(`/laboratorio/certificado/extraer-ley${params}`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    async extraerCertificadoRec(archivo: File, laboratorio: string = ''): Promise<ExtraerRecResult> {
+        const fd = new FormData()
+        fd.append('archivo', archivo)
+        const params = laboratorio ? `?laboratorio=${encodeURIComponent(laboratorio)}` : ''
+        const { data } = await api.post(`/laboratorio/certificado/extraer-recuperacion${params}`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+    },
+
+    async getLeyComercial(ip: string): Promise<LeyComercialCalc> {
+        const { data } = await api.get(`/laboratorio/lotes/${ip}/ley-comercial`)
+        return data
+    },
+
+    async descargarCertificadoPdf(ip: string): Promise<void> {
+        const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(response.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `certificado_ley_${ip.replace(/-/g, '_')}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
     },
 
     // ── Sync Offline ──────────────────────────────────────────────────────────

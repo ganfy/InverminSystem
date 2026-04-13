@@ -77,7 +77,7 @@
 
     <!-- ── Filtros ────────────────────────────────────────── -->
     <div class="filtros">
-      <select class="field-input filtro-sm field-select" v-model="filtros.estado" @change="aplicarFiltros">
+      <select class="field-input filtro-sm field-select field-sm" v-model="filtros.estado" @change="aplicarFiltros">
         <option value="">Todos los estados</option>
         <option value="EN_PROCESO">En proceso</option>
         <option value="PAUSADO">Pausado</option>

@@ -34,7 +34,7 @@
     <div class="filtros-bar">
       <div class="field" style="min-width:180px">
         <label class="field-label">ESTADO</label>
-        <select class="field-select field-sm field-input" v-model="filtroEstado">
+        <select class="field-select field-sm field-sm field-input" v-model="filtroEstado">
           <option value="">Todos los estados</option>
           <option value="PENDIENTE">Pendiente</option>
           <option value="COMPLETADO">Completado</option>
@@ -46,7 +46,7 @@
       </div>
       <div class="field" style="min-width:160px">
         <label class="field-label">FECHA HASTA</label>
-        <input type="date" class="field-input" v-model="filtroHasta" />
+        <input type="date" class="field-input field-sm" v-model="filtroHasta" />
       </div>
       <div class="field" style="flex:1;min-width:200px">
         <label class="field-label">BÚSQUEDA</label>
