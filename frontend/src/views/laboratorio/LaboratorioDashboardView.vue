@@ -269,7 +269,7 @@ function badgeClass(estado: string) {
 
 function irARegistrarLey(cip: string)          { router.push(`/laboratorio/ley/${cip}`) }
 function irARegistrarRecuperacion(cip: string) { router.push(`/laboratorio/recuperacion/${cip}`) }
-function irADetalleLote(ip: string) { router.push(`/laboratorio/lotes/${ip}`) }
+function irADetalleLote(ip: string) { router.push(`/laboratorio/lote/${ip}`) }
 
 </script>
 

@@ -423,7 +423,11 @@ function abrirModalAgregarLey() {
 
 function confirmarAgregarLey() {
   if (cipSeleccionado.value) {
-    router.push(`/laboratorio/ley/${cipSeleccionado.value}`)
+    if (store.puedeImportarCert) {
+      router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}`)
+    } else {
+      router.push(`/laboratorio/ley/${cipSeleccionado.value}`)
+    }
   }
 }
 

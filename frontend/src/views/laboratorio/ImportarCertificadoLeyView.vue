@@ -54,7 +54,7 @@
         </div>
         <div class="field">
           <label class="field-label">TIPO DE ANÁLISIS:</label>
-          <select class="field-select field-sm" v-model="form.tipo_analisis">
+          <select class="field-select field-sm field-input" v-model="form.tipo_analisis">
             <option value="externo">Externo</option>
             <option value="minero">Minero (presentado por proveedor)</option>
             <option value="dirimencia">Dirimencia</option>
