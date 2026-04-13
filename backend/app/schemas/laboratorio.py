@@ -6,14 +6,16 @@ from pydantic import BaseModel, Field
 
 # ── Análisis de Ley (Fire Assay triple sampling) ──────────────────────────────
 
+model_config = {"from_attributes": True, "json_encoders": {Decimal: float}}
+
 
 class AnalisisLeyCreate(BaseModel):
     cip: str = Field(..., description="Código CIP de la muestra")
     laboratorio: str = Field(..., description="Nombre del laboratorio")
     tipo_analisis: TipoAnalisis = Field(..., description="planta | externo | minero | dirimencia")
     material: str = Field("Au", description="Material analizado")
-    ley_fino: Decimal = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
-    ley_grueso: Decimal = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
+    ley_fino: float = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
+    ley_grueso: float = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
 
@@ -136,8 +138,8 @@ class LoteLabOut(BaseModel):
     fecha_recepcion: datetime | None
     cips: list[str]  # todos los CIPs del lote (compatibilidad)
     cips_detalle: list[CIPResumen] = []  # CIPs con tipo para UI
-    ley_planta: Decimal | None = None  # calculada on-the-fly
-    ley_minero: Decimal | None = None  # del análisis tipo minero vigente
+    ley_planta: float | None = None  # calculada on-the-fly
+    ley_minero: float | None = None  # del análisis tipo minero vigente
     analisis_ley: list[AnalisisLeyOut]
     analisis_recuperacion: list[AnalisisRecuperacionOut]
     tiene_dirimencia: bool

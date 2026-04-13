@@ -105,6 +105,8 @@ PERMISOS = [
     ("Admin", "LABORATORIO", "VIEW", True),
     ("Gerencia", "LABORATORIO", "DELETE", True),
     ("Gerencia", "LABORATORIO", "VIEW", True),
+    ("Gerencia", "LABORATORIO", "CREATE", False),
+    ("Gerencia", "LABORATORIO", "UPDATE", True),
     ("Comercial", "LABORATORIO", "CREATE", True),
     ("Comercial", "LABORATORIO", "UPDATE", True),
     ("Comercial", "LABORATORIO", "DELETE", True),

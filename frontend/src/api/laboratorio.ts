@@ -169,6 +169,12 @@ export const laboratorioApi = {
         URL.revokeObjectURL(url)
     },
 
+    async obtenerUrlArchivoVirtual(rutaArchivo: string): Promise<string> {
+        const { data } = await api.get(`/laboratorio/archivos/${rutaArchivo}`, { responseType: 'blob' })
+        // Crea una URL temporal del archivo blob para previsualizar
+        return URL.createObjectURL(data)
+    },
+
     // ── Sync Offline ──────────────────────────────────────────────────────────
     async sincronizarBatch(payload: SyncLaboratorioRequest): Promise<SyncLaboratorioResponse> {
         const { data } = await api.post('/laboratorio/sync', payload)

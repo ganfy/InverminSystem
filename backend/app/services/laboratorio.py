@@ -50,11 +50,11 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
-    return (fino + grueso).quantize(Decimal("0.0001"))
+    return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.0001"))
 
 
 def _calcular_ley_gr_tm(ley_final: Decimal) -> Decimal:
-    return (ley_final * FACTOR_OZ_TC).quantize(Decimal("0.001"))
+    return (Decimal(str(ley_final)) * FACTOR_OZ_TC).quantize(Decimal("0.001"))
 
 
 def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
@@ -139,6 +139,11 @@ def obtener_cips_laboratorio(
 
     resultados: list[CIPAnalisisOut] = []
     for cip in cips:
+        print(
+            f"Procesando CIP: {cip.codigo_cip}, Laboratorio: {cip.laboratorio}, Tipo muestra: {cip.tipo_muestra}"
+        )  # Debug
+        if not incluir_ip and cip.laboratorio not in ["Paititi", "Laboratorio Interno"]:
+            continue
         lote = db.query(Lote).filter(Lote.id == cip.lote_id).first()
         if not lote:
             continue
@@ -207,19 +212,16 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     except AttributeError:
         proveedor = "-"
 
-    _mcip = lote.mapeo_cip  # single object or None (uselist=False)
-    cips = [_mcip.codigo_cip] if _mcip else []
-    cips_detalle = (
-        [
-            CIPResumen(
-                codigo_cip=_mcip.codigo_cip,
-                tipo_muestra=_mcip.tipo_muestra,
-                laboratorio=_mcip.laboratorio,
-            )
-        ]
-        if _mcip
-        else []
-    )
+    todos_cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).all()
+    cips = [c.codigo_cip for c in todos_cips]
+    cips_detalle = [
+        CIPResumen(
+            codigo_cip=c.codigo_cip,
+            tipo_muestra=c.tipo_muestra,
+            laboratorio=c.laboratorio,
+        )
+        for c in todos_cips
+    ]
 
     analisis_ley = (
         db.query(AnalisisLey).filter(AnalisisLey.lote_id == lote.id).order_by(AnalisisLey.id).all()
