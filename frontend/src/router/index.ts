@@ -37,7 +37,7 @@ const router = createRouter({
         // Balanza
         { path: 'balanza', name: 'Balanza', component: BalanzaView },
         { path: 'balanza/nueva', name: 'NuevaSesion', component: RegistrarCamionView },
-        { path: 'balanza/:id', name: 'SesionDetalle', component: SesionView },
+        { path: 'balanza/:id', name: 'SesionBalanza', component: SesionView },
 
         // Muestreo
         { path: 'muestreo', name: 'Muestreo', component: MuestreoView },

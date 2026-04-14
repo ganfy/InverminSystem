@@ -77,6 +77,7 @@
       <div class="tabs-lab">
         <button class="tab-lab-btn" :class="{ active: tabActual === 'ley' }" @click="tabActual = 'ley'">
           Análisis de Ley
+          <span v-if="pendientesLey > 0" class="badge-count">{{ pendientesLey }}</span>
           <span class="tab-lab-toggle">{{ tabActual === 'ley' ? '︿' : '︾' }}</span>
         </button>
         <button class="tab-lab-btn" :class="{ active: tabActual === 'rec' }" @click="tabActual = 'rec'">
@@ -147,6 +148,7 @@
                   </td>
                   <td class="td-acciones">
                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarLey(fila.cip)">Registrar</button>
+                    <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                   </td>
                 </tr>
               </template>
@@ -166,6 +168,7 @@
                   </td>
                   <td class="td-acciones">
                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila.cip)">Registrar</button>
+                    <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                   </td>
                 </tr>
               </template>
@@ -181,12 +184,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { FlaskConical, RefreshCw } from 'lucide-vue-next'
+import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import type { CIPAnalisisOut, LoteLabOut } from '@/types/laboratorio'
 
 const router = useRouter()
 const store  = useLaboratorioStore()
+const ui     = useUiStore()
 
 const tabActual      = ref<'ley' | 'rec'>('ley')
 const filtroEstado   = ref('')
@@ -216,6 +221,10 @@ async function cargarDatos() {
 onMounted(() => cargarDatos())
 function recargar() { cargarDatos() }
 
+const pendientesLey = computed(() =>
+  store.cips.filter(c => c.tipo_muestra === 'Laboratorio' && c.estado_ley === 'PENDIENTE').length
+)
+
 const pendientesRec = computed(() =>
   store.cips.filter(c =>
     (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') &&
@@ -230,6 +239,7 @@ function mapearCIP(c: CIPAnalisisOut) {
       cip: c.cip, fecha_envio: c.fecha_envio, estado: c.estado_ley,
       leyMas: a?.ley_grueso ?? null, leyMenos: a?.ley_fino ?? null,
       ozTc: a?.ley_final ?? null, grTm: a?.ley_gr_tm ?? null,
+      certificadoUrl: a?.certificado_url ?? null,
     }
   } else {
     const pending = c.analisis_recuperacion.find(x => x.estado === 'PENDIENTE' && x.vigente)
@@ -239,6 +249,7 @@ function mapearCIP(c: CIPAnalisisOut) {
       cip: c.cip, fecha_envio: c.fecha_envio, estado: c.estado_recuperacion,
       leyCabeza: a?.ley_cabeza ?? null, leyCola: a?.ley_cola ?? null,
       leyLiquido: a?.ley_liquido ?? null, recuperacion: a?.recuperacion ?? null,
+      certificadoUrl: a?.certificado_url ?? null,
     }
   }
 }
@@ -269,6 +280,13 @@ function fmt(d?: string | null | Date) {
 
 function badgeClass(estado: string) {
   return estado === 'COMPLETADO' ? 'completo' : estado === 'PENDIENTE' ? 'pendiente' : 'parcial'
+}
+
+async function verCertificado(ruta: string) {
+  try {
+    const url = await laboratorioApi.obtenerUrlArchivoVirtual(ruta)
+    window.open(url, '_blank')
+  } catch { ui.toast('Error al abrir certificado', 'error') }
 }
 
 function irARegistrarLey(cip: string)          { router.push(`/laboratorio/ley/${cip}`) }

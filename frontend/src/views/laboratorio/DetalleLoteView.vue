@@ -222,22 +222,17 @@
 
         <div class="acciones-lote">
           <button
-            v-if="lote.ley_planta != null && cipRecupInterno && !tienePendiente"
+            v-if="lote.ley_planta != null && cipsRecuperacionDisponibles.length > 0"
             class="btn-primary"
-            @click="enviarARecuperacion"
+            @click="abrirModalRecup"
             :disabled="enviando"
           >
             <span v-if="enviando" class="spinner" style="margin-right:0.4rem"></span>
-            Enviar a recuperación interna
+            Enviar a recuperación
           </button>
-          <span v-else-if="tienePendiente" class="info-inline">
-            ⏳ Pendiente en laboratorio
+          <span v-if="tienePendiente" class="info-inline" style="margin-left:0.5rem">
+            ⏳ Análisis pendiente en laboratorio
           </span>
-
-          <label v-if="cipRecupExterno" class="btn-secondary" style="cursor:pointer">
-            Subir certificado externo
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="subirCertExterno" />
-          </label>
         </div>
 
       </template>
@@ -291,6 +286,45 @@
     </div>
 
   </div>
+
+    <!-- Modal selección lab recuperacion -->
+    <div v-if="modalRecup" class="modal-overlay" @click.self="modalRecup = false">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2>Enviar a Recuperación</h2>
+          <button class="btn-cerrar" @click="modalRecup = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="field" style="margin-bottom:1rem">
+            <label class="field-label">CIP A USAR:</label>
+            <select class="field-select field-input" v-model="cipRecupElegido" @change="onCipRecupChange">
+              <option v-for="c in cipsRecuperacionDisponibles" :key="c.codigo_cip" :value="c.codigo_cip">
+                {{ c.codigo_cip }} — {{ c.tipo_muestra }}
+              </option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">LABORATORIO DESTINO:</label>
+            <select class="field-select field-input" v-model="labRecupElegida">
+              <option v-for="lab in labsRecupDisponibles" :key="lab" :value="lab">{{ lab }}</option>
+            </select>
+            <p style="font-size:0.7rem;color:var(--color-text-faint);margin-top:0.4rem">
+              <span v-if="labRecupElegida === 'Paititi' || labRecupElegida === 'Laboratorio Interno'">
+                Laboratorio interno: se creará análisis PENDIENTE para el laboratorista.
+              </span>
+              <span v-else>
+                Lab externo: se marcará el CIP como enviado. Suba el certificado cuando lo reciba.
+              </span>
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalRecup = false">Cancelar</button>
+          <button class="btn-primary" @click="confirmarEnvioRecuperacion" :disabled="!cipRecupElegido">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
 </template>
 
 <script setup lang="ts">
@@ -300,6 +334,7 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import type { LoteLabOut } from '@/types/laboratorio'
 import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
+import { muestreoApi } from '@/api/muestreo'
 
 const router = useRouter()
 const route  = useRoute()
@@ -324,6 +359,12 @@ const cargandoLeyComercial = ref(false)
 const leyComercialCalc = ref<LeyComercialCalc | null>(null)
 const generando = ref(false)
 
+// Modal seleccion lab para recuperacion
+const modalRecup = ref(false)
+const cipRecupElegido = ref<string | null>(null)
+const labRecupElegida = ref('')
+const labsRecupDisponibles = ref<string[]>([])
+
 // ── Computed: CIPs Disponibles para Ley ──
 // Solo traemos los CIPs de tipo Laboratorio que NO existan en el array de analisis_ley
 const cipsDisponiblesLey = computed(() => {
@@ -334,12 +375,17 @@ const cipsDisponiblesLey = computed(() => {
   )
 })
 
-// CIPs de recuperación del lote
+// CIPs de recuperacion disponibles (sin analisis vigente)
+const cipsRecuperacionDisponibles = computed(() => {
+  if (!lote.value) return []
+  return lote.value.cips_detalle.filter(c =>
+    (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') &&
+    !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente)
+  )
+})
+
 const cipRecupInterno = computed(() =>
-  lote.value?.cips_detalle.find(c => c.tipo_muestra === 'RecuperacionInterno')?.codigo_cip ?? null
-)
-const cipRecupExterno = computed(() =>
-  lote.value?.cips_detalle.find(c => c.tipo_muestra === 'RecuperacionExterno')?.codigo_cip ?? null
+  lote.value?.cips_detalle.find(c => (c.tipo_muestra === 'RecuperacionInterno') && !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente))
 )
 
 const tienePendiente = computed(() =>
@@ -381,7 +427,10 @@ async function generarCertificado() {
 
 onMounted(async () => {
   cargando.value = true
-  lote.value = await store.cargarDetalleLote(ipActual)
+  ;[lote.value, labsRecupDisponibles.value] = await Promise.all([
+    store.cargarDetalleLote(ipActual),
+    muestreoApi.listarLaboratorios().catch(() => ['Paititi', 'Minares South S.R.L.', 'El Dorado', 'Otro']),
+  ])
   cargando.value = false
 })
 
@@ -472,14 +521,43 @@ async function adjuntarCertRec(e: Event, analisisId: number) {
   if (ok) lote.value = await store.cargarDetalleLote(ipActual)
 }
 
-// ── Enviar a recuperación interna ──
-async function enviarARecuperacion() {
+// ── Modal recuperacion ──
+function abrirModalRecup() {
+  cipRecupElegido.value = cipsRecuperacionDisponibles.value[0]?.codigo_cip ?? null
+  labRecupElegida.value = cipsRecuperacionDisponibles.value[0]?.laboratorio ?? labsRecupDisponibles.value[0] ?? 'Paititi'
+  modalRecup.value = true
+}
+
+function onCipRecupChange() {
+  const cip = cipsRecuperacionDisponibles.value.find(c => c.codigo_cip === cipRecupElegido.value)
+  labRecupElegida.value = cip?.laboratorio ?? labsRecupDisponibles.value[0] ?? 'Paititi'
+}
+
+async function confirmarEnvioRecuperacion() {
+  if (!cipRecupElegido.value) return
   enviando.value = true
-  const nuevo = await store.enviarRecuperacion(ipActual, {
-    cip: cipRecupInterno.value ?? undefined,
-  })
+  modalRecup.value = false
+  const esInterno = labRecupElegida.value === 'Paititi' || labRecupElegida.value === 'Laboratorio Interno'
+  if (esInterno) {
+    await store.enviarRecuperacion(ipActual, { cip: cipRecupElegido.value, laboratorio: labRecupElegida.value })
+  } else {
+    // Externo: solo actualizar lab destino en el CIP
+    const cipObj = lote.value?.cips_detalle.find(c => c.codigo_cip === cipRecupElegido.value)
+    if (cipObj) {
+      try {
+        // Necesitamos el id numerico del CIP - viene de cips_detalle que no tiene id
+        // Recargamos cips para obtenerlo y hacer el patch
+        const cips = await muestreoApi.obtenerEtiquetas(ipActual)
+        const cipConId = cips.find(c => c.codigo_cip === cipRecupElegido.value)
+        if (cipConId) await muestreoApi.actualizarLaboratorioCip(cipConId.id, labRecupElegida.value)
+        ui.toast(`CIP marcado para ${labRecupElegida.value}. Suba el certificado cuando lo reciba.`, 'info')
+      } catch {
+        ui.toast('Error al asignar laboratorio', 'error')
+      }
+    }
+  }
   enviando.value = false
-  if (nuevo) lote.value = await store.cargarDetalleLote(ipActual)
+  lote.value = await store.cargarDetalleLote(ipActual)
 }
 
 async function subirCertExterno(e: Event) {
@@ -491,7 +569,7 @@ async function solicitarRemuestreo() {
     title: 'Solicitar Remuestreo',
     message: `¿Confirmar solicitud de remuestreo para el lote ${ipActual}?`,
   })
-  if (ok) ui.toast('Remuestreo solicitado — avise al área de muestreo', 'info')
+  if (ok) ui.toast('Remuestreo solicitado — avise al área de Pruebas Metalúrgicas', 'info')
 }
 </script>
 

@@ -427,6 +427,10 @@ def enviar_recuperacion_interna(
             )
         cip_obj = cips_internos[0]
 
+    # Actualizar laboratorio destino en el mapeo
+    if datos.laboratorio:
+        cip_obj.laboratorio = datos.laboratorio
+
     # Verificar que no haya pending vigente para ese CIP
     pending_existente = (
         db.query(AnalisisRecuperacion)

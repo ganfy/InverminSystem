@@ -300,7 +300,8 @@ async function extraer() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!store.cips.length) await store.cargarCips()
   loteInfo.value = store.cips.find(c => c.cip === cipActual) ?? null
 })
 
