@@ -244,7 +244,11 @@ function mapearCIP(c: CIPAnalisisOut) {
 }
 
 const filasMostrar = computed(() => {
-  const cipsFiltrados = store.cips.filter(c => tabActual.value === 'ley' ? c.tipo_muestra === 'Laboratorio' : c.tipo_muestra !== 'Laboratorio')
+  const cipsFiltrados = store.cips.filter(c =>
+    tabActual.value === 'ley'
+      ? c.tipo_muestra === 'Laboratorio'
+      : c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno'
+  )
   return cipsFiltrados.map(mapearCIP).filter(f => {
     if (filtroEstado.value && f.estado !== filtroEstado.value) return false
     if (filtroBusqueda.value && !f.cip.toLowerCase().includes(filtroBusqueda.value.toLowerCase())) return false

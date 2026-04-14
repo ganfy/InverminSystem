@@ -126,7 +126,7 @@
           </div>
           <div class="field">
             <label class="field-label">TIPO DE ANÁLISIS:</label>
-            <select class="field-select field-sm" v-model="form.tipo_analisis">
+            <select class="field-select field-input" v-model="form.tipo_analisis">
               <option value="externo">Externo</option>
               <option value="minero">Minero</option>
               <option value="dirimencia">Dirimencia</option>
@@ -134,7 +134,7 @@
           </div>
           <div class="field">
             <label class="field-label">MATERIAL:</label>
-            <select class="field-select field-sm" v-model="form.material">
+            <select class="field-select field-input" v-model="form.material">
               <option value="Au">Au</option>
               <option value="Ag">Ag</option>
             </select>

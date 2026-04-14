@@ -165,8 +165,11 @@ onMounted(async () => {
       analisisPendiente.value = pending ?? null
     }
 
-    if (analisisPendiente.value?.estado === 'PENDIENTE') {
-      ui.toast('Este CIP ya tiene un análisis de recuperación vigente', 'warning')
+    const yaCompletado = cipObj?.analisis_recuperacion.find(
+        a => a.estado === 'COMPLETADO' && a.vigente
+    )
+    if (yaCompletado) {
+        ui.toast('Este CIP ya tiene un análisis de recuperación completado', 'info')
     }
   } catch {
     ui.toast('Error al cargar datos', 'error')

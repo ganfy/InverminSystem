@@ -27,8 +27,7 @@ class MuestreoOut(BaseModel):
     creado_por: int
     observaciones: str | None = None
 
-    class Config:
-        model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True}
 
 
 # ==========================================
@@ -46,8 +45,11 @@ class MapeoCIPOut(BaseModel):
     laboratorio: str | None
     tipo_muestra: str | None
 
-    class Config:
-        model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True}
+
+
+class ActualizarLabCIPRequest(BaseModel):
+    laboratorio: str
 
 
 # ==========================================

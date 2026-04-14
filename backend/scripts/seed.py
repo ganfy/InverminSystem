@@ -196,6 +196,11 @@ CONFIGURACIONES = [
         "valor": "5",
         "descripcion": "Cantidad máxima de códigos CIP que se pueden generar por lote",
     },
+    {
+        "clave": "labs_lista",
+        "valor": '["Minares South S.R.L.", "El Dorado - Invermin Paititi", "Quantum", "Otro"]',
+        "descripcion": "Lista de laboratorios disponibles para asignar a CIPs",
+    },
     # Laboratorio
     {
         "clave": "LAB_DIFERENCIA_MAX_PCT",

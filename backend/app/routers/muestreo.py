@@ -1,7 +1,9 @@
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.models.enums import RolSistema
 from app.models.models import Lote, MapeoCIP, Muestreo, Usuario
 from app.schemas.muestreo import (
+    ActualizarLabCIPRequest,
     GenerarCipsRequest,
     MapeoCIPOut,
     MuestreoCreate,
@@ -15,6 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/muestreo", tags=["Muestreo"])
+
+_ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
 
 
 # ==========================================
@@ -78,7 +82,7 @@ def generar_cips(
     ip_lote: str,
     solicitud: GenerarCipsRequest,
     db: Session = Depends(get_db),
-    # current_user: Usuario = Depends(get_current_user) # Descomentar cuando uses auth
+    current_user: Usuario = Depends(get_current_user),  # Descomentar cuando uses auth
 ):
     """
     Genera códigos CIP anónimos y seguros (Muestreo Ciego) para las muestras de laboratorio.
@@ -102,7 +106,9 @@ def generar_cips(
 @router.get(
     "/lotes/{ip_lote}/etiquetas", response_model=list[MapeoCIPOut], status_code=status.HTTP_200_OK
 )
-def listar_cips_lote(ip_lote: str, db: Session = Depends(get_db)):
+def listar_cips_lote(
+    ip_lote: str, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)
+):
     """Devuelve los códigos CIP ya generados para un lote (Reimpresión / Vista)."""
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
@@ -113,7 +119,9 @@ def listar_cips_lote(ip_lote: str, db: Session = Depends(get_db)):
 
 
 @router.get("/lotes", status_code=status.HTTP_200_OK)
-def listar_lotes_muestreo(db: Session = Depends(get_db)):
+def listar_lotes_muestreo(
+    db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)
+):
     """
     Devuelve la lista de lotes listos para el muestreo (sesiones finalizadas).
     """
@@ -121,7 +129,9 @@ def listar_lotes_muestreo(db: Session = Depends(get_db)):
 
 
 @router.get("/lotes/{ip_lote}/muestreos", response_model=list[MuestreoOut])
-def listar_muestreos_lote(ip_lote: str, db: Session = Depends(get_db)):
+def listar_muestreos_lote(
+    ip_lote: str, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)
+):
     """Obtiene el historial de intentos de humedad de un lote específico."""
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
@@ -133,3 +143,43 @@ def listar_muestreos_lote(ip_lote: str, db: Session = Depends(get_db)):
         .order_by(Muestreo.intento.asc())
         .all()
     )
+
+
+@router.patch("/cips/{cip_id}/laboratorio", response_model=MapeoCIPOut)
+def actualizar_laboratorio_cip(
+    cip_id: int,
+    datos: ActualizarLabCIPRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Asigna el laboratorio destino a un CIP. Solo Admin/Gerencia/Comercial."""
+    rol = current_user.rol.codigo if current_user.rol else None
+    if rol not in {r.value for r in _ROLES_COMERCIAL}:
+        raise HTTPException(status_code=403, detail="Sin permiso para asignar laboratorio")
+    cip = db.query(MapeoCIP).filter(MapeoCIP.id == cip_id).first()
+    if not cip:
+        raise HTTPException(status_code=404, detail="CIP no encontrado")
+    cip.laboratorio = datos.laboratorio
+    db.commit()
+    db.refresh(cip)
+    return cip
+
+
+@router.get("/labs", response_model=list[str])
+def listar_laboratorios(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Lista de laboratorios configurados. Solo Admin/Gerencia/Comercial."""
+    from app.models.models import Configuracion
+
+    cfg = db.query(Configuracion).filter(Configuracion.clave == "labs_lista").first()
+    if cfg:
+        import json
+
+        try:
+            return json.loads(cfg.valor)
+        except Exception:
+            pass
+    # fallback hardcodeado si no existe la config
+    return ["Minares South S.R.L.", "El Dorado - Invermin Paititi", "Quantum", "Otro"]

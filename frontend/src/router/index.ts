@@ -70,9 +70,9 @@ const router = createRouter({
               case 'Gerencia':
               case 'Comercial':
                 return '/dashboard'
-              case 'Balanza':
+              case 'OperadorBalanza':
                 return '/balanza'
-              case 'Muestreo':
+              case 'TecnicoMuestreo':
                 return '/muestreo'
               case 'Laboratorista':
                 return '/laboratorio'

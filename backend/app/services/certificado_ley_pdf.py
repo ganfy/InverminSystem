@@ -33,7 +33,7 @@ _TEMPLATE = """
   body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
   .logo-row {{ display: table; width: 100%; margin-bottom: 6px; }}
   .logo-cell {{ display: table-cell; vertical-align: middle; }}
-  .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #1a3c6b; }}
+  .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
   .empresa-sub {{ font-size: 10px; color: #555; font-style: italic; }}
   .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 6px 0; }}
   .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold;
@@ -52,7 +52,7 @@ _TEMPLATE = """
                       text-align: center; border: 1px solid #bbb; }}
   table.detalle td {{ padding: 5px 8px; border: 1px solid #ccc;
                       text-align: center; font-family: monospace; }}
-  table.detalle td.codigo {{ text-align: left; font-family: Arial; }}
+  table.detalle td.codigo {{ text-align: center; font-family: Arial; }}
   .pie {{ font-size: 9px; color: #555; margin-top: 24px;
           border-top: 1px solid #ccc; padding-top: 6px; }}
 </style>
@@ -83,11 +83,11 @@ _TEMPLATE = """
 <!-- RECEPCIÓN DE MUESTRAS -->
 <div class="seccion">
   <div class="seccion-titulo">Recepción de Muestras</div>
-  <div class="kv-row"><span class="kv-label">Cantidad</span><span class="kv-val">: 1</span></div>
-  <div class="kv-row"><span class="kv-label">Descripción</span><span class="kv-val">: Polveado</span></div>
-  <div class="kv-row"><span class="kv-label">Envase</span><span class="kv-val">: Bolsa de plastico</span></div>
-  <div class="kv-row"><span class="kv-label">Fecha de Recepcion</span><span class="kv-val">: {fecha_recepcion}</span></div>
-  <div class="kv-row"><span class="kv-label">Termino de Analisis</span><span class="kv-val">: {fecha_termino}</span></div>
+  <div class="kv-row"><span class="kv-label">Cantidad</span><span class="kv-val">: 1</span><br/></div>
+  <div class="kv-row"><span class="kv-label">Descripción</span><span class="kv-val">: Polveado</span><br/></div>
+  <div class="kv-row"><span class="kv-label">Envase</span><span class="kv-val">: Bolsa de plastico</span><br/></div>
+  <div class="kv-row"><span class="kv-label">Fecha de Recepcion</span><span class="kv-val">: {fecha_recepcion}</span><br/></div>
+  <div class="kv-row"><span class="kv-label">Termino de Analisis</span><span class="kv-val">: {fecha_termino}</span><br/></div>
   <div class="kv-row"><span class="kv-label">Metodo de Ensayo</span><span class="kv-val">: Newmont</span></div>
 </div>
 
@@ -102,8 +102,6 @@ _TEMPLATE = """
         <th>N&deg;</th>
         <th>CODIGO</th>
         <th>Ley Au Oz/Tc</th>
-        <th>Descuento/Ajuste</th>
-        <th>Ley Comercial Oz/Tc</th>
       </tr>
     </thead>
     <tbody>
@@ -116,10 +114,11 @@ _TEMPLATE = """
 
 <!-- PIE -->
 <div class="pie">
-  Los resultados obtenidos y que se consigna en el presente informe corresponde FIRE ASSAY
-  o analisis gravimetrico en las muestras recepcionadas por el cliente.<br/>
-  <strong>{empresa_nombre}</strong><br/>
-  {empresa_direccion}
+    Los resultados obtenidos y que se consigna en el presente informe corresponde FIRE ASSAY
+    o analisis gravimetrico en las muestras recepcionadas por el cliente.<br/>
+    <br/>
+    <strong>{empresa_nombre}</strong><br/>
+    {empresa_direccion}
 </div>
 
 </body>
@@ -210,30 +209,11 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
 
     calc = calcular_ley_comercial(ley_planta, params)
     ley_comercial = calc["ley_comercial"]
-    descuento = calc["descuento_aplicado"]
-    factor = calc["factor_aplicado"]
-
-    # Descripcion del ajuste para la celda de tabla
-    if calc["sin_parametros"]:
-        ajuste_str = "Sin parametros"
-    elif descuento or factor != 1.0 or calc["ajuste_rango"]:
-        partes = []
-        if descuento:
-            partes.append(f"Dscto -{descuento:.4f}")
-        if calc["ajuste_rango"]:
-            partes.append("Ajuste rango")
-        if factor != 1.0:
-            partes.append(f"x{factor:.3f}")
-        ajuste_str = " | ".join(partes) if partes else "-"
-    else:
-        ajuste_str = "Sin ajuste"
 
     fila = (
         f"<tr>"
         f"<td>1</td>"
         f'<td class="codigo">{ip_lote}</td>'
-        f"<td>{_fmt_oz(float(ley_planta))}</td>"
-        f"<td>{ajuste_str}</td>"
         f"<td><strong>{_fmt_oz(ley_comercial)}</strong></td>"
         f"</tr>"
     )
