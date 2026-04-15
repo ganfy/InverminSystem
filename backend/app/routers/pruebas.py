@@ -25,7 +25,6 @@ def listar_pruebas(
     return pruebas_service.obtener_lista_pruebas(db)
 
 
-# IMPORTANTE: rutas estáticas ANTES de /{ip_lote} para que FastAPI no las capture como param
 @router.get(
     "/para-recuperacion",
     response_model=list[PruebaRecuperacionItem],
@@ -102,6 +101,30 @@ def registrar_prueba(
         if warning:
             response.__pydantic_extra__ = {"warning": warning}
         return response
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post(
+    "/{ip_lote}/remuestreo",
+    response_model=PruebaMetalurgicaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crea nuevo registro de prueba metalúrgica (remuestreo) sin modificar el anterior",
+)
+def solicitar_remuestreo(
+    ip_lote: str,
+    current_user=Depends(check_permiso("PRUEBAS", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Siempre crea un INSERT nuevo para auditoría. El registro anterior queda intacto.
+    El técnico deberá rellenar los parámetros en el formulario de pruebas.
+    """
+    try:
+        prueba = pruebas_service.crear_prueba_remuestreo(db, ip_lote, current_user.id)
+        db.commit()
+        return PruebaMetalurgicaOut.model_validate(prueba)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e

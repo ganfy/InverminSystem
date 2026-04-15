@@ -379,7 +379,7 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
     )
     pesajes = relationship("Pesaje", back_populates="lote")
     muestreos = relationship("Muestreo", back_populates="lote")
-    mapeo_cip = relationship("MapeoCIP", back_populates="lote", uselist=False)
+    mapeo_cip = relationship("MapeoCIP", back_populates="lote")
     analisis_ley = relationship(
         "AnalisisLey",
         foreign_keys="AnalisisLey.lote_id",
@@ -399,7 +399,6 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
         "PruebaMetalurgica",
         foreign_keys="PruebaMetalurgica.lote_id",
         back_populates="lote",
-        uselist=False,
     )
     modificador_estado = relationship("Usuario", foreign_keys=[estado_modificado_por])
 
@@ -550,6 +549,11 @@ class MapeoCIP(Base):
         foreign_keys="AnalisisRecuperacion.cip",
         back_populates="mapeo_cip",
     )
+    prueba_metalurgica = relationship(
+        "PruebaMetalurgica",
+        foreign_keys="PruebaMetalurgica.cip",
+        back_populates="mapeo_cip",
+    )
 
 
 # =============================================================================
@@ -687,7 +691,7 @@ class PruebaMetalurgica(AuditMixin, Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
-    fecha_ingreso = Column(DateTime, nullable=False)
+    fecha_ingreso = Column(DateTime)
     malla_porcentaje = Column(Numeric(5, 2))
     porcentaje_nacn = Column(Numeric(5, 2))
     ph_inicial = Column(Numeric(4, 2))
@@ -695,6 +699,7 @@ class PruebaMetalurgica(AuditMixin, Base):
     adicion_nacn = Column(Numeric(10, 4))  # gramos
     adicion_naoh = Column(Numeric(10, 4))  # gramos
     gasto_agno3 = Column(Numeric(10, 4))  # ml
+    cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
 
     @hybrid_property
     def fecha_salida(self):
@@ -704,6 +709,7 @@ class PruebaMetalurgica(AuditMixin, Base):
         return None
 
     lote = relationship("Lote", back_populates="prueba_metalurgica")
+    mapeo_cip = relationship("MapeoCIP", foreign_keys=[cip])
 
 
 # =============================================================================

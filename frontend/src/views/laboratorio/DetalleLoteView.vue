@@ -165,9 +165,6 @@
           <button class="btn-primary" @click="abrirModalAgregarLey">
             + Registrar nueva ley
           </button>
-          <button class="btn-secondary" @click="solicitarRemuestreo">
-            Solicitar remuestreo
-          </button>
         </div>
 
       </template>
@@ -234,6 +231,10 @@
             ⏳ Análisis pendiente en laboratorio
           </span>
         </div>
+
+        <button class="btn-secondary" @click="solicitarRemuestreo">
+            Solicitar nueva prueba
+        </button>
 
       </template>
 
@@ -335,6 +336,7 @@ import { useUiStore } from '@/stores/ui'
 import type { LoteLabOut } from '@/types/laboratorio'
 import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
+import { pruebasApi } from '@/api/pruebas'
 
 const router = useRouter()
 const route  = useRoute()
@@ -567,9 +569,18 @@ async function subirCertExterno(e: Event) {
 async function solicitarRemuestreo() {
   const ok = await ui.showConfirm({
     title: 'Solicitar Remuestreo',
-    message: `¿Confirmar solicitud de remuestreo para el lote ${ipActual}?`,
+    message: `Se creará un nuevo registro de prueba metalúrgica para ${ipActual}. ` +
+             'El registro anterior se conserva para auditoría. El técnico deberá completar los parámetros y etiquetar un nuevo CIP. ¿Confirmar?',
+    confirmLabel: 'Solicitar',
   })
-  if (ok) ui.toast('Remuestreo solicitado — avise al área de Pruebas Metalúrgicas', 'info')
+  if (!ok) return
+  try {
+    await pruebasApi.solicitarRemuestreo(ipActual)
+    ui.toast('Remuestreo solicitado. El lote aparece en Pruebas Metalúrgicas.', 'success')
+    lote.value = await store.cargarDetalleLote(ipActual)
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al solicitar remuestreo', 'error')
+  }
 }
 </script>
 

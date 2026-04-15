@@ -91,4 +91,10 @@ export const pruebasApi = {
         const { data } = await api.post('/pruebas/sync', { pruebas })
         return data
     },
+
+    /** Solicita remuestreo: siempre crea un nuevo registro (auditoría) */
+    async solicitarRemuestreo(ip: string): Promise<PruebaMetalurgicaOut> {
+        const { data } = await api.post(`/pruebas/${ip}/remuestreo`)
+        return data
+    },
 }

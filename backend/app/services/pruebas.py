@@ -95,39 +95,63 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
     ahora = datetime.now()
 
     for lote in lotes_db:
-        prueba = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).first()
+        pruebas = (
+            db.query(PruebaMetalurgica)
+            .filter(PruebaMetalurgica.lote_id == lote.id)
+            .order_by(PruebaMetalurgica.id)
+            .all()
+        )
 
         fecha_recepcion = lote.pesajes[0].fecha_fin if lote.pesajes else None
 
-        estado = "PENDIENTE"
-        fecha_ingreso = None
-        fecha_salida = None
-
-        if prueba:
-            fecha_ingreso = prueba.fecha_ingreso
-            fecha_salida_calc = prueba.fecha_ingreso + timedelta(hours=48)
-            fecha_salida = fecha_salida_calc
-            estado = "COMPLETADO" if ahora >= fecha_salida_calc else "EN PROCESO"
-
         # CIPs de recuperación asignados a este lote
         cips_rec = _get_cips_recuperacion(db, lote.id)
-        cip_asignado = cips_rec[0].codigo_cip if cips_rec else None
 
-        lista.append(
-            LotePruebaList(
-                ip=lote.ip,
-                fecha_recepcion=fecha_recepcion,
-                fecha_ingreso=fecha_ingreso,
-                fecha_salida=fecha_salida,
-                malla_porcentaje=float(prueba.malla_porcentaje)
-                if prueba and prueba.malla_porcentaje
-                else None,
-                gasto_agno3=float(prueba.gasto_agno3) if prueba and prueba.gasto_agno3 else None,
-                estado=estado,
-                cip_asignado=cip_asignado,
-                etiquetado=cip_asignado is not None,
+        # 🔴 Caso 1: NO hay pruebas → PENDIENTE
+        if not pruebas:
+            lista.append(
+                LotePruebaList(
+                    ip=lote.ip,
+                    fecha_recepcion=fecha_recepcion,
+                    fecha_ingreso=None,
+                    fecha_salida=None,
+                    malla_porcentaje=None,
+                    gasto_agno3=None,
+                    estado="PENDIENTE",
+                    cip_asignado=None,
+                    etiquetado=False,
+                )
             )
-        )
+            continue
+
+        # 🟢 Caso 2: SÍ hay pruebas → agregar TODAS
+        for n, prueba in enumerate(pruebas):
+            fecha_ingreso = prueba.fecha_ingreso
+            fecha_salida = fecha_ingreso + timedelta(hours=48) if fecha_ingreso else None
+
+            estado = "PENDIENTE"
+            if fecha_ingreso:
+                estado = "COMPLETADO" if ahora >= fecha_salida else "EN PROCESO"
+
+            cip_asignado = cips_rec[n].codigo_cip if n < len(cips_rec) else None
+
+            lista.append(
+                LotePruebaList(
+                    ip=lote.ip,
+                    fecha_recepcion=fecha_recepcion,
+                    fecha_ingreso=fecha_ingreso,
+                    fecha_salida=fecha_salida,
+                    malla_porcentaje=float(prueba.malla_porcentaje)
+                    if prueba.malla_porcentaje is not None
+                    else None,
+                    gasto_agno3=float(prueba.gasto_agno3)
+                    if prueba.gasto_agno3 is not None
+                    else None,
+                    estado=estado,
+                    cip_asignado=cip_asignado,
+                    etiquetado=cip_asignado is not None,
+                )
+            )
 
     return lista
 
@@ -175,10 +199,39 @@ def obtener_prueba_por_ip(db: Session, ip_lote: str) -> PruebaMetalurgica | None
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
         return None
-    return db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).first()
+    return (
+        db.query(PruebaMetalurgica)
+        .filter(PruebaMetalurgica.lote_id == lote.id)
+        .order_by(PruebaMetalurgica.id.desc())
+        .first()
+    )
 
 
 # ── Etiquetado ────────────────────────────────────────────────────────────────
+
+
+def crear_prueba_remuestreo(
+    db: Session,
+    ip_lote: str,
+    usuario_id: int,
+) -> PruebaMetalurgica:
+    """
+    Crea SIEMPRE un nuevo registro de PruebaMetalurgica para el lote (auditoría).
+    No modifica registros existentes. El técnico completará los campos en el formulario.
+    """
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise ValueError(f"Lote '{ip_lote}' no encontrado")
+
+    prueba = PruebaMetalurgica(
+        lote_id=lote.id,
+        fecha_ingreso=datetime.now(),
+        creado_por=usuario_id,
+    )
+    db.add(prueba)
+    db.flush()
+    db.refresh(prueba)
+    return prueba
 
 
 def etiquetar_prueba(
@@ -190,8 +243,6 @@ def etiquetar_prueba(
     """
     Genera un CIP de recuperación para la prueba metalúrgica de un lote.
     - Solo disponible cuando la prueba está COMPLETADO (48h pasadas).
-    - Se puede llamar múltiples veces para generar CIPs adicionales
-      (ej: uno interno y uno externo).
     - tipo: RecuperacionInterno (default) o RecuperacionExterno.
     """
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
@@ -206,8 +257,20 @@ def etiquetar_prueba(
     if ahora < prueba.fecha_ingreso + timedelta(hours=48):
         raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
 
-    # Contar todos los CIPs del lote (incluye Laboratorio + Recuperacion*)
-    # para generar sufijo único global
+    cip_existente = (
+        db.query(MapeoCIP)
+        .filter(
+            MapeoCIP.lote_id == lote.id,
+            MapeoCIP.tipo_muestra == tipo,
+        )
+        .join(PruebaMetalurgica, PruebaMetalurgica.lote_id == MapeoCIP.lote_id)
+        .filter(PruebaMetalurgica.id == prueba.id)
+        .first()
+    )
+
+    if cip_existente:
+        raise ValueError("Esta prueba ya tiene un CIP asignado")
+
     total_cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).count()
     correlativo = total_cips + 1
     base = generar_base_cip(lote.id)
@@ -224,6 +287,10 @@ def etiquetar_prueba(
         fecha_envio=ahora.date(),
     )
     db.add(nuevo_cip)
+
+    prueba.cip = codigo_cip
+    prueba.modificado_por = usuario_id
+
     db.flush()
 
     return EtiquetadoPruebaOut(
