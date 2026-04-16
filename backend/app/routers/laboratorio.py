@@ -378,9 +378,34 @@ def generar_certificado_pdf(
     )
 
 
+@router.get("/cips/{cip}/certificado-ensayo")
+def generar_certificado_ensayo(
+    cip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera PDF de informe de ensayo Fire Assay para un CIP.
+    Accesible por Laboratorista (VIEW). No expone IP ni datos del proveedor.
+    """
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(db, cip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = f"ensayo_{cip.replace('-', '_')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 # Obtener certificado
-
-
 @router.get("/archivos/{ruta_archivo:path}")
 def descargar_archivo(
     ruta_archivo: str,

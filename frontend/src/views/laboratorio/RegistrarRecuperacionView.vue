@@ -35,10 +35,6 @@
             <input class="field-input" :value="cipActual" disabled style="color:var(--color-gold);font-family:var(--font-mono)" />
           </div>
           <div class="field">
-            <label class="field-label">LABORATORIO:</label>
-            <input class="field-input" :value="analisisPendiente.laboratorio" disabled />
-          </div>
-          <div class="field">
             <label class="field-label">FECHA ANÁLISIS:</label>
             <input type="date" class="field-input" v-model="fechaAnalisis" />
           </div>
@@ -48,11 +44,6 @@
       <!-- LEYES -->
       <section class="card">
         <h2 class="card-titulo">LEYES DE LA MUESTRA</h2>
-
-        <div class="info-ley-cabeza">
-          ℹ️ La <strong>ley cabeza</strong> fue definida por Comercial al enviar a recuperación.
-          Solo ingresar <strong>ley cola</strong> y <strong>ley líquido</strong>.
-        </div>
 
         <div class="ensayo-col">
           <div class="field">
@@ -82,18 +73,6 @@
         </div>
 
         <p v-if="errForm" class="error-msg" style="margin-top:.75rem">{{ errForm }}</p>
-      </section>
-
-      <!-- Adjuntar certificado (opcional) -->
-      <section class="card">
-        <h2 class="card-titulo">CERTIFICADO (opcional)</h2>
-        <div class="field">
-          <label class="field-label">Adjuntar PDF o imagen:</label>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="onArchivo" class="field-input" style="padding:0.35rem" />
-          <span v-if="archivo" style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.25rem">
-            {{ archivo.name }}
-          </span>
-        </div>
       </section>
 
     </template>

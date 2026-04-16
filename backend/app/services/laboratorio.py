@@ -142,7 +142,11 @@ def obtener_cips_laboratorio(
         print(
             f"Procesando CIP: {cip.codigo_cip}, Laboratorio: {cip.laboratorio}, Tipo muestra: {cip.tipo_muestra}"
         )  # Debug
-        if not incluir_ip and cip.laboratorio not in ["Paititi", "Laboratorio Interno"]:
+        if not incluir_ip and cip.laboratorio not in [
+            "Paititi",
+            "Laboratorio Interno",
+            "El Dorado - Invermin Paititi",
+        ]:
             continue
         lote = db.query(Lote).filter(Lote.id == cip.lote_id).first()
         if not lote:

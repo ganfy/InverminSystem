@@ -169,6 +169,18 @@ export const laboratorioApi = {
         URL.revokeObjectURL(url)
     },
 
+    async descargarCertificadoEnsayo(cip: string): Promise<void> {
+        const response = await api.get(`/laboratorio/cips/${encodeURIComponent(cip)}/certificado-ensayo`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(response.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ensayo_${cip.replace(/-/g, '_')}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+    },
+
     async obtenerUrlArchivoVirtual(rutaArchivo: string): Promise<string> {
         const { data } = await api.get(`/laboratorio/archivos/${rutaArchivo}`, { responseType: 'blob' })
         // Crea una URL temporal del archivo blob para previsualizar

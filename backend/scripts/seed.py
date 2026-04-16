@@ -113,6 +113,7 @@ PERMISOS = [
     ("Comercial", "LABORATORIO", "VIEW", True),
     ("Laboratorista", "LABORATORIO", "CREATE", True),
     ("Laboratorista", "LABORATORIO", "VIEW", True),
+    ("Laboratorista", "LABORATORIO", "UPDATE", True),
     # ── PRUEBAS METALÚRGICAS ──────────────────────────────────────────────────
     ("Admin", "PRUEBAS_MET", "CREATE", True),
     ("Admin", "PRUEBAS_MET", "VIEW", True),

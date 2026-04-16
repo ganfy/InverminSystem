@@ -161,6 +161,16 @@
           </div>
         </section>
 
+        <!-- Alerta dirimencia -->
+        <div v-if="alertaDirimencia" class="dirimencia-request-alert">
+          ⚠️ Diferencia Planta/Minero:
+          <strong style="font-family:var(--font-mono)">{{ alertaDirimencia.toFixed(4) }} oz/TC</strong>
+          supera el límite (0.10). Se recomienda solicitar dirimencia.
+          <button class="btn-warning-sm" style="margin-left:0.75rem" @click="abrirModalAgregarLey">
+            Solicitar Dirimencia →
+          </button>
+        </div>
+
         <div class="acciones-lote">
           <button class="btn-primary" @click="abrirModalAgregarLey">
             + Registrar nueva ley
@@ -214,6 +224,37 @@
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertRec($event, a.id)" />
               </label>
             </div>
+          </div>
+        </div>
+
+        <!-- CIPs enviados a lab externo esperando certificado -->
+        <div
+          v-if="cipsExternosPendienteCert.length > 0"
+          v-for="c in cipsExternosPendienteCert"
+          :key="c.codigo_cip"
+          class="lab-card"
+          style="margin-bottom:0.75rem"
+        >
+          <div class="lab-card-header">
+            <span class="lab-titulo">RECUPERACIÓN EXTERNA — ESPERANDO CERT.</span>
+            <span class="badge-estado pendiente" style="font-size:0.65rem">PENDIENTE</span>
+          </div>
+          <div class="lab-field">
+            <span class="lf-label">CIP:</span>
+            <span class="lf-value td-mono" style="color:var(--color-gold)">{{ c.codigo_cip }}</span>
+          </div>
+          <div class="lab-field">
+            <span class="lf-label">LABORATORIO:</span>
+            <span class="lf-value">{{ c.laboratorio }}</span>
+          </div>
+          <div class="lab-card-footer">
+            <button
+              class="btn-primary"
+              style="font-size:0.72rem;padding:0.25rem 0.65rem"
+              @click="router.push(`/laboratorio/importar-rec/${c.codigo_cip}`)"
+            >
+              Subir certificado →
+            </button>
           </div>
         </div>
 
@@ -393,6 +434,26 @@ const cipRecupInterno = computed(() =>
 const tienePendiente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.vigente) ?? false
 )
+
+// alerta |ley_planta - ley_minero| > 0.10
+const alertaDirimencia = computed(() => {
+  if (!lote.value?.ley_planta || !lote.value?.ley_minero) return null
+  if (lote.value.tiene_dirimencia) return null  // ya tiene dirimencia, no alertar
+  const diff = Math.abs(Number(lote.value.ley_planta) - Number(lote.value.ley_minero))
+  return diff > 0.10 ? diff : null
+})
+
+// CIPs de recuperación enviados a lab externo que aún no tienen certificado
+const internos = new Set(['Paititi', 'Laboratorio Interno'])
+const cipsExternosPendienteCert = computed(() => {
+  if (!lote.value) return []
+  return lote.value.cips_detalle.filter(c => {
+    const esRec = c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno'
+    const tieneLabExterno = c.laboratorio && !internos.has(c.laboratorio)
+    const sinVigente = !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente)
+    return esRec && tieneLabExterno && sinVigente
+  })
+})
 
 // Cargar ley comercial
 watch([tabActual, lote], async ([tab, l]: ['ley' | 'rec', LoteLabOut | null]) => {
@@ -739,4 +800,28 @@ async function solicitarRemuestreo() {
 
 .lc-valor.mono { font-family: var(--font-mono); }
 .lc-valor.gold { color: var(--color-gold); font-size: var(--text-lg); font-weight: 600; }
+
+.dirimencia-request-alert {
+  background: rgba(234,179,8,0.10);
+  border: 1px solid rgba(234,179,8,0.45);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: #fbbf24;
+  font-size: var(--text-sm);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.btn-warning-sm {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.65rem;
+  background: rgba(234,179,8,0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(234,179,8,0.4);
+  border-radius: 4px;
+  cursor: pointer;
+}
 </style>

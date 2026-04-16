@@ -239,6 +239,110 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
     return _html_to_pdf(html)
 
 
+_TEMPLATE_ENSAYO = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  @page {{ size: A4; margin: 20mm 18mm; }}
+  body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
+  .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
+  .empresa-sub {{ font-size: 10px; color: #555; font-style: italic; }}
+  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 6px 0; }}
+  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 1px; margin: 10px 0 2px; }}
+  .n-cert {{ text-align: center; color: #c8a84b; font-size: 11px; font-weight: bold; margin-bottom: 12px; }}
+  .kv-row {{ display: table; width: 100%; margin-bottom: 4px; }}
+  .kv-label {{ display: table-cell; width: 160px; color: #555; }}
+  .kv-val {{ display: table-cell; font-weight: bold; }}
+  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 6px; }}
+  table.detalle th {{ background: #e8e0cc; font-size: 10px; padding: 5px 8px; text-align: center; border: 1px solid #bbb; }}
+  table.detalle td {{ padding: 5px 8px; border: 1px solid #ccc; text-align: center; font-family: monospace; }}
+  .pie {{ font-size: 9px; color: #555; margin-top: 24px; border-top: 1px solid #ccc; padding-top: 6px; }}
+</style>
+</head>
+<body>
+<div><div class="empresa-nombre">{empresa_nombre}</div><div class="empresa-sub">{empresa_sub}</div></div>
+<hr class="linea-gold"/>
+<div class="titulo-cert">INFORME DE ENSAYO — LABORATORIO INTERNO</div>
+<div class="n-cert">CIP: {n_ensayo}</div>
+<div class="kv-row"><span class="kv-label">Laboratorio</span><span class="kv-val">: {laboratorio}</span></div>
+<div class="kv-row"><span class="kv-label">Fecha análisis</span><span class="kv-val">: {fecha}</span></div>
+<hr class="linea-gold"/>
+<table class="detalle">
+  <thead>
+    <tr><th>N°</th><th>CIP</th><th>Ley Fino (Oz/TC)</th><th>Ley Grueso (Oz/TC)</th><th>Ley Final (Oz/TC)</th><th>Ley (Gr/TM)</th></tr>
+  </thead>
+  <tbody>{filas_detalle}</tbody>
+</table>
+<div class="pie">
+  Resultados obtenidos por FIRE ASSAY (triple sampling).<br/>
+  <strong>{empresa_nombre}</strong> — {empresa_direccion}
+</div>
+</body>
+</html>
+"""
+
+
+def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
+    """Certificado de ensayo Fire Assay para laboratorista (por CIP, sin revelar IP)."""
+    from app.models.models import AnalisisLey, Configuracion, MapeoCIP
+
+    cip = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_code).first()
+    if not cip:
+        raise ValueError(f"CIP {cip_code} no encontrado")
+
+    analisis_list = (
+        db.query(AnalisisLey)
+        .filter(AnalisisLey.cip == cip_code, AnalisisLey.vigente == True)  # noqa: E712
+        .order_by(AnalisisLey.id)
+        .all()
+    )
+    if not analisis_list:
+        raise ValueError(f"No hay análisis de ley vigentes para CIP {cip_code}")
+
+    cfg_rows = (
+        db.query(Configuracion.clave, Configuracion.valor)
+        .filter(Configuracion.clave.in_(["empresa_nombre", "empresa_planta", "empresa_direccion"]))
+        .all()
+    )
+    cfg = {r.clave: r.valor for r in cfg_rows}
+    empresa_nombre = cfg.get("empresa_nombre", "INVERMIN PAITITI S.A.C.")
+    empresa_sub = cfg.get("empresa_planta", "Inversiones Mineras con Responsabilidad Social")
+    empresa_dir = cfg.get(
+        "empresa_direccion", "Otr.Las Terrazas KM.2 - Chala - Caraveli - Arequipa"
+    )
+
+    filas = ""
+    for i, a in enumerate(analisis_list, 1):
+        filas += (
+            f"<tr>"
+            f"<td>{i}</td>"
+            f"<td>{cip_code}</td>"
+            f"<td>{_fmt_oz(float(a.ley_fino) if a.ley_fino else None)}</td>"
+            f"<td>{_fmt_oz(float(a.ley_grueso) if a.ley_grueso else None)}</td>"
+            f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None)}</strong></td>"
+            f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None)}</td>"
+            f"</tr>"
+        )
+
+    fecha_analisis = analisis_list[-1].fecha_analisis
+    fecha = _fmt_date(
+        datetime.combine(fecha_analisis, datetime.min.time()) if fecha_analisis else None
+    )
+
+    html = _TEMPLATE_ENSAYO.format(
+        empresa_nombre=empresa_nombre,
+        empresa_sub=empresa_sub,
+        empresa_direccion=empresa_dir,
+        n_ensayo=cip_code,
+        laboratorio=analisis_list[0].laboratorio if analisis_list else "-",
+        fecha=fecha,
+        filas_detalle=filas,
+    )
+    return _html_to_pdf(html)
+
+
 def _html_to_pdf(html: str) -> bytes:
     try:
         from xhtml2pdf import pisa

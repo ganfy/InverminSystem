@@ -167,9 +167,13 @@
                     <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                   </td>
                   <td class="td-acciones">
-                    <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila.cip)">Registrar</button>
-                    <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
-                  </td>
+                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila.cip)">Registrar</button>
+                     <button v-if="fila.estado === 'COMPLETADO'" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" :disabled="descargando === fila.cip" @click="descargarInforme(fila.cip)">
+                       <span v-if="descargando === fila.cip" class="spinner" style="margin-right:0.3rem"></span>
+                       Descargar informe
+                     </button>
+                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
+                   </td>
                 </tr>
               </template>
             </template>
@@ -293,6 +297,18 @@ function irARegistrarLey(cip: string)          { router.push(`/laboratorio/ley/$
 function irARegistrarRecuperacion(cip: string) { router.push(`/laboratorio/recuperacion/${cip}`) }
 function irADetalleLote(ip: string) { router.push(`/laboratorio/lote/${ip}`) }
 
+const descargando = ref<string | null>(null)
+
+async function descargarInforme(cip: string) {
+  descargando.value = cip
+  try {
+    await laboratorioApi.descargarCertificadoEnsayo(cip)
+  } catch {
+    ui.toast('Error al generar informe de ensayo', 'error')
+  } finally {
+    descargando.value = null
+  }
+}
 </script>
 
 <style scoped>

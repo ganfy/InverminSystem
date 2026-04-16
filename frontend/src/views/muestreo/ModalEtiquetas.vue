@@ -32,7 +32,7 @@
 
           <div id="area-impresion" class="grid-etiquetas">
             <div v-for="cip in codigosExistentes" :key="cip.id" class="etiqueta-print">
-              <span class="etiqueta-title">INVERMIN S.A.C.</span>
+              <span class="etiqueta-title">INVERMIN PAITITI S.A.C.</span>
               <span class="etiqueta-subtitle">MUESTRA ANÁLISIS</span>
 
               <svg :id="`barcode-${cip.id}`" class="barcode-visual"></svg>

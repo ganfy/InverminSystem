@@ -170,11 +170,14 @@ def registrar_prueba(
     if datos.malla_porcentaje is not None:
         if not (88 <= datos.malla_porcentaje <= 94):
             warning_msg = (
-                f"⚠️ Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
+                f"Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
             )
 
     prueba_existente = (
-        db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).first()
+        db.query(PruebaMetalurgica)
+        .filter(PruebaMetalurgica.lote_id == lote.id)
+        .order_by(PruebaMetalurgica.id.desc())
+        .first()
     )
 
     if prueba_existente:
@@ -225,7 +228,7 @@ def crear_prueba_remuestreo(
 
     prueba = PruebaMetalurgica(
         lote_id=lote.id,
-        fecha_ingreso=datetime.now(),
+        fecha_ingreso=None,  # se completará al ingresar a pruebas
         creado_por=usuario_id,
     )
     db.add(prueba)
