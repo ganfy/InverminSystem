@@ -548,7 +548,7 @@ def subir_certificado(db: Session, analisis_id: int, archivo: UploadFile, tipo: 
     if not a:
         raise ValueError("Análisis no encontrado")
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()
     cip_str = (a.cip or "cert").replace("/", "_")
     carpeta = STORAGE_PATH / "certificados" / str(ahora.year) / f"{ahora.month:02d}"
     carpeta.mkdir(parents=True, exist_ok=True)
@@ -624,32 +624,42 @@ def extraer_certificado_ley(
         # Normalizar espacios: "IP 2793" → "IP-2793"
         cip = re.sub(r"^IP\s+", "IP-", cip.strip())
 
-    # ── Leyes de la muestra ───────────────────────────────────────────────────
-    # ley_grueso = MALLA +140 o +150 (fracción retenida en malla)
     ley_grueso = _first_float(
-        r"MALLA\s*\+\s*1[45]\d\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
-        r"MESH\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-        r"\+\s*1[45]\d\s*(?:oz/tc)?\s*[:\|]?\s*([\d]+[.,][\d]+)",
+        r"MALLA\s*\+\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"MESH\s*\+\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"\+\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
     )
-
-    # ley_fino = MALLA -140 o -150 (fracción pasante)
     ley_fino = _first_float(
-        r"MALLA\s*-\s*1[45]\d\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
-        r"MESH\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-        r"-\s*1[45]\d\s*(?:oz/tc)?\s*[:\|]?\s*([\d]+[.,][\d]+)",
+        r"MALLA\s*-\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"MESH\s*-\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"-\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
     )
-
-    # ley_final = suma (oz/tc total). Si no aparece explícito, se calculará
     ley_final = _first_float(
-        r"LEY\s+FINAL\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
-        r"LEY\s+AU\s*(?:OZ/TC|OZ\.TC|OZ/T\.C)\s*:?\s*([\d]+[.,][\d]+)",
-        r"AU\s*(?:OZ/TC|OZ\.TC)\s*:?\s*([\d]+[.,][\d]+)",
-        # En tabla: valor aislado mayor (generalmente la suma es el mayor de la fila)
+        r"LE[YV]\s*FINAL[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"LE[YV]\s+AU[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"AU\s*(?:OZ/TC|OZ\.TC|0Z/TC|ozitc|oz/te|o2z/tc)[\s\S]{0,30}?([\d]+[.,][\d]+)",
     )
 
-    # Si no se encontró ley_final pero sí fino y grueso, calcular
-    if ley_final is None and ley_fino is not None and ley_grueso is not None:
-        ley_final = round(ley_fino + ley_grueso, 4)
+    # Si las etiquetas están muy separadas de los valores, leemos fila por fila.
+    if ley_final is None or ley_fino is None or ley_grueso is None:
+        for linea in texto.split("\n"):
+            # Encontrar todos los decimales en la línea actual
+            floats = re.findall(r"\b\d+\.\d{2,4}\b", linea)
+
+            # Caso 1: La fila tiene al menos 3 números (Grueso, Fino, Final, opcional g/TM)
+            # Ej: RLV-83 IP - 2793 0.040 0.519 0.559 19.162
+            if len(floats) >= 3:
+                # El orden minero estándar de izquierda a derecha suele ser: Malla Gruesa (+), Malla Fina (-), Final
+                ley_grueso = float(floats[0])
+                ley_fino = float(floats[1])
+                ley_final = float(floats[2])
+                break
+
+            # Caso 2: La fila tiene exactamente 2 números (Ley Final oz/TC y g/TM)
+            elif len(floats) == 2 and ley_final is None:
+                f1, f2 = float(floats[0]), float(floats[1])
+                # Sabemos que g/TM es ~34.28 veces mayor que oz/TC, así que la Final es el valor menor.
+                ley_final = min(f1, f2)
 
     # ley_gr_tm (referencia, no se guarda en BD - backend lo recalcula)
     ley_gr_tm = _first_float(
@@ -790,6 +800,48 @@ def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
     try:
         ruta = tmp / filename
         ruta.write_bytes(archivo_bytes)
+
+        def preprocesar_imagen(img_path):
+            from PIL import Image
+
+            # Volvemos a lo simple y efectivo: Solo escala de grises y zoom 2x.
+            # Sin filtros destructivos (autocontrast, binarize, etc.) que borren los números.
+            img = Image.open(str(img_path)).convert("L")
+            img = img.resize((img.width * 2, img.height * 2), Image.Resampling.LANCZOS)
+            return img
+
+        # Volvemos a psm 4: Ideal para tablas y asume una columna de texto de tamaños variables
+        config_ocr = r"--oem 3 --psm 4"
+
+        ext = ruta.suffix.lower()
+        if ext in [".jpg", ".jpeg", ".png"]:
+            try:
+                import pytesseract
+
+                img = preprocesar_imagen(ruta)
+                texto = pytesseract.image_to_string(img, lang="spa+eng", config=config_ocr)
+                print(f"[OCR TEXTO EXTRAÍDO]\n{texto}\n[FIN OCR]")
+                return texto
+            except Exception as e:
+                print(f"Error OCR Imagen: {e}")
+                return ""
+
+        # psm 6 asume un bloque de texto uniforme, ideal para cuando limpiamos todo el fondo
+        config_ocr = r"--oem 3 --psm 6"
+
+        ext = ruta.suffix.lower()
+        if ext in [".jpg", ".jpeg", ".png"]:
+            try:
+                import pytesseract
+
+                img = preprocesar_imagen(ruta)
+                texto = pytesseract.image_to_string(img, lang="spa+eng", config=config_ocr)
+                print(f"[OCR TEXTO EXTRAÍDO]\n{texto}\n[FIN OCR]")
+                return texto
+            except Exception as e:
+                print(f"Error OCR Imagen: {e}")
+                return ""
+
         try:
             import fitz
 
@@ -817,6 +869,34 @@ def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
             return ""
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def generar_y_guardar_certificado_interno(db: Session, analisis_id: int, tipo: str) -> str:
+    from app.services import certificado_ley_pdf as cert_svc
+
+    if tipo == "ley":
+        a = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_id).first()
+        if not a:
+            raise ValueError("Análisis no encontrado")
+        pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(db, a.cip)
+    else:
+        a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+        if not a:
+            raise ValueError("Análisis no encontrado")
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_cip_pdf(db, a.cip)
+
+    ahora = datetime.utcnow()
+    cip_str = (a.cip or "cert").replace("/", "_")
+    carpeta = STORAGE_PATH / "certificados" / str(ahora.year) / f"{ahora.month:02d}"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    nombre = f"{cip_str}_{tipo}_interno_{uuid.uuid4().hex[:8]}.pdf"
+
+    (carpeta / nombre).write_bytes(pdf_bytes)
+    ruta = f"certificados/{ahora.year}/{ahora.month:02d}/{nombre}"
+
+    a.certificado_url = ruta
+    db.flush()
+    return ruta
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

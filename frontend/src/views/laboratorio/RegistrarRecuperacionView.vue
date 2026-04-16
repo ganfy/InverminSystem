@@ -10,7 +10,7 @@
         <button class="btn-secondary" @click="router.back()">← Volver</button>
         <button class="btn-primary" @click="guardar" :disabled="guardando || !analisisPendiente">
           <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
-          Guardar →
+          Guardar y Generar Certificado
         </button>
       </div>
     </header>
@@ -157,6 +157,7 @@ onMounted(async () => {
   }
 })
 
+
 async function guardar() {
   errForm.value = ''
   if (!analisisPendiente.value) { errForm.value = 'Sin análisis pendiente'; return }
@@ -168,18 +169,27 @@ async function guardar() {
     return
   }
 
+  const okConf = await ui.showConfirm({
+      title: 'Generar Certificado',
+      message: 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?',
+      confirmLabel: 'Generar y Guardar'
+  })
+  if (!okConf) return
+
   guardando.value = true
-  const ok = await store.completarRecuperacion(
+  const result = await store.completarRecuperacion(
     analisisPendiente.value.id,
     {
       ley_cola:       form.value.ley_cola,
       ley_liquido:    form.value.ley_liquido,
       fecha_analisis: fechaAnalisis.value,
-    },
-    archivo.value,
+    }
   )
+  if (result) {
+      await store.generarCertificadoRecInterno(result.id)
+      router.push('/laboratorio')
+  }
   guardando.value = false
-  if (ok) router.push('/laboratorio')
 }
 </script>
 

@@ -148,6 +148,7 @@
                   </td>
                   <td class="td-acciones">
                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarLey(fila.cip)">Registrar</button>
+                    <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="generarCertLey(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                   </td>
                 </tr>
@@ -167,13 +168,10 @@
                     <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                   </td>
                   <td class="td-acciones">
-                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila.cip)">Registrar</button>
-                     <button v-if="fila.estado === 'COMPLETADO'" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" :disabled="descargando === fila.cip" @click="descargarInforme(fila.cip)">
-                       <span v-if="descargando === fila.cip" class="spinner" style="margin-right:0.3rem"></span>
-                       Descargar informe
-                     </button>
-                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
-                   </td>
+                    <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila.cip)">Registrar</button>
+                    <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="generarCertRec(fila)">Generar cert.</button>
+                    <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
+                  </td>
                 </tr>
               </template>
             </template>
@@ -240,6 +238,7 @@ function mapearCIP(c: CIPAnalisisOut) {
   if (tabActual.value === 'ley') {
     const a = c.analisis_ley.find(x => x.vigente) ?? c.analisis_ley[0]
     return {
+      id: a?.id,
       cip: c.cip, fecha_envio: c.fecha_envio, estado: c.estado_ley,
       leyMas: a?.ley_grueso ?? null, leyMenos: a?.ley_fino ?? null,
       ozTc: a?.ley_final ?? null, grTm: a?.ley_gr_tm ?? null,
@@ -250,6 +249,7 @@ function mapearCIP(c: CIPAnalisisOut) {
     const completado = c.analisis_recuperacion.find(x => x.estado === 'COMPLETADO' && x.vigente)
     const a = pending ?? completado
     return {
+      id: a?.id,
       cip: c.cip, fecha_envio: c.fecha_envio, estado: c.estado_recuperacion,
       leyCabeza: a?.ley_cabeza ?? null, leyCola: a?.ley_cola ?? null,
       leyLiquido: a?.ley_liquido ?? null, recuperacion: a?.recuperacion ?? null,
@@ -308,6 +308,18 @@ async function descargarInforme(cip: string) {
   } finally {
     descargando.value = null
   }
+}
+
+async function generarCertLey(fila: any) {
+    if (!fila.id) return
+    await store.generarCertificadoLeyInterno(fila.id)
+    recargar()
+}
+
+async function generarCertRec(fila: any) {
+    if (!fila.id) return
+    await store.generarCertificadoRecInterno(fila.id)
+    recargar()
 }
 </script>
 

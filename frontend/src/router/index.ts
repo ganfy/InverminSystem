@@ -18,6 +18,7 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import RegistrarHumedadView from '@/views/muestreo/RegistrarHumedadView.vue'
 import ImportarCertificadoLeyView from '@/views/laboratorio/ImportarCertificadoLeyView.vue'
 import ImportarCertificadoRecuperacionView from '@/views/laboratorio/ImportarCertificadoRecView.vue'
+import TercerosView from '@/views/terceros/TercerosView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -54,6 +55,8 @@ const router = createRouter({
         { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
         { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView },
         { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView },
+        // Gestión
+        { path: 'terceros', name: 'Terceros', component: TercerosView },
         // Error
         { path: 'unauthorized', name: 'Unauthorized', component: UnauthorizedView },
 

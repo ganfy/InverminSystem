@@ -187,6 +187,15 @@ export const laboratorioApi = {
         return URL.createObjectURL(data)
     },
 
+    async generarCertificadoLeyInterno(analisisId: number): Promise<AnalisisLeyOut> {
+        const { data } = await api.post(`/laboratorio/ley/${analisisId}/generar-certificado`)
+        return data
+    },
+    async generarCertificadoRecInterno(analisisId: number): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.post(`/laboratorio/recuperacion/${analisisId}/generar-certificado`)
+        return data
+    },
+
     // ── Sync Offline ──────────────────────────────────────────────────────────
     async sincronizarBatch(payload: SyncLaboratorioRequest): Promise<SyncLaboratorioResponse> {
         const { data } = await api.post('/laboratorio/sync', payload)

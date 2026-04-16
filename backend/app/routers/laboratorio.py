@@ -22,7 +22,7 @@ from pathlib import Path
 from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.models.enums import RolSistema
-from app.models.models import Lote
+from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote
 from app.schemas.laboratorio import (
     AnalisisLeyCreate,
     AnalisisLeyOut,
@@ -161,6 +161,30 @@ async def subir_certificado_ley(
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/ley/{analisis_id}/generar-certificado", response_model=AnalisisLeyOut)
+def generar_certificado_ley_interno(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    svc.generar_y_guardar_certificado_interno(db, analisis_id, "ley")
+    db.commit()
+    return svc._ley_out(db.query(AnalisisLey).get(analisis_id))
+
+
+@router.post(
+    "/recuperacion/{analisis_id}/generar-certificado", response_model=AnalisisRecuperacionOut
+)
+def generar_certificado_recuperacion_interno(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    svc.generar_y_guardar_certificado_interno(db, analisis_id, "recuperacion")
+    db.commit()
+    return svc._rec_out(db.query(AnalisisRecuperacion).get(analisis_id))
 
 
 # ── Flujo de recuperación interna ────────────────────────────────────────────
