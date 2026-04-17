@@ -444,7 +444,7 @@ def enviar_recuperacion_interna(
 
     # Actualizar laboratorio destino en el mapeo
     if datos.laboratorio:
-        cip_obj.laboratorio = datos.laboratorio
+        cip_obj.laboratorio = datos.laboratorio or "Paititi"
 
     # Verificar que no haya pending vigente para ese CIP
     pending_existente = (

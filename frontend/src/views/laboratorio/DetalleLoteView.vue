@@ -251,7 +251,7 @@
             <button
               class="btn-primary"
               style="font-size:0.72rem;padding:0.25rem 0.65rem"
-              @click="router.push(`/laboratorio/importar-rec/${c.codigo_cip}?ip=${ipActual}`)"
+              @click="router.push(`/laboratorio/importar-rec/${c.codigo_cip}?ip=${ipActual}&lab=${encodeURIComponent(c.laboratorio || '')}`)"
             >
               Subir certificado →
             </button>

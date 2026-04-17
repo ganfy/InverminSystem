@@ -40,7 +40,7 @@
               <span class="etiqueta-codigo">{{ cip.codigo_cip }}</span>
 
               <span class="etiqueta-lab" style="font-size:0.5rem;color:#555;margin-top:0.2rem">
-                {{ labsPorCip[cip.id] || cip.laboratorio || 'Sin asignar' }}
+                {{ labsPorCip[cip.id] || cip.laboratorio || '' }}
               </span>
 
               <div v-if="puedeAsignarLab" class="lab-selector no-print">
@@ -127,37 +127,41 @@ const inicializarEtiquetas = async () => {
   }
 
   try {
+  cargando.value = true
+  error.value = null
+
+  const [labs, historialInicial] = await Promise.all([
+    puedeAsignarLab.value ? muestreoApi.listarLaboratorios() : Promise.resolve([]),
+    store.obtenerCodigosCip(props.ipLote),
+  ])
+
+  if (puedeAsignarLab.value) labsDisponibles.value = labs
+
+  let historial = historialInicial
+
+  if (!historial || historial.length === 0) {
+    mensajeCarga.value = 'Generando muestras iniciales (Laboratorio y Dirimencia)...'
+    const nuevos = await store.generarCodigosCip(props.ipLote, 2)
+    if (nuevos) {
+      historial = nuevos
+      emit('etiquetado')
+    }
+  }
+
+  if (historial && historial.length > 0) {
+    codigosExistentes.value = historial
+    // Precargar lab por CIP DESPUÉS de tener los datos
     if (puedeAsignarLab.value) {
-      labsDisponibles.value = await muestreoApi.listarLaboratorios()
-      // Pre-cargar valores actuales
-      codigosExistentes.value.forEach(c => {
+      historial.forEach(c => {
         labsPorCip.value[c.id] = c.laboratorio ?? ''
       })
     }
-    cargando.value = true
-    error.value = null
-
-    // 1. Verificamos si ya tiene etiquetas
-    let historial = await store.obtenerCodigosCip(props.ipLote)
-
-    // 2. Lógica de negocio: Si no hay, generamos 2 automáticamente
-    if (!historial || historial.length === 0) {
-      mensajeCarga.value = 'Generando muestras iniciales (Laboratorio y Dirimencia)...'
-      const nuevos = await store.generarCodigosCip(props.ipLote, 2)
-      if (nuevos) {
-        historial = nuevos
-        emit('etiquetado') // Avisamos al padre que el estado cambió
-      }
-    }
-
-    if (historial && historial.length > 0) {
-      codigosExistentes.value = historial
-      cargando.value = false
-      await dibujarCodigosBarras()
-    } else {
-      error.value = 'No se pudieron recuperar ni generar los códigos.'
-      cargando.value = false
-    }
+    cargando.value = false
+    await dibujarCodigosBarras()
+  } else {
+    error.value = 'No se pudieron recuperar ni generar los códigos.'
+    cargando.value = false
+  }
 
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Error interno del servidor.'

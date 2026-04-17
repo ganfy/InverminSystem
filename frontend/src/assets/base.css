@@ -263,10 +263,11 @@ font-size: var(--text-sm);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   width: 100%;
-  max-width: 520px;
+  max-width: 600px;
   font-family: var(--font-mono);
 }
 .modal-sm  { max-width: 360px; }
+.modal-md  { max-width: 480px; }
 .modal-lg  { max-width: 720px; }
 .modal-xl  { max-width: 900px; }
 
