@@ -58,7 +58,7 @@
         </div>
 
         <div v-if="lote.tiene_dirimencia" class="dirimencia-alert" style="margin-top:0.75rem">
-          ⚠️ Este lote tiene análisis de dirimencia — prevalece sobre todos los demás
+          <AlertTriangle :size="16" /> Este lote tiene análisis de dirimencia - prevalece sobre todos los demás
         </div>
       </section>
 
@@ -148,7 +148,7 @@
             </div>
 
             <div v-if="leyComercialCalc.sin_parametros" class="info-box warning" style="margin-top:0.75rem">
-              ⚠️ Sin parámetros comerciales configurados para este proveedor-acopiador.
+              <AlertTriangle :size="16" /> Sin parámetros comerciales configurados para este proveedor-acopiador.
             </div>
             <div v-if="leyComercialCalc.detalle && !leyComercialCalc.sin_parametros"
               style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.5rem;font-family:var(--font-mono)">
@@ -163,7 +163,7 @@
 
         <!-- Alerta dirimencia -->
         <div v-if="alertaDirimencia" class="dirimencia-request-alert">
-          ⚠️ Diferencia Planta/Minero:
+          <AlertTriangle :size="16" />lertTriangle :size="16" /> Diferencia Planta/Minero:
           <strong style="font-family:var(--font-mono)">{{ alertaDirimencia.toFixed(4) }} oz/TC</strong>
           supera el límite (0.10). Se recomienda solicitar dirimencia.
           <button class="btn-warning-sm" style="margin-left:0.75rem" @click="abrirModalAgregarLey">
@@ -182,10 +182,10 @@
       <template v-if="tabActual === 'rec'">
 
         <div v-if="lote.ley_planta == null" class="info-box warning">
-          ⚠️ Sin ley planta disponible. Registre al menos un análisis de ley vigente antes de enviar a recuperación.
+          <AlertTriangle :size="16" /> Sin ley planta disponible. Registre al menos un análisis de ley vigente antes de enviar a recuperación.
         </div>
         <div v-else-if="!cipRecupInterno" class="info-box warning">
-          ⚠️ Sin CIP de recuperación. El técnico debe completar pruebas metalúrgicas y etiquetar la muestra.
+          <AlertTriangle :size="16" /> Sin CIP de recuperación. El técnico debe completar pruebas metalúrgicas y etiquetar la muestra.
         </div>
 
         <div class="labs-grid" v-if="lote.analisis_recuperacion.length > 0">
@@ -236,7 +236,7 @@
           style="margin-bottom:0.75rem"
         >
           <div class="lab-card-header">
-            <span class="lab-titulo">RECUPERACIÓN EXTERNA — ESPERANDO CERT.</span>
+            <span class="lab-titulo">RECUPERACIÓN EXTERNA - ESPERANDO CERT.</span>
             <span class="badge-estado pendiente" style="font-size:0.65rem">PENDIENTE</span>
           </div>
           <div class="lab-field">
@@ -251,7 +251,7 @@
             <button
               class="btn-primary"
               style="font-size:0.72rem;padding:0.25rem 0.65rem"
-              @click="router.push(`/laboratorio/importar-rec/${c.codigo_cip}`)"
+              @click="router.push(`/laboratorio/importar-rec/${c.codigo_cip}?ip=${ipActual}`)"
             >
               Subir certificado →
             </button>
@@ -269,12 +269,21 @@
             Enviar a recuperación
           </button>
           <span v-if="tienePendiente" class="info-inline" style="margin-left:0.5rem">
-            ⏳ Análisis pendiente en laboratorio
+            <Hourglass :size ="16"/> Análisis pendiente en laboratorio
           </span>
         </div>
 
-        <button class="btn-secondary" @click="solicitarRemuestreo">
-            Solicitar nueva prueba
+        <div v-if="lote.tiene_prueba_pendiente" class="alerta-warning" style="margin-top:0.75rem">
+        <TriangleAlert :size="16"/> Este lote tiene una prueba metalúrgica en curso (PENDIENTE o EN PROCESO).
+          Revise el módulo de <strong>Pruebas Metalúrgicas</strong> antes de solicitar nuevas muestras.
+        </div>
+        <button
+          class="btn-secondary"
+          @click="solicitarRemuestreo"
+          :disabled="lote.tiene_prueba_pendiente"
+          style="margin-top:0.5rem"
+        >
+          Solicitar nueva prueba
         </button>
 
       </template>
@@ -308,7 +317,7 @@
         </div>
         <div class="modal-body">
           <div v-if="cipsDisponiblesLey.length === 0" class="info-box warning">
-            ⚠️ No hay CIPs de laboratorio disponibles sin análisis. Es necesario generar nuevas etiquetas o solicitar un remuestreo.
+            <AlertTriangle :size="16" /> No hay CIPs de laboratorio disponibles sin análisis. Es necesario generar nuevas etiquetas o solicitar un remuestreo.
           </div>
           <div v-else class="field">
             <label class="field-label">Seleccione el CIP a analizar:</label>
@@ -341,7 +350,7 @@
             <label class="field-label">CIP A USAR:</label>
             <select class="field-select field-input" v-model="cipRecupElegido" @change="onCipRecupChange">
               <option v-for="c in cipsRecuperacionDisponibles" :key="c.codigo_cip" :value="c.codigo_cip">
-                {{ c.codigo_cip }} — {{ c.tipo_muestra }}
+                {{ c.codigo_cip }} - {{ c.tipo_muestra }}
               </option>
             </select>
           </div>
@@ -378,6 +387,7 @@ import type { LoteLabOut } from '@/types/laboratorio'
 import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
 import { pruebasApi } from '@/api/pruebas'
+import { AlertTriangle, Hourglass, TriangleAlert } from 'lucide-vue-next'
 
 const router = useRouter()
 const route  = useRoute()
@@ -536,7 +546,7 @@ function abrirModalAgregarLey() {
 function confirmarAgregarLey() {
   if (cipSeleccionado.value) {
     if (store.puedeImportarCert) {
-      router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}`)
+      router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}?ip=${ipActual}`)
     } else {
       router.push(`/laboratorio/ley/${cipSeleccionado.value}`)
     }

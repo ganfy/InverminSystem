@@ -131,7 +131,7 @@
                 @click="verEtiqueta(prueba)"
                 title="Ver etiqueta CIP"
               >
-                🏷 Reimprimir
+                <Tag :size="14" /> Reimprimir
               </button>
             </td>
           </tr>
@@ -152,7 +152,7 @@
         <div class="modal-body" style="text-align:center">
           <p class="field-label" style="margin-bottom:0.5rem">LOTE: {{ etiquetaModal.ip }}</p>
           <div class="etiqueta-cip">
-            <span class="etiqueta-title">INVERMIN PAITITI S.A.C. — RECUPERACIÓN</span>
+            <span class="etiqueta-title">INVERMIN PAITITI S.A.C. - RECUPERACIÓN</span>
             <div :id="`barcode-prueba`" class="barcode-container"></div>
             <span class="etiqueta-codigo">{{ etiquetaModal.cip }}</span>
           </div>
@@ -174,7 +174,7 @@ import { useUiStore } from '@/stores/ui'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
 import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'
-import { WifiOff } from 'lucide-vue-next'
+import { WifiOff, Tag } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()

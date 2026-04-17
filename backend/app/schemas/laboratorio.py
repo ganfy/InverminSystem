@@ -143,6 +143,7 @@ class LoteLabOut(BaseModel):
     analisis_ley: list[AnalisisLeyOut]
     analisis_recuperacion: list[AnalisisRecuperacionOut]
     tiene_dirimencia: bool
+    tiene_prueba_pendiente: bool = False
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

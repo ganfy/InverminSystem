@@ -20,6 +20,7 @@ from app.models.models import (
     Lote,
     MapeoCIP,
     ProveedorAcopiador,
+    PruebaMetalurgica,
     SesionDescarga,
 )
 from app.schemas.laboratorio import (
@@ -237,6 +238,15 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         .all()
     )
 
+    from datetime import datetime, timedelta
+
+    pruebas_lote = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).all()
+    _ahora = datetime.now()
+    tiene_prueba_pendiente = any(
+        p.fecha_ingreso is None or _ahora < p.fecha_ingreso + timedelta(hours=48)
+        for p in pruebas_lote
+    )
+
     return LoteLabOut(
         ip=lote.ip,
         lote_id=lote.id,
@@ -250,6 +260,7 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         analisis_ley=[_ley_out(a, lote.ip) for a in analisis_ley],
         analisis_recuperacion=[_rec_out(a, lote.ip) for a in analisis_rec],
         tiene_dirimencia=bool(lote.dirimencia),
+        tiene_prueba_pendiente=tiene_prueba_pendiente,
     )
 
 

@@ -104,11 +104,12 @@ export interface LoteLabOut {
     fecha_recepcion?: string | null
     cips: string[]
     cips_detalle: CIPResumen[]
-    ley_planta?: number | null      // calculada on-the-fly (promedio vigentes)
-    ley_minero?: number | null      // del análisis tipo minero vigente
+    ley_planta?: number | null
+    ley_minero?: number | null
     analisis_ley: AnalisisLeyOut[]
     analisis_recuperacion: AnalisisRecuperacionOut[]
     tiene_dirimencia: boolean
+    tiene_prueba_pendiente: boolean
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────────

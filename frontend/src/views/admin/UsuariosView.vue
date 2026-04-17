@@ -53,13 +53,13 @@
             </td>
             <td class="td-fecha">{{ formatFecha(u.creado_en) }}</td>
             <td class="td-acciones">
-              <button class="btn-icon" title="Editar" @click="abrirEditar(u)">✎</button>
+              <button class="btn-icon" title="Editar" @click="abrirEditar(u)"><Pencil :size="16" />Pencil :size="16" /></button>
               <button
                 class="btn-icon"
                 :title="u.activo ? 'Desactivar' : 'Activar'"
                 @click="toggleEstado(u)"
               >{{ u.activo ? '⊘' : '⊕' }}</button>
-              <button class="btn-icon" title="Reset password" @click="abrirReset(u)">🔑</button>
+              <button class="btn-icon" title="Reset password" @click="abrirReset(u)"><KeyRound :size="16" /></button>
             </td>
           </tr>
         </tbody>
@@ -149,7 +149,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usuariosApi, type UsuarioListItem } from '@/api/usuarios'
 import { useUiStore } from '@/stores/ui'
-
+import { X, Pencil, KeyRound } from 'lucide-vue-next'
 const ui = useUiStore()
 
 const ROLES = [

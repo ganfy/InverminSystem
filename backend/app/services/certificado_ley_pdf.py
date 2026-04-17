@@ -277,7 +277,7 @@ _TEMPLATE_ENSAYO = """
 </table>
 <div class="pie">
   Resultados obtenidos por FIRE ASSAY (triple sampling).<br/>
-  <strong>{empresa_nombre}</strong> — {empresa_direccion}
+  <strong>{empresa_nombre}</strong> &mdash; {empresa_direccion}
 </div>
 </body>
 </html>
@@ -381,7 +381,7 @@ _TEMPLATE_RECUPERACION = """
 </table>
 <div class="pie">
 <br/>
-  <strong>{empresa_nombre}</strong> — {empresa_direccion}
+  <strong>{empresa_nombre}</strong> &mdash; {empresa_direccion}
 </div>
 </body>
 </html>

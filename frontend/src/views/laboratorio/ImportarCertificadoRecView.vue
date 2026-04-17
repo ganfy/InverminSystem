@@ -2,7 +2,7 @@
   <div class="page-container">
     <header class="page-header">
       <div>
-        <h1 class="page-title">Importar Certificado — Análisis Recuperación</h1>
+        <h1 class="page-title">Importar Certificado - Análisis Recuperación</h1>
         <p class="page-subtitle" style="color:var(--color-gold);font-family:var(--font-mono)">{{ cipActual }}</p>
       </div>
       <div style="display:flex;gap:0.75rem">
@@ -19,7 +19,7 @@
       <div class="form-grid">
         <div class="field">
           <label class="field-label">IP:</label>
-          <input class="field-input" :value="loteInfo?.lote_ip ?? '-'" disabled />
+          <<input class="field-input" :value="loteIp || '-'" disabled />
         </div>
         <div class="field">
           <label class="field-label">CIP ESPERADO:</label>
@@ -64,7 +64,7 @@
       <section class="card">
         <h2 class="card-titulo">VERIFICAR DATA EXTRAÍDA</h2>
 
-        <div v-if="errCip" class="alerta-warning" style="margin-bottom:1rem">⚠️ {{ errCip }}</div>
+        <div v-if="errCip" class="alerta-warning" style="margin-bottom:1rem"><AlertTriangle :size="16" /> {{ errCip }}</div>
 
         <div class="form-grid" style="margin-bottom:1.25rem">
           <div class="field">
@@ -130,7 +130,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { FileText } from 'lucide-vue-next'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
-import type { CIPAnalisisOut } from '@/types/laboratorio'
+import { AlertTriangle } from 'lucide-vue-next'
 
 const router    = useRouter()
 const route     = useRoute()
@@ -143,7 +143,7 @@ const extrayendo  = ref(false)
 const dragOver    = ref(false)
 const archivo     = ref<File | null>(null)
 const fileInput   = ref<HTMLInputElement | null>(null)
-const loteInfo    = ref<CIPAnalisisOut | null>(null)
+const loteIp = ref<string>((route.query.ip as string) ?? '')
 
 const cipExtraido   = ref('')
 const nInforme      = ref('')
@@ -213,11 +213,6 @@ async function extraer() {
     extrayendo.value = false
   }
 }
-
-onMounted(async () => {
-  if (!store.cips.length) await store.cargarCips()
-  loteInfo.value = store.cips.find(c => c.cip === cipActual) ?? null
-})
 
 async function guardar() {
   errForm.value = ''

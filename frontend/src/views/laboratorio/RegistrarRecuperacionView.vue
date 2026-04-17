@@ -47,7 +47,7 @@
 
         <div class="ensayo-col">
           <div class="field">
-            <label class="field-label">LEY CABEZA (ley planta — snapshot):</label>
+            <label class="field-label">LEY CABEZA (ley planta - snapshot):</label>
             <div class="ley-cabeza-display">
               <span class="lc-valor">{{ analisisPendiente.ley_cabeza }}</span>
               <span class="lc-label">oz/TC</span>
