@@ -126,6 +126,11 @@
           </div>
           <div class="field">
             <label class="field-label">TIPO DE ANÁLISIS:</label>
+
+            <div v-if="form.tipo_analisis === 'dirimencia'" class="info-box warning" style="margin-bottom:0.75rem">
+              <AlertTriangle :size="14" /> Modo DIRIMENCIA: este análisis prevalecerá sobre todos los demás.
+            </div>
+
             <select class="field-select field-input" v-model="form.tipo_analisis">
               <option value="externo">Externo</option>
               <option value="minero">Minero</option>
@@ -213,13 +218,15 @@ const leyFinalExtraida = ref<number | null>(null)
 
 const FACTOR = 34.2857
 
+const tipoDesdeQuery = (route.query.tipo as TipoAnalisis | undefined) ?? 'externo'
+
 const form = ref({
   cip:           cipActual,
   laboratorio:   '',
-  tipo_analisis: 'externo' as TipoAnalisis,
+  tipo_analisis: tipoDesdeQuery,
   material:      'Au',
-  ley_fino:      null as number | null,   // malla -140/-150
-  ley_grueso:    null as number | null,   // malla +140/+150
+  ley_fino:      null as number | null,
+  ley_grueso:    null as number | null,
   origen_datos:  'certificado' as const,
   fecha_analisis: new Date().toISOString().split('T')[0],
 })

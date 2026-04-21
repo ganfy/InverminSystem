@@ -13,6 +13,8 @@ import type {
     LoteLabOut,
     AnalisisLeyOut,
 } from '@/types/laboratorio'
+import { useSync } from '@/composables/useSync'
+import { encolarAnalisisLey } from '@/composables/useOfflineQueue'
 
 export const useLaboratorioStore = defineStore('laboratorio', () => {
     const ui = useUiStore()
@@ -67,13 +69,51 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
     }
 
     // ── Análisis de Ley ───────────────────────────────────────────────────────
-    async function registrarLey(datos: AnalisisLeyCreate, archivo?: File | null): Promise<AnalisisLeyOut | null> {
+    async function registrarLey(
+        datos: AnalisisLeyCreate,
+        archivo?: File | null,
+    ): Promise<AnalisisLeyOut | null> {
+        const { online } = useSync()
+
+        // Si hay conexion: flujo normal
+        if (online.value) {
+            try {
+                const nuevo = await laboratorioApi.registrarLey(datos)
+                if (archivo) await laboratorioApi.subirCertificadoLey(nuevo.id, archivo)
+                return nuevo
+            } catch (e: any) {
+                ui.toast(e?.response?.data?.detail ?? 'Error al registrar analisis de ley', 'error')
+                return null
+            }
+        }
+
+        // Sin conexion: encolar en IndexedDB
+        // El certificado NO puede guardarse offline - se avisa al usuario
+        if (archivo) {
+            ui.toast('Sin conexion: el analisis se guardara pero el certificado no podra adjuntarse hasta reconectar.', 'warning')
+        }
         try {
-            const nuevo = await laboratorioApi.registrarLey(datos)
-            if (archivo) await laboratorioApi.subirCertificadoLey(nuevo.id, archivo)
-            return nuevo
-        } catch (e: any) {
-            ui.toast(e?.response?.data?.detail ?? 'Error al registrar análisis de ley', 'error')
+            const offline_id = crypto.randomUUID()
+            await encolarAnalisisLey({
+                offline_id,
+                datos: {
+                    cip: datos.cip,
+                    laboratorio: datos.laboratorio,
+                    tipo_analisis: datos.tipo_analisis,
+                    material: datos.material ?? 'Au',
+                    ley_fino: datos.ley_fino,
+                    ley_grueso: datos.ley_grueso,
+                    origen_datos: datos.origen_datos ?? 'manual',
+                    fecha_analisis:
+                        datos.fecha_analisis ??
+                        new Date().toISOString().slice(0, 10),
+                },
+            })
+            ui.toast('Analisis guardado localmente. Se sincronizara al recuperar conexion.', 'info')
+            // Retornar objeto optimista para que la UI pueda mostrar algo
+            return null
+        } catch {
+            ui.toast('Error al guardar analisis offline', 'error')
             return null
         }
     }

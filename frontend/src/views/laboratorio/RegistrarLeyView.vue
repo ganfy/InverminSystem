@@ -177,7 +177,7 @@
   const form = ref({
     cip: cipActual,
     laboratorio:    '',
-    tipo_analisis:  'planta' as TipoAnalisis,
+    tipo_analisis: ((route.query.tipo as TipoAnalisis | undefined) ?? 'planta'),
     material:       'Au',
     ley_fino:       0,
     ley_grueso:     0,

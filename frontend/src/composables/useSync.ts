@@ -46,7 +46,13 @@ import {
     type LoteOnlineData,
     siguienteIP,
     encolarSesion,
+    encolarAnalisisLey,
+    obtenerAnalisisLeyPendientes,
+    marcarAnalisisLeySynced,
+    marcarAnalisisLeyError,
+    limpiarAnalisisLeySynced,
 } from '@/composables/useOfflineQueue'
+import { laboratorioApi } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
 import { pruebasApi } from '@/api/pruebas'
 
@@ -304,6 +310,34 @@ export function useSync() {
         }
     }
 
+    async function sincronizarLaboratorio(): Promise<void> {
+        const pendientes = await obtenerAnalisisLeyPendientes()
+        if (pendientes.length === 0) return
+
+        try {
+            const payload = {
+                analisis_ley: pendientes.map(p => ({
+                    offline_id: p.offline_id,
+                    datos: p.datos,
+                })),
+                analisis_recuperacion: [],
+            }
+
+            const resp = await laboratorioApi.syncLaboratorio(payload)
+
+            for (const resultado of resp.resultados_ley) {
+                if (resultado.error) {
+                    await marcarAnalisisLeyError(resultado.offline_id, resultado.error)
+                } else {
+                    await marcarAnalisisLeySynced(resultado.offline_id)
+                }
+            }
+            await limpiarAnalisisLeySynced()
+        } catch (err) {
+            console.error('[useSync] Error sincronizando analisis de laboratorio:', err)
+        }
+    }
+
     async function sincronizar(): Promise<void> {
         if (sincronizando.value || !isOnline()) return
 
@@ -408,6 +442,9 @@ export function useSync() {
 
             // 5. pruebas metalúrgicas offline
             await sincronizarPruebas()
+
+            // 6. análisis de laboratorio offline
+            await sincronizarLaboratorio()
 
             // Siempre marcar timestamp - es la señal de "sync completó" para los watchers
             ultimoSync.value = new Date().toLocaleString('es-PE')

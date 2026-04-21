@@ -22,10 +22,11 @@ from pathlib import Path
 from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.models.enums import RolSistema
-from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote
+from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, ParametrosComerciales
 from app.schemas.laboratorio import (
     AnalisisLeyCreate,
     AnalisisLeyOut,
+    AnalisisLeyPorIPCreate,
     AnalisisRecuperacionCreate,
     AnalisisRecuperacionOut,
     CIPAnalisisOut,
@@ -37,6 +38,7 @@ from app.schemas.laboratorio import (
     SyncLaboratorioResponse,
 )
 from app.services import laboratorio as svc
+from app.services.pruebas import calcular_ley_planta
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi import UploadFile as FastAPIFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -389,9 +391,6 @@ def preview_ley_comercial(
     de parametros_comerciales del proveedor-acopiador.
     Solo visible para Comercial, Gerencia, Admin (pueden ver IP).
     """
-    from app.models.models import ParametrosComerciales
-    from app.services.pruebas import calcular_ley_planta
-
     lote = db.query(Lote).filter(Lote.ip == ip, ~Lote.eliminado).first()
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado")
@@ -409,6 +408,33 @@ def preview_ley_comercial(
         params = None
 
     return svc.calcular_ley_comercial(ley_planta, params)
+
+
+@router.post(
+    "/lotes/{ip}/ley",
+    response_model=AnalisisLeyOut,
+    status_code=201,
+    summary="Registrar ley minero o dirimencia por IP (sin CIP obligatorio)",
+)
+def registrar_ley_por_ip(
+    ip: str,
+    datos: AnalisisLeyPorIPCreate,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Usado por Comercial para:
+    - Ingresar la ley declarada por el minero (tipo='minero')
+    - Registrar resultado de dirimencia (tipo='dirimencia')
+    Ambos pueden no tener CIP de planta. El lote se identifica por su IP.
+    """
+    try:
+        nuevo = svc.registrar_ley_por_ip(db, ip, datos, usuario_id=current_user.id)
+        db.commit()
+        return svc._ley_out(nuevo, lote_ip=ip)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 # ── Generar certificado PDF (formato Paititi) ──────────────────────────────

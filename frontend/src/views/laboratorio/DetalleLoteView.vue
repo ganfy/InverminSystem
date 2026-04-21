@@ -175,18 +175,86 @@
 
         <!-- Alerta dirimencia -->
         <div v-if="alertaDirimencia" class="dirimencia-request-alert">
-          <AlertTriangle :size="16" />lertTriangle :size="16" /> Diferencia Planta/Minero:
+          <AlertTriangle :size="16" /> Diferencia Planta/Minero:
           <strong style="font-family:var(--font-mono)">{{ alertaDirimencia.toFixed(4) }} oz/TC</strong>
           supera el límite (0.10). Se recomienda solicitar dirimencia.
-          <button class="btn-warning-sm" style="margin-left:0.75rem" @click="abrirModalAgregarLey">
+          <button class="btn-warning-sm" style="margin-left:0.75rem" @click="abrirModalDirimencia">
             Solicitar Dirimencia →
           </button>
         </div>
 
-        <div class="acciones-lote">
-          <button class="btn-primary" @click="abrirModalAgregarLey">
+        <div class="acciones-lote" style="display:flex;gap:0.75rem;flex-wrap:wrap">
+          <button class="btn-primary" @click="abrirModalAgregarLeyNormal">
             + Registrar nueva ley
           </button>
+          <!-- Ley minero: solo si aun no hay una registrada -->
+          <button
+            v-if="!lote.ley_minero"
+            class="btn-secondary"
+            @click="modalLeyMinero = true"
+          >
+            Registrar Ley Minero
+          </button>
+          <!-- Si ya hay ley minero pero sin dirimencia, mostrar el valor y permitir dirimencia -->
+          <span
+            v-else-if="lote.ley_minero && !lote.tiene_dirimencia"
+            style="font-size:0.85rem;color:var(--color-text-muted);align-self:center"
+          >
+            Ley minero registrada: <strong style="font-family:var(--font-mono)">
+              {{ Number(lote.ley_minero).toFixed(4) }} oz/TC
+            </strong>
+          </span>
+        </div>
+
+        <!-- Modal Ley Minero -->
+        <div v-if="modalLeyMinero" class="modal-overlay" @click.self="modalLeyMinero = false">
+          <div class="modal modal-sm">
+            <div class="modal-header">
+              <h2>Registrar Ley Minero</h2>
+              <button class="btn-cerrar" @click="modalLeyMinero = false">×</button>
+            </div>
+            <div class="modal-body">
+              <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem">
+                Ley declarada por el proveedor (minero). Si difiere más de 0.10 oz/TC
+                respecto a la ley de planta, se habilitará la solicitud de dirimencia.
+              </p>
+              <div class="field">
+                <label class="field-label">LABORATORIO / ORIGEN</label>
+                <input
+                  class="field-input"
+                  v-model="formLeyMinero.laboratorio"
+                  placeholder="Ej: Laboratorio del Minero"
+                />
+              </div>
+              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+                <div class="field">
+                  <label class="field-label">LEY FINO (Oz/TC)</label>
+                  <input type="number" class="field-input" v-model.number="formLeyMinero.ley_fino"
+                    step="0.0001" placeholder="0.0000" />
+                </div>
+                <div class="field">
+                  <label class="field-label">LEY GRUESO (Oz/TC)</label>
+                  <input type="number" class="field-input" v-model.number="formLeyMinero.ley_grueso"
+                    step="0.0001" placeholder="0.0000" />
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label">FECHA ANÁLISIS</label>
+                <input type="date" class="field-input" v-model="formLeyMinero.fecha_analisis" />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-secondary" @click="modalLeyMinero = false">Cancelar</button>
+              <button
+                class="btn-primary"
+                @click="guardarLeyMinero"
+                :disabled="guardandoLeyMinero"
+              >
+                <span v-if="guardandoLeyMinero" class="spinner" style="margin-right:0.4rem"></span>
+                Guardar Ley Minero
+              </button>
+            </div>
+          </div>
         </div>
 
       </template>
@@ -446,6 +514,18 @@ const cipRecupElegido = ref<string | null>(null)
 const labRecupElegida = ref('')
 const labsRecupDisponibles = ref<string[]>([])
 
+// Dirimencia
+const modalLeyMinero = ref(false)
+const guardandoLeyMinero = ref(false)
+const formLeyMinero = ref({
+  laboratorio: '',
+  ley_fino: null as number | null,
+  ley_grueso: null as number | null,
+  fecha_analisis: new Date().toISOString().split('T')[0],
+})
+
+const modoModalLey = ref<'normal' | 'dirimencia'>('normal')
+
 // ── Computed: CIPs Disponibles para Ley ──
 // Solo traemos los CIPs de tipo Laboratorio que NO existan en el array de analisis_ley
 const cipsDisponiblesLey = computed(() => {
@@ -572,13 +652,27 @@ function abrirModalAgregarLey() {
 }
 
 function confirmarAgregarLey() {
-  if (cipSeleccionado.value) {
-    if (store.puedeImportarCert) {
-      router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}?ip=${ipActual}`)
-    } else {
-      router.push(`/laboratorio/ley/${cipSeleccionado.value}`)
-    }
+  if (!cipSeleccionado.value) return
+  const tipoPorUrl = modoModalLey.value === 'dirimencia' ? 'dirimencia' : 'externo'
+  if (store.puedeImportarCert) {
+    router.push(
+      `/laboratorio/importar-ley/${cipSeleccionado.value}?ip=${ipActual}&tipo=${tipoPorUrl}`
+    )
+  } else {
+    router.push(`/laboratorio/ley/${cipSeleccionado.value}?tipo=${tipoPorUrl}`)
   }
+}
+
+function abrirModalAgregarLeyNormal() {
+  modoModalLey.value = 'normal'
+  cipSeleccionado.value = ''
+  modalAgregarLey.value = true
+}
+
+function abrirModalDirimencia() {
+  modoModalLey.value = 'dirimencia'
+  cipSeleccionado.value = ''
+  modalAgregarLey.value = true
 }
 
 // ── Descartar ──
@@ -691,6 +785,38 @@ async function solicitarRemuestreo() {
     ui.toast(e?.response?.data?.detail ?? 'Error al solicitar remuestreo', 'error')
   }
 }
+
+// ── Modal Ley Minero (Dirimencia) ──
+async function guardarLeyMinero() {
+  if (!formLeyMinero.value.laboratorio.trim()) {
+    ui.toast('Ingrese el nombre del laboratorio o minero', 'error')
+    return
+  }
+  if (formLeyMinero.value.ley_fino == null || formLeyMinero.value.ley_grueso == null) {
+    ui.toast('Ingrese ambas leyes (fino y grueso)', 'error')
+    return
+  }
+  guardandoLeyMinero.value = true
+  try {
+    await laboratorioApi.registrarLeyPorIP(ipActual, {
+      tipo_analisis: 'minero',
+      laboratorio: formLeyMinero.value.laboratorio,
+      ley_fino: formLeyMinero.value.ley_fino,
+      ley_grueso: formLeyMinero.value.ley_grueso,
+      fecha_analisis: formLeyMinero.value.fecha_analisis,
+    })
+    ui.toast('Ley minero registrada', 'success')
+    modalLeyMinero.value = false
+    lote.value = await store.cargarDetalleLote(ipActual)
+    leyComercialCalc.value = null  // forzar recalculo
+    await recargarLeyComercial()
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al registrar ley minero', 'error')
+  } finally {
+    guardandoLeyMinero.value = false
+  }
+}
+
 </script>
 
 <style scoped>

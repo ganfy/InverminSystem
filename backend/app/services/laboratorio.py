@@ -358,6 +358,64 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     return nuevo
 
 
+def registrar_ley_por_ip(
+    db: Session,
+    ip_lote: str,
+    datos,  # AnalisisLeyPorIPCreate
+    usuario_id: int,
+) -> AnalisisLey:
+    """
+    Registra ley minero o dirimencia directamente por IP.
+    No requiere CIP: la ley minero la presenta el proveedor, no pasa por
+    el laboratorio de planta. La dirimencia se registra cuando ya se tiene
+    el CIP pero se invoca desde la vista por IP para simplificar el flujo.
+    """
+    from app.models.models import Lote
+
+    if datos.tipo_analisis not in (TipoAnalisis.MINERO, TipoAnalisis.DIRIMENCIA):
+        raise ValueError("Este endpoint solo acepta tipo_analisis 'minero' o 'dirimencia'")
+
+    lote = db.query(Lote).filter(Lote.ip == ip_lote, Lote.eliminado == False).first()  # noqa: E712
+    if not lote:
+        raise ValueError(f"Lote '{ip_lote}' no encontrado")
+
+    # Dirimencia: invalidar todos los analisis previos vigentes del lote
+    if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
+        previos = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.lote_id == lote.id,
+                AnalisisLey.vigente == True,  # noqa: E712
+            )
+            .all()
+        )
+        for p in previos:
+            p.vigente = False
+
+    ley_final = _calcular_ley_final(Decimal(str(datos.ley_fino)), Decimal(str(datos.ley_grueso)))
+    ley_gr_tm = _calcular_ley_gr_tm(ley_final)
+
+    nuevo = AnalisisLey(
+        lote_id=lote.id,
+        cip=None,  # ley minero y dirimencia pueden no tener CIP de planta
+        laboratorio=datos.laboratorio,
+        tipo_analisis=datos.tipo_analisis,
+        material=datos.material,
+        ley_fino=Decimal(str(datos.ley_fino)),
+        ley_grueso=Decimal(str(datos.ley_grueso)),
+        ley_final=ley_final,
+        ley_gr_tm=ley_gr_tm,
+        origen_datos=datos.origen_datos,
+        fecha_analisis=datos.fecha_analisis,
+        vigente=True,
+        creado_por=usuario_id,
+    )
+    db.add(nuevo)
+    db.flush()
+    db.refresh(nuevo)
+    return nuevo
+
+
 def registrar_analisis_recuperacion(
     db: Session, datos: AnalisisRecuperacionCreate, usuario_id: int
 ) -> AnalisisRecuperacion:

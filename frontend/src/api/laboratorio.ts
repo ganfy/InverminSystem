@@ -46,6 +46,26 @@ export interface LeyComercialCalc {
     detalle: string
 }
 
+export interface SyncLaboratorioItem {
+    offline_id: string
+    datos: {
+        cip: string
+        laboratorio: string
+        tipo_analisis: string
+        material: string
+        ley_fino: number
+        ley_grueso: number
+        origen_datos: string
+        fecha_analisis: string
+    }
+}
+
+export interface SyncResultado {
+    offline_id: string
+    server_id: number | null
+    error: string | null
+}
+
 export const laboratorioApi = {
 
     // ── Vista por CIP (Laboratorista + Comercial) ─────────────────────────────
@@ -206,8 +226,23 @@ export const laboratorioApi = {
     },
 
     // ── Sync Offline ──────────────────────────────────────────────────────────
-    async sincronizarBatch(payload: SyncLaboratorioRequest): Promise<SyncLaboratorioResponse> {
+    async syncLaboratorio(payload: SyncLaboratorioRequest): Promise<SyncLaboratorioResponse> {
         const { data } = await api.post('/laboratorio/sync', payload)
+        return data
+    },
+
+    async registrarLeyPorIP(
+        ip: string,
+        datos: {
+            tipo_analisis: 'minero' | 'dirimencia'
+            laboratorio: string
+            ley_fino: number
+            ley_grueso: number
+            material?: string
+            fecha_analisis?: string
+        }
+    ): Promise<AnalisisLeyOut> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/ley`, datos)
         return data
     },
 }
