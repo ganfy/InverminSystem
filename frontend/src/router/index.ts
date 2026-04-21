@@ -19,6 +19,7 @@ import RegistrarHumedadView from '@/views/muestreo/RegistrarHumedadView.vue'
 import ImportarCertificadoLeyView from '@/views/laboratorio/ImportarCertificadoLeyView.vue'
 import ImportarCertificadoRecuperacionView from '@/views/laboratorio/ImportarCertificadoRecView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
+import UsuariosView from '@/views/admin/UsuariosView.vue'  // ← AÑADIDO
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -37,7 +38,7 @@ const router = createRouter({
 
         // Balanza
         { path: 'balanza', name: 'Balanza', component: BalanzaView },
-        { path: 'balanza/nueva', name: 'NuevaSesion', component: RegistrarCamionView },
+        { path: 'balanza/nueva', name: 'RegistrarCamion', component: RegistrarCamionView },
         { path: 'balanza/:id', name: 'SesionBalanza', component: SesionView },
 
         // Muestreo
@@ -55,8 +56,13 @@ const router = createRouter({
         { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
         { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView },
         { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView },
+
         // Gestión
         { path: 'terceros', name: 'Terceros', component: TercerosView },
+
+        // Administración
+        { path: 'administracion', name: 'Administracion', component: UsuariosView, meta: { roles: ['Admin'] } },
+
         // Error
         { path: 'unauthorized', name: 'Unauthorized', component: UnauthorizedView },
 
@@ -75,7 +81,7 @@ const router = createRouter({
                 return '/dashboard'
               case 'OperadorBalanza':
                 return '/balanza'
-              case 'TecnicoMuestreo':
+              case 'TecnicoMuestreo':    // sin acento — coincide con backend
                 return '/muestreo'
               case 'Laboratorista':
                 return '/laboratorio'
@@ -109,6 +115,12 @@ router.beforeEach(async (to) => {
       auth.clearTokens()
       return { name: 'Login' }
     }
+  }
+
+  // Guard por roles específicos de ruta (meta.roles)
+  if (to.meta.roles) {
+    const rol = auth.user?.rol ?? ''
+    if (!(to.meta.roles as string[]).includes(rol)) return { name: 'Unauthorized' }
   }
 
   // Protección específica de DetalleLote

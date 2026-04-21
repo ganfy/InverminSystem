@@ -23,7 +23,7 @@ class AnalisisLeyCreate(BaseModel):
 class AnalisisLeyOut(BaseModel):
     id: int
     lote_id: int
-    lote_ip: str | None = None  # Solo si el solicitante tiene permiso
+    lote_ip: str | None = None
     cip: str | None
     laboratorio: str
     tipo_analisis: str
@@ -38,6 +38,9 @@ class AnalisisLeyOut(BaseModel):
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     justificacion_descarte: str | None = None
+    eliminado: bool = False
+    eliminado_en: datetime | None = None
+    eliminado_por: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -82,16 +85,19 @@ class AnalisisRecuperacionOut(BaseModel):
     lote_ip: str | None = None
     cip: str | None
     laboratorio: str
-    ley_cabeza: Decimal | None
-    ley_cola: Decimal | None
-    ley_liquido: Decimal | None
-    recuperacion: Decimal | None
-    estado: str  # PENDIENTE | COMPLETADO
+    ley_cabeza: Decimal
+    ley_cola: Decimal
+    ley_liquido: Decimal | None = None
+    recuperacion: Decimal | None = None
+    estado: str
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
+    eliminado: bool = False
+    eliminado_en: datetime | None = None
+    eliminado_por: int | None = None
 
     model_config = {"from_attributes": True}
 

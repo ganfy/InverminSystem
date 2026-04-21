@@ -18,7 +18,7 @@ export interface AnalisisLeyCreate {
 export interface AnalisisLeyOut {
     id: number
     lote_id: number
-    lote_ip?: string | null    // Solo visible para Comercial/Gerencia/Admin
+    lote_ip?: string | null
     cip: string | null
     laboratorio: string
     tipo_analisis: TipoAnalisis
@@ -33,6 +33,9 @@ export interface AnalisisLeyOut {
     descartado_por?: number | null
     fecha_descarte?: string | null
     justificacion_descarte?: string | null
+    eliminado: boolean
+    eliminado_en?: string | null
+    eliminado_por?: number | null
 }
 
 // ── Análisis de Recuperación ──────────────────────────────────────────────────
@@ -67,12 +70,15 @@ export interface AnalisisRecuperacionOut {
     ley_cola: number
     ley_liquido?: number | null
     recuperacion?: number | null
-    estado: EstadoRecuperacion   // PENDIENTE | COMPLETADO
+    estado: EstadoRecuperacion
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
     descartado_por?: number | null
     fecha_descarte?: string | null
+    eliminado: boolean
+    eliminado_en?: string | null
+    eliminado_por?: number | null
 }
 
 // ── Vista Laboratorista: por CIP ──────────────────────────────────────────────

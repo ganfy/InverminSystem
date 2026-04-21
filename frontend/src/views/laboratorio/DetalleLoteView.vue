@@ -89,14 +89,26 @@
               <a href="#" @click.prevent="verCertificado(a.certificado_url)" class="link-cert">Ver PDF</a>
             </div>
 
-            <div class="lab-card-footer" v-if="a.vigente">
-              <button class="btn-danger-sm" @click="toggleDescartarLey(a.id)" title="Descartar">
-                Descartar
+            <div class="lab-card-footer" v-if="!a.eliminado">
+              <template v-if="a.vigente">
+                <button class="btn-danger-sm" @click="toggleDescartarLey(a.id)" title="Excluir del calculo de ley comercial">
+                  Descartar
+                </button>
+                <label class="btn-secondary-sm" title="Adjuntar certificado">
+                  Adjuntar cert.
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertLey($event, a.id)" />
+                </label>
+              </template>
+              <!-- Eliminar: solo Admin y Gerencia, oculta de TODAS las vistas -->
+              <button
+                v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+                class="btn-danger-sm"
+                style="margin-left:auto;opacity:0.7"
+                @click="eliminarLey(a.id)"
+                title="Eliminar registro permanentemente de la vista"
+              >
+                Eliminar
               </button>
-              <label class="btn-secondary-sm" title="Adjuntar certificado">
-                Adjuntar cert.
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertLey($event, a.id)" />
-              </label>
             </div>
           </div>
 
@@ -217,12 +229,26 @@
               <a href="#" @click.prevent="verCertificado(a.certificado_url)" class="link-cert">Ver PDF</a>
             </div>
 
-            <div class="lab-card-footer" v-if="a.vigente">
-              <button class="btn-danger-sm" @click="toggleDescartarRec(a.id)">Descartar</button>
-              <label class="btn-secondary-sm">
-                Adjuntar cert.
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertRec($event, a.id)" />
-              </label>
+            <div class="lab-card-footer" v-if="!a.eliminado">
+              <template v-if="a.vigente">
+                <button class="btn-danger-sm" @click="toggleDescartarLey(a.id)" title="Excluir del calculo de ley comercial">
+                  Descartar
+                </button>
+                <label class="btn-secondary-sm" title="Adjuntar certificado">
+                  Adjuntar cert.
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertLey($event, a.id)" />
+                </label>
+              </template>
+              <!-- Eliminar: solo Admin y Gerencia, oculta de TODAS las vistas -->
+              <button
+                v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+                class="btn-danger-sm"
+                style="margin-left:auto;opacity:0.7"
+                @click="eliminarLey(a.id)"
+                title="Eliminar registro permanentemente de la vista"
+              >
+                Eliminar
+              </button>
             </div>
           </div>
         </div>
@@ -383,6 +409,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import type { LoteLabOut } from '@/types/laboratorio'
 import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
@@ -393,6 +420,7 @@ const router = useRouter()
 const route  = useRoute()
 const store  = useLaboratorioStore()
 const ui     = useUiStore()
+const auth   = useAuthStore()
 
 const ipActual  = route.params.ip as string
 const cargando  = ref(false)
@@ -577,6 +605,16 @@ async function confirmarDescartar() {
     modalDescartar.value = null
     lote.value = await store.cargarDetalleLote(ipActual)
   }
+}
+
+async function eliminarLey(id: number) {
+  const ok = await store.eliminarLey(id)
+  if (ok) lote.value = await store.cargarDetalleLote(ipActual)
+}
+
+async function eliminarRecuperacion(id: number) {
+  const ok = await store.eliminarRecuperacion(id)
+  if (ok) lote.value = await store.cargarDetalleLote(ipActual)
 }
 
 // ── Adjuntar certificados ──

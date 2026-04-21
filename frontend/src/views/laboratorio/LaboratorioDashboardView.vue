@@ -236,23 +236,38 @@ const pendientesRec = computed(() =>
 
 function mapearCIP(c: CIPAnalisisOut) {
   if (tabActual.value === 'ley') {
-    const a = c.analisis_ley.find(x => x.vigente) ?? c.analisis_ley[0]
+    // Preferir vigente; si todos fueron descartados, mostrar el ultimo con valores
+    // pero sin ofrecer boton "Registrar" (eso lo controla estado_ley del backend)
+    const a =
+      c.analisis_ley.find(x => x.vigente) ??
+      c.analisis_ley[c.analisis_ley.length - 1]
     return {
       id: a?.id,
-      cip: c.cip, fecha_envio: c.fecha_envio, estado: c.estado_ley,
-      leyMas: a?.ley_grueso ?? null, leyMenos: a?.ley_fino ?? null,
-      ozTc: a?.ley_final ?? null, grTm: a?.ley_gr_tm ?? null,
+      cip: c.cip,
+      fecha_envio: c.fecha_envio,
+      estado: c.estado_ley,
+      leyMas: a?.vigente ? (a.ley_grueso ?? null) : null,
+      leyMenos: a?.vigente ? (a.ley_fino ?? null) : null,
+      ozTc: a?.vigente ? (a.ley_final ?? null) : null,
+      grTm: a?.vigente ? (a.ley_gr_tm ?? null) : null,
       certificadoUrl: a?.certificado_url ?? null,
     }
   } else {
     const pending = c.analisis_recuperacion.find(x => x.estado === 'PENDIENTE' && x.vigente)
     const completado = c.analisis_recuperacion.find(x => x.estado === 'COMPLETADO' && x.vigente)
-    const a = pending ?? completado
+    const a =
+      pending ??
+      completado ??
+      c.analisis_recuperacion[c.analisis_recuperacion.length - 1]
     return {
       id: a?.id,
-      cip: c.cip, fecha_envio: c.fecha_envio, estado: c.estado_recuperacion,
-      leyCabeza: a?.ley_cabeza ?? null, leyCola: a?.ley_cola ?? null,
-      leyLiquido: a?.ley_liquido ?? null, recuperacion: a?.recuperacion ?? null,
+      cip: c.cip,
+      fecha_envio: c.fecha_envio,
+      estado: c.estado_recuperacion,
+      leyCabeza: a?.vigente ? (a.ley_cabeza ?? null) : null,
+      leyCola: a?.vigente ? (a.ley_cola ?? null) : null,
+      leyLiquido: a?.vigente ? (a.ley_liquido ?? null) : null,
+      recuperacion: a?.vigente ? (a.recuperacion ?? null) : null,
       certificadoUrl: a?.certificado_url ?? null,
     }
   }

@@ -163,6 +163,45 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
+    // ── Eliminar (soft delete) ─────────────────────────────────────────────────
+    async function eliminarLey(analisisId: number): Promise<boolean> {
+        const ok = await ui.showConfirm({
+            title: 'Eliminar analisis',
+            message:
+                'Esto ocultara el analisis de todas las vistas. El registro permanece en la base de datos. Esta accion no se puede deshacer desde la interfaz.',
+            confirmLabel: 'Eliminar',
+            danger: true,
+        })
+        if (!ok) return false
+        try {
+            await laboratorioApi.eliminarLey(analisisId)
+            ui.toast('Analisis eliminado', 'success')
+            return true
+        } catch {
+            ui.toast('Error al eliminar analisis', 'error')
+            return false
+        }
+    }
+
+    async function eliminarRecuperacion(analisisId: number): Promise<boolean> {
+        const ok = await ui.showConfirm({
+            title: 'Eliminar analisis',
+            message:
+                'Esto ocultara el analisis de todas las vistas. El registro permanece en la base de datos. Esta accion no se puede deshacer desde la interfaz.',
+            confirmLabel: 'Eliminar',
+            danger: true,
+        })
+        if (!ok) return false
+        try {
+            await laboratorioApi.eliminarRecuperacion(analisisId)
+            ui.toast('Analisis eliminado', 'success')
+            return true
+        } catch {
+            ui.toast('Error al eliminar analisis', 'error')
+            return false
+        }
+    }
+
     // ── Certificados ──────────────────────────────────────────────────────────
     async function subirCertificadoLey(analisisId: number, archivo: File): Promise<boolean> {
         try {
@@ -215,6 +254,7 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         registrarLey,
         enviarRecuperacion, completarRecuperacion, registrarRecuperacion,
         descartarLey, descartarRecuperacion,
+        eliminarLey, eliminarRecuperacion,
         subirCertificadoLey, subirCertificadoRecuperacion,
         puedeImportarCert,
         generarCertificadoLeyInterno, generarCertificadoRecInterno,

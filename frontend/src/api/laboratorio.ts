@@ -114,6 +114,15 @@ export const laboratorioApi = {
         return data
     },
 
+    // Soft delete - oculta de todas las vistas (Admin/Gerencia/Comercial)
+    async eliminarLey(analisisId: number): Promise<void> {
+        await api.delete(`/laboratorio/ley/${analisisId}`)
+    },
+
+    async eliminarRecuperacion(analisisId: number): Promise<void> {
+        await api.delete(`/laboratorio/recuperacion/${analisisId}`)
+    },
+
     async subirCertificadoRecuperacion(analisisId: number, archivo: File): Promise<{ certificado_url: string }> {
         const form = new FormData()
         form.append('archivo', archivo)

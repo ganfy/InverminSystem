@@ -27,20 +27,32 @@
       <nav class="sidebar-nav">
         <template v-for="section in visibleSections" :key="section.section">
           <p class="nav-section-label">{{ section.section }}</p>
-          <RouterLink
-            v-for="item in visibleItems(section)"
-            :key="item.path"
-            :to="item.path"
-            class="nav-item"
-            active-class="nav-item--active"
-            exact-active-class="nav-item--active"
-            @click="sidebarOpen = false"
-          >
-          <component :is="item.icon" :size="20" class="nav-icon" />
-          <span>{{ item.label }}</span>
-          </RouterLink>
+          <template v-for="item in visibleItems(section)" :key="item.path">
+            <!-- Item deshabilitado (módulo no implementado aún) -->
+            <span
+              v-if="item.disabled"
+              class="nav-item nav-item--disabled"
+              :title="`${item.label} — próximamente`"
+            >
+              <component :is="item.icon" :size="20" class="nav-icon" />
+              <span>{{ item.label }}</span>
+            </span>
+            <!-- Item normal -->
+            <RouterLink
+              v-else
+              :to="item.path"
+              class="nav-item"
+              active-class="nav-item--active"
+              exact-active-class="nav-item--active"
+              @click="sidebarOpen = false"
+            >
+              <component :is="item.icon" :size="20" class="nav-icon" />
+              <span>{{ item.label }}</span>
+            </RouterLink>
+          </template>
         </template>
       </nav>
+
 
       <!-- Usuario + logout -->
       <div class="sidebar-footer">
@@ -405,6 +417,12 @@ watch(() => online.value, (isOnline) => {
   padding: var(--page-padding);
   overflow-y: auto;
 }
+
+.nav-item--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
 
 /* ── Estado Offline (Advertencia Visual) ─────────────────────── */
 

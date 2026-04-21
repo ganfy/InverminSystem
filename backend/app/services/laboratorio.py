@@ -168,19 +168,19 @@ def obtener_cips_laboratorio(
             .all()
         )
 
-        vigentes_ley = [a for a in analisis_ley if a.vigente]
+        no_eliminados_ley = [a for a in analisis_ley if not a.eliminado]
+        # vigentes_ley = [a for a in no_eliminados_ley if a.vigente]
+        estado_ley = "COMPLETADO" if no_eliminados_ley else "PENDIENTE"
 
-        # Estado ley: aplica a CIPs tipo Laboratorio
-        estado_ley = "COMPLETADO" if vigentes_ley else "PENDIENTE"
-
-        # Estado recuperación: aplica a CIPs tipo Recuperacion*
-        # PENDIENTE si hay registro pendiente, COMPLETADO si hay completado, SIN_DATOS si no hay nada
+        # Estado recuperacion: idem, filtrar eliminados primero
+        no_eliminados_rec = [a for a in analisis_rec if not a.eliminado]
         pendiente_rec = any(
-            a.estado == EstadoRecuperacion.PENDIENTE and a.vigente for a in analisis_rec
+            a.estado == EstadoRecuperacion.PENDIENTE and a.vigente for a in no_eliminados_rec
         )
         completado_rec = any(
-            a.estado == EstadoRecuperacion.COMPLETADO and a.vigente for a in analisis_rec
+            a.estado == EstadoRecuperacion.COMPLETADO and a.vigente for a in no_eliminados_rec
         )
+
         if completado_rec:
             estado_rec = "COMPLETADO"
         elif pendiente_rec:
@@ -200,8 +200,8 @@ def obtener_cips_laboratorio(
                 laboratorio_destino=cip.laboratorio,
                 estado_ley=estado_ley,
                 estado_recuperacion=estado_rec,
-                analisis_ley=[_ley_out(a, ip) for a in analisis_ley],
-                analisis_recuperacion=[_rec_out(a, ip) for a in analisis_rec],
+                analisis_ley=[_ley_out(a, ip) for a in no_eliminados_ley],
+                analisis_recuperacion=[_rec_out(a, ip) for a in no_eliminados_rec],
             )
         )
 
@@ -229,11 +229,16 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     ]
 
     analisis_ley = (
-        db.query(AnalisisLey).filter(AnalisisLey.lote_id == lote.id).order_by(AnalisisLey.id).all()
+        db.query(AnalisisLey)
+        .filter(AnalisisLey.lote_id == lote.id)
+        .filter(~AnalisisLey.eliminado)
+        .order_by(AnalisisLey.id)
+        .all()  # noqa: E712
     )
     analisis_rec = (
         db.query(AnalisisRecuperacion)
         .filter(AnalisisRecuperacion.lote_id == lote.id)
+        .filter(~AnalisisRecuperacion.eliminado)
         .order_by(AnalisisRecuperacion.id)
         .all()
     )
@@ -490,7 +495,12 @@ def completar_recuperacion(
     Laboratorista completa un análisis de recuperación PENDIENTE.
     Ingresa ley_cola y ley_liquido; el sistema calcula recuperacion automáticamente.
     """
-    a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+    a = (
+        db.query(AnalisisRecuperacion)
+        .filter(AnalisisRecuperacion.id == analisis_id)
+        .filter(~AnalisisRecuperacion.eliminado)
+        .first()
+    )
     if not a:
         raise ValueError("Análisis de recuperación no encontrado")
     if a.estado != EstadoRecuperacion.PENDIENTE:
@@ -538,6 +548,49 @@ def descartar_analisis_recuperacion(
     a.descartado_por = usuario_id
     a.fecha_descarte = datetime.utcnow()
     a.justificacion_descarte = justificacion
+    db.flush()
+    return a
+
+
+def eliminar_analisis_ley(db: Session, analisis_id: int, usuario_id: int) -> AnalisisLey:
+    from datetime import datetime
+
+    a = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_id).first()
+    if not a:
+        raise ValueError("Analisis de ley no encontrado")
+    if a.eliminado:
+        raise ValueError("El analisis ya esta eliminado")
+    a.eliminado = True
+    a.eliminado_en = datetime.utcnow()
+    a.eliminado_por = usuario_id
+    # Si estaba vigente, marcarlo no vigente tambien para que no afecte calculos
+    if a.vigente:
+        a.vigente = False
+        a.descartado_por = usuario_id
+        a.fecha_descarte = a.eliminado_en
+        a.justificacion_descarte = "Eliminado por usuario"
+    db.flush()
+    return a
+
+
+def eliminar_analisis_recuperacion(
+    db: Session, analisis_id: int, usuario_id: int
+) -> AnalisisRecuperacion:
+    from datetime import datetime
+
+    a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+    if not a:
+        raise ValueError("Analisis de recuperacion no encontrado")
+    if a.eliminado:
+        raise ValueError("El analisis ya esta eliminado")
+    a.eliminado = True
+    a.eliminado_en = datetime.utcnow()
+    a.eliminado_por = usuario_id
+    if a.vigente:
+        a.vigente = False
+        a.descartado_por = usuario_id
+        a.fecha_descarte = a.eliminado_en
+        a.justificacion_descarte = "Eliminado por usuario"
     db.flush()
     return a
 

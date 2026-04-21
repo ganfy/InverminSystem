@@ -591,6 +591,12 @@ class AnalisisLey(AuditMixin, Base):
     descartado_por = Column(Integer, ForeignKey("usuarios.id"))
     fecha_descarte = Column(DateTime)
     justificacion_descarte = Column(Text)
+    eliminado = Column(Boolean, default=False, nullable=False)
+    eliminado_en = Column(DateTime)
+    eliminado_por = Column(Integer, ForeignKey("usuarios.id"))
+
+    descartador = relationship("Usuario", foreign_keys=[descartado_por])
+    eliminador = relationship("Usuario", foreign_keys=[eliminado_por])
 
     lote = relationship("Lote", back_populates="analisis_ley")
     mapeo_cip = relationship("MapeoCIP", foreign_keys=[cip], back_populates="analisis_ley")
@@ -665,6 +671,12 @@ class AnalisisRecuperacion(AuditMixin, Base):
     descartado_por = Column(Integer, ForeignKey("usuarios.id"))
     fecha_descarte = Column(DateTime)
     justificacion_descarte = Column(Text)
+    eliminado = Column(Boolean, default=False, nullable=False)
+    eliminado_en = Column(DateTime)
+    eliminado_por = Column(Integer, ForeignKey("usuarios.id"))
+
+    descartador = relationship("Usuario", foreign_keys=[descartado_por])
+    eliminador = relationship("Usuario", foreign_keys=[eliminado_por])
 
     lote = relationship("Lote", back_populates="analisis_recuperacion")
     mapeo_cip = relationship(

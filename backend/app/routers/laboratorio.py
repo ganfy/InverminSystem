@@ -147,6 +147,44 @@ def descartar_ley(
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
+@router.delete("/ley/{analisis_id}", status_code=204)
+def eliminar_ley(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "DELETE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Soft delete de un analisis de ley.
+    Lo oculta de todas las vistas (laboratorista y comercial) pero permanece en DB.
+    Solo Admin, Gerencia y Comercial (permiso LABORATORIO DELETE).
+    """
+    try:
+        svc.eliminar_analisis_ley(db, analisis_id, current_user.id)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.delete("/recuperacion/{analisis_id}", status_code=204)
+def eliminar_recuperacion(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "DELETE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Soft delete de un analisis de recuperacion.
+    Lo oculta de todas las vistas pero permanece en DB.
+    Solo Admin, Gerencia y Comercial (permiso LABORATORIO DELETE).
+    """
+    try:
+        svc.eliminar_analisis_recuperacion(db, analisis_id, current_user.id)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
 @router.post("/ley/{analisis_id}/certificado")
 async def subir_certificado_ley(
     analisis_id: int,
