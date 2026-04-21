@@ -11,6 +11,7 @@ import type {
     CompletarRecuperacionRequest,
     EnviarRecuperacionInternaRequest,
     LoteLabOut,
+    AnalisisLeyOut,
 } from '@/types/laboratorio'
 
 export const useLaboratorioStore = defineStore('laboratorio', () => {
@@ -66,15 +67,14 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
     }
 
     // ── Análisis de Ley ───────────────────────────────────────────────────────
-    async function registrarLey(datos: AnalisisLeyCreate, archivo?: File | null): Promise<boolean> {
+    async function registrarLey(datos: AnalisisLeyCreate, archivo?: File | null): Promise<AnalisisLeyOut | null> {
         try {
             const nuevo = await laboratorioApi.registrarLey(datos)
             if (archivo) await laboratorioApi.subirCertificadoLey(nuevo.id, archivo)
-            ui.toast('Análisis de ley registrado', 'success')
-            return true
+            return nuevo
         } catch (e: any) {
             ui.toast(e?.response?.data?.detail ?? 'Error al registrar análisis de ley', 'error')
-            return false
+            return null
         }
     }
 
@@ -99,15 +99,14 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         analisisId: number,
         datos: CompletarRecuperacionRequest,
         archivo?: File | null,
-    ): Promise<boolean> {
+    ): Promise<AnalisisRecuperacionOut | null> {
         try {
             const resultado = await laboratorioApi.completarRecuperacion(analisisId, datos)
             if (archivo) await laboratorioApi.subirCertificadoRecuperacion(resultado.id, archivo)
-            ui.toast('Análisis de recuperación completado', 'success')
-            return true
+            return resultado
         } catch (e: any) {
             ui.toast(e?.response?.data?.detail ?? 'Error al completar recuperación', 'error')
-            return false
+            return null
         }
     }
 
@@ -164,6 +163,45 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
+    // ── Eliminar (soft delete) ─────────────────────────────────────────────────
+    async function eliminarLey(analisisId: number): Promise<boolean> {
+        const ok = await ui.showConfirm({
+            title: 'Eliminar analisis',
+            message:
+                'Esto ocultara el analisis de todas las vistas. El registro permanece en la base de datos. Esta accion no se puede deshacer desde la interfaz.',
+            confirmLabel: 'Eliminar',
+            danger: true,
+        })
+        if (!ok) return false
+        try {
+            await laboratorioApi.eliminarLey(analisisId)
+            ui.toast('Analisis eliminado', 'success')
+            return true
+        } catch {
+            ui.toast('Error al eliminar analisis', 'error')
+            return false
+        }
+    }
+
+    async function eliminarRecuperacion(analisisId: number): Promise<boolean> {
+        const ok = await ui.showConfirm({
+            title: 'Eliminar analisis',
+            message:
+                'Esto ocultara el analisis de todas las vistas. El registro permanece en la base de datos. Esta accion no se puede deshacer desde la interfaz.',
+            confirmLabel: 'Eliminar',
+            danger: true,
+        })
+        if (!ok) return false
+        try {
+            await laboratorioApi.eliminarRecuperacion(analisisId)
+            ui.toast('Analisis eliminado', 'success')
+            return true
+        } catch {
+            ui.toast('Error al eliminar analisis', 'error')
+            return false
+        }
+    }
+
     // ── Certificados ──────────────────────────────────────────────────────────
     async function subirCertificadoLey(analisisId: number, archivo: File): Promise<boolean> {
         try {
@@ -187,6 +225,28 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
+    async function generarCertificadoLeyInterno(analisisId: number) {
+        try {
+            await laboratorioApi.generarCertificadoLeyInterno(analisisId)
+            ui.toast('Certificado generado y adjuntado', 'success')
+            return true
+        } catch {
+            ui.toast('Error al generar certificado', 'error')
+            return false
+        }
+    }
+
+    async function generarCertificadoRecInterno(analisisId: number) {
+        try {
+            await laboratorioApi.generarCertificadoRecInterno(analisisId)
+            ui.toast('Certificado generado y adjuntado', 'success')
+            return true
+        } catch {
+            ui.toast('Error al generar certificado', 'error')
+            return false
+        }
+    }
+
     return {
         cips, lotes, cargando,
         puedeVerIP, esLaboratorista,
@@ -194,7 +254,9 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         registrarLey,
         enviarRecuperacion, completarRecuperacion, registrarRecuperacion,
         descartarLey, descartarRecuperacion,
+        eliminarLey, eliminarRecuperacion,
         subirCertificadoLey, subirCertificadoRecuperacion,
         puedeImportarCert,
+        generarCertificadoLeyInterno, generarCertificadoRecInterno,
     }
 })

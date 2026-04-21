@@ -131,7 +131,7 @@
                 @click="verEtiqueta(prueba)"
                 title="Ver etiqueta CIP"
               >
-                🏷 Reimprimir
+                <Tag :size="14" /> Reimprimir
               </button>
             </td>
           </tr>
@@ -144,7 +144,7 @@
 
     <!-- Modal etiqueta CIP (impresión) -->
     <div v-if="etiquetaModal" class="modal-overlay" @click.self="etiquetaModal = null">
-      <div class="modal modal-sm">
+      <div class="modal modal-md">
         <div class="modal-header">
           <h2>Etiqueta CIP Recuperación</h2>
           <button class="btn-cerrar" @click="etiquetaModal = null">×</button>
@@ -152,8 +152,8 @@
         <div class="modal-body" style="text-align:center">
           <p class="field-label" style="margin-bottom:0.5rem">LOTE: {{ etiquetaModal.ip }}</p>
           <div class="etiqueta-cip">
-            <span class="etiqueta-title">INVERMIN PAITITI S.A.C. — RECUPERACIÓN</span>
-            <div :id="`barcode-prueba`" class="barcode-container"></div>
+            <span class="etiqueta-title">INVERMIN PAITITI S.A.C. - RECUPERACIÓN</span>
+            <svg id="barcode-prueba" class="barcode-container"></svg>
             <span class="etiqueta-codigo">{{ etiquetaModal.cip }}</span>
           </div>
         </div>
@@ -168,13 +168,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
 import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'
-import { WifiOff } from 'lucide-vue-next'
+import { WifiOff, Tag } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()
@@ -206,6 +206,23 @@ watch(online, async (isOnline) => {
     if (hay === 0) { await cargarDatos(); await cargarOffline() }
   } else {
     await cargarOffline()
+  }
+})
+watch(etiquetaModal, async (val) => {
+  if (!val) return
+  await nextTick()
+  try {
+    JsBarcode(`#barcode-prueba`, val.cip, {
+      format: 'CODE128',
+      displayValue: false,
+      width: 2,
+      height: 45,
+      margin: 0,
+      background: 'transparent',
+      lineColor: '#000000',
+    })
+  } catch (e) {
+    console.error('Error dibujando barcode prueba:', e)
   }
 })
 
@@ -316,17 +333,22 @@ function verEtiqueta(prueba: LotePruebaList) {
 }
 
 function imprimirEtiqueta(e: { ip: string; cip: string }) {
+  const svgEl = document.querySelector<SVGElement>('#barcode-prueba')
+  const svgHtml = svgEl ? svgEl.outerHTML : ''
+
   const css = `
-    body { font-family: monospace; display:flex; align-items:center; }
-    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:80%; }
+    body { font-family: monospace; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; }
+    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:220px; }
     .et-title { font-size:0.65rem; font-weight:900; letter-spacing:.1em; display:block; margin-bottom:4px; }
-    .et-sub { font-size:0.55rem; border-bottom:1px solid #000; padding-bottom:4px; display:block; width:100%; text-align:center; }
-    .et-code { font-size:2rem; font-weight:900; margin-top:8px; display:block; }
+    .et-sub { font-size:0.55rem; border-bottom:1px solid #000; padding-bottom:4px; display:block; width:100%; text-align:center; margin-bottom:8px; }
+    svg { width:100%; height:45px; margin:6px 0; }
+    .et-code { font-size:1.6rem; font-weight:900; margin-top:8px; display:block; letter-spacing:0.05em; }
   `
   const html = `<!DOCTYPE html><html><head><style>${css}</style></head><body>
     <div class="et">
       <span class="et-title">INVERMIN PAITITI S.A.C.</span>
       <span class="et-sub">RECUPERACIÓN</span>
+      ${svgHtml}
       <span class="et-code">${e.cip}</span>
     </div>
     <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))<\/script>

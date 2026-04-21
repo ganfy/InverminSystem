@@ -59,7 +59,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_pesajes_peso_final_mayor_inicial",
         "pesajes",
-        "peso_final > peso_inicial",
+        "peso_final < peso_inicial",
     )
     op.create_check_constraint(
         "ck_muestreos_peso_seco_menor_humedo",

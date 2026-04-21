@@ -19,6 +19,7 @@ export interface NavItem {
   path:  string
   icon:  string | Component
   roles?: RolSistema[]  // si no viene, hereda los de la sección
+  disabled?: boolean
 }
 
 export const NAV_CONFIG: NavSection[] = [
@@ -31,11 +32,11 @@ export const NAV_CONFIG: NavSection[] = [
   },
   {
     section: 'OPERACIONES',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza', 'Laboratorista', 'TécnicoMuestreo'],
+    roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza', 'Laboratorista', 'TecnicoMuestreo'],
     items: [
       { label: 'Balanza', path: '/balanza', icon: Weight, roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] },
-      { label: 'Muestreo',            path: '/muestreo',   icon: FlaskConical, roles: ['Admin', 'Gerencia', 'Comercial', 'TécnicoMuestreo'] },
-      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'TécnicoMuestreo'] },
+      { label: 'Muestreo',            path: '/muestreo',   icon: FlaskConical, roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] },
+      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] },
       { label: 'Laboratorio',         path: '/laboratorio',icon: Microscope, roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] },
       { label: 'Liquidaciones',       path: '/liquidaciones', icon: FileText, roles: ['Admin', 'Gerencia', 'Comercial'] },
       { label: 'Facturación',         path: '/facturacion',icon: Receipt, roles: ['Admin', 'Gerencia', 'Comercial'] },

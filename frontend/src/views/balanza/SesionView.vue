@@ -388,7 +388,10 @@ const {
 const pesoActual = ref<number | null>(null)
 watch(peso, (nuevoPeso) => {
   if (wsConectado.value && conectado.value && nuevoPeso !== null) {
-    pesoActual.value = nuevoPeso
+    // 1. El agente (hardware) siempre envía en KG. Lo pasamos a la base (TM)
+    const pesoBaseTM = nuevoPeso / 1000
+    // 2. units.ts lo adapta a lo que pida la configuración (ej. TM, KG, TMC)
+    pesoActual.value = convertirParaInput(pesoBaseTM, 'BALANZA')
   }
 })
 
@@ -420,7 +423,10 @@ async function resolverPeso(): Promise<number | null> {
   if (wsConectado.value && conectado.value) {
     const lectura = await capturar()
     if (!lectura.estable) ui.toast('Peso capturado, pero la balanza no estaba estable. Verificar.', 'warning')
-    return lectura.peso
+    if (lectura.peso !== null) {
+      const pesoBaseTM = lectura.peso / 1000
+      return convertirParaInput(pesoBaseTM, 'BALANZA')
+    }
   }
   return pesoActual.value
 }

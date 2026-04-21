@@ -32,12 +32,28 @@
 
           <div id="area-impresion" class="grid-etiquetas">
             <div v-for="cip in codigosExistentes" :key="cip.id" class="etiqueta-print">
-              <span class="etiqueta-title">INVERMIN S.A.C.</span>
+              <span class="etiqueta-title">INVERMIN PAITITI S.A.C.</span>
               <span class="etiqueta-subtitle">MUESTRA ANÁLISIS</span>
 
               <svg :id="`barcode-${cip.id}`" class="barcode-visual"></svg>
 
               <span class="etiqueta-codigo">{{ cip.codigo_cip }}</span>
+
+              <span class="etiqueta-lab" style="font-size:0.5rem;color:#555;margin-top:0.2rem">
+                {{ labsPorCip[cip.id] || cip.laboratorio || '' }}
+              </span>
+
+              <div v-if="puedeAsignarLab" class="lab-selector no-print">
+                <label style="font-size:0.68rem;color:var(--color-text-faint)">LABORATORIO DESTINO:</label>
+                <select
+                  class="field-select field-input"
+                  style="font-size:0.75rem;padding:0.25rem 0.5rem"
+                  :value="labsPorCip[cip.id] || cip.laboratorio"
+                  @change="cambiarLab(cip, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="lab in labsDisponibles" :key="lab" :value="lab">{{ lab }}</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -69,13 +85,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, computed } from 'vue'
 import JsBarcode from 'jsbarcode'
 import { useMuestreoStore } from '@/stores/muestreo'
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
 import type { MapeoCIPOut } from '@/api/muestreo'
 import { X, WifiOff } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
+import { muestreoApi } from '@/api/muestreo'
 
 const props = defineProps<{ ipLote: string }>()
 const emit = defineEmits(['close', 'etiquetado'])
@@ -90,6 +108,13 @@ const mensajeCarga = ref('Consultando historial de etiquetas...')
 const codigosExistentes = ref<MapeoCIPOut[]>([])
 const error = ref<string | null>(null)
 
+const auth = useAuthStore()
+const puedeAsignarLab = computed(() =>
+  ['Admin', 'Gerencia', 'Comercial'].includes(auth.user?.rol ?? '')
+)
+const labsDisponibles = ref<string[]>([])
+const labsPorCip = ref<Record<number, string>>({})
+
 onMounted(async () => {
   await inicializarEtiquetas()
 })
@@ -102,30 +127,41 @@ const inicializarEtiquetas = async () => {
   }
 
   try {
-    cargando.value = true
-    error.value = null
+  cargando.value = true
+  error.value = null
 
-    // 1. Verificamos si ya tiene etiquetas
-    let historial = await store.obtenerCodigosCip(props.ipLote)
+  const [labs, historialInicial] = await Promise.all([
+    puedeAsignarLab.value ? muestreoApi.listarLaboratorios() : Promise.resolve([]),
+    store.obtenerCodigosCip(props.ipLote),
+  ])
 
-    // 2. Lógica de negocio: Si no hay, generamos 2 automáticamente
-    if (!historial || historial.length === 0) {
-      mensajeCarga.value = 'Generando muestras iniciales (Laboratorio y Dirimencia)...'
-      const nuevos = await store.generarCodigosCip(props.ipLote, 2)
-      if (nuevos) {
-        historial = nuevos
-        emit('etiquetado') // Avisamos al padre que el estado cambió
-      }
+  if (puedeAsignarLab.value) labsDisponibles.value = labs
+
+  let historial = historialInicial
+
+  if (!historial || historial.length === 0) {
+    mensajeCarga.value = 'Generando muestras iniciales (Laboratorio y Dirimencia)...'
+    const nuevos = await store.generarCodigosCip(props.ipLote, 2)
+    if (nuevos) {
+      historial = nuevos
+      emit('etiquetado')
     }
+  }
 
-    if (historial && historial.length > 0) {
-      codigosExistentes.value = historial
-      cargando.value = false
-      await dibujarCodigosBarras()
-    } else {
-      error.value = 'No se pudieron recuperar ni generar los códigos.'
-      cargando.value = false
+  if (historial && historial.length > 0) {
+    codigosExistentes.value = historial
+    // Precargar lab por CIP DESPUÉS de tener los datos
+    if (puedeAsignarLab.value) {
+      historial.forEach(c => {
+        labsPorCip.value[c.id] = c.laboratorio ?? ''
+      })
     }
+    cargando.value = false
+    await dibujarCodigosBarras()
+  } else {
+    error.value = 'No se pudieron recuperar ni generar los códigos.'
+    cargando.value = false
+  }
 
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Error interno del servidor.'
@@ -163,7 +199,7 @@ const dibujarCodigosBarras = async () => {
         format: 'CODE128',
         displayValue: false,
         width: 2,
-        height: 40,
+        height: 55,
         margin: 0,
         background: "transparent",
         lineColor: "#000000"
@@ -195,7 +231,7 @@ const ejecutarImpresion = () => {
       border-radius: 8px;
       width: 100%;
       max-width: 82mm;
-      height: 45mm;
+      height: 58mm;
       box-sizing: border-box;
       padding: 5mm;
       display: flex;
@@ -206,7 +242,8 @@ const ejecutarImpresion = () => {
     }
     .etiqueta-title { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0.2rem; }
     .etiqueta-subtitle { font-size: 0.55rem; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 0.2rem; width: 100%; text-align: center; }
-    .barcode-visual { max-width: 100%; height: 35px; margin: 0.5rem 0; transform: scaleY(1.3); }
+    .barcode-visual { width: 100%; height: 55px; margin: 0.25rem 0; }
+    .no-print { display: none !important; }
     .etiqueta-codigo { font-family: monospace; font-size: 1.1rem; font-weight: 900; letter-spacing: 0.05em; }
   `;
 
@@ -243,6 +280,16 @@ const formatearFecha = (isoDate: string | undefined | null) => {
   if (!isoDate) return new Date().toLocaleDateString('es-PE')
   return new Date(isoDate).toLocaleDateString('es-PE')
 }
+
+async function cambiarLab(cip: MapeoCIPOut, lab: string) {
+  try {
+    await muestreoApi.actualizarLaboratorioCip(cip.id, lab)
+    labsPorCip.value[cip.id] = lab
+    ui.toast(`Lab asignado: ${lab}`, 'success')
+  } catch {
+    ui.toast('Error al asignar laboratorio', 'error')
+  }
+}
 </script>
 
 <style scoped>
@@ -275,4 +322,16 @@ const formatearFecha = (isoDate: string | undefined | null) => {
 @media (max-width: 560px) {
   .grid-etiquetas { grid-template-columns: 1fr; }
 }
+
+.etiqueta-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.lab-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+@media print { .no-print { display: none !important; } }
 </style>

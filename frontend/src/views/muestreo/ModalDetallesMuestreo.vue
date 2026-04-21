@@ -12,7 +12,7 @@
           <div v-if="cargando" class="estado-tabla">Cargando historial...</div>
 
           <div v-else-if="errorRed" class="aviso-offline">
-            <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" />️</span>
+            <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
             <p class="aviso-texto">
               <strong>Sin conexión.</strong> No se puede consultar el historial detallado de intentos mientras el dispositivo esté fuera de línea.
             </p>

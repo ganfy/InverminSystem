@@ -31,7 +31,7 @@
               step="0.01"
             />
             <p v-if="mostrarWarningMalla" class="field-hint" style="color: var(--color-warning);">
-              ⚠️ El porcentaje de malla está fuera del rango aceptable (88% - 94%).
+              <AlertTriangle :size="16" /> El porcentaje de malla está fuera del rango aceptable (88% - 94%).
             </p>
           </div>
 
@@ -84,7 +84,7 @@
   import { useSync } from '@/composables/useSync'
   import { pruebasApi } from '@/api/pruebas'
   import { encolarPruebaOffline } from '@/composables/useOfflineQueue'
-
+  import { AlertTriangle } from 'lucide-vue-next'
   const router = useRouter()
   const route = useRoute()
   const ui = useUiStore()
@@ -179,7 +179,7 @@
         // Guardado normal (Online) usando la IP
         const response = await pruebasApi.registrarPrueba(ipActual, payload)
         ui.toast('Prueba registrada correctamente', 'success')
-        if (response.warning) ui.toast(response.warning, 'warning')
+        //if (response.warning) ui.toast(response.warning, 'warning')
       } else {
         // Guardado a la cola (Offline) usando la IP
         const offlineId = `pm-${Date.now()}`

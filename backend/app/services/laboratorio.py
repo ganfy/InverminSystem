@@ -20,6 +20,7 @@ from app.models.models import (
     Lote,
     MapeoCIP,
     ProveedorAcopiador,
+    PruebaMetalurgica,
     SesionDescarga,
 )
 from app.schemas.laboratorio import (
@@ -50,11 +51,11 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
-    return (fino + grueso).quantize(Decimal("0.0001"))
+    return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.0001"))
 
 
 def _calcular_ley_gr_tm(ley_final: Decimal) -> Decimal:
-    return (ley_final * FACTOR_OZ_TC).quantize(Decimal("0.001"))
+    return (Decimal(str(ley_final)) * FACTOR_OZ_TC).quantize(Decimal("0.001"))
 
 
 def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
@@ -139,6 +140,15 @@ def obtener_cips_laboratorio(
 
     resultados: list[CIPAnalisisOut] = []
     for cip in cips:
+        print(
+            f"Procesando CIP: {cip.codigo_cip}, Laboratorio: {cip.laboratorio}, Tipo muestra: {cip.tipo_muestra}"
+        )  # Debug
+        if not incluir_ip and cip.laboratorio not in [
+            "Paititi",
+            "Laboratorio Interno",
+            "El Dorado - Invermin Paititi",
+        ]:
+            continue
         lote = db.query(Lote).filter(Lote.id == cip.lote_id).first()
         if not lote:
             continue
@@ -158,19 +168,19 @@ def obtener_cips_laboratorio(
             .all()
         )
 
-        vigentes_ley = [a for a in analisis_ley if a.vigente]
+        no_eliminados_ley = [a for a in analisis_ley if not a.eliminado]
+        # vigentes_ley = [a for a in no_eliminados_ley if a.vigente]
+        estado_ley = "COMPLETADO" if no_eliminados_ley else "PENDIENTE"
 
-        # Estado ley: aplica a CIPs tipo Laboratorio
-        estado_ley = "COMPLETADO" if vigentes_ley else "PENDIENTE"
-
-        # Estado recuperación: aplica a CIPs tipo Recuperacion*
-        # PENDIENTE si hay registro pendiente, COMPLETADO si hay completado, SIN_DATOS si no hay nada
+        # Estado recuperacion: idem, filtrar eliminados primero
+        no_eliminados_rec = [a for a in analisis_rec if not a.eliminado]
         pendiente_rec = any(
-            a.estado == EstadoRecuperacion.PENDIENTE and a.vigente for a in analisis_rec
+            a.estado == EstadoRecuperacion.PENDIENTE and a.vigente for a in no_eliminados_rec
         )
         completado_rec = any(
-            a.estado == EstadoRecuperacion.COMPLETADO and a.vigente for a in analisis_rec
+            a.estado == EstadoRecuperacion.COMPLETADO and a.vigente for a in no_eliminados_rec
         )
+
         if completado_rec:
             estado_rec = "COMPLETADO"
         elif pendiente_rec:
@@ -190,8 +200,8 @@ def obtener_cips_laboratorio(
                 laboratorio_destino=cip.laboratorio,
                 estado_ley=estado_ley,
                 estado_recuperacion=estado_rec,
-                analisis_ley=[_ley_out(a, ip) for a in analisis_ley],
-                analisis_recuperacion=[_rec_out(a, ip) for a in analisis_rec],
+                analisis_ley=[_ley_out(a, ip) for a in no_eliminados_ley],
+                analisis_recuperacion=[_rec_out(a, ip) for a in no_eliminados_rec],
             )
         )
 
@@ -207,28 +217,39 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     except AttributeError:
         proveedor = "-"
 
-    _mcip = lote.mapeo_cip  # single object or None (uselist=False)
-    cips = [_mcip.codigo_cip] if _mcip else []
-    cips_detalle = (
-        [
-            CIPResumen(
-                codigo_cip=_mcip.codigo_cip,
-                tipo_muestra=_mcip.tipo_muestra,
-                laboratorio=_mcip.laboratorio,
-            )
-        ]
-        if _mcip
-        else []
-    )
+    todos_cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).all()
+    cips = [c.codigo_cip for c in todos_cips]
+    cips_detalle = [
+        CIPResumen(
+            codigo_cip=c.codigo_cip,
+            tipo_muestra=c.tipo_muestra,
+            laboratorio=c.laboratorio,
+        )
+        for c in todos_cips
+    ]
 
     analisis_ley = (
-        db.query(AnalisisLey).filter(AnalisisLey.lote_id == lote.id).order_by(AnalisisLey.id).all()
+        db.query(AnalisisLey)
+        .filter(AnalisisLey.lote_id == lote.id)
+        .filter(~AnalisisLey.eliminado)
+        .order_by(AnalisisLey.id)
+        .all()  # noqa: E712
     )
     analisis_rec = (
         db.query(AnalisisRecuperacion)
         .filter(AnalisisRecuperacion.lote_id == lote.id)
+        .filter(~AnalisisRecuperacion.eliminado)
         .order_by(AnalisisRecuperacion.id)
         .all()
+    )
+
+    from datetime import datetime, timedelta
+
+    pruebas_lote = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).all()
+    _ahora = datetime.now()
+    tiene_prueba_pendiente = any(
+        p.fecha_ingreso is None or _ahora < p.fecha_ingreso + timedelta(hours=48)
+        for p in pruebas_lote
     )
 
     return LoteLabOut(
@@ -244,6 +265,7 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         analisis_ley=[_ley_out(a, lote.ip) for a in analisis_ley],
         analisis_recuperacion=[_rec_out(a, lote.ip) for a in analisis_rec],
         tiene_dirimencia=bool(lote.dirimencia),
+        tiene_prueba_pendiente=tiene_prueba_pendiente,
     )
 
 
@@ -425,6 +447,10 @@ def enviar_recuperacion_interna(
             )
         cip_obj = cips_internos[0]
 
+    # Actualizar laboratorio destino en el mapeo
+    if datos.laboratorio:
+        cip_obj.laboratorio = datos.laboratorio or "Paititi"
+
     # Verificar que no haya pending vigente para ese CIP
     pending_existente = (
         db.query(AnalisisRecuperacion)
@@ -469,7 +495,12 @@ def completar_recuperacion(
     Laboratorista completa un análisis de recuperación PENDIENTE.
     Ingresa ley_cola y ley_liquido; el sistema calcula recuperacion automáticamente.
     """
-    a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+    a = (
+        db.query(AnalisisRecuperacion)
+        .filter(AnalisisRecuperacion.id == analisis_id)
+        .filter(~AnalisisRecuperacion.eliminado)
+        .first()
+    )
     if not a:
         raise ValueError("Análisis de recuperación no encontrado")
     if a.estado != EstadoRecuperacion.PENDIENTE:
@@ -521,6 +552,49 @@ def descartar_analisis_recuperacion(
     return a
 
 
+def eliminar_analisis_ley(db: Session, analisis_id: int, usuario_id: int) -> AnalisisLey:
+    from datetime import datetime
+
+    a = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_id).first()
+    if not a:
+        raise ValueError("Analisis de ley no encontrado")
+    if a.eliminado:
+        raise ValueError("El analisis ya esta eliminado")
+    a.eliminado = True
+    a.eliminado_en = datetime.utcnow()
+    a.eliminado_por = usuario_id
+    # Si estaba vigente, marcarlo no vigente tambien para que no afecte calculos
+    if a.vigente:
+        a.vigente = False
+        a.descartado_por = usuario_id
+        a.fecha_descarte = a.eliminado_en
+        a.justificacion_descarte = "Eliminado por usuario"
+    db.flush()
+    return a
+
+
+def eliminar_analisis_recuperacion(
+    db: Session, analisis_id: int, usuario_id: int
+) -> AnalisisRecuperacion:
+    from datetime import datetime
+
+    a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+    if not a:
+        raise ValueError("Analisis de recuperacion no encontrado")
+    if a.eliminado:
+        raise ValueError("El analisis ya esta eliminado")
+    a.eliminado = True
+    a.eliminado_en = datetime.utcnow()
+    a.eliminado_por = usuario_id
+    if a.vigente:
+        a.vigente = False
+        a.descartado_por = usuario_id
+        a.fecha_descarte = a.eliminado_en
+        a.justificacion_descarte = "Eliminado por usuario"
+    db.flush()
+    return a
+
+
 def subir_certificado(db: Session, analisis_id: int, archivo: UploadFile, tipo: str) -> str:
     contenido = archivo.file.read()
     if len(contenido) > MAX_FILE_SIZE:
@@ -538,7 +612,7 @@ def subir_certificado(db: Session, analisis_id: int, archivo: UploadFile, tipo: 
     if not a:
         raise ValueError("Análisis no encontrado")
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()
     cip_str = (a.cip or "cert").replace("/", "_")
     carpeta = STORAGE_PATH / "certificados" / str(ahora.year) / f"{ahora.month:02d}"
     carpeta.mkdir(parents=True, exist_ok=True)
@@ -614,32 +688,42 @@ def extraer_certificado_ley(
         # Normalizar espacios: "IP 2793" → "IP-2793"
         cip = re.sub(r"^IP\s+", "IP-", cip.strip())
 
-    # ── Leyes de la muestra ───────────────────────────────────────────────────
-    # ley_grueso = MALLA +140 o +150 (fracción retenida en malla)
     ley_grueso = _first_float(
-        r"MALLA\s*\+\s*1[45]\d\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
-        r"MESH\s*\+\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-        r"\+\s*1[45]\d\s*(?:oz/tc)?\s*[:\|]?\s*([\d]+[.,][\d]+)",
+        r"MALLA\s*\+\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"MESH\s*\+\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"\+\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
     )
-
-    # ley_fino = MALLA -140 o -150 (fracción pasante)
     ley_fino = _first_float(
-        r"MALLA\s*-\s*1[45]\d\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
-        r"MESH\s*-\s*1[45]\d\s*:?\s*([\d]+[.,][\d]+)",
-        r"-\s*1[45]\d\s*(?:oz/tc)?\s*[:\|]?\s*([\d]+[.,][\d]+)",
+        r"MALLA\s*-\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"MESH\s*-\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"-\s*1[45]0[\s\S]{0,30}?([\d]+[.,][\d]+)",
     )
-
-    # ley_final = suma (oz/tc total). Si no aparece explícito, se calculará
     ley_final = _first_float(
-        r"LEY\s+FINAL\s*(?:oz/tc)?\s*:?\s*([\d]+[.,][\d]+)",
-        r"LEY\s+AU\s*(?:OZ/TC|OZ\.TC|OZ/T\.C)\s*:?\s*([\d]+[.,][\d]+)",
-        r"AU\s*(?:OZ/TC|OZ\.TC)\s*:?\s*([\d]+[.,][\d]+)",
-        # En tabla: valor aislado mayor (generalmente la suma es el mayor de la fila)
+        r"LE[YV]\s*FINAL[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"LE[YV]\s+AU[\s\S]{0,30}?([\d]+[.,][\d]+)",
+        r"AU\s*(?:OZ/TC|OZ\.TC|0Z/TC|ozitc|oz/te|o2z/tc)[\s\S]{0,30}?([\d]+[.,][\d]+)",
     )
 
-    # Si no se encontró ley_final pero sí fino y grueso, calcular
-    if ley_final is None and ley_fino is not None and ley_grueso is not None:
-        ley_final = round(ley_fino + ley_grueso, 4)
+    # Si las etiquetas están muy separadas de los valores, leemos fila por fila.
+    if ley_final is None or ley_fino is None or ley_grueso is None:
+        for linea in texto.split("\n"):
+            # Encontrar todos los decimales en la línea actual
+            floats = re.findall(r"\b\d+\.\d{2,4}\b", linea)
+
+            # Caso 1: La fila tiene al menos 3 números (Grueso, Fino, Final, opcional g/TM)
+            # Ej: RLV-83 IP - 2793 0.040 0.519 0.559 19.162
+            if len(floats) >= 3:
+                # El orden minero estándar de izquierda a derecha suele ser: Malla Gruesa (+), Malla Fina (-), Final
+                ley_grueso = float(floats[0])
+                ley_fino = float(floats[1])
+                ley_final = float(floats[2])
+                break
+
+            # Caso 2: La fila tiene exactamente 2 números (Ley Final oz/TC y g/TM)
+            elif len(floats) == 2 and ley_final is None:
+                f1, f2 = float(floats[0]), float(floats[1])
+                # Sabemos que g/TM es ~34.28 veces mayor que oz/TC, así que la Final es el valor menor.
+                ley_final = min(f1, f2)
 
     # ley_gr_tm (referencia, no se guarda en BD - backend lo recalcula)
     ley_gr_tm = _first_float(
@@ -780,6 +864,48 @@ def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
     try:
         ruta = tmp / filename
         ruta.write_bytes(archivo_bytes)
+
+        def preprocesar_imagen(img_path):
+            from PIL import Image
+
+            # Volvemos a lo simple y efectivo: Solo escala de grises y zoom 2x.
+            # Sin filtros destructivos (autocontrast, binarize, etc.) que borren los números.
+            img = Image.open(str(img_path)).convert("L")
+            img = img.resize((img.width * 2, img.height * 2), Image.Resampling.LANCZOS)
+            return img
+
+        # Volvemos a psm 4: Ideal para tablas y asume una columna de texto de tamaños variables
+        config_ocr = r"--oem 3 --psm 4"
+
+        ext = ruta.suffix.lower()
+        if ext in [".jpg", ".jpeg", ".png"]:
+            try:
+                import pytesseract
+
+                img = preprocesar_imagen(ruta)
+                texto = pytesseract.image_to_string(img, lang="spa+eng", config=config_ocr)
+                print(f"[OCR TEXTO EXTRAÍDO]\n{texto}\n[FIN OCR]")
+                return texto
+            except Exception as e:
+                print(f"Error OCR Imagen: {e}")
+                return ""
+
+        # psm 6 asume un bloque de texto uniforme, ideal para cuando limpiamos todo el fondo
+        config_ocr = r"--oem 3 --psm 6"
+
+        ext = ruta.suffix.lower()
+        if ext in [".jpg", ".jpeg", ".png"]:
+            try:
+                import pytesseract
+
+                img = preprocesar_imagen(ruta)
+                texto = pytesseract.image_to_string(img, lang="spa+eng", config=config_ocr)
+                print(f"[OCR TEXTO EXTRAÍDO]\n{texto}\n[FIN OCR]")
+                return texto
+            except Exception as e:
+                print(f"Error OCR Imagen: {e}")
+                return ""
+
         try:
             import fitz
 
@@ -807,6 +933,34 @@ def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
             return ""
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def generar_y_guardar_certificado_interno(db: Session, analisis_id: int, tipo: str) -> str:
+    from app.services import certificado_ley_pdf as cert_svc
+
+    if tipo == "ley":
+        a = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_id).first()
+        if not a:
+            raise ValueError("Análisis no encontrado")
+        pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(db, a.cip)
+    else:
+        a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+        if not a:
+            raise ValueError("Análisis no encontrado")
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_cip_pdf(db, a.cip)
+
+    ahora = datetime.utcnow()
+    cip_str = (a.cip or "cert").replace("/", "_")
+    carpeta = STORAGE_PATH / "certificados" / str(ahora.year) / f"{ahora.month:02d}"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    nombre = f"{cip_str}_{tipo}_interno_{uuid.uuid4().hex[:8]}.pdf"
+
+    (carpeta / nombre).write_bytes(pdf_bytes)
+    ruta = f"certificados/{ahora.year}/{ahora.month:02d}/{nombre}"
+
+    a.certificado_url = ruta
+    db.flush()
+    return ruta
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

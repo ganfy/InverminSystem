@@ -9,7 +9,7 @@
           <button class="btn-secondary" @click="router.back()">← Volver</button>
           <button class="btn-primary" @click="guardar" :disabled="guardando">
             <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
-            Generar certificado →
+            Guardar y Generar Certificado
           </button>
         </div>
       </header>
@@ -28,7 +28,7 @@
           </div>
           <div class="field">
             <label class="field-label">MINERAL (Au/Ag):</label>
-            <select class="field-select field-sm" v-model="form.material">
+            <select class="field-select field-input field-sm" v-model="form.material">
               <option value="Au">Au</option>
               <option value="Ag">Ag</option>
             </select>
@@ -50,12 +50,12 @@
           </div>
           <div class="field">
             <label class="field-label">MÉTODO:</label>
-            <input v-model="metodo" readonly class="input-disabled">
+            <input v-model="metodo" readonly class="field-input" disabled>
           </input>
           </div>
           <div class="field">
             <label class="field-label">PUNTO:</label>
-            <select class="field-select field-sm" v-model="punto">
+            <select class="field-select field-sm field-input" v-model="punto">
               <option>Cabeza</option>
               <option>Cola</option>
               <option>Líquido</option>
@@ -72,45 +72,80 @@
         </div>
       </section>
 
-      <!-- LEYES DE LA MUESTRA (triple sampling) -->
+      <!-- LEYES DE LA MUESTRA (triple sampling) - REEMPLAZAR sección card -->
       <section class="card">
-        <h2 class="card-titulo">LEYES DE LA MUESTRA</h2>
-        <div class="muestras-grid">
+        <h2 class="card-titulo">LEYES DE LA MUESTRA (Triple Sampling)</h2>
+        <div class="muestras-cards">
 
-          <!-- Fila Fino 1 -->
-          <div class="muestra-row">
-            <span class="muestra-label">P. MUESTRA FINO 1:</span>
-            <input type="number" class="field-input muestra-input" v-model.number="pFino1" step="0.001" placeholder="g" />
-            <span class="muestra-label">Au (mg) -:</span>
-            <input type="number" class="field-input muestra-input" v-model.number="auFino1" step="0.0001" placeholder="0.0000" @input="recalc" />
-            <span class="muestra-label">OZ/TC -140:</span>
-            <span class="muestra-calc">{{ fmtNum(ozMenos) }}</span>
-            <span class="muestra-label">LEY AU (OZ/TC):</span>
-            <span class="muestra-calc highlight">{{ fmtNum(leyFinal) }}</span>
+          <!-- Card Fino 1 -->
+          <div class="muestra-card">
+            <h3 class="muestra-card-titulo">MUESTRA FINO 1</h3>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label">P. MUESTRA (g)</label>
+                <input type="number" class="field-input" v-model.number="pFino1" step="0.001" placeholder="0.000" />
+              </div>
+              <div class="field">
+                <label class="field-label">Au (mg)</label>
+                <input type="number" class="field-input" v-model.number="auFino1" step="0.0001" placeholder="0.0000" @input="recalc" />
+              </div>
+            </div>
           </div>
 
-          <!-- Fila Fino 2 -->
-          <div class="muestra-row">
-            <span class="muestra-label">P. MUESTRA FINO 2:</span>
-            <input type="number" class="field-input muestra-input" v-model.number="pFino2" step="0.001" placeholder="g" />
-            <span class="muestra-label">Au (mg) -:</span>
-            <input type="number" class="field-input muestra-input" v-model.number="auFino2" step="0.0001" placeholder="0.0000" @input="recalc" />
-            <span class="muestra-label">OZ/TC +140:</span>
-            <span class="muestra-calc">{{ fmtNum(ozMas) }}</span>
-            <span class="muestra-label">LEY Au g/TM:</span>
-            <span class="muestra-calc highlight">{{ fmtNum(leyGrTm) }}</span>
+          <!-- Card Fino 2 -->
+          <div class="muestra-card">
+            <h3 class="muestra-card-titulo">MUESTRA FINO 2</h3>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label">P. MUESTRA (g)</label>
+                <input type="number" class="field-input" v-model.number="pFino2" step="0.001" placeholder="0.000" />
+              </div>
+              <div class="field">
+                <label class="field-label">Au (mg)</label>
+                <input type="number" class="field-input" v-model.number="auFino2" step="0.0001" placeholder="0.0000" @input="recalc" />
+              </div>
+            </div>
           </div>
 
-          <!-- Fila Grueso -->
-          <div class="muestra-row">
-            <span class="muestra-label">P. MUESTRA GRUESO:</span>
-            <input type="number" class="field-input muestra-input" v-model.number="pGrueso" step="0.001" placeholder="g" />
-            <span class="muestra-label">Au (mg) +:</span>
-            <input type="number" class="field-input muestra-input" v-model.number="auGrueso" step="0.0001" placeholder="0.0000" @input="recalc" />
+          <!-- Card Grueso -->
+          <div class="muestra-card">
+            <h3 class="muestra-card-titulo">MUESTRA GRUESO</h3>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label">P. MUESTRA (g)</label>
+                <input type="number" class="field-input" v-model.number="pGrueso" step="0.001" placeholder="0.000" />
+              </div>
+              <div class="field">
+                <label class="field-label">Au (mg)</label>
+                <input type="number" class="field-input" v-model.number="auGrueso" step="0.0001" placeholder="0.0000" @input="recalc" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Card Resultados -->
+          <div class="muestra-card muestra-card--resultados">
+            <h3 class="muestra-card-titulo">RESULTADOS CALCULADOS</h3>
+            <div class="resultados-grid">
+              <div class="resultado-item">
+                <span class="resultado-label">OZ/TC -140 (fino prom.)</span>
+                <span class="resultado-valor">{{ fmtNum(ozMenos) }}</span>
+              </div>
+              <div class="resultado-item">
+                <span class="resultado-label">OZ/TC +140 (grueso)</span>
+                <span class="resultado-valor">{{ fmtNum(ozMas) }}</span>
+              </div>
+              <div class="resultado-item resultado-item--gold">
+                <span class="resultado-label">LEY AU (OZ/TC)</span>
+                <span class="resultado-valor highlight">{{ fmtNum(leyFinal) }}</span>
+              </div>
+              <div class="resultado-item">
+                <span class="resultado-label">LEY AU (GR/TM)</span>
+                <span class="resultado-valor">{{ leyGrTm != null ? leyGrTm.toFixed(3) : '-' }}</span>
+              </div>
+            </div>
           </div>
 
         </div>
-
         <p v-if="errCalc" class="error-msg" style="margin-top:0.75rem">{{ errCalc }}</p>
       </section>
 
@@ -122,9 +157,11 @@
   import { useRouter, useRoute } from 'vue-router'
   import { useLaboratorioStore } from '@/stores/laboratorio'
   import type { TipoAnalisis } from '@/types/laboratorio'
+  import { useUiStore } from '@/stores/ui'
 
   const router = useRouter()
   const route  = useRoute()
+  const ui = useUiStore()
   const store  = useLaboratorioStore()
 
   const cipActual  = route.params.cip as string
@@ -139,8 +176,8 @@
 
   const form = ref({
     cip: cipActual,
-    laboratorio:    'Newmont',
-    tipo_analisis:  'externo' as TipoAnalisis,
+    laboratorio:    '',
+    tipo_analisis:  'planta' as TipoAnalisis,
     material:       'Au',
     ley_fino:       0,
     ley_grueso:     0,
@@ -221,57 +258,82 @@
       return
     }
 
+    const okConf = await ui.showConfirm({
+        title: 'Generar Certificado',
+        message: 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?',
+        confirmLabel: 'Generar y Guardar'
+    })
+    if (!okConf) return
+
     form.value.ley_fino   = ozMenos.value ?? 0
     form.value.ley_grueso = ozMas.value   ?? 0
 
     guardando.value = true
-    const ok = await store.registrarLey(form.value)
+    const result = await store.registrarLey(form.value)
+    if (result) {
+        await store.generarCertificadoLeyInterno(result.id)
+        router.push('/laboratorio')
+    }
     guardando.value = false
 
-    if (ok) router.push('/laboratorio')
   }
   </script>
 
   <style scoped>
-  .muestras-grid {
-    display: flex;
-    flex-direction: column;
+  .muestras-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 1rem;
   }
 
-  .muestra-row {
-    display: grid;
-    grid-template-columns: 180px 110px 130px 110px 140px 90px 180px 90px;
-    align-items: center;
+  .muestra-card {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 0.9rem 1rem;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .muestra-card--resultados {
+    border-color: rgba(184,151,75,0.3);
+    background: rgba(184,151,75,0.04);
+  }
+
+  .muestra-card-titulo {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: var(--color-text-faint);
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+  }
+
+  .resultados-grid {
+    display: flex;
+    flex-direction: column;
     gap: 0.5rem;
   }
 
-  @media (max-width: 1100px) {
-    .muestra-row {
-      grid-template-columns: 1fr 1fr;
-    }
+  .resultado-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
-  .muestra-label {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
+  .resultado-label {
+    font-size: 0.68rem;
+    color: var(--color-text-faint);
     font-family: var(--font-mono);
-    letter-spacing: 0.02em;
   }
 
-  .muestra-input {
-    max-width: 110px;
-  }
-
-  .muestra-calc {
+  .resultado-valor {
     font-family: var(--font-mono);
     color: var(--color-text-muted);
     font-size: var(--text-md);
   }
 
-  .muestra-calc.highlight {
+  .resultado-valor.highlight {
     color: var(--color-gold);
-    font-size: var(--text-lg);
-    font-weight: 600;
+    font-size: var(--text-xl);
+    font-weight: 700;
   }
   </style>

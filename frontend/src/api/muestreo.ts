@@ -106,4 +106,14 @@ export const muestreoApi = {
         const response = await api.get<MapeoCIPOut[]>(`/muestreo/lotes/${ipLote}/etiquetas`)
         return response.data
     },
+
+    async actualizarLaboratorioCip(cipId: number, laboratorio: string): Promise<MapeoCIPOut> {
+        const response = await api.patch<MapeoCIPOut>(`/muestreo/cips/${cipId}/laboratorio`, { laboratorio })
+        return response.data
+    },
+
+    async listarLaboratorios(): Promise<string[]> {
+        const response = await api.get<string[]>('/muestreo/labs')
+        return response.data
+    },
 }

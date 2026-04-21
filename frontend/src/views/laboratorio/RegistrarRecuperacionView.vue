@@ -10,7 +10,7 @@
         <button class="btn-secondary" @click="router.back()">← Volver</button>
         <button class="btn-primary" @click="guardar" :disabled="guardando || !analisisPendiente">
           <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
-          Guardar →
+          Guardar y Generar Certificado
         </button>
       </div>
     </header>
@@ -35,10 +35,6 @@
             <input class="field-input" :value="cipActual" disabled style="color:var(--color-gold);font-family:var(--font-mono)" />
           </div>
           <div class="field">
-            <label class="field-label">LABORATORIO:</label>
-            <input class="field-input" :value="analisisPendiente.laboratorio" disabled />
-          </div>
-          <div class="field">
             <label class="field-label">FECHA ANÁLISIS:</label>
             <input type="date" class="field-input" v-model="fechaAnalisis" />
           </div>
@@ -49,14 +45,9 @@
       <section class="card">
         <h2 class="card-titulo">LEYES DE LA MUESTRA</h2>
 
-        <div class="info-ley-cabeza">
-          ℹ️ La <strong>ley cabeza</strong> fue definida por Comercial al enviar a recuperación.
-          Solo ingresar <strong>ley cola</strong> y <strong>ley líquido</strong>.
-        </div>
-
         <div class="ensayo-col">
           <div class="field">
-            <label class="field-label">LEY CABEZA (ley planta — snapshot):</label>
+            <label class="field-label">LEY CABEZA (ley planta - snapshot):</label>
             <div class="ley-cabeza-display">
               <span class="lc-valor">{{ analisisPendiente.ley_cabeza }}</span>
               <span class="lc-label">oz/TC</span>
@@ -82,18 +73,6 @@
         </div>
 
         <p v-if="errForm" class="error-msg" style="margin-top:.75rem">{{ errForm }}</p>
-      </section>
-
-      <!-- Adjuntar certificado (opcional) -->
-      <section class="card">
-        <h2 class="card-titulo">CERTIFICADO (opcional)</h2>
-        <div class="field">
-          <label class="field-label">Adjuntar PDF o imagen:</label>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="onArchivo" class="field-input" style="padding:0.35rem" />
-          <span v-if="archivo" style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.25rem">
-            {{ archivo.name }}
-          </span>
-        </div>
       </section>
 
     </template>
@@ -165,8 +144,11 @@ onMounted(async () => {
       analisisPendiente.value = pending ?? null
     }
 
-    if (analisisPendiente.value?.estado === 'PENDIENTE') {
-      ui.toast('Este CIP ya tiene un análisis de recuperación vigente', 'warning')
+    const yaCompletado = cipObj?.analisis_recuperacion.find(
+        a => a.estado === 'COMPLETADO' && a.vigente
+    )
+    if (yaCompletado) {
+        ui.toast('Este CIP ya tiene un análisis de recuperación completado', 'info')
     }
   } catch {
     ui.toast('Error al cargar datos', 'error')
@@ -174,6 +156,7 @@ onMounted(async () => {
     cargando.value = false
   }
 })
+
 
 async function guardar() {
   errForm.value = ''
@@ -186,18 +169,27 @@ async function guardar() {
     return
   }
 
+  const okConf = await ui.showConfirm({
+      title: 'Generar Certificado',
+      message: 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?',
+      confirmLabel: 'Generar y Guardar'
+  })
+  if (!okConf) return
+
   guardando.value = true
-  const ok = await store.completarRecuperacion(
+  const result = await store.completarRecuperacion(
     analisisPendiente.value.id,
     {
       ley_cola:       form.value.ley_cola,
       ley_liquido:    form.value.ley_liquido,
       fecha_analisis: fechaAnalisis.value,
-    },
-    archivo.value,
+    }
   )
+  if (result) {
+      await store.generarCertificadoRecInterno(result.id)
+      router.push('/laboratorio')
+  }
   guardando.value = false
-  if (ok) router.push('/laboratorio')
 }
 </script>
 

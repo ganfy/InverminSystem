@@ -6,14 +6,16 @@ from pydantic import BaseModel, Field
 
 # ── Análisis de Ley (Fire Assay triple sampling) ──────────────────────────────
 
+model_config = {"from_attributes": True, "json_encoders": {Decimal: float}}
+
 
 class AnalisisLeyCreate(BaseModel):
     cip: str = Field(..., description="Código CIP de la muestra")
     laboratorio: str = Field(..., description="Nombre del laboratorio")
     tipo_analisis: TipoAnalisis = Field(..., description="planta | externo | minero | dirimencia")
     material: str = Field("Au", description="Material analizado")
-    ley_fino: Decimal = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
-    ley_grueso: Decimal = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
+    ley_fino: float = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
+    ley_grueso: float = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
 
@@ -21,7 +23,7 @@ class AnalisisLeyCreate(BaseModel):
 class AnalisisLeyOut(BaseModel):
     id: int
     lote_id: int
-    lote_ip: str | None = None  # Solo si el solicitante tiene permiso
+    lote_ip: str | None = None
     cip: str | None
     laboratorio: str
     tipo_analisis: str
@@ -36,6 +38,9 @@ class AnalisisLeyOut(BaseModel):
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     justificacion_descarte: str | None = None
+    eliminado: bool = False
+    eliminado_en: datetime | None = None
+    eliminado_por: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -71,7 +76,7 @@ class EnviarRecuperacionInternaRequest(BaseModel):
     """
 
     cip: str | None = None  # None → sistema elige el único RecuperacionInterno del lote
-    laboratorio: str = "Laboratorio Interno"
+    laboratorio: str | None = None
 
 
 class AnalisisRecuperacionOut(BaseModel):
@@ -80,16 +85,19 @@ class AnalisisRecuperacionOut(BaseModel):
     lote_ip: str | None = None
     cip: str | None
     laboratorio: str
-    ley_cabeza: Decimal | None
-    ley_cola: Decimal | None
-    ley_liquido: Decimal | None
-    recuperacion: Decimal | None
-    estado: str  # PENDIENTE | COMPLETADO
+    ley_cabeza: Decimal
+    ley_cola: Decimal
+    ley_liquido: Decimal | None = None
+    recuperacion: Decimal | None = None
+    estado: str
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
+    eliminado: bool = False
+    eliminado_en: datetime | None = None
+    eliminado_por: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -136,11 +144,12 @@ class LoteLabOut(BaseModel):
     fecha_recepcion: datetime | None
     cips: list[str]  # todos los CIPs del lote (compatibilidad)
     cips_detalle: list[CIPResumen] = []  # CIPs con tipo para UI
-    ley_planta: Decimal | None = None  # calculada on-the-fly
-    ley_minero: Decimal | None = None  # del análisis tipo minero vigente
+    ley_planta: float | None = None  # calculada on-the-fly
+    ley_minero: float | None = None  # del análisis tipo minero vigente
     analisis_ley: list[AnalisisLeyOut]
     analisis_recuperacion: list[AnalisisRecuperacionOut]
     tiene_dirimencia: bool
+    tiene_prueba_pendiente: bool = False
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

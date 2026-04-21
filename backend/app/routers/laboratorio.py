@@ -22,7 +22,7 @@ from pathlib import Path
 from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.models.enums import RolSistema
-from app.models.models import Lote
+from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote
 from app.schemas.laboratorio import (
     AnalisisLeyCreate,
     AnalisisLeyOut,
@@ -75,20 +75,30 @@ def listar_cips(
 
 @router.get("/lotes", response_model=list[LoteLabOut])
 def listar_lotes(
-    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
+    if not _puede_ver_ip(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
+        )
     return svc.obtener_lotes_laboratorio(db)
 
 
 @router.get("/lotes/{ip}", response_model=LoteLabOut)
 def detalle_lote(
     ip: str,
-    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """Detalle completo de un lote: todos sus análisis, vigentes y descartados."""
+    if not _puede_ver_ip(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
+        )
     result = svc.obtener_detalle_lote(db, ip)
     if not result:
         raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
@@ -137,6 +147,44 @@ def descartar_ley(
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
+@router.delete("/ley/{analisis_id}", status_code=204)
+def eliminar_ley(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "DELETE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Soft delete de un analisis de ley.
+    Lo oculta de todas las vistas (laboratorista y comercial) pero permanece en DB.
+    Solo Admin, Gerencia y Comercial (permiso LABORATORIO DELETE).
+    """
+    try:
+        svc.eliminar_analisis_ley(db, analisis_id, current_user.id)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.delete("/recuperacion/{analisis_id}", status_code=204)
+def eliminar_recuperacion(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "DELETE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Soft delete de un analisis de recuperacion.
+    Lo oculta de todas las vistas pero permanece en DB.
+    Solo Admin, Gerencia y Comercial (permiso LABORATORIO DELETE).
+    """
+    try:
+        svc.eliminar_analisis_recuperacion(db, analisis_id, current_user.id)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
 @router.post("/ley/{analisis_id}/certificado")
 async def subir_certificado_ley(
     analisis_id: int,
@@ -151,6 +199,30 @@ async def subir_certificado_ley(
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/ley/{analisis_id}/generar-certificado", response_model=AnalisisLeyOut)
+def generar_certificado_ley_interno(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    svc.generar_y_guardar_certificado_interno(db, analisis_id, "ley")
+    db.commit()
+    return svc._ley_out(db.query(AnalisisLey).get(analisis_id))
+
+
+@router.post(
+    "/recuperacion/{analisis_id}/generar-certificado", response_model=AnalisisRecuperacionOut
+)
+def generar_certificado_recuperacion_interno(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    svc.generar_y_guardar_certificado_interno(db, analisis_id, "recuperacion")
+    db.commit()
+    return svc._rec_out(db.query(AnalisisRecuperacion).get(analisis_id))
 
 
 # ── Flujo de recuperación interna ────────────────────────────────────────────
@@ -368,9 +440,34 @@ def generar_certificado_pdf(
     )
 
 
+@router.get("/cips/{cip}/certificado-ensayo")
+def generar_certificado_ensayo(
+    cip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera PDF de informe de ensayo Fire Assay para un CIP.
+    Accesible por Laboratorista (VIEW). No expone IP ni datos del proveedor.
+    """
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(db, cip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = f"ensayo_{cip.replace('-', '_')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 # Obtener certificado
-
-
 @router.get("/archivos/{ruta_archivo:path}")
 def descargar_archivo(
     ruta_archivo: str,

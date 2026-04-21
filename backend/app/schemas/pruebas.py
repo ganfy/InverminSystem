@@ -15,7 +15,7 @@ class PruebaMetalurgicaBase(BaseModel):
     adicion_nacn: float | None = None
     adicion_naoh: float | None = None
     gasto_agno3: float | None = None
-    fecha_ingreso: datetime
+    fecha_ingreso: datetime | None = None
 
 
 class PruebaMetalurgicaCreate(PruebaMetalurgicaBase):

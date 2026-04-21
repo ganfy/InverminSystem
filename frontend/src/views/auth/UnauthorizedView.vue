@@ -1,7 +1,7 @@
 <template>
     <div class="unauthorized-page">
       <div class="card error-card">
-        <div class="error-icon">🚫</div>
+        <div class="error-icon"><Ban :size="48" /></div>
         <h2>Acceso Denegado</h2>
         <p>No tienes los permisos necesarios para ver esta página.</p>
         <div class="btn-container">
@@ -15,6 +15,7 @@
 
   <script setup lang="ts">
   import { useRouter } from 'vue-router'
+  import { Ban } from 'lucide-vue-next'
 
   const router = useRouter()
 

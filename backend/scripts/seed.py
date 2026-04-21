@@ -105,12 +105,15 @@ PERMISOS = [
     ("Admin", "LABORATORIO", "VIEW", True),
     ("Gerencia", "LABORATORIO", "DELETE", True),
     ("Gerencia", "LABORATORIO", "VIEW", True),
+    ("Gerencia", "LABORATORIO", "CREATE", False),
+    ("Gerencia", "LABORATORIO", "UPDATE", True),
     ("Comercial", "LABORATORIO", "CREATE", True),
     ("Comercial", "LABORATORIO", "UPDATE", True),
     ("Comercial", "LABORATORIO", "DELETE", True),
     ("Comercial", "LABORATORIO", "VIEW", True),
     ("Laboratorista", "LABORATORIO", "CREATE", True),
     ("Laboratorista", "LABORATORIO", "VIEW", True),
+    ("Laboratorista", "LABORATORIO", "UPDATE", True),
     # ── PRUEBAS METALÚRGICAS ──────────────────────────────────────────────────
     ("Admin", "PRUEBAS_MET", "CREATE", True),
     ("Admin", "PRUEBAS_MET", "VIEW", True),
@@ -193,6 +196,11 @@ CONFIGURACIONES = [
         "clave": "MAX_CIPS_GENERADOS",
         "valor": "5",
         "descripcion": "Cantidad máxima de códigos CIP que se pueden generar por lote",
+    },
+    {
+        "clave": "labs_lista",
+        "valor": '["Minares South S.R.L.", "El Dorado - Invermin Paititi", "Quantum", "Otro"]',
+        "descripcion": "Lista de laboratorios disponibles para asignar a CIPs",
     },
     # Laboratorio
     {

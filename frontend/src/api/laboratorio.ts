@@ -114,6 +114,15 @@ export const laboratorioApi = {
         return data
     },
 
+    // Soft delete - oculta de todas las vistas (Admin/Gerencia/Comercial)
+    async eliminarLey(analisisId: number): Promise<void> {
+        await api.delete(`/laboratorio/ley/${analisisId}`)
+    },
+
+    async eliminarRecuperacion(analisisId: number): Promise<void> {
+        await api.delete(`/laboratorio/recuperacion/${analisisId}`)
+    },
+
     async subirCertificadoRecuperacion(analisisId: number, archivo: File): Promise<{ certificado_url: string }> {
         const form = new FormData()
         form.append('archivo', archivo)
@@ -167,6 +176,33 @@ export const laboratorioApi = {
         a.download = `certificado_ley_${ip.replace(/-/g, '_')}.pdf`
         a.click()
         URL.revokeObjectURL(url)
+    },
+
+    async descargarCertificadoEnsayo(cip: string): Promise<void> {
+        const response = await api.get(`/laboratorio/cips/${encodeURIComponent(cip)}/certificado-ensayo`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(response.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ensayo_${cip.replace(/-/g, '_')}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+    },
+
+    async obtenerUrlArchivoVirtual(rutaArchivo: string): Promise<string> {
+        const { data } = await api.get(`/laboratorio/archivos/${rutaArchivo}`, { responseType: 'blob' })
+        // Crea una URL temporal del archivo blob para previsualizar
+        return URL.createObjectURL(data)
+    },
+
+    async generarCertificadoLeyInterno(analisisId: number): Promise<AnalisisLeyOut> {
+        const { data } = await api.post(`/laboratorio/ley/${analisisId}/generar-certificado`)
+        return data
+    },
+    async generarCertificadoRecInterno(analisisId: number): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.post(`/laboratorio/recuperacion/${analisisId}/generar-certificado`)
+        return data
     },
 
     // ── Sync Offline ──────────────────────────────────────────────────────────

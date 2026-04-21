@@ -2,7 +2,7 @@
   <div class="page-container">
     <header class="page-header">
       <div>
-        <h1 class="page-title">Importar Certificado — Análisis de Ley</h1>
+        <h1 class="page-title">Importar Certificado - Análisis de Ley</h1>
         <p class="page-subtitle" style="color:var(--color-gold);font-family:var(--font-mono)">{{ cipActual }}</p>
       </div>
       <div style="display:flex;gap:0.75rem">
@@ -20,7 +20,7 @@
       <div class="form-grid">
         <div class="field">
           <label class="field-label">IP:</label>
-          <input class="field-input" :value="loteInfo?.lote_ip ?? '-'" disabled />
+          <input class="field-input" :value="loteIp || '-'" disabled />
         </div>
         <div class="field">
           <label class="field-label">CIP ESPERADO:</label>
@@ -32,7 +32,7 @@
 
     <!-- PASO 1: Ingresar laboratorio ANTES de subir -->
     <section class="card">
-      <h2 class="card-titulo">PASO 1 — LABORATORIO</h2>
+      <h2 class="card-titulo">PASO 1 - LABORATORIO</h2>
       <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:1rem">
         Ingrese el nombre del laboratorio que emitió el certificado antes de extraer los datos.
         El sistema no detecta el laboratorio automáticamente.
@@ -54,7 +54,7 @@
         </div>
         <div class="field">
           <label class="field-label">TIPO DE ANÁLISIS:</label>
-          <select class="field-select field-sm" v-model="form.tipo_analisis">
+          <select class="field-select field-sm field-input" v-model="form.tipo_analisis">
             <option value="externo">Externo</option>
             <option value="minero">Minero (presentado por proveedor)</option>
             <option value="dirimencia">Dirimencia</option>
@@ -65,7 +65,7 @@
 
     <!-- PASO 2: Subir certificado -->
     <section class="card">
-      <h2 class="card-titulo">PASO 2 — CARGAR CERTIFICADO</h2>
+      <h2 class="card-titulo">PASO 2 - CARGAR CERTIFICADO</h2>
       <div
         class="upload-zone"
         :class="{ 'upload-zone--over': dragOver, 'upload-zone--done': !!archivo }"
@@ -98,12 +98,12 @@
     <!-- PASO 3: Verificar y corregir datos extraídos -->
     <template v-if="fase === 'form'">
       <section class="card">
-        <h2 class="card-titulo">PASO 3 — VERIFICAR DATOS EXTRAÍDOS</h2>
+        <h2 class="card-titulo">PASO 3 - VERIFICAR DATOS EXTRAÍDOS</h2>
         <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:1rem">
           Revise y corrija los campos. El OCR puede cometer errores especialmente en imágenes escaneadas.
         </p>
 
-        <div v-if="errCip" class="alerta-warning" style="margin-bottom:1rem">⚠️ {{ errCip }}</div>
+        <div v-if="errCip" class="alerta-warning" style="margin-bottom:1rem"><AlertTriangle :size="16" /> {{ errCip }}</div>
 
         <div class="form-grid" style="margin-bottom:1.25rem">
           <div class="field">
@@ -126,7 +126,7 @@
           </div>
           <div class="field">
             <label class="field-label">TIPO DE ANÁLISIS:</label>
-            <select class="field-select field-sm" v-model="form.tipo_analisis">
+            <select class="field-select field-input" v-model="form.tipo_analisis">
               <option value="externo">Externo</option>
               <option value="minero">Minero</option>
               <option value="dirimencia">Dirimencia</option>
@@ -134,7 +134,7 @@
           </div>
           <div class="field">
             <label class="field-label">MATERIAL:</label>
-            <select class="field-select field-sm" v-model="form.material">
+            <select class="field-select field-input" v-model="form.material">
               <option value="Au">Au</option>
               <option value="Ag">Ag</option>
             </select>
@@ -169,7 +169,7 @@
 
         <!-- Advertencia si ley_final extraída difiere del cálculo -->
         <div v-if="alertaDivergencia" class="alerta-warning" style="margin-top:0.75rem">
-          ⚠️ La ley final extraída del certificado ({{ leyFinalExtraida?.toFixed(4) }}) difiere
+          <AlertTriangle :size="16" /> La ley final extraída del certificado ({{ leyFinalExtraida?.toFixed(4) }}) difiere
           del cálculo fino+grueso ({{ leyFinalCalc?.toFixed(4) }}).
           Verifique los valores.
         </div>
@@ -186,8 +186,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { FileText } from 'lucide-vue-next'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
-import type { TipoAnalisis, CIPAnalisisOut } from '@/types/laboratorio'
-
+import type { TipoAnalisis } from '@/types/laboratorio'
+import { AlertTriangle } from 'lucide-vue-next'
 const router    = useRouter()
 const route     = useRoute()
 const store     = useLaboratorioStore()
@@ -199,7 +199,7 @@ const extrayendo   = ref(false)
 const dragOver     = ref(false)
 const archivo      = ref<File | null>(null)
 const fileInput    = ref<HTMLInputElement | null>(null)
-const loteInfo     = ref<CIPAnalisisOut | null>(null)
+const loteIp = ref<string>((route.query.ip as string) ?? '')
 
 // Ingresado por operador antes de extraer
 const laboratorio  = ref('')
@@ -299,10 +299,6 @@ async function extraer() {
     extrayendo.value = false
   }
 }
-
-onMounted(() => {
-  loteInfo.value = store.cips.find(c => c.cip === cipActual) ?? null
-})
 
 async function guardar() {
   errForm.value = ''

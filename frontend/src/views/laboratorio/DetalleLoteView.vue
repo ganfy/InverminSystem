@@ -24,7 +24,6 @@
 
     <template v-else-if="lote">
 
-      <!-- DATOS DEL LOTE -->
       <section class="card">
         <h2 class="card-titulo">DATOS DEL LOTE</h2>
         <div class="detalle-row-grid">
@@ -44,7 +43,6 @@
             <span class="di-label">MATERIAL:</span>
             <span class="di-value">{{ lote.material ?? '-' }}</span>
           </div>
-          <!-- Ley planta calculada on-the-fly -->
           <div class="detalle-item" v-if="lote.ley_planta != null">
             <span class="di-label">LEY PLANTA (promedio):</span>
             <span class="di-value" style="color:var(--color-gold);font-family:var(--font-mono)">
@@ -59,13 +57,11 @@
           </div>
         </div>
 
-        <!-- Dirimencia badge -->
         <div v-if="lote.tiene_dirimencia" class="dirimencia-alert" style="margin-top:0.75rem">
-          ⚠️ Este lote tiene análisis de dirimencia — prevalece sobre todos los demás
+          <AlertTriangle :size="16" /> Este lote tiene análisis de dirimencia - prevalece sobre todos los demás
         </div>
       </section>
 
-      <!-- ── TAB: ANÁLISIS DE LEY ──────────────────────────────────────── -->
       <template v-if="tabActual === 'ley'">
 
         <div class="labs-grid">
@@ -90,17 +86,29 @@
 
             <div v-if="a.certificado_url" class="lab-field">
               <span class="lf-label">CERTIFICADO:</span>
-              <a :href="urlCertificado(a.certificado_url) || ''" target="_blank" class="link-cert">Ver PDF</a>
+              <a href="#" @click.prevent="verCertificado(a.certificado_url)" class="link-cert">Ver PDF</a>
             </div>
 
-            <div class="lab-card-footer" v-if="a.vigente">
-              <button class="btn-danger-sm" @click="toggleDescartarLey(a.id)" title="Descartar">
-                Descartar
+            <div class="lab-card-footer" v-if="!a.eliminado">
+              <template v-if="a.vigente">
+                <button class="btn-danger-sm" @click="toggleDescartarLey(a.id)" title="Excluir del calculo de ley comercial">
+                  Descartar
+                </button>
+                <label class="btn-secondary-sm" title="Adjuntar certificado">
+                  Adjuntar cert.
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertLey($event, a.id)" />
+                </label>
+              </template>
+              <!-- Eliminar: solo Admin y Gerencia, oculta de TODAS las vistas -->
+              <button
+                v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+                class="btn-danger-sm"
+                style="margin-left:auto;opacity:0.7"
+                @click="eliminarLey(a.id)"
+                title="Eliminar registro permanentemente de la vista"
+              >
+                Eliminar
               </button>
-              <label class="btn-secondary-sm" title="Adjuntar certificado">
-                Adjuntar cert.
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertLey($event, a.id)" />
-              </label>
             </div>
           </div>
 
@@ -109,7 +117,6 @@
           </div>
         </div>
 
-        <!-- ── LEY COMERCIAL CALCULADA ─────────────────────────────────────────── -->
         <section class="card" v-if="lote.ley_planta != null">
           <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
             <span>LEY COMERCIAL (con reglas aplicadas)</span>
@@ -132,11 +139,11 @@
             <div class="lc-grid">
               <div class="lc-item">
                 <span class="lc-label">LEY PLANTA (promedio vigentes):</span>
-                <span class="lc-valor mono">{{ lote.ley_planta?.toFixed(4) }} oz/TC</span>
+                <span class="lc-valor mono">{{ Number(lote.ley_planta)?.toFixed(4) }} oz/TC</span>
               </div>
               <div class="lc-item" v-if="lote.ley_minero">
                 <span class="lc-label">LEY MINERO:</span>
-                <span class="lc-valor mono">{{ lote.ley_minero?.toFixed(4) }} oz/TC</span>
+                <span class="lc-valor mono">{{ Number(lote.ley_minero)?.toFixed(4) }} oz/TC</span>
               </div>
               <div class="lc-item">
                 <span class="lc-label">LEY COMERCIAL (a entregar):</span>
@@ -153,38 +160,46 @@
             </div>
 
             <div v-if="leyComercialCalc.sin_parametros" class="info-box warning" style="margin-top:0.75rem">
-              ⚠️ Sin parámetros comerciales configurados para este proveedor-acopiador.
-              El certificado se emitirá con la ley planta sin ajustes.
+              <AlertTriangle :size="16" /> Sin parámetros comerciales configurados para este proveedor-acopiador.
             </div>
-
             <div v-if="leyComercialCalc.detalle && !leyComercialCalc.sin_parametros"
               style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.5rem;font-family:var(--font-mono)">
               Detalle: {{ leyComercialCalc.detalle }}
             </div>
           </template>
+          <div v-else class="info-box warning" style="margin-top:0.75rem">
+            <AlertTriangle /> No se pudo calcular la ley comercial.
+            <button class="btn-secondary" style="margin-left:0.5rem;font-size:0.75rem" @click="recargarLeyComercial">Reintentar</button>
+          </div>
         </section>
 
-        <!-- Acciones ley -->
+        <!-- Alerta dirimencia -->
+        <div v-if="alertaDirimencia" class="dirimencia-request-alert">
+          <AlertTriangle :size="16" />lertTriangle :size="16" /> Diferencia Planta/Minero:
+          <strong style="font-family:var(--font-mono)">{{ alertaDirimencia.toFixed(4) }} oz/TC</strong>
+          supera el límite (0.10). Se recomienda solicitar dirimencia.
+          <button class="btn-warning-sm" style="margin-left:0.75rem" @click="abrirModalAgregarLey">
+            Solicitar Dirimencia →
+          </button>
+        </div>
+
         <div class="acciones-lote">
-          <button class="btn-secondary" @click="solicitarRemuestreo">
-            Solicitar remuestreo
+          <button class="btn-primary" @click="abrirModalAgregarLey">
+            + Registrar nueva ley
           </button>
         </div>
 
       </template>
 
-      <!-- ── TAB: ANÁLISIS DE RECUPERACIÓN ──────────────────────────────── -->
       <template v-if="tabActual === 'rec'">
 
-        <!-- Info ley planta necesaria para enviar a recuperación -->
         <div v-if="lote.ley_planta == null" class="info-box warning">
-          ⚠️ Sin ley planta disponible. Registre al menos un análisis de ley vigente antes de enviar a recuperación.
+          <AlertTriangle :size="16" /> Sin ley planta disponible. Registre al menos un análisis de ley vigente antes de enviar a recuperación.
         </div>
         <div v-else-if="!cipRecupInterno" class="info-box warning">
-          ⚠️ Sin CIP de recuperación. El técnico debe completar pruebas metalúrgicas y etiquetar la muestra.
+          <AlertTriangle :size="16" /> Sin CIP de recuperación. El técnico debe completar pruebas metalúrgicas y etiquetar la muestra.
         </div>
 
-        <!-- Cards de análisis de recuperación existentes -->
         <div class="labs-grid" v-if="lote.analisis_recuperacion.length > 0">
           <div
             v-for="(a, i) in lote.analisis_recuperacion"
@@ -211,47 +226,96 @@
 
             <div v-if="a.certificado_url" class="lab-field">
               <span class="lf-label">CERTIFICADO:</span>
-              <a :href="urlCertificado(a.certificado_url) || ''" target="_blank" class="link-cert">Ver PDF</a>
+              <a href="#" @click.prevent="verCertificado(a.certificado_url)" class="link-cert">Ver PDF</a>
             </div>
 
-            <div class="lab-card-footer" v-if="a.vigente">
-              <button class="btn-danger-sm" @click="toggleDescartarRec(a.id)">Descartar</button>
-              <label class="btn-secondary-sm">
-                Adjuntar cert.
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertRec($event, a.id)" />
-              </label>
+            <div class="lab-card-footer" v-if="!a.eliminado">
+              <template v-if="a.vigente">
+                <button class="btn-danger-sm" @click="toggleDescartarLey(a.id)" title="Excluir del calculo de ley comercial">
+                  Descartar
+                </button>
+                <label class="btn-secondary-sm" title="Adjuntar certificado">
+                  Adjuntar cert.
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertLey($event, a.id)" />
+                </label>
+              </template>
+              <!-- Eliminar: solo Admin y Gerencia, oculta de TODAS las vistas -->
+              <button
+                v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+                class="btn-danger-sm"
+                style="margin-left:auto;opacity:0.7"
+                @click="eliminarLey(a.id)"
+                title="Eliminar registro permanentemente de la vista"
+              >
+                Eliminar
+              </button>
             </div>
           </div>
         </div>
 
-        <!-- Acciones recuperación -->
+        <!-- CIPs enviados a lab externo esperando certificado -->
+        <div
+          v-if="cipsExternosPendienteCert.length > 0"
+          v-for="c in cipsExternosPendienteCert"
+          :key="c.codigo_cip"
+          class="lab-card"
+          style="margin-bottom:0.75rem"
+        >
+          <div class="lab-card-header">
+            <span class="lab-titulo">RECUPERACIÓN EXTERNA - ESPERANDO CERT.</span>
+            <span class="badge-estado pendiente" style="font-size:0.65rem">PENDIENTE</span>
+          </div>
+          <div class="lab-field">
+            <span class="lf-label">CIP:</span>
+            <span class="lf-value td-mono" style="color:var(--color-gold)">{{ c.codigo_cip }}</span>
+          </div>
+          <div class="lab-field">
+            <span class="lf-label">LABORATORIO:</span>
+            <span class="lf-value">{{ c.laboratorio }}</span>
+          </div>
+          <div class="lab-card-footer">
+            <button
+              class="btn-primary"
+              style="font-size:0.72rem;padding:0.25rem 0.65rem"
+              @click="router.push(`/laboratorio/importar-rec/${c.codigo_cip}?ip=${ipActual}&lab=${encodeURIComponent(c.laboratorio || '')}`)"
+            >
+              Subir certificado →
+            </button>
+          </div>
+        </div>
+
         <div class="acciones-lote">
-          <!-- Enviar a lab interno: solo si hay ley planta y CIP rec interno y no hay pending activo -->
           <button
-            v-if="lote.ley_planta != null && cipRecupInterno && !tienePendiente"
+            v-if="lote.ley_planta != null && cipsRecuperacionDisponibles.length > 0"
             class="btn-primary"
-            @click="enviarARecuperacion"
+            @click="abrirModalRecup"
             :disabled="enviando"
           >
             <span v-if="enviando" class="spinner" style="margin-right:0.4rem"></span>
-            Enviar a recuperación interna
+            Enviar a recuperación
           </button>
-          <span v-else-if="tienePendiente" class="info-inline">
-            ⏳ Pendiente en laboratorio
+          <span v-if="tienePendiente" class="info-inline" style="margin-left:0.5rem">
+            <Hourglass :size ="16"/> Análisis pendiente en laboratorio
           </span>
-
-          <!-- Adjuntar certificado externo directamente -->
-          <label v-if="cipRecupExterno" class="btn-secondary" style="cursor:pointer">
-            Subir certificado externo
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="subirCertExterno" />
-          </label>
         </div>
+
+        <div v-if="lote.tiene_prueba_pendiente" class="alerta-warning" style="margin-top:0.75rem">
+        <TriangleAlert :size="16"/> Este lote tiene una prueba metalúrgica en curso (PENDIENTE o EN PROCESO).
+          Revise el módulo de <strong>Pruebas Metalúrgicas</strong> antes de solicitar nuevas muestras.
+        </div>
+        <button
+          class="btn-secondary"
+          @click="solicitarRemuestreo"
+          :disabled="lote.tiene_prueba_pendiente"
+          style="margin-top:0.5rem"
+        >
+          Solicitar nueva prueba
+        </button>
 
       </template>
 
     </template>
 
-    <!-- Modal descartar -->
     <div v-if="modalDescartar" class="modal-overlay" @click.self="modalDescartar = null">
       <div class="modal modal-sm">
         <div class="modal-header">
@@ -271,7 +335,73 @@
       </div>
     </div>
 
+    <div v-if="modalAgregarLey" class="modal-overlay" @click.self="modalAgregarLey = false">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2>Registrar Nueva Ley</h2>
+          <button class="btn-cerrar" @click="modalAgregarLey = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="cipsDisponiblesLey.length === 0" class="info-box warning">
+            <AlertTriangle :size="16" /> No hay CIPs de laboratorio disponibles sin análisis. Es necesario generar nuevas etiquetas o solicitar un remuestreo.
+          </div>
+          <div v-else class="field">
+            <label class="field-label">Seleccione el CIP a analizar:</label>
+            <select class="field-select field-input" v-model="cipSeleccionado">
+              <option disabled value="">-- Seleccionar CIP --</option>
+              <option v-for="c in cipsDisponiblesLey" :key="c.codigo_cip" :value="c.codigo_cip">
+                {{ c.codigo_cip }} ({{ c.laboratorio || 'Por definir' }})
+              </option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalAgregarLey = false">Cancelar</button>
+          <button class="btn-primary" @click="confirmarAgregarLey" :disabled="!cipSeleccionado">Continuar</button>
+        </div>
+      </div>
+    </div>
+
   </div>
+
+    <!-- Modal selección lab recuperacion -->
+    <div v-if="modalRecup" class="modal-overlay" @click.self="modalRecup = false">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2>Enviar a Recuperación</h2>
+          <button class="btn-cerrar" @click="modalRecup = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="field" style="margin-bottom:1rem">
+            <label class="field-label">CIP A USAR:</label>
+            <select class="field-select field-input" v-model="cipRecupElegido" @change="onCipRecupChange">
+              <option v-for="c in cipsRecuperacionDisponibles" :key="c.codigo_cip" :value="c.codigo_cip">
+                {{ c.codigo_cip }} - {{ c.tipo_muestra }}
+              </option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">LABORATORIO DESTINO:</label>
+            <select class="field-select field-input" v-model="labRecupElegida">
+              <option v-for="lab in labsRecupDisponibles" :key="lab" :value="lab">{{ lab }}</option>
+            </select>
+            <p style="font-size:0.7rem;color:var(--color-text-faint);margin-top:0.4rem">
+              <span v-if="labRecupElegida === 'Paititi' || labRecupElegida === 'Laboratorio Interno'">
+                Laboratorio interno: se creará análisis PENDIENTE para el laboratorista.
+              </span>
+              <span v-else>
+                Lab externo: se marcará el CIP como enviado. Suba el certificado cuando lo reciba.
+              </span>
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalRecup = false">Cancelar</button>
+          <button class="btn-primary" @click="confirmarEnvioRecuperacion" :disabled="!cipRecupElegido">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
 </template>
 
 <script setup lang="ts">
@@ -279,13 +409,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import type { LoteLabOut } from '@/types/laboratorio'
 import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
+import { muestreoApi } from '@/api/muestreo'
+import { pruebasApi } from '@/api/pruebas'
+import { AlertTriangle, Hourglass, TriangleAlert } from 'lucide-vue-next'
 
 const router = useRouter()
 const route  = useRoute()
 const store  = useLaboratorioStore()
 const ui     = useUiStore()
+const auth   = useAuthStore()
 
 const ipActual  = route.params.ip as string
 const cargando  = ref(false)
@@ -293,40 +428,92 @@ const enviando  = ref(false)
 const lote      = ref<LoteLabOut | null>(null)
 const tabActual = ref<'ley' | 'rec'>('ley')
 
+// Descarte
 const modalDescartar = ref<{ id: number; tipo: 'ley' | 'rec' } | null>(null)
 const justificacion  = ref('')
 
+// Agregar Ley
+const modalAgregarLey = ref(false)
+const cipSeleccionado = ref('')
 
 const cargandoLeyComercial = ref(false)
 const leyComercialCalc = ref<LeyComercialCalc | null>(null)
 const generando = ref(false)
 
+// Modal seleccion lab para recuperacion
+const modalRecup = ref(false)
+const cipRecupElegido = ref<string | null>(null)
+const labRecupElegida = ref('')
+const labsRecupDisponibles = ref<string[]>([])
 
-// CIPs de recuperación del lote
+// ── Computed: CIPs Disponibles para Ley ──
+// Solo traemos los CIPs de tipo Laboratorio que NO existan en el array de analisis_ley
+const cipsDisponiblesLey = computed(() => {
+  if (!lote.value) return []
+  return lote.value.cips_detalle.filter(c =>
+    c.tipo_muestra === 'Laboratorio' &&
+    !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip)
+  )
+})
+
+// CIPs de recuperacion disponibles (sin analisis vigente)
+const cipsRecuperacionDisponibles = computed(() => {
+  if (!lote.value) return []
+  return lote.value.cips_detalle.filter(c =>
+    (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') &&
+    !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente)
+  )
+})
+
 const cipRecupInterno = computed(() =>
-  lote.value?.cips_detalle.find(c => c.tipo_muestra === 'RecuperacionInterno')?.codigo_cip ?? null
-)
-const cipRecupExterno = computed(() =>
-  lote.value?.cips_detalle.find(c => c.tipo_muestra === 'RecuperacionExterno')?.codigo_cip ?? null
+  lote.value?.cips_detalle.find(c => (c.tipo_muestra === 'RecuperacionInterno') && !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente))
 )
 
 const tienePendiente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.vigente) ?? false
 )
 
-// Cargar ley comercial cuando cambia a tab ley y hay ley_planta
+// alerta |ley_planta - ley_minero| > 0.10
+const alertaDirimencia = computed(() => {
+  if (!lote.value?.ley_planta || !lote.value?.ley_minero) return null
+  if (lote.value.tiene_dirimencia) return null  // ya tiene dirimencia, no alertar
+  const diff = Math.abs(Number(lote.value.ley_planta) - Number(lote.value.ley_minero))
+  return diff > 0.10 ? diff : null
+})
+
+// CIPs de recuperación enviados a lab externo que aún no tienen certificado
+const internos = new Set(['Paititi', 'Laboratorio Interno'])
+const cipsExternosPendienteCert = computed(() => {
+  if (!lote.value) return []
+  return lote.value.cips_detalle.filter(c => {
+    const esRec = c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno'
+    const tieneLabExterno = c.laboratorio && !internos.has(c.laboratorio)
+    const sinVigente = !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente)
+    return esRec && tieneLabExterno && sinVigente
+  })
+})
+
+// Cargar ley comercial
 watch([tabActual, lote], async ([tab, l]: ['ley' | 'rec', LoteLabOut | null]) => {
   if (tab === 'ley' && l?.ley_planta != null && !leyComercialCalc.value) {
     cargandoLeyComercial.value = true
     try {
       leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
-    } catch {
-      // silencioso - no es crítico
-    } finally {
+    } catch { } finally {
       cargandoLeyComercial.value = false
     }
   }
 }, { immediate: true })
+
+async function recargarLeyComercial() {
+  if (!lote.value?.ley_planta) return
+  cargandoLeyComercial.value = true
+  try {
+    leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
+  } catch { } finally {
+    cargandoLeyComercial.value = false
+  }
+}
 
 async function generarCertificado() {
   generando.value = true
@@ -341,7 +528,10 @@ async function generarCertificado() {
 
 onMounted(async () => {
   cargando.value = true
-  lote.value = await store.cargarDetalleLote(ipActual)
+  ;[lote.value, labsRecupDisponibles.value] = await Promise.all([
+    store.cargarDetalleLote(ipActual),
+    muestreoApi.listarLaboratorios().catch(() => ['Paititi', 'Minares South S.R.L.', 'El Dorado', 'Otro']),
+  ])
   cargando.value = false
 })
 
@@ -364,7 +554,34 @@ function tipoBadge(tipo: string) {
   return m[tipo] ?? tipo.toUpperCase()
 }
 
-// ── Descartar ─────────────────────────────────────────────────────────────────
+// ── Visor Seguro de PDF ──
+async function verCertificado(ruta: string | null | undefined) {
+  if (!ruta) return
+  try {
+    const url = await laboratorioApi.obtenerUrlArchivoVirtual(ruta)
+    window.open(url, '_blank')
+  } catch (error) {
+    ui.toast('Error al descargar o visualizar el documento', 'error')
+  }
+}
+
+// ── Modal Agregar Ley ──
+function abrirModalAgregarLey() {
+  cipSeleccionado.value = '' // Reiniciamos el estado del select
+  modalAgregarLey.value = true
+}
+
+function confirmarAgregarLey() {
+  if (cipSeleccionado.value) {
+    if (store.puedeImportarCert) {
+      router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}?ip=${ipActual}`)
+    } else {
+      router.push(`/laboratorio/ley/${cipSeleccionado.value}`)
+    }
+  }
+}
+
+// ── Descartar ──
 function toggleDescartarLey(id: number) {
   justificacion.value = ''
   modalDescartar.value = { id, tipo: 'ley' }
@@ -390,7 +607,17 @@ async function confirmarDescartar() {
   }
 }
 
-// ── Adjuntar certificados ─────────────────────────────────────────────────────
+async function eliminarLey(id: number) {
+  const ok = await store.eliminarLey(id)
+  if (ok) lote.value = await store.cargarDetalleLote(ipActual)
+}
+
+async function eliminarRecuperacion(id: number) {
+  const ok = await store.eliminarRecuperacion(id)
+  if (ok) lote.value = await store.cargarDetalleLote(ipActual)
+}
+
+// ── Adjuntar certificados ──
 async function adjuntarCertLey(e: Event, analisisId: number) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -405,17 +632,45 @@ async function adjuntarCertRec(e: Event, analisisId: number) {
   if (ok) lote.value = await store.cargarDetalleLote(ipActual)
 }
 
-// ── Enviar a recuperación interna ─────────────────────────────────────────────
-async function enviarARecuperacion() {
-  enviando.value = true
-  const nuevo = await store.enviarRecuperacion(ipActual, {
-    cip: cipRecupInterno.value ?? undefined,
-  })
-  enviando.value = false
-  if (nuevo) lote.value = await store.cargarDetalleLote(ipActual)
+// ── Modal recuperacion ──
+function abrirModalRecup() {
+  cipRecupElegido.value = cipsRecuperacionDisponibles.value[0]?.codigo_cip ?? null
+  labRecupElegida.value = cipsRecuperacionDisponibles.value[0]?.laboratorio ?? labsRecupDisponibles.value[0] ?? 'Paititi'
+  modalRecup.value = true
 }
 
-// ── Subir certificado externo (sin pending previo, registro directo) ───────────
+function onCipRecupChange() {
+  const cip = cipsRecuperacionDisponibles.value.find(c => c.codigo_cip === cipRecupElegido.value)
+  labRecupElegida.value = cip?.laboratorio ?? labsRecupDisponibles.value[0] ?? 'Paititi'
+}
+
+async function confirmarEnvioRecuperacion() {
+  if (!cipRecupElegido.value) return
+  enviando.value = true
+  modalRecup.value = false
+  const esInterno = labRecupElegida.value === 'Paititi' || labRecupElegida.value === 'Laboratorio Interno'
+  if (esInterno) {
+    await store.enviarRecuperacion(ipActual, { cip: cipRecupElegido.value, laboratorio: labRecupElegida.value })
+  } else {
+    // Externo: solo actualizar lab destino en el CIP
+    const cipObj = lote.value?.cips_detalle.find(c => c.codigo_cip === cipRecupElegido.value)
+    if (cipObj) {
+      try {
+        // Necesitamos el id numerico del CIP - viene de cips_detalle que no tiene id
+        // Recargamos cips para obtenerlo y hacer el patch
+        const cips = await muestreoApi.obtenerEtiquetas(ipActual)
+        const cipConId = cips.find(c => c.codigo_cip === cipRecupElegido.value)
+        if (cipConId) await muestreoApi.actualizarLaboratorioCip(cipConId.id, labRecupElegida.value)
+        ui.toast(`CIP marcado para ${labRecupElegida.value}. Suba el certificado cuando lo reciba.`, 'info')
+      } catch {
+        ui.toast('Error al asignar laboratorio', 'error')
+      }
+    }
+  }
+  enviando.value = false
+  lote.value = await store.cargarDetalleLote(ipActual)
+}
+
 async function subirCertExterno(e: Event) {
   ui.toast('Para registrar recuperación externa, use el formulario de laboratorio con el CIP externo', 'info')
 }
@@ -423,14 +678,18 @@ async function subirCertExterno(e: Event) {
 async function solicitarRemuestreo() {
   const ok = await ui.showConfirm({
     title: 'Solicitar Remuestreo',
-    message: `¿Confirmar solicitud de remuestreo para el lote ${ipActual}?`,
+    message: `Se creará un nuevo registro de prueba metalúrgica para ${ipActual}. ` +
+             'El registro anterior se conserva para auditoría. El técnico deberá completar los parámetros y etiquetar un nuevo CIP. ¿Confirmar?',
+    confirmLabel: 'Solicitar',
   })
-  if (ok) ui.toast('Remuestreo solicitado — avise al área de muestreo', 'info')
-}
-
-function urlCertificado(url: string | null | undefined): string | null {
-  if (!url) return null
-  return `/api/v1/laboratorio/archivos/${url}`
+  if (!ok) return
+  try {
+    await pruebasApi.solicitarRemuestreo(ipActual)
+    ui.toast('Remuestreo solicitado. El lote aparece en Pruebas Metalúrgicas.', 'success')
+    lote.value = await store.cargarDetalleLote(ipActual)
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al solicitar remuestreo', 'error')
+  }
 }
 </script>
 
@@ -523,7 +782,7 @@ function urlCertificado(url: string | null | undefined): string | null {
   cursor: pointer;
 }
 
-.link-cert { font-size: 0.75rem; color: var(--color-gold); text-decoration: underline; }
+.link-cert { font-size: 0.75rem; color: var(--color-gold); text-decoration: underline; cursor: pointer; }
 
 .acciones-lote {
   display: flex;
@@ -589,4 +848,28 @@ function urlCertificado(url: string | null | undefined): string | null {
 
 .lc-valor.mono { font-family: var(--font-mono); }
 .lc-valor.gold { color: var(--color-gold); font-size: var(--text-lg); font-weight: 600; }
+
+.dirimencia-request-alert {
+  background: rgba(234,179,8,0.10);
+  border: 1px solid rgba(234,179,8,0.45);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: #fbbf24;
+  font-size: var(--text-sm);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.btn-warning-sm {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.65rem;
+  background: rgba(234,179,8,0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(234,179,8,0.4);
+  border-radius: 4px;
+  cursor: pointer;
+}
 </style>

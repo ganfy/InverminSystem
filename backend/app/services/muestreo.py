@@ -130,10 +130,13 @@ def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 2) -> list
         # Resultado final: Ej. CIP-058598D-A1
         codigo_final = f"CIP-{base_ofuscada}-A{correlativo}"
 
+        # Asignar Paititi al primer CIP, el resto queda Por Definir
+        laboratorio = "Paititi" if i == 0 else "Por definir"
+
         nuevo_cip = MapeoCIP(
             lote_id=lote.id,
             codigo_cip=codigo_final,
-            laboratorio="Por definir",
+            laboratorio=laboratorio,
             tipo_muestra="Laboratorio",
             fecha_envio=datetime.now().date(),
         )

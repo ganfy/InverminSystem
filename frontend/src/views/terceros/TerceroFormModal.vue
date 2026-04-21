@@ -738,7 +738,7 @@ async function guardar() {
 }
 
 .modal-icon {
-  font-size: var(--text-base)text-base);
+  font-size: var(--text-base);
   color: var(--color-gold);
   font-family: var(--font-mono);
 }
@@ -765,7 +765,7 @@ async function guardar() {
   background: transparent;
   color: var(--color-text-muted);
   font-family: var(--font-mono);
-  font-size: var(--text-sm)text-sm);
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -818,7 +818,7 @@ async function guardar() {
 
 .seccion-num {
   color: var(--color-text-muted);
-  font-size: var(--text-sm)text-sm);
+  font-size: var(--text-sm);
 }
 
 /* ── Body ────────────────────────────────────────────────────── */
