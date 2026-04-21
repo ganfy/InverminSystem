@@ -26,4 +26,4 @@ export type RolSistema =
   | 'Comercial'
   | 'Laboratorista'
   | 'OperadorBalanza'
-  | 'TécnicoMuestreo'
+  | 'TecnicoMuestreo'
