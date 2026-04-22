@@ -246,39 +246,120 @@ _TEMPLATE_ENSAYO = """
 <meta charset="utf-8"/>
 <style>
   @page {{ size: A4; margin: 20mm 18mm; }}
-  body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
-  .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
-  .empresa-sub {{ font-size: 10px; color: #555; font-style: italic; }}
-  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 6px 0; }}
-  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 1px; margin: 10px 0 2px; }}
-  .n-cert {{ text-align: center; color: #c8a84b; font-size: 11px; font-weight: bold; margin-bottom: 12px; }}
-  .kv-row {{ display: table; width: 100%; margin-bottom: 4px; }}
-  .kv-label {{ display: table-cell; width: 160px; color: #555; }}
-  .kv-val {{ display: table-cell; font-weight: bold; }}
-  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 6px; }}
-  table.detalle th {{ background: #e8e0cc; font-size: 10px; padding: 5px 8px; text-align: center; border: 1px solid #bbb; }}
-  table.detalle td {{ padding: 5px 8px; border: 1px solid #ccc; text-align: center; font-family: monospace; }}
-  .pie {{ font-size: 9px; color: #555; margin-top: 24px; border-top: 1px solid #ccc; padding-top: 6px; }}
+  body {{ font-family: Arial, sans-serif; font-size: 10px; color: #222; }}
+  .cab {{ display: table; width: 100%; margin-bottom: 4px; }}
+  .cab-left {{ display: table-cell; vertical-align: top; }}
+  .cab-right {{ display: table-cell; text-align: right; vertical-align: top; font-size: 9px; color: #555; }}
+  .lab-titulo {{ font-size: 13px; font-weight: bold; color: #c8a84b; }}
+  .lab-sub {{ font-size: 9px; color: #777; }}
+  .linea-gold {{ border: none; border-top: 2px solid #c8a84b; margin: 5px 0; }}
+  .titulo-cert {{ text-align: center; font-size: 12px; font-weight: bold; letter-spacing: .5px; margin: 6px 0 2px; }}
+  .n-cert {{ text-align: center; color: #555; font-size: 10px; margin-bottom: 8px; }}
+  .meta-grid {{ display: table; width: 100%; margin-bottom: 6px; }}
+  .meta-row {{ display: table-row; }}
+  .meta-label {{ display: table-cell; width: 40%; font-weight: bold; padding: 1px 4px 1px 0; color: #444; }}
+  .meta-val {{ display: table-cell; padding: 1px 0; }}
+  .seccion-titulo {{ font-weight: bold; font-size: 10px; background: #f0ece0;
+                     padding: 3px 6px; margin: 8px 0 2px; border-left: 3px solid #c8a84b; }}
+  table.det {{ width: 100%; border-collapse: collapse; font-size: 9.5px; }}
+  table.det th {{ background: #e8e0cc; padding: 4px 6px; text-align: center;
+                  border: 1px solid #bbb; font-size: 9px; }}
+  table.det td {{ padding: 3px 6px; border: 1px solid #ddd; text-align: center; font-family: monospace; }}
+  table.det tr:nth-child(even) {{ background: #faf8f3; }}
+  .total-row td {{ font-weight: bold; background: #f0ece0; border-top: 2px solid #bbb; }}
+  .pie {{ font-size: 8.5px; color: #666; margin-top: 16px; border-top: 1px solid #ccc; padding-top: 5px; }}
+  .firma-bloque {{ margin-top: 20px; }}
+  .firma-linea {{ display: inline-block; width: 200px; border-top: 1px solid #333;
+                  text-align: center; font-size: 9px; margin-right: 30px; padding-top: 3px; }}
 </style>
 </head>
 <body>
-<div><div class="empresa-nombre">{empresa_nombre}</div><div class="empresa-sub">{empresa_sub}</div></div>
+
+<!-- CABECERA -->
+<div class="cab">
+  <div class="cab-left">
+    <div class="lab-titulo">{empresa_nombre}</div>
+    <div class="lab-sub">{empresa_sub}</div>
+  </div>
+  <div class="cab-right">
+    {empresa_direccion}
+  </div>
+</div>
 <hr class="linea-gold"/>
-<div class="titulo-cert">INFORME DE ENSAYO - LEY NEWMONT</div>
-<div class="n-cert">CIP: {n_ensayo}</div>
-<div class="kv-row"><span class="kv-label">Laboratorio</span><span class="kv-val">: {laboratorio}</span></div>
-<div class="kv-row"><span class="kv-label">Fecha análisis</span><span class="kv-val">: {fecha}</span></div>
+
+<div class="titulo-cert">CERTIFICADO DE ENSAYO - NEWMONT - PROCESO - Au</div>
+<div class="n-cert">N&deg; {n_ensayo}</div>
+
+<!-- METADATOS -->
+<div class="meta-grid">
+  <div class="meta-row">
+    <span class="meta-label">Fecha Ingreso:</span><span class="meta-val">{fecha_ingreso}</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">Fecha Entrega:</span><span class="meta-val">{fecha_entrega}</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">PARA:</span><span class="meta-val">PLANTA</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">Solicitud de ensaye:</span><span class="meta-val">Análisis de sólidos por Au y Ag</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">Recepción de muestras:</span><span class="meta-val">Mineral de 0.5 Kg aproximado</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">Descripción:</span><span class="meta-val">PROCESO</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">Tipo de análisis:</span><span class="meta-val">Fire Assay - Gravimétrico</span>
+  </div>
+  <div class="meta-row">
+    <span class="meta-label">Laboratorio:</span><span class="meta-val">{laboratorio}</span>
+  </div>
+</div>
+
 <hr class="linea-gold"/>
-<table class="detalle">
+
+<!-- ANÁLISIS POR ORO (Au) -->
+<div class="seccion-titulo">ANÁLISIS POR ORO</div>
+<table class="det">
   <thead>
-    <tr><th>N°</th><th>CIP</th><th>Ley Fino (Oz/TC)</th><th>Ley Grueso (Oz/TC)</th><th>Ley Final (Oz/TC)</th><th>Ley (Gr/TM)</th></tr>
+    <tr>
+      <th rowspan="2">ITEM</th>
+      <th rowspan="2">CÓDIGO</th>
+      <th colspan="2">LEY Oz/Tc</th>
+      <th rowspan="2">Au Oz/Tc</th>
+      <th rowspan="2">LEY Au Gr/TM</th>
+    </tr>
+    <tr>
+      <th>+140</th>
+      <th>-140</th>
+    </tr>
   </thead>
-  <tbody>{filas_detalle}</tbody>
+  <tbody>{filas_au}</tbody>
 </table>
+
+{bloque_ag}
+
+<!-- TOTALES / PIE -->
+<div class="meta-grid" style="margin-top:10px">
+  <div class="meta-row">
+    <span class="meta-label">Total muestras analizadas:</span>
+    <span class="meta-val">{total_muestras}</span>
+  </div>
+</div>
+
+<div class="firma-bloque">
+  <span class="firma-linea">{reportado_por}<br/>Reportado por</span>
+  <span class="firma-linea">{analista}<br/>Analista</span>
+</div>
+
 <div class="pie">
-  Resultados obtenidos por FIRE ASSAY (triple sampling).<br/>
+  Los resultados obtenidos y consignados en el presente informe corresponden a análisis
+  FIRE ASSAY (gravimétrico) en las muestras recepcionadas.<br/>
   <strong>{empresa_nombre}</strong> &mdash; {empresa_direccion}
 </div>
+
 </body>
 </html>
 """
@@ -313,23 +394,30 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
         "empresa_direccion", "Otr.Las Terrazas KM.2 - Chala - Caraveli - Arequipa"
     )
 
-    filas = ""
+    # Filas Au: +140 = ley_grueso, -140 = ley_fino (convención del Excel de planta)
+    filas_au = ""
     for i, a in enumerate(analisis_list, 1):
-        filas += (
+        filas_au += (
             f"<tr>"
             f"<td>{i}</td>"
-            f"<td>{cip_code}</td>"
-            f"<td>{_fmt_oz(float(a.ley_fino) if a.ley_fino else None)}</td>"
+            f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
             f"<td>{_fmt_oz(float(a.ley_grueso) if a.ley_grueso else None)}</td>"
+            f"<td>{_fmt_oz(float(a.ley_fino) if a.ley_fino else None)}</td>"
             f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None)}</strong></td>"
             f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None)}</td>"
             f"</tr>"
         )
 
+    # Bloque Ag: solo si hay análisis con ley_gr_tm (proxy de que hay dato Ag registrado)
+    # Por ahora se omite si no hay datos de Ag — la sección queda reservada para futuro
+    bloque_ag = ""
+
     fecha_analisis = analisis_list[-1].fecha_analisis
-    fecha = _fmt_date(
+    hoy = datetime.now()
+    fecha_ingreso = _fmt_date(
         datetime.combine(fecha_analisis, datetime.min.time()) if fecha_analisis else None
     )
+    fecha_entrega = hoy.strftime("%d-%m-%y")
 
     html = _TEMPLATE_ENSAYO.format(
         empresa_nombre=empresa_nombre,
@@ -337,8 +425,13 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
         empresa_direccion=empresa_dir,
         n_ensayo=cip_code,
         laboratorio=analisis_list[0].laboratorio if analisis_list else "-",
-        fecha=fecha,
-        filas_detalle=filas,
+        fecha_ingreso=fecha_ingreso,
+        fecha_entrega=fecha_entrega,
+        filas_au=filas_au,
+        bloque_ag=bloque_ag,
+        total_muestras=len(analisis_list),
+        reportado_por="",
+        analista="",
     )
     return _html_to_pdf(html)
 

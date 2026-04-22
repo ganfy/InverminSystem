@@ -1,5 +1,9 @@
+from datetime import timedelta
+
 from app.core.database import get_db
 from app.core.deps import check_permiso
+from app.models.enums import TipoMuestra
+from app.models.models import MapeoCIP
 from app.schemas.pruebas import (
     EtiquetadoPruebaOut,
     EtiquetarPruebaRequest,
@@ -60,15 +64,14 @@ def obtener_detalle_prueba(
     current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
     db: Session = Depends(get_db),
 ):
-    from app.models.enums import TipoMuestra
-    from app.models.models import MapeoCIP
-
     prueba = pruebas_service.obtener_prueba_por_ip(db, ip_lote)
     if not prueba:
         raise HTTPException(status_code=404, detail="No hay prueba metalúrgica para este lote")
 
     out = PruebaMetalurgicaOut.model_validate(prueba)
     # Poblar CIPs de recuperación desde mapeo_cip (el modelo ya no tiene columna cip)
+    if prueba.fecha_ingreso:
+        out.fecha_salida = prueba.fecha_ingreso + timedelta(hours=48)
     cips_rec = (
         db.query(MapeoCIP)
         .filter(
@@ -98,6 +101,8 @@ def registrar_prueba(
         prueba, warning = pruebas_service.registrar_prueba(db, ip_lote, datos, current_user.id)
         db.commit()
         response = PruebaMetalurgicaOut.model_validate(prueba)
+        if prueba.fecha_ingreso:
+            response.fecha_salida = prueba.fecha_ingreso + timedelta(hours=48)
         if warning:
             response.__pydantic_extra__ = {"warning": warning}
         return response

@@ -7,8 +7,7 @@
 # COLUMNAS CALCULADAS:
 #   - Las expresiones simples (suma, resta, división) usan Computed() de
 #     SQLAlchemy, que traduce al dialecto correcto en cada motor.
-#   - fecha_salida (PruebaMetalurgica) usa @hybrid_property en lugar de
-#     Computed porque INTERVAL es sintaxis exclusiva de PostgreSQL.
+#   - DESPUES: "fecha_salida (PruebaMetalurgica) se calcula en el service/router.
 #
 # MÓDULO DE FACTURACIÓN (Comprobante, Pago):
 #   - Gestionado por sistema externo de contabilidad.
@@ -21,7 +20,6 @@
 # TO DO: Computed a capa de servicio para cálculos agnósticos de motor
 # =============================================================================
 
-from datetime import timedelta
 
 from app.models.base import AuditMixin, Base, SoftDeleteMixin
 from app.models.enums import (
@@ -46,7 +44,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -712,14 +709,6 @@ class PruebaMetalurgica(AuditMixin, Base):
     adicion_naoh = Column(Numeric(10, 4))  # gramos
     gasto_agno3 = Column(Numeric(10, 4))  # ml
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
-
-    @hybrid_property
-    def fecha_salida(self):
-        """fecha_ingreso + 48 horas."""
-        if self.fecha_ingreso:
-            return self.fecha_ingreso + timedelta(hours=48)
-        return None
-
     lote = relationship("Lote", back_populates="prueba_metalurgica")
     mapeo_cip = relationship("MapeoCIP", foreign_keys=[cip])
 

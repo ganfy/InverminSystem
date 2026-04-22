@@ -236,38 +236,38 @@ const pendientesRec = computed(() =>
 
 function mapearCIP(c: CIPAnalisisOut) {
   if (tabActual.value === 'ley') {
-    // Preferir vigente; si todos fueron descartados, mostrar el ultimo con valores
-    // pero sin ofrecer boton "Registrar" (eso lo controla estado_ley del backend)
-    const a =
-      c.analisis_ley.find(x => x.vigente) ??
-      c.analisis_ley[c.analisis_ley.length - 1]
+    const vigente = c.analisis_ley.find(x => x.vigente)
+    // Fallback: ultimo analisis (descartado) para mostrar valores historicos.
+    // Array.at() requiere ES2022 - usar indice explicito.
+    const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
+    const a = vigente ?? ultimo
     return {
       id: a?.id,
       cip: c.cip,
       fecha_envio: c.fecha_envio,
       estado: c.estado_ley,
-      leyMas: a?.vigente ? (a.ley_grueso ?? null) : null,
-      leyMenos: a?.vigente ? (a.ley_fino ?? null) : null,
-      ozTc: a?.vigente ? (a.ley_final ?? null) : null,
-      grTm: a?.vigente ? (a.ley_gr_tm ?? null) : null,
+      // Solo mostrar valores si el analisis esta vigente
+      leyMas:  vigente ? (vigente.ley_grueso ?? null) : null,
+      leyMenos: vigente ? (vigente.ley_fino   ?? null) : null,
+      ozTc:    vigente ? (vigente.ley_final   ?? null) : null,
+      grTm:    vigente ? (vigente.ley_gr_tm   ?? null) : null,
       certificadoUrl: a?.certificado_url ?? null,
     }
   } else {
-    const pending = c.analisis_recuperacion.find(x => x.estado === 'PENDIENTE' && x.vigente)
+    const pending   = c.analisis_recuperacion.find(x => x.estado === 'PENDIENTE'  && x.vigente)
     const completado = c.analisis_recuperacion.find(x => x.estado === 'COMPLETADO' && x.vigente)
-    const a =
-      pending ??
-      completado ??
-      c.analisis_recuperacion[c.analisis_recuperacion.length - 1]
+    const vigente   = pending ?? completado
+    const ultimo    = c.analisis_recuperacion[c.analisis_recuperacion.length - 1]
+    const a         = vigente ?? ultimo
     return {
       id: a?.id,
       cip: c.cip,
       fecha_envio: c.fecha_envio,
       estado: c.estado_recuperacion,
-      leyCabeza: a?.vigente ? (a.ley_cabeza ?? null) : null,
-      leyCola: a?.vigente ? (a.ley_cola ?? null) : null,
-      leyLiquido: a?.vigente ? (a.ley_liquido ?? null) : null,
-      recuperacion: a?.vigente ? (a.recuperacion ?? null) : null,
+      leyCabeza:   vigente ? (vigente.ley_cabeza   ?? null) : null,
+      leyCola:     vigente ? (vigente.ley_cola     ?? null) : null,
+      leyLiquido:  vigente ? (vigente.ley_liquido  ?? null) : null,
+      recuperacion: vigente ? (vigente.recuperacion ?? null) : null,
       certificadoUrl: a?.certificado_url ?? null,
     }
   }

@@ -20,6 +20,21 @@ class AnalisisLeyCreate(BaseModel):
     fecha_analisis: date | None = None
 
 
+class AnalisisLeyPorIPCreate(BaseModel):
+    """
+    Para registrar ley minero o dirimencia directamente por IP del lote,
+    sin requerir CIP (ley minero no pasa por laboratorio de planta).
+    """
+
+    tipo_analisis: TipoAnalisis = Field(..., description="minero | dirimencia")
+    laboratorio: str = Field(..., description="Nombre del laboratorio o minero")
+    ley_fino: float = Field(..., ge=0, description="Oz/TC malla fina")
+    ley_grueso: float = Field(..., ge=0, description="Oz/TC malla gruesa")
+    material: str = Field("Au")
+    origen_datos: str = OrigenDatos.MANUAL
+    fecha_analisis: date | None = None
+
+
 class AnalisisLeyOut(BaseModel):
     id: int
     lote_id: int

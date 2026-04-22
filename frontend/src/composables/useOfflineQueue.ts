@@ -17,9 +17,10 @@
 import { ref } from 'vue'
 import type { SesionLista, SesionDetalle } from '@/api/balanza'
 import type { LoteMuestreo } from '@/api/muestreo'
+import type { TipoAnalisis, OrigenDatos } from '@/types/laboratorio'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 7
+const DB_VERSION = 8
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -147,6 +148,24 @@ export interface PruebaQueueData {
     sync_error: string | null
 }
 
+// ── Tipos para offline de laboratorio ────────────────────────────────────────
+
+export interface AnalisisLeyOfflineItem {
+    offline_id: string
+    datos: {
+        cip: string
+        laboratorio: string
+        tipo_analisis: TipoAnalisis
+        material: string
+        ley_fino: number
+        ley_grueso: number
+        origen_datos: OrigenDatos
+        fecha_analisis: string
+    }
+    error?: string
+    synced?: boolean
+}
+
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -191,6 +210,9 @@ async function openDB(): Promise<IDBDatabase> {
             }
             if (oldVersion < 7) {
                 db.createObjectStore('pruebas_q', { keyPath: 'offline_id' })
+            }
+            if (oldVersion < 8) {
+                db.createObjectStore('analisis_lab_q', { keyPath: 'offline_id' })
             }
         }
 
@@ -382,16 +404,18 @@ export async function limpiarSynced(): Promise<number> {
 
 export async function contarPendientes(): Promise<number> {
     try {
-        const [sesiones, lotes, fin, pruebas] = await Promise.all([
+        const [sesiones, lotes, fin, pruebas, analisisLab] = await Promise.all([
             getAll<SesionOfflineData>('sesiones_q').catch(() => []),
             getAll<LoteOnlineData>('lotes_online_q').catch(() => []),
             getAll<FinalizacionPendiente>('finalizaciones_q').catch(() => []),
-            getAll<PruebaQueueData>('pruebas_q').catch(() => [])
+            getAll<PruebaQueueData>('pruebas_q').catch(() => []),
+            getAll<AnalisisLeyOfflineItem>('analisis_lab_q').catch(() => [])
         ])
         return sesiones.filter(s => !s.synced).length +
             lotes.filter(l => !l.synced).length +
             fin.length +
-            pruebas.filter(p => !p.synced).length
+            pruebas.filter(p => !p.synced).length +
+            analisisLab.filter(a => !a.synced).length
     } catch (e) {
         return 0
     }
@@ -676,4 +700,70 @@ export async function limpiarPruebasSynced(): Promise<void> {
     for (const p of todas.filter(x => x.synced)) {
         await del('pruebas_q', p.offline_id)
     }
+}
+
+
+// ── CRUD analisis_lab_q ───────────────────────────────────────────────────────
+
+export async function encolarAnalisisLey(item: AnalisisLeyOfflineItem): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_lab_q', 'readwrite')
+        tx.objectStore('analisis_lab_q').put(item)
+        tx.oncomplete = () => res()
+        tx.onerror = () => rej(tx.error)
+    })
+}
+
+export async function obtenerAnalisisLeyPendientes(): Promise<AnalisisLeyOfflineItem[]> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_lab_q', 'readonly')
+        const req = tx.objectStore('analisis_lab_q').getAll()
+        req.onsuccess = () => res((req.result as AnalisisLeyOfflineItem[]).filter(x => !x.synced))
+        req.onerror = () => rej(req.error)
+    })
+}
+
+export async function marcarAnalisisLeySynced(offline_id: string): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_lab_q', 'readwrite')
+        const store = tx.objectStore('analisis_lab_q')
+        const req = store.get(offline_id)
+        req.onsuccess = () => {
+            if (req.result) { store.put({ ...req.result, synced: true, error: undefined }) }
+            res()
+        }
+        req.onerror = () => rej(req.error)
+    })
+}
+
+export async function marcarAnalisisLeyError(offline_id: string, error: string): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_lab_q', 'readwrite')
+        const store = tx.objectStore('analisis_lab_q')
+        const req = store.get(offline_id)
+        req.onsuccess = () => {
+            if (req.result) { store.put({ ...req.result, error }) }
+            res()
+        }
+        req.onerror = () => rej(req.error)
+    })
+}
+
+export async function limpiarAnalisisLeySynced(): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_lab_q', 'readwrite')
+        const store = tx.objectStore('analisis_lab_q')
+        const req = store.getAll()
+        req.onsuccess = () => {
+            const synced = (req.result as AnalisisLeyOfflineItem[]).filter(x => x.synced)
+            synced.forEach(x => store.delete(x.offline_id))
+            res()
+        }
+        req.onerror = () => rej(req.error)
+    })
 }

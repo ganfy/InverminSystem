@@ -190,6 +190,12 @@ const etiquetaModal = ref<{ ip: string; cip: string } | null>(null)
 const filtroEstado   = ref('Todos')
 const filtroBusqueda = ref('')
 
+const estadosPrueba = [
+  { id: 'PENDIENTE', nombre: 'Pendiente' },
+  { id: 'EN PROCESO', nombre: 'En Proceso' }, // Cambiado de EN_PROCESO a EN PROCESO
+  { id: 'COMPLETADO', nombre: 'Completado' }
+];
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 watch(pendientes, async (nuevo, viejo) => {
   await cargarOffline()
@@ -256,15 +262,33 @@ onMounted(async () => {
 
 // ── Filtros ───────────────────────────────────────────────────────────────────
 const pruebasFiltradas = computed(() => {
-  const estaOffline = new Set(pruebasOffline.value.map(p => p.ip))
+  // 1. Filtrar IPs que están en cola offline para no duplicar
+  const estaOffline = new Set(pruebasOffline.value.map(p => p.ip));
+
   return pruebas.value.filter(p => {
-    if (estaOffline.has(p.ip)) return false
-    if (filtroEstado.value !== 'Todos' && p.estado !== filtroEstado.value) return false
-    const q = filtroBusqueda.value.toLowerCase()
-    if (q && !p.ip.toLowerCase().includes(q) && !(p.cip_asignado ?? '').toLowerCase().includes(q)) return false
-    return true
-  })
-})
+    // Regla 1: Ocultar si está en cola de subida
+    if (estaOffline.has(p.ip)) return false;
+
+    // Regla 2: Filtro de Estado (EL PUNTO CRÍTICO)
+    // Forzamos comparación limpia de strings
+    if (filtroEstado.value && filtroEstado.value !== 'Todos') {
+      if (p.estado.trim() !== filtroEstado.value.trim()) {
+        return false;
+      }
+    }
+
+    // Regla 3: Búsqueda por IP o CIP_ASIGNADO
+    const q = filtroBusqueda.value.trim().toLowerCase();
+    if (q) {
+      const coincideIP = (p.ip || '').toLowerCase().includes(q);
+      const coincideCIP = (p.cip_asignado || '').toLowerCase().includes(q);
+
+      if (!coincideIP && !coincideCIP) return false;
+    }
+
+    return true;
+  });
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(d: string | null | undefined) {
