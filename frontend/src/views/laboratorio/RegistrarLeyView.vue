@@ -1,339 +1,348 @@
 <template>
-    <div class="page-container">
+  <div class="page-container">
 
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">Registro Análisis Newmont</h1>
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Registro Análisis Newmont</h1>
+      </div>
+      <div style="display:flex;gap:0.75rem">
+        <button class="btn-secondary" @click="router.back()">← Volver</button>
+        <button class="btn-primary" @click="guardar" :disabled="guardando">
+          <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
+          Guardar y Generar Certificado
+        </button>
+      </div>
+    </header>
+
+    <!-- DATOS DEL LOTE -->
+    <section class="card">
+      <h2 class="card-titulo">DATOS DEL LOTE</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">CIP:</label>
+          <input class="field-input" :value="cipActual" disabled style="color:var(--color-gold);font-family:var(--font-mono)" />
         </div>
-        <div style="display:flex;gap:0.75rem">
-          <button class="btn-secondary" @click="router.back()">← Volver</button>
-          <button class="btn-primary" @click="guardar" :disabled="guardando">
-            <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
-            Guardar y Generar Certificado
-          </button>
+        <div class="field">
+          <label class="field-label">MATERIAL:</label>
+          <input class="field-input" :value="materialInfo" disabled />
         </div>
-      </header>
-
-      <!-- DATOS DEL LOTE -->
-      <section class="card">
-        <h2 class="card-titulo">DATOS DEL LOTE</h2>
-        <div class="form-grid">
-          <div class="field">
-            <label class="field-label">CIP:</label>
-            <input class="field-input" :value="cipActual" disabled style="color:var(--color-gold);font-family:var(--font-mono)" />
-          </div>
-          <div class="field">
-            <label class="field-label">MATERIAL:</label>
-            <input class="field-input" :value="materialInfo" disabled />
-          </div>
-          <div class="field">
-            <label class="field-label">MINERAL (Au/Ag):</label>
-            <select class="field-select field-input field-sm" v-model="form.material">
-              <option value="Au">Au</option>
-              <option value="Ag">Ag</option>
-            </select>
-          </div>
+        <div class="field">
+          <label class="field-label">MINERAL (Au/Ag):</label>
+          <select class="field-select field-input field-sm" v-model="form.material">
+            <option value="Au">Au</option>
+            <option value="Ag">Ag</option>
+          </select>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- DATOS DEL ENSAYO -->
-      <section class="card">
-        <h2 class="card-titulo">DATOS DEL ENSAYO</h2>
-        <div class="form-grid">
-          <div class="field">
-            <label class="field-label">FECHA INGRESO:</label>
-            <input type="date" class="field-input" v-model="form.fecha_analisis" />
-          </div>
-          <div class="field">
-            <label class="field-label">DESCRIPCIÓN:</label>
-            <input class="field-input" v-model="descripcion" placeholder="Polveado" />
-          </div>
-          <div class="field">
-            <label class="field-label">MÉTODO:</label>
-            <input v-model="metodo" readonly class="field-input" disabled>
-          </input>
-          </div>
-          <div class="field">
-            <label class="field-label">PUNTO:</label>
-            <select class="field-select field-sm field-input" v-model="punto">
-              <option>Cabeza</option>
-              <option>Cola</option>
-              <option>Líquido</option>
-            </select>
-          </div>
-          <div class="field">
-            <label class="field-label">SOLICITUD:</label>
-            <input class="field-input" :value="'Análisis de sólidos por ' + form.material" disabled />
-          </div>
-          <div class="field">
-            <label class="field-label">TIPO DE ANÁLISIS:</label>
-            <input class="field-input" :value="'Fire Assay - Gravimétrico'" disabled />
-          </div>
+    <!-- DATOS DEL ENSAYO -->
+    <section class="card">
+      <h2 class="card-titulo">DATOS DEL ENSAYO</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">FECHA INGRESO:</label>
+          <input type="date" class="field-input" v-model="form.fecha_analisis" />
         </div>
-      </section>
+        <div class="field">
+          <label class="field-label">DESCRIPCIÓN:</label>
+          <input class="field-input" v-model="descripcion" placeholder="Polveado" />
+        </div>
+        <div class="field">
+          <label class="field-label">MÉTODO:</label>
+          <input v-model="metodo" readonly class="field-input" disabled>
+        </input>
+        </div>
+        <div class="field">
+          <label class="field-label">PUNTO:</label>
+          <select class="field-select field-sm field-input" v-model="punto">
+            <option>Cabeza</option>
+            <option>Cola</option>
+            <option>Líquido</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">SOLICITUD:</label>
+          <input class="field-input" :value="'Análisis de sólidos por ' + form.material" disabled />
+        </div>
+        <div class="field">
+          <label class="field-label">TIPO DE ANÁLISIS:</label>
+          <input class="field-input" :value="'Fire Assay - Gravimétrico'" disabled />
+        </div>
+      </div>
+    </section>
 
-      <!-- LEYES DE LA MUESTRA (triple sampling) - REEMPLAZAR sección card -->
-      <section class="card">
-        <h2 class="card-titulo">LEYES DE LA MUESTRA (Triple Sampling)</h2>
-        <div class="muestras-cards">
+    <!-- LEYES DE LA MUESTRA (triple sampling) - REEMPLAZAR sección card -->
+    <section class="card">
+      <h2 class="card-titulo">LEYES DE LA MUESTRA (Triple Sampling)</h2>
+      <div class="muestras-cards">
 
-          <!-- Card Fino 1 -->
-          <div class="muestra-card">
-            <h3 class="muestra-card-titulo">MUESTRA FINO 1</h3>
-            <div class="form-grid">
-              <div class="field">
-                <label class="field-label">P. MUESTRA (g)</label>
-                <input type="number" class="field-input" v-model.number="pFino1" step="0.001" placeholder="0.000" />
-              </div>
-              <div class="field">
-                <label class="field-label">Au (mg)</label>
-                <input type="number" class="field-input" v-model.number="auFino1" step="0.0001" placeholder="0.0000" @input="recalc" />
-              </div>
+        <!-- Card Fino 1 -->
+        <div class="muestra-card">
+          <h3 class="muestra-card-titulo">MUESTRA FINO 1</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Peso15 (g)</label>
+              <input type="number" class="field-input" v-model.number="pFino1" step="0.001" placeholder="0.000" @input="recalc" />
+            </div>
+            <div class="field">
+              <label class="field-label">Au (mg)</label>
+              <input type="number" class="field-input" v-model.number="auFino1" step="0.0001" placeholder="0.0000" @input="recalc" />
             </div>
           </div>
-
-          <!-- Card Fino 2 -->
-          <div class="muestra-card">
-            <h3 class="muestra-card-titulo">MUESTRA FINO 2</h3>
-            <div class="form-grid">
-              <div class="field">
-                <label class="field-label">P. MUESTRA (g)</label>
-                <input type="number" class="field-input" v-model.number="pFino2" step="0.001" placeholder="0.000" />
-              </div>
-              <div class="field">
-                <label class="field-label">Au (mg)</label>
-                <input type="number" class="field-input" v-model.number="auFino2" step="0.0001" placeholder="0.0000" @input="recalc" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Card Grueso -->
-          <div class="muestra-card">
-            <h3 class="muestra-card-titulo">MUESTRA GRUESO</h3>
-            <div class="form-grid">
-              <div class="field">
-                <label class="field-label">P. MUESTRA (g)</label>
-                <input type="number" class="field-input" v-model.number="pGrueso" step="0.001" placeholder="0.000" />
-              </div>
-              <div class="field">
-                <label class="field-label">Au (mg)</label>
-                <input type="number" class="field-input" v-model.number="auGrueso" step="0.0001" placeholder="0.0000" @input="recalc" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Card Resultados -->
-          <div class="muestra-card muestra-card--resultados">
-            <h3 class="muestra-card-titulo">RESULTADOS CALCULADOS</h3>
-            <div class="resultados-grid">
-              <div class="resultado-item">
-                <span class="resultado-label">OZ/TC -140 (fino prom.)</span>
-                <span class="resultado-valor">{{ fmtNum(ozMenos) }}</span>
-              </div>
-              <div class="resultado-item">
-                <span class="resultado-label">OZ/TC +140 (grueso)</span>
-                <span class="resultado-valor">{{ fmtNum(ozMas) }}</span>
-              </div>
-              <div class="resultado-item resultado-item--gold">
-                <span class="resultado-label">LEY AU (OZ/TC)</span>
-                <span class="resultado-valor highlight">{{ fmtNum(leyFinal) }}</span>
-              </div>
-              <div class="resultado-item">
-                <span class="resultado-label">LEY AU (GR/TM)</span>
-                <span class="resultado-valor">{{ leyGrTm != null ? leyGrTm.toFixed(3) : '-' }}</span>
-              </div>
-            </div>
-          </div>
-
         </div>
-        <p v-if="errCalc" class="error-msg" style="margin-top:0.75rem">{{ errCalc }}</p>
-      </section>
 
-    </div>
-  </template>
+        <!-- Card Fino 2 -->
+        <div class="muestra-card">
+          <h3 class="muestra-card-titulo">MUESTRA FINO 2</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Peso (g)</label>
+              <input type="number" class="field-input" v-model.number="pFino2" step="0.001" placeholder="0.000" />
+            </div>
+            <div class="field">
+              <label class="field-label">Au (mg)</label>
+              <input type="number" class="field-input" v-model.number="auFino2" step="0.0001" placeholder="0.0000" @input="recalc" />
+            </div>
+          </div>
+        </div>
 
-  <script setup lang="ts">
-  import { ref, computed, onMounted } from 'vue'
-  import { useRouter, useRoute } from 'vue-router'
-  import { useLaboratorioStore } from '@/stores/laboratorio'
-  import type { TipoAnalisis } from '@/types/laboratorio'
-  import { useUiStore } from '@/stores/ui'
+        <!-- Card Grueso -->
+        <div class="muestra-card">
+          <h3 class="muestra-card-titulo">MUESTRA GRUESO</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Peso (g)</label>
+              <input type="number" class="field-input" v-model.number="pGrueso" step="0.001" placeholder="0.000" @input="recalc" />
+            </div>
+            <div class="field">
+              <label class="field-label">Au (mg)</label>
+              <input type="number" class="field-input" v-model.number="auGrueso" step="0.0001" placeholder="0.0000" @input="recalc" />
+            </div>
+          </div>
+        </div>
 
-  const router = useRouter()
-  const route  = useRoute()
-  const ui = useUiStore()
-  const store  = useLaboratorioStore()
+        <!-- Card Resultados -->
+        <div class="muestra-card muestra-card--resultados">
+          <h3 class="muestra-card-titulo">RESULTADOS CALCULADOS</h3>
+          <div class="resultados-grid">
+            <div class="resultado-item">
+              <span class="resultado-label">OZ/TC -140 (fino prom.)</span>
+              <span class="resultado-valor">{{ fmtNum(ozMenos) }}</span>
+            </div>
+            <div class="resultado-item">
+              <span class="resultado-label">OZ/TC +140 (grueso)</span>
+              <span class="resultado-valor">{{ fmtNum(ozMas) }}</span>
+            </div>
+            <div class="resultado-item resultado-item--gold">
+              <span class="resultado-label">LEY AU (OZ/TC)</span>
+              <span class="resultado-valor highlight">{{ fmtNum(leyFinal) }}</span>
+            </div>
+            <div class="resultado-item">
+              <span class="resultado-label">LEY AU (GR/TM)</span>
+              <span class="resultado-valor">{{ leyGrTm != null ? leyGrTm.toFixed(3) : '-' }}</span>
+            </div>
+          </div>
+        </div>
 
-  const cipActual  = route.params.cip as string
-  const guardando  = ref(false)
-  const errCalc    = ref('')
-  const materialInfo = ref('Mineral')
+      </div>
+      <p v-if="errCalc" class="error-msg" style="margin-top:0.75rem">{{ errCalc }}</p>
+    </section>
 
-  // ── Campos del formulario ─────────────────────────────────────────────────────
-  const descripcion = ref('Polveado')
-  const metodo     = ref('Newmont')
-  const punto      = ref('Cabeza')
+  </div>
+</template>
 
-  const form = ref({
-    cip: cipActual,
-    laboratorio:    '',
-    tipo_analisis: ((route.query.tipo as TipoAnalisis | undefined) ?? 'planta'),
-    material:       'Au',
-    ley_fino:       0,
-    ley_grueso:     0,
-    origen_datos:   'manual' as const,
-    fecha_analisis: new Date().toISOString().split('T')[0],
-  })
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useLaboratorioStore } from '@/stores/laboratorio'
+import type { TipoAnalisis } from '@/types/laboratorio'
+import { useUiStore } from '@/stores/ui'
 
-  // ── Campos de triple sampling ─────────────────────────────────────────────────
-  // Triple sampling: Fino1 → Grueso → Fino2
-  // Ley fino promedio = (auFino1 + auFino2) / 2
-  // Ley final = ley_fino_prom + ley_grueso (ambos en oz/tc)
-  const FACTOR = 34.2857
+const router = useRouter()
+const route  = useRoute()
+const ui = useUiStore()
+const store  = useLaboratorioStore()
 
-  const pFino1  = ref<number | null>(null)
-  const auFino1 = ref<number | null>(null)
-  const pFino2  = ref<number | null>(null)
-  const auFino2 = ref<number | null>(null)
-  const pGrueso = ref<number | null>(null)
-  const auGrueso = ref<number | null>(null)
+const cipActual  = route.params.cip as string
+const guardando  = ref(false)
+const errCalc    = ref('')
+const materialInfo = ref('Mineral')
 
-  // Conversión mg → oz/tc: (mg / (peso_g * 29.1667))  aproximado
-  // Usar fórmula: oz/tc = (Au_mg / peso_g) / 29.1667
-  function mgToOzTc(mg: number, pesoG: number): number {
-    if (!pesoG || pesoG === 0) return 0
-    return mg / pesoG / 29.1667
-  }
+// ── Campos del formulario ─────────────────────────────────────────────────────
+const descripcion = ref('Polveado')
+const metodo     = ref('Newmont')
+const punto      = ref('Cabeza')
 
-  const ozMenos = computed(() => {
-    if (auFino1.value == null || auFino2.value == null) return null
-    // Ley fino = promedio de fino1 y fino2
-    const avgMg = (auFino1.value + auFino2.value) / 2
-    const avgP  = ((pFino1.value ?? 15) + (pFino2.value ?? 15)) / 2
-    return parseFloat(mgToOzTc(avgMg, avgP).toFixed(4))
-  })
+const form = ref({
+  cip: cipActual,
+  laboratorio:    '',
+  tipo_analisis: ((route.query.tipo as TipoAnalisis | undefined) ?? 'planta'),
+  material:       'Au',
+  ley_fino:       0,
+  ley_grueso:     0,
+  origen_datos:   'manual' as const,
+  fecha_analisis: new Date().toISOString().split('T')[0],
+})
 
-  const ozMas = computed(() => {
-    if (auGrueso.value == null) return null
-    return parseFloat(mgToOzTc(auGrueso.value, pGrueso.value ?? 10).toFixed(4))
-  })
+// ── Campos de triple sampling ─────────────────────────────────────────────────
+// Triple sampling: Fino1 → Grueso → Fino2
+// Ley fino promedio = (auFino1 + auFino2) / 2
+// Ley final = ley_fino_prom + ley_grueso (ambos en oz/tc)
+const FACTOR = 34.2857
 
-  const leyFinal = computed(() => {
-    if (ozMenos.value == null || ozMas.value == null) return null
-    return parseFloat((ozMenos.value + ozMas.value).toFixed(4))
-  })
+const pFino1  = ref<number | null>(null)
+const auFino1 = ref<number | null>(null)
+const pFino2  = ref<number | null>(null)
+const auFino2 = ref<number | null>(null)
+const pGrueso = ref<number | null>(null)
+const auGrueso = ref<number | null>(null)
 
-  const leyGrTm = computed(() => {
-    if (leyFinal.value == null) return null
-    return parseFloat((leyFinal.value * FACTOR).toFixed(3))
-  })
+// ── Fórmulas Newmont (planta) ─────────────────────────────────────────────
+// Fuente: hoja DATOS NEWMONT del Excel de planta.
+//
+// ley_fino = AVERAGE(Au_fino1, Au_fino2) * (200 - peso_grueso) / (peso_fino1 * 200) * 1000 / 34.285
+//   (200-peso_grueso) corrige la fracción de muestra que corresponde a la malla fina.
+//
+// ley_grueso = Au_grueso_mg / (200 * 34.285 / 1000)
+//   El peso_grueso se cancela algebraicamente en la fórmula original del Excel.
+//
+// ley_final = ley_fino + ley_grueso
+// ley_gr_tm = ley_final * 34.285
 
-  function recalc() {
-    errCalc.value = ''
-    if (leyFinal.value != null) {
-      form.value.ley_fino   = ozMenos.value ?? 0
-      form.value.ley_grueso = ozMas.value   ?? 0
-    }
-  }
+const FACTOR_NEWMONT = 34.285  // constante del laboratorio
 
-  function fmtNum(n: number | null | undefined) {
-    if (n == null) return '-'
-    return n.toFixed(4)
-  }
+const ozMenos = computed(() => {
+  // Requiere: ambos Au finos, peso fino 1 y peso grueso
+  if (auFino1.value == null || auFino2.value == null || pFino1.value == null || pGrueso.value == null) return null
+  const avgAu = (auFino1.value + auFino2.value) / 2
+  const result = avgAu * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT
+  return parseFloat(result.toFixed(4))
+})
 
-  // ── Cargar info del CIP si está disponible ────────────────────────────────────
-  onMounted(async () => {
-    const cip = store.cips.find(c => c.cip === cipActual)
-    if (cip?.tipo_muestra) materialInfo.value = cip.tipo_muestra
-    if (cip?.laboratorio_destino) form.value.laboratorio = cip.laboratorio_destino
-  })
+const ozMas = computed(() => {
+  if (auGrueso.value == null) return null
+  // peso_grueso se cancela — solo depende de Au_grueso en mg
+  const result = auGrueso.value / (200 * FACTOR_NEWMONT / 1000)
+  return parseFloat(result.toFixed(4))
+})
 
-  // ── Guardar ───────────────────────────────────────────────────────────────────
-  async function guardar() {
-    errCalc.value = ''
+const leyFinal = computed(() => {
+  if (ozMenos.value == null || ozMas.value == null) return null
+  return parseFloat((ozMenos.value + ozMas.value).toFixed(4))
+})
 
-    if (!form.value.laboratorio) { errCalc.value = 'Ingrese el laboratorio'; return }
-    if (leyFinal.value == null || leyFinal.value <= 0) {
-      errCalc.value = 'Ingrese los pesos y valores Au para calcular las leyes'
-      return
-    }
+const leyGrTm = computed(() => {
+  if (leyFinal.value == null) return null
+  return parseFloat((leyFinal.value * FACTOR).toFixed(3))
+})
 
-    const okConf = await ui.showConfirm({
-        title: 'Generar Certificado',
-        message: 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?',
-        confirmLabel: 'Generar y Guardar'
-    })
-    if (!okConf) return
-
+function recalc() {
+  errCalc.value = ''
+  if (leyFinal.value != null) {
     form.value.ley_fino   = ozMenos.value ?? 0
     form.value.ley_grueso = ozMas.value   ?? 0
-
-    guardando.value = true
-    const result = await store.registrarLey(form.value)
-    if (result) {
-        await store.generarCertificadoLeyInterno(result.id)
-        router.push('/laboratorio')
-    }
-    guardando.value = false
-
   }
-  </script>
+}
 
-  <style scoped>
-  .muestras-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 1rem;
-  }
+function fmtNum(n: number | null | undefined) {
+  if (n == null) return '-'
+  return n.toFixed(4)
+}
 
-  .muestra-card {
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    padding: 0.9rem 1rem;
-    background: rgba(255,255,255,0.02);
-  }
+// ── Cargar info del CIP si está disponible ────────────────────────────────────
+onMounted(async () => {
+  const cip = store.cips.find(c => c.cip === cipActual)
+  if (cip?.tipo_muestra) materialInfo.value = cip.tipo_muestra
+  if (cip?.laboratorio_destino) form.value.laboratorio = cip.laboratorio_destino
+})
 
-  .muestra-card--resultados {
-    border-color: rgba(184,151,75,0.3);
-    background: rgba(184,151,75,0.04);
+// ── Guardar ───────────────────────────────────────────────────────────────────
+async function guardar() {
+  errCalc.value = ''
+
+  if (!form.value.laboratorio) { errCalc.value = 'Ingrese el laboratorio'; return }
+  if (leyFinal.value == null || leyFinal.value <= 0) {
+    errCalc.value = 'Ingrese los pesos y valores Au para calcular las leyes'
+    return
   }
 
-  .muestra-card-titulo {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    color: var(--color-text-faint);
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
-  }
+  const okConf = await ui.showConfirm({
+      title: 'Generar Certificado',
+      message: 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?',
+      confirmLabel: 'Generar y Guardar'
+  })
+  if (!okConf) return
 
-  .resultados-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
+  form.value.ley_fino   = ozMenos.value ?? 0
+  form.value.ley_grueso = ozMas.value   ?? 0
 
-  .resultado-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  guardando.value = true
+  const result = await store.registrarLey(form.value)
+  if (result) {
+      await store.generarCertificadoLeyInterno(result.id)
+      router.push('/laboratorio')
   }
+  guardando.value = false
 
-  .resultado-label {
-    font-size: 0.68rem;
-    color: var(--color-text-faint);
-    font-family: var(--font-mono);
-  }
+}
+</script>
 
-  .resultado-valor {
-    font-family: var(--font-mono);
-    color: var(--color-text-muted);
-    font-size: var(--text-md);
-  }
+<style scoped>
+.muestras-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
 
-  .resultado-valor.highlight {
-    color: var(--color-gold);
-    font-size: var(--text-xl);
-    font-weight: 700;
-  }
-  </style>
+.muestra-card {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  background: rgba(255,255,255,0.02);
+}
+
+.muestra-card--resultados {
+  border-color: rgba(184,151,75,0.3);
+  background: rgba(184,151,75,0.04);
+}
+
+.muestra-card-titulo {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.resultados-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.resultado-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resultado-label {
+  font-size: 0.68rem;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+}
+
+.resultado-valor {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+}
+
+.resultado-valor.highlight {
+  color: var(--color-gold);
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+</style>
