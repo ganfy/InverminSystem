@@ -158,11 +158,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import type { TipoAnalisis } from '@/types/laboratorio'
 import { useUiStore } from '@/stores/ui'
+import { useSync } from '@/composables/useSync'
 
 const router = useRouter()
 const route  = useRoute()
 const ui = useUiStore()
 const store  = useLaboratorioStore()
+const { online } = useSync()
 
 const cipActual  = route.params.cip as string
 const guardando  = ref(false)
@@ -281,6 +283,8 @@ async function guardar() {
   const result = await store.registrarLey(form.value)
   if (result) {
       await store.generarCertificadoLeyInterno(result.id)
+      router.push('/laboratorio')
+  } else if (!online.value) {
       router.push('/laboratorio')
   }
   guardando.value = false

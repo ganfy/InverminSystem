@@ -131,7 +131,9 @@ export interface AnalisisLeyOfflineItem {
 
 export interface AnalisisRecuperacionOfflineItem {
     offline_id: string
-    datos: AnalisisRecuperacionCreate
+    analisis_id?: number | null // Si existe, es un UPDATE. Si no, es un CREATE.
+    // Usamos una Unión de Tipos para decirle a TS que acepte cualquiera de los dos formatos
+    datos: AnalisisRecuperacionCreate | CompletarRecuperacionRequest
 }
 
 export interface SyncLaboratorioRequest {

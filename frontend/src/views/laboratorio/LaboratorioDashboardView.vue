@@ -190,10 +190,12 @@ import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import type { CIPAnalisisOut, LoteLabOut } from '@/types/laboratorio'
+import { useSync } from '@/composables/useSync'
 
 const router = useRouter()
 const store  = useLaboratorioStore()
 const ui     = useUiStore()
+const { online, pendientes: pendientesSync, sincronizando } = useSync()
 
 const tabActual      = ref<'ley' | 'rec'>('ley')
 const filtroEstado   = ref('')
