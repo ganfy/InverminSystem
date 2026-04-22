@@ -248,11 +248,11 @@ function mapearCIP(c: CIPAnalisisOut) {
       cip: c.cip,
       fecha_envio: c.fecha_envio,
       estado: c.estado_ley,
-      // Solo mostrar valores si el analisis esta vigente
-      leyMas:  vigente ? (vigente.ley_grueso ?? null) : null,
-      leyMenos: vigente ? (vigente.ley_fino   ?? null) : null,
-      ozTc:    vigente ? (vigente.ley_final   ?? null) : null,
-      grTm:    vigente ? (vigente.ley_gr_tm   ?? null) : null,
+      // Mostrar valores al laboratorista si completó el análisis, o si no hay análisis vigente (posiblemente descartado) para tener referencia histórica.
+      leyMas:  (a?.ley_grueso ?? null) ,
+      leyMenos:  (a?.ley_fino   ?? null) ,
+      ozTc:     (a?.ley_final   ?? null) ,
+      grTm:    (a?.ley_gr_tm   ?? null) ,
       certificadoUrl: a?.certificado_url ?? null,
     }
   } else {

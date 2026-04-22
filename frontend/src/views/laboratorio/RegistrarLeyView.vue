@@ -82,7 +82,7 @@
           <h3 class="muestra-card-titulo">MUESTRA FINO 1</h3>
           <div class="form-grid">
             <div class="field">
-              <label class="field-label">Peso15 (g)</label>
+              <label class="field-label">Peso (g)</label>
               <input type="number" class="field-input" v-model.number="pFino1" step="0.001" placeholder="0.000" @input="recalc" />
             </div>
             <div class="field">
@@ -178,7 +178,7 @@ const punto      = ref('Cabeza')
 
 const form = ref({
   cip: cipActual,
-  laboratorio:    '',
+  laboratorio:    'Paititi',
   tipo_analisis: ((route.query.tipo as TipoAnalisis | undefined) ?? 'planta'),
   material:       'Au',
   ley_fino:       0,
