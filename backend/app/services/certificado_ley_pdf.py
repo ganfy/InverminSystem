@@ -288,7 +288,7 @@ _TEMPLATE_ENSAYO = """
 <hr class="linea-gold"/>
 
 <div class="titulo-cert">CERTIFICADO DE ENSAYO - NEWMONT - PROCESO - Au</div>
-<div class="n-cert">N&deg; {n_ensayo}</div>
+<div class="n-cert">N&deg;{n_ensayo}</div>
 
 <!-- METADATOS -->
 <div class="meta-grid">
