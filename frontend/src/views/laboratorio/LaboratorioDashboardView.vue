@@ -19,6 +19,34 @@
       </div>
     </header>
 
+    <!-- ── [OFFLINE] Análisis pendientes de sincronizar (solo Laboratorista) ── -->
+    <div
+      v-if="!store.puedeVerIP && analisisOfflinePendientes.length > 0"
+      class="offline-section"
+    >
+      <div class="offline-section-header">
+        <span class="offline-section-titulo">
+          <WifiOff :size="16" style="margin-right:0.4rem;vertical-align:middle" />
+          SIN SINCRONIZAR
+        </span>
+        <span class="offline-section-count">
+          {{ analisisOfflinePendientes.length }} análisis local(es)
+        </span>
+      </div>
+      <div style="padding:0.75rem 1rem">
+        <div
+          v-for="item in analisisOfflinePendientes"
+          :key="item.offline_id"
+          class="pendiente-item"
+        >
+          <span class="pendiente-cip">{{ item.datos.cip }}</span>
+          <span class="pendiente-tipo">Análisis de ley · {{ item.datos.tipo_analisis }}</span>
+          <span v-if="item.error" class="pendiente-error" :title="item.error">⚠ Error sync</span>
+          <span v-else class="badge-local">LOCAL</span>
+        </div>
+      </div>
+    </div>
+
     <template v-if="store.puedeVerIP">
       <div class="filtros-bar">
         <div class="field" style="flex:1;min-width:200px">
@@ -183,29 +211,44 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FlaskConical, RefreshCw } from 'lucide-vue-next'
+import { FlaskConical, RefreshCw, WifiOff } from 'lucide-vue-next'
 import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import type { CIPAnalisisOut, LoteLabOut } from '@/types/laboratorio'
 import { useSync } from '@/composables/useSync'
+import { obtenerAnalisisLeyPendientes, type AnalisisLeyOfflineItem } from '@/composables/useOfflineQueue'
 
 const router = useRouter()
 const store  = useLaboratorioStore()
 const ui     = useUiStore()
-const { online, pendientes: pendientesSync, sincronizando } = useSync()
+const {
+  online,
+  pendientes: pendientesSync,
+  ultimoSync,
+  sincronizar,
+} = useSync()
 
 const tabActual      = ref<'ley' | 'rec'>('ley')
 const filtroEstado   = ref('')
 const filtroBusqueda = ref('')
 const filtroBusquedaLotes = ref('')
-const filtroDesde    = ref('')
-const filtroHasta    = ref('')
 
 const lotes = ref<LoteLabOut[]>([])
 const cargandoLotes = ref(false)
+
+// Análisis encolados offline para mostrar al laboratorista
+const analisisOfflinePendientes = ref<AnalisisLeyOfflineItem[]>([])
+
+async function cargarAnalisisOffline() {
+  try {
+    analisisOfflinePendientes.value = await obtenerAnalisisLeyPendientes()
+  } catch {
+    analisisOfflinePendientes.value = []
+  }
+}
 
 async function cargarDatos() {
   if (store.puedeVerIP) {
@@ -219,11 +262,39 @@ async function cargarDatos() {
     }
   } else {
     store.cargarCips()
+    await cargarAnalisisOffline()
   }
 }
 
 onMounted(() => cargarDatos())
 function recargar() { cargarDatos() }
+
+// ── Recargar datos cuando el sync completa ──────────────────────────────
+watch(ultimoSync, async () => {
+  await cargarDatos()
+  await cargarAnalisisOffline()
+})
+
+// ── Recargar cuando vuelve la conexión ──────────────────────────────────
+watch(online, async (ahoraOnline) => {
+  if (ahoraOnline) {
+    // Pequeño delay para que el sync arranque primero
+    await new Promise(r => setTimeout(r, 300))
+    if (pendientesSync.value === 0) {
+      // Sin pendientes: recargar directo (watch(ultimoSync) no disparará)
+      await cargarDatos()
+    }
+    // Con pendientes: watch(ultimoSync) recargará cuando el sync termine
+  } else {
+    // Al desconectarse: actualizar sección de pendientes offline
+    await cargarAnalisisOffline()
+  }
+})
+
+// ── Actualizar pendientes offline cuando cambia el count global ─────────
+watch(pendientesSync, () => {
+  if (!store.puedeVerIP) cargarAnalisisOffline()
+})
 
 const pendientesLey = computed(() =>
   store.cips.filter(c => c.tipo_muestra === 'Laboratorio' && c.estado_ley === 'PENDIENTE').length
@@ -239,8 +310,6 @@ const pendientesRec = computed(() =>
 function mapearCIP(c: CIPAnalisisOut) {
   if (tabActual.value === 'ley') {
     const vigente = c.analisis_ley.find(x => x.vigente)
-    // Fallback: ultimo analisis (descartado) para mostrar valores historicos.
-    // Array.at() requiere ES2022 - usar indice explicito.
     const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
     const a = vigente ?? ultimo
     return {
@@ -248,7 +317,6 @@ function mapearCIP(c: CIPAnalisisOut) {
       cip: c.cip,
       fecha_envio: c.fecha_envio,
       estado: c.estado_ley,
-      // Mostrar valores al laboratorista si completó el análisis, o si no hay análisis vigente (posiblemente descartado) para tener referencia histórica.
       leyMas:  (a?.ley_grueso ?? null) ,
       leyMenos:  (a?.ley_fino   ?? null) ,
       ozTc:     (a?.ley_final   ?? null) ,
@@ -346,4 +414,44 @@ async function generarCertRec(fila: any) {
 .tab-lab-btn.active { color: var(--color-gold); border-bottom-color: var(--color-gold); }
 .badge-count { background: var(--color-error, #ef4444); color: #fff; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 999px; min-width: 1.2rem; text-align: center; }
 .filtros-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+
+/* ── Sección offline pendientes ──────────────────────────── */
+.offline-section {
+  border: 1px solid rgba(245,158,11,.4);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+.offline-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .55rem 1rem;
+  background: rgba(245,158,11,.1);
+  border-bottom: 1px solid rgba(245,158,11,.3);
+}
+.offline-section-titulo {
+  font-family: var(--font-mono); font-size: var(--text-sm);
+  letter-spacing: .18em; color: #f59e0b;
+}
+.offline-section-count {
+  font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.pendiente-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: var(--text-sm);
+}
+.pendiente-item:last-child { border-bottom: none; }
+.pendiente-cip {
+  font-family: var(--font-mono); color: var(--color-gold);
+  min-width: 120px;
+}
+.pendiente-tipo { color: var(--color-text-muted); flex: 1; }
+.pendiente-error { color: var(--color-error); font-size: 0.7rem; }
+.badge-local {
+  font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: .1em;
+  background: rgba(245,158,11,.15); color: #f59e0b;
+  border: 1px solid rgba(245,158,11,.3); border-radius: 3px;
+  padding: 1px 5px;
+}
 </style>
