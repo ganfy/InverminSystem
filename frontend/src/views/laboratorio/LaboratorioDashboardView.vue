@@ -261,7 +261,7 @@ async function cargarDatos() {
       cargandoLotes.value = false
     }
   } else {
-    store.cargarCips()
+    await store.cargarCips()
     await cargarAnalisisOffline()
   }
 }
@@ -272,7 +272,6 @@ function recargar() { cargarDatos() }
 // ── Recargar datos cuando el sync completa ──────────────────────────────
 watch(ultimoSync, async () => {
   await cargarDatos()
-  await cargarAnalisisOffline()
 })
 
 // ── Recargar cuando vuelve la conexión ──────────────────────────────────
@@ -344,11 +343,20 @@ function mapearCIP(c: CIPAnalisisOut) {
 }
 
 const filasMostrar = computed(() => {
-  const cipsFiltrados = store.cips.filter(c =>
-    tabActual.value === 'ley'
-      ? c.tipo_muestra === 'Laboratorio'
-      : c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno'
+  // CIPs con análisis ya registrado offline → aparecen en la sección superior
+  const cipsConAnalisisOffline = new Set(
+    analisisOfflinePendientes.value.map(a => a.datos.cip)
   )
+
+  const cipsFiltrados = store.cips.filter(c => {
+    if (tabActual.value === 'ley') {
+      if (c.tipo_muestra !== 'Laboratorio') return false
+      if (cipsConAnalisisOffline.has(c.cip)) return false  // excluir si ya está en sección offline
+      return true
+    }
+    return c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno'
+  })
+
   return cipsFiltrados.map(mapearCIP).filter(f => {
     if (filtroEstado.value && f.estado !== filtroEstado.value) return false
     if (filtroBusqueda.value && !f.cip.toLowerCase().includes(filtroBusqueda.value.toLowerCase())) return false
