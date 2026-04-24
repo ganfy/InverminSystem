@@ -154,7 +154,7 @@ function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
 <table class="datos">
   <tr><td class="lbl">Conductor</td><td class="sep">:</td><td>${s.conductor || '-'}</td></tr>
   <tr><td class="lbl">Transportista</td><td class="sep">:</td><td>${s.transportista || '-'}</td></tr>
-  <tr><td class="lbl">Razon Social</td><td class="sep">:</td><td>${s.razon_social || s.proveedor_razon_social || '-'}</td></tr>
+  <tr><td class="lbl">Razon Social Rte.</td><td class="sep">:</td><td>${s.razon_social || s.proveedor_razon_social || '-'}</td></tr>
   ${acopHtml}
   <tr><td class="lbl">Producto</td><td class="sep">:</td><td>${lote.tipo_material?.toUpperCase() ?? '-'}</td></tr>
   <tr><td class="lbl">Documento</td><td class="sep">:</td><td>${s.guia_remision || s.guia_transporte || '-'}</td></tr>

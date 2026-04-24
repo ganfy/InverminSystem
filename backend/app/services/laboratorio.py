@@ -79,7 +79,6 @@ def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
     from app.models.models import Usuario
 
     rows = db.query(Usuario.id, Usuario.nombre_completo).filter(Usuario.id.in_(ids)).all()
-    print(f"Lookup nombres usuarios: {ids} -> {rows}")  # Debug
     return {r.id: r.nombre_completo for r in rows}
 
 
@@ -157,9 +156,6 @@ def obtener_cips_laboratorio(
 
     resultados: list[CIPAnalisisOut] = []
     for cip in cips:
-        print(
-            f"Procesando CIP: {cip.codigo_cip}, Laboratorio: {cip.laboratorio}, Tipo muestra: {cip.tipo_muestra}"
-        )  # Debug
         if not incluir_ip and cip.laboratorio not in [
             "Paititi",
             "Laboratorio Interno",

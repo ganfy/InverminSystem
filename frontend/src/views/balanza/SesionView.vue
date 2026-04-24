@@ -317,7 +317,8 @@ import {
   Printer,
   Pause,
   Play,
-  Info
+  Info,
+  X
 } from 'lucide-vue-next'
 
 const unidadBalanza = computed(() => getUnidadPorModulo('BALANZA'))

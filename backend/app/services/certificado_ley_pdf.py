@@ -10,7 +10,8 @@ Flujo:
 
 from __future__ import annotations
 
-import io
+import base64
+import os
 from datetime import datetime
 
 from app.models.models import (
@@ -18,109 +19,162 @@ from app.models.models import (
     ParametrosComerciales,
     ProveedorAcopiador,
     SesionDescarga,
+    Usuario,
 )
 from app.services.laboratorio import calcular_ley_comercial
 from app.services.pruebas import calcular_ley_planta
 from sqlalchemy.orm import Session, joinedload
 
+
+def _get_image_b64(filename: str) -> str:
+    """Convierte una imagen local a Base64 para incrustarla sin problemas de rutas en el PDF."""
+    filepath = os.path.join(os.path.dirname(__file__), "..", "assets", filename)
+    if not os.path.exists(filepath):
+        return ""
+
+    with open(filepath, "rb") as img_file:
+        encoded = base64.b64encode(img_file.read()).decode("utf-8")
+        ext = filename.split(".")[-1].lower()
+        mime = "image/png" if ext == "png" else "image/jpeg"
+        return f"data:{mime};base64,{encoded}"
+
+
+# -- TEMPLATE PARA CERTIFICADO DE LEY COMERCIAL (CLIENTE) --
 _TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <style>
-  @page {{ size: A4; margin: 20mm 18mm; }}
+  @page {{
+      size: A4;
+      margin: 20mm 18mm;
+      background-image: url('{membrete_b64}');
+      background-size: cover;
+  }}
   body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
-  .logo-row {{ display: table; width: 100%; margin-bottom: 6px; }}
-  .logo-cell {{ display: table-cell; vertical-align: middle; }}
+
+  .watermark-pattern {{
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      z-index: -50;
+
+      /*
+         1. linear-gradient es una capa blanca al 95% de opacidad (rgba = 0.95).
+         2. url() es la capa de tu logo que va debajo de esa capa blanca. */
+      background-image:
+          linear-gradient(rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0.50)),
+          url('{logo_b64}');
+
+      background-repeat: repeat;
+      background-size: 100px;         /* TAMAÑO DEL LOGO: baja este número para hacerlos más chiquitos (ej. 80px) */
+      background-position: center;
+      transform: rotate(-30deg);      /* Inclinación */
+  }}
+
+  .logo-header {{ width: 140px; margin-bottom: 10px; }}
   .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
   .empresa-sub {{ font-size: 10px; color: #555; font-style: italic; }}
-  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 6px 0; }}
-  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold;
-                  letter-spacing: 1px; margin: 10px 0 2px; }}
-  .n-cert {{ text-align: center; color: #c8a84b; font-size: 11px;
-             font-weight: bold; margin-bottom: 12px; }}
+  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 8px 0; }}
+  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 1px; margin: 10px 0 2px; }}
+  .n-cert {{ text-align: center; color: #c8a84b; font-size: 11px; font-weight: bold; margin-bottom: 12px; }}
   .seccion {{ margin-bottom: 10px; }}
-  .seccion-titulo {{ font-size: 10px; font-weight: bold; letter-spacing: .5px;
-                     border-bottom: 1px solid #ccc; padding-bottom: 3px;
-                     margin-bottom: 6px; text-transform: uppercase; }}
   .kv-row {{ display: table; width: 100%; margin-bottom: 4px; }}
   .kv-label {{ display: table-cell; width: 160px; color: #555; }}
   .kv-val {{ display: table-cell; font-weight: bold; }}
-  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 6px; }}
-  table.detalle th {{ background: #e8e0cc; font-size: 10px; padding: 5px 8px;
-                      text-align: center; border: 1px solid #bbb; }}
-  table.detalle td {{ padding: 5px 8px; border: 1px solid #ccc;
-                      text-align: center; font-family: monospace; }}
-  table.detalle td.codigo {{ text-align: center; font-family: Arial; }}
-  .pie {{ font-size: 9px; color: #555; margin-top: 24px;
-          border-top: 1px solid #ccc; padding-top: 6px; }}
+
+  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+  table.detalle th {{ background: #e8e0cc; font-size: 10px; padding: 6px; border: 1px solid #bbb; }}
+  table.detalle td {{ padding: 8px; border: 1px solid #ccc; text-align: center; font-family: monospace; font-size: 12px; }}
+
+  .firma-bloque {{ margin-top: 60px; text-align: center; }}
+  .firma-linea {{ display: inline-block; width: 220px; border-top: 1px solid #333; padding-top: 4px; font-weight: bold; font-size: 10px; }}
+  .pie {{ font-size: 9px; color: #555; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 8px; }}
 </style>
 </head>
 <body>
 
-<!-- CABECERA -->
+<div class="watermark-pattern"></div>
+
 <div class="logo-row">
-  <div class="logo-cell">
-    <div class="empresa-nombre">{empresa_nombre}</div>
-    <div class="empresa-sub">{empresa_sub}</div>
-  </div>
+  <img src="{logo_b64}" class="logo-header" />
+  <div class="empresa-nombre">{empresa_nombre}</div>
+  <div class="empresa-sub">{empresa_sub}</div>
 </div>
 <hr class="linea-gold"/>
 
 <div class="titulo-cert">INFORME DE ENSAYO</div>
 <div class="n-cert">N&deg; LQ {n_lq}</div>
 
-<!-- DATOS DEL CLIENTE -->
 <div class="seccion">
   <div class="kv-row"><span class="kv-label">Cliente</span><span class="kv-val">: {cliente}</span></div>
   <div class="kv-row"><span class="kv-label">Referencia</span><span class="kv-val">: {referencia}</span></div>
-  <div class="kv-row"><span class="kv-label">Solicitud de Ensayo</span><span class="kv-val">: Analisis por Au</span></div>
+  <div class="kv-row"><span class="kv-label">Solicitud de Ensayo</span><span class="kv-val">: Análisis por Au</span></div>
 </div>
-
 <hr class="linea-gold"/>
-
-<!-- RECEPCIÓN DE MUESTRAS -->
 <div class="seccion">
-  <div class="seccion-titulo">Recepción de Muestras</div>
-  <div class="kv-row"><span class="kv-label">Cantidad</span><span class="kv-val">: 1</span><br/></div>
-  <div class="kv-row"><span class="kv-label">Descripción</span><span class="kv-val">: Polveado</span><br/></div>
-  <div class="kv-row"><span class="kv-label">Envase</span><span class="kv-val">: Bolsa de plastico</span><br/></div>
-  <div class="kv-row"><span class="kv-label">Fecha de Recepcion</span><span class="kv-val">: {fecha_recepcion}</span><br/></div>
-  <div class="kv-row"><span class="kv-label">Termino de Analisis</span><span class="kv-val">: {fecha_termino}</span><br/></div>
-  <div class="kv-row"><span class="kv-label">Metodo de Ensayo</span><span class="kv-val">: Newmont</span></div>
+  <div class="kv-row"><span class="kv-label">Fecha de Recepcion</span><span class="kv-val">: {fecha_recepcion}</span></div>
+  <div class="kv-row"><span class="kv-label">Termino de Analisis</span><span class="kv-val">: {fecha_termino}</span></div>
 </div>
 
-<hr class="linea-gold"/>
-
-<!-- DETALLE -->
-<div class="seccion">
-  <div class="seccion-titulo">Detalle del Informe</div>
-  <table class="detalle">
-    <thead>
-      <tr>
-        <th>N&deg;</th>
-        <th>CODIGO</th>
-        <th>Ley Au Oz/Tc</th>
-      </tr>
-    </thead>
-    <tbody>
-      {filas_detalle}
-    </tbody>
-  </table>
-</div>
+<table class="detalle">
+  <thead><tr><th>N&deg;</th><th>CÓDIGO</th><th>Ley Au Oz/Tc</th></tr></thead>
+  <tbody>{filas_detalle}</tbody>
+</table>
 
 {bloque_notas}
 
-<!-- PIE -->
-<div class="pie">
-    Los resultados obtenidos y que se consigna en el presente informe corresponde FIRE ASSAY
-    o analisis gravimetrico en las muestras recepcionadas.<br/>
-    <br/>
-    <strong>{empresa_nombre}</strong><br/>
-    {empresa_direccion}
+<div class="firma-bloque">
+  <span class="firma-linea">{analista}<br/>Responsable de Laboratorio</span>
 </div>
 
+<div class="pie">
+    Los resultados obtenidos corresponden a FIRE ASSAY (análisis gravimétrico).<br/>
+    <strong>{empresa_nombre}</strong> - {empresa_direccion}
+</div>
+
+</body>
+</html>
+"""
+
+# -- TEMPLATE PARA INFORME DE RECUPERACIÓN --
+_TEMPLATE_RECUPERACION = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  @page {{ size: A4; margin: 20mm 18mm; background-image: url('{membrete_b64}'); }}
+  body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
+  .watermark {{ position: absolute; top: 30%; left: 15%; width: 70%; opacity: 0.08; z-index: -1; }}
+  .logo-header {{ width: 140px; margin-bottom: 8px; }}
+  .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
+  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 6px 0; }}
+  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold; margin: 15px 0; }}
+  table.detalle {{ width: 100%; border-collapse: collapse; }}
+  table.detalle th {{ background: #e8e0cc; padding: 6px; border: 1px solid #bbb; }}
+  table.detalle td {{ padding: 6px; border: 1px solid #ccc; text-align: center; font-family: monospace; }}
+  .firma-bloque {{ margin-top: 60px; text-align: center; }}
+  .firma-linea {{ display: inline-block; width: 220px; border-top: 1px solid #333; padding-top: 4px; font-weight: bold; }}
+</style>
+</head>
+<body>
+<img src="{logo_b64}" class="watermark" />
+<img src="{logo_b64}" class="logo-header" />
+<div class="empresa-nombre">{empresa_nombre}</div>
+<hr class="linea-gold"/>
+<div class="titulo-cert">INFORME DE RECUPERACIÓN</div>
+<div class="kv-row"><strong>CIP:</strong> {n_ensayo} | <strong>Laboratorio:</strong> {laboratorio} | <strong>Fecha:</strong> {fecha}</div>
+<table class="detalle" style="margin-top:20px">
+  <thead><tr><th>N°</th><th>CIP</th><th>Ley Cabeza</th><th>Ley Cola</th><th>Ley Líquido</th><th>% Rec.</th></tr></thead>
+  <tbody>{filas_detalle}</tbody>
+</table>
+<div class="firma-bloque">
+  <span class="firma-linea">{analista}<br/>Analista Responsable</span>
+</div>
 </body>
 </html>
 """
@@ -151,7 +205,7 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
     Aplica las reglas de parametros_comerciales del proveedor-acopiador.
     Retorna bytes del PDF listo para descarga.
     """
-    from app.models.models import Configuracion
+    from app.models.models import AnalisisLey, Configuracion, Usuario
 
     lote = (
         db.query(Lote)
@@ -180,6 +234,22 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
         "empresa_direccion",
         "Otr.Las Terrazas KM.2 Otr. Quebrada El Totoral - Chala - Caraveli - Arequipa",
     )
+
+    analista_nombre = "CONTROL DE CALIDAD"  # Valor por defecto
+    ultimo_analisis = (
+        db.query(AnalisisLey)
+        .filter(AnalisisLey.lote_id == lote.id, AnalisisLey.vigente)
+        .order_by(AnalisisLey.id.desc())
+        .first()
+    )
+    if ultimo_analisis and ultimo_analisis.creado_por:
+        user = db.query(Usuario).get(ultimo_analisis.creado_por)
+        if user:
+            analista_nombre = user.nombre_completo
+
+    # CARGAR IMÁGENES
+    logo_b64 = _get_image_b64("logo invermin.png")
+    membrete_b64 = _get_image_b64("membrete invermin.png")
 
     # Proveedor / cliente
     try:
@@ -234,6 +304,9 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
         fecha_termino=_fmt_date(datetime.now()),
         filas_detalle=fila,
         bloque_notas=notas,
+        logo_b64=logo_b64,
+        membrete_b64=membrete_b64,
+        analista=analista_nombre,
     )
 
     return _html_to_pdf(html)
@@ -246,44 +319,30 @@ _TEMPLATE_ENSAYO = """
 <meta charset="utf-8"/>
 <style>
   @page {{ size: A4; margin: 20mm 18mm; }}
-  body {{ font-family: Arial, sans-serif; font-size: 10px; color: #222; }}
-  .cab {{ display: table; width: 100%; margin-bottom: 4px; }}
-  .cab-left {{ display: table-cell; vertical-align: top; }}
-  .cab-right {{ display: table-cell; text-align: right; vertical-align: top; font-size: 9px; color: #555; }}
+  body {{ font-family: Arial, sans-serif; font-size: 10px; color: #222; background-color: #ffffff; }}
+  .cab {{ display: table; width: 100%; margin-bottom: 5px; }}
+  .cab-left {{ display: table-cell; vertical-align: middle; }}
+  .cab-right {{ display: table-cell; text-align: right; vertical-align: middle; font-size: 9px; color: #555; }}
+  .logo-header {{ width: 110px; margin-bottom: 5px; }}
   .lab-titulo {{ font-size: 13px; font-weight: bold; color: #c8a84b; }}
   .lab-sub {{ font-size: 9px; color: #777; }}
   .linea-gold {{ border: none; border-top: 2px solid #c8a84b; margin: 5px 0; }}
-  .titulo-cert {{ text-align: center; font-size: 12px; font-weight: bold; letter-spacing: .5px; margin: 6px 0 2px; }}
-  .n-cert {{ text-align: center; color: #555; font-size: 10px; margin-bottom: 8px; }}
-  .meta-grid {{ display: table; width: 100%; margin-bottom: 6px; }}
-  .meta-row {{ display: table-row; }}
-  .meta-label {{ display: table-cell; width: 40%; font-weight: bold; padding: 1px 4px 1px 0; color: #444; }}
-  .meta-val {{ display: table-cell; padding: 1px 0; }}
-  .seccion-titulo {{ font-weight: bold; font-size: 10px; background: #f0ece0;
-                     padding: 3px 6px; margin: 8px 0 2px; border-left: 3px solid #c8a84b; }}
+  .titulo-cert {{ text-align: center; font-size: 12px; font-weight: bold; margin: 10px 0; }}
   table.det {{ width: 100%; border-collapse: collapse; font-size: 9.5px; }}
-  table.det th {{ background: #e8e0cc; padding: 4px 6px; text-align: center;
-                  border: 1px solid #bbb; font-size: 9px; }}
-  table.det td {{ padding: 3px 6px; border: 1px solid #ddd; text-align: center; font-family: monospace; }}
-  table.det tr:nth-child(even) {{ background: #faf8f3; }}
-  .total-row td {{ font-weight: bold; background: #f0ece0; border-top: 2px solid #bbb; }}
-  .pie {{ font-size: 8.5px; color: #666; margin-top: 16px; border-top: 1px solid #ccc; padding-top: 5px; }}
-  .firma-bloque {{ margin-top: 20px; }}
-  .firma-linea {{ display: inline-block; width: 200px; border-top: 1px solid #333;
-                  text-align: center; font-size: 9px; margin-right: 30px; padding-top: 3px; }}
+  table.det th {{ background: #e8e0cc; padding: 4px; border: 1px solid #bbb; }}
+  table.det td {{ padding: 4px; border: 1px solid #ddd; text-align: center; font-family: monospace; }}
+  .firma-bloque {{ margin-top: 50px; text-align: center; }}
+  .firma-linea {{ display: inline-block; width: 180px; border-top: 1px solid #333; padding-top: 4px; font-weight: bold; }}
 </style>
 </head>
 <body>
-
-<!-- CABECERA -->
 <div class="cab">
   <div class="cab-left">
+    <img src="{logo_b64}" class="logo-header" />
     <div class="lab-titulo">{empresa_nombre}</div>
     <div class="lab-sub">{empresa_sub}</div>
   </div>
-  <div class="cab-right">
-    {empresa_direccion}
-  </div>
+  <div class="cab-right">{empresa_direccion}</div>
 </div>
 <hr class="linea-gold"/>
 
@@ -302,7 +361,7 @@ _TEMPLATE_ENSAYO = """
     <span class="meta-label">PARA:</span><span class="meta-val">PLANTA</span>
   </div>
   <div class="meta-row">
-    <span class="meta-label">Solicitud de ensaye:</span><span class="meta-val">Análisis de sólidos por Au y Ag</span>
+    <span class="meta-label">Solicitud de ensayo:</span><span class="meta-val">Análisis de sólidos por Au y Ag</span>
   </div>
   <div class="meta-row">
     <span class="meta-label">Recepción de muestras:</span><span class="meta-val">Mineral de 0.5 Kg aproximado</span>
@@ -350,8 +409,8 @@ _TEMPLATE_ENSAYO = """
 </div>
 
 <div class="firma-bloque">
-  <span class="firma-linea">{reportado_por}<br/>Reportado por</span>
-  <span class="firma-linea">{analista}<br/>Analista</span>
+  <span class="firma-linea">Reportado por<br/>{reportado_por}<br/></span>
+  <span class="firma-linea">Analista<br/>{analista}</span>
 </div>
 
 <div class="pie">
@@ -381,6 +440,13 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
     )
     if not analisis_list:
         raise ValueError(f"No hay análisis de ley vigentes para CIP {cip_code}")
+
+    analista_nombre = ""
+    primer_analisis = analisis_list[0]
+    if primer_analisis.creado_por:
+        usuario = db.query(Usuario).filter(Usuario.id == primer_analisis.creado_por).first()
+        if usuario:
+            analista_nombre = usuario.nombre_completo
 
     cfg_rows = (
         db.query(Configuracion.clave, Configuracion.valor)
@@ -419,6 +485,9 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
     )
     fecha_entrega = hoy.strftime("%d-%m-%y")
 
+    logo_b64 = _get_image_b64("logo invermin.png")
+    membrete_b64 = _get_image_b64("membrete invermin.png")
+
     html = _TEMPLATE_ENSAYO.format(
         empresa_nombre=empresa_nombre,
         empresa_sub=empresa_sub,
@@ -430,8 +499,10 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
         filas_au=filas_au,
         bloque_ag=bloque_ag,
         total_muestras=len(analisis_list),
-        reportado_por="",
-        analista="",
+        reportado_por=analista_nombre,  # <-- Inyectando el nombre
+        analista=analista_nombre,  # <-- Inyectando el nombre
+        logo_b64=logo_b64,  # <-- Imagen de Logo
+        membrete_b64=membrete_b64,
     )
     return _html_to_pdf(html)
 
@@ -488,12 +559,19 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
     if not cip:
         raise ValueError(f"CIP {cip_code} no encontrado")
 
+    analista_nombre = "DEPARTAMENTO TÉCNICO"
+
     analisis_list = (
         db.query(AnalisisRecuperacion)
         .filter(AnalisisRecuperacion.cip == cip_code, AnalisisRecuperacion.vigente)
         .order_by(AnalisisRecuperacion.id)
         .all()
     )
+    if analisis_list and analisis_list[0].creado_por:
+        usuario = db.query(Usuario).filter(Usuario.id == analisis_list[0].creado_por).first()
+        if usuario:
+            analista_nombre = usuario.nombre_completo
+
     if not analisis_list:
         raise ValueError(f"No hay análisis vigentes para CIP {cip_code}")
 
@@ -527,17 +605,15 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
         laboratorio=analisis_list[0].laboratorio or "-",
         fecha=fecha,
         filas_detalle=filas,
+        analista_nombre=analista_nombre,
     )
     return _html_to_pdf(html)
 
 
 def _html_to_pdf(html: str) -> bytes:
     try:
-        from xhtml2pdf import pisa
+        from weasyprint import HTML
     except ImportError as e:
-        raise RuntimeError("Ejecutar: pip install xhtml2pdf") from e
-    buf = io.BytesIO()
-    result = pisa.CreatePDF(io.StringIO(html), dest=buf, encoding="utf-8")
-    if result.err:
-        raise RuntimeError(f"Error al generar PDF: {result.err}")
-    return buf.getvalue()
+        raise RuntimeError("Ejecutar: pip install weasyprint (o instalar GTK en Windows)") from e
+
+    return HTML(string=html).write_pdf()

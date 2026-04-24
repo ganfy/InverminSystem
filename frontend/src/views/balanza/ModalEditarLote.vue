@@ -3,7 +3,7 @@
       <div class="modal">
         <div class="modal-header">
           <h2>EDITAR LOTE {{ modalData.ip }}</h2>
-          <button class="btn-cerrar" @click="$emit('close')"><X :size="18" />X :size="18" /></button>
+          <button class="btn-cerrar" @click="$emit('close')"><X :size="18" /></button>
         </div>
         <div class="modal-body">
           <div class="form-grid">
@@ -32,6 +32,22 @@
               <label for="edit-granel" class="field-label" style="margin:0">Granel</label>
             </div>
 
+            <template v-if="isAdmin">
+              <div class="field field-full" style="padding-top:0.75rem;border-top:1px solid var(--color-border)">
+                <div class="seccion-edit-titulo" style="font-family:var(--font-mono);font-size:0.7rem;letter-spacing:.15em;color:var(--color-gold);margin-bottom:0.5rem">
+                  FECHAS DEL PESAJE <span class="badge-admin">ADMIN</span>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label">Fecha/hora BRUTO (camión cargado)</label>
+                <input type="datetime-local" class="field-input" v-model="modalData.form.fecha_inicio" />
+              </div>
+              <div class="field">
+                <label class="field-label">Fecha/hora TARA (camión vacío)</label>
+                <input type="datetime-local" class="field-input" v-model="modalData.form.fecha_fin" />
+              </div>
+            </template>
+
             <div class="field field-full" style="padding-top: 1rem;">
               <label class="field-label" style="color: var(--color-warning);">Justificación de Edición Manual *</label>
               <textarea class="field-input" rows="2" v-model="modalData.form.justificacion_manual" placeholder="Obligatorio..."></textarea>
@@ -50,10 +66,16 @@
     </div>
   </template>
 
-  <script setup lang="ts">
+<script setup lang="ts">
 
-  import { getUnidadPorModulo } from '@/utils/units'
+import { getUnidadPorModulo } from '@/utils/units'
+import { useAuthStore } from '@/stores/auth'
+import { computed } from 'vue'
+import { X } from 'lucide-vue-next'
 
-  defineProps<{ modalData: any; guardando: boolean }>()
-  defineEmits(['close', 'save'])
-  </script>
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.user?.rol === 'Admin')
+
+defineProps<{ modalData: any; guardando: boolean }>()
+defineEmits(['close', 'save'])
+</script>

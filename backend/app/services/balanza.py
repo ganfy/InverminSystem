@@ -562,6 +562,11 @@ def editar_lote(
         if datos.granel is not None:
             pesaje.granel = datos.granel
 
+        if datos.fecha_inicio is not None:
+            pesaje.fecha_inicio = datos.fecha_inicio
+        if datos.fecha_fin is not None:
+            pesaje.fecha_fin = datos.fecha_fin
+
         if datos.es_manual is not None:
             pesaje.es_manual = datos.es_manual
             if datos.es_manual and not datos.justificacion_manual:
