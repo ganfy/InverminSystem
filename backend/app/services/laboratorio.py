@@ -9,7 +9,7 @@ import re
 import shutil
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -72,10 +72,23 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
     return a.ley_final if a else None
 
 
+def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
+    """Batch lookup: {user_id: nombre_completo}"""
+    if not ids:
+        return {}
+    from app.models.models import Usuario
+
+    rows = db.query(Usuario.id, Usuario.nombre_completo).filter(Usuario.id.in_(ids)).all()
+    print(f"Lookup nombres usuarios: {ids} -> {rows}")  # Debug
+    return {r.id: r.nombre_completo for r in rows}
+
+
 # ── Serializadores ────────────────────────────────────────────────────────────
 
 
-def _ley_out(a: AnalisisLey, lote_ip: str | None = None) -> AnalisisLeyOut:
+def _ley_out(
+    a: AnalisisLey, lote_ip: str | None = None, creado_por_nombre: str | None = None
+) -> AnalisisLeyOut:
     return AnalisisLeyOut(
         id=a.id,
         lote_id=a.lote_id,
@@ -94,10 +107,13 @@ def _ley_out(a: AnalisisLey, lote_ip: str | None = None) -> AnalisisLeyOut:
         descartado_por=a.descartado_por,
         fecha_descarte=a.fecha_descarte,
         justificacion_descarte=a.justificacion_descarte,
+        creado_por_nombre=creado_por_nombre,
     )
 
 
-def _rec_out(a: AnalisisRecuperacion, lote_ip: str | None = None) -> AnalisisRecuperacionOut:
+def _rec_out(
+    a: AnalisisRecuperacion, lote_ip: str | None = None, creado_por_nombre: str | None = None
+) -> AnalisisRecuperacionOut:
     return AnalisisRecuperacionOut(
         id=a.id,
         lote_id=a.lote_id,
@@ -114,6 +130,7 @@ def _rec_out(a: AnalisisRecuperacion, lote_ip: str | None = None) -> AnalisisRec
         certificado_url=a.certificado_url,
         descartado_por=a.descartado_por,
         fecha_descarte=a.fecha_descarte,
+        creado_por_nombre=creado_por_nombre,
     )
 
 
@@ -190,6 +207,9 @@ def obtener_cips_laboratorio(
 
         ip = lote.ip if incluir_ip else None
 
+        ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
+        nombres = _nombres_usuarios(db, ids)
+
         resultados.append(
             CIPAnalisisOut(
                 cip=cip.codigo_cip,
@@ -200,8 +220,12 @@ def obtener_cips_laboratorio(
                 laboratorio_destino=cip.laboratorio,
                 estado_ley=estado_ley,
                 estado_recuperacion=estado_rec,
-                analisis_ley=[_ley_out(a, ip) for a in no_eliminados_ley],
-                analisis_recuperacion=[_rec_out(a, ip) for a in no_eliminados_rec],
+                analisis_ley=[
+                    _ley_out(a, ip, nombres.get(a.creado_por)) for a in no_eliminados_ley
+                ],
+                analisis_recuperacion=[
+                    _rec_out(a, ip, nombres.get(a.creado_por)) for a in no_eliminados_rec
+                ],
             )
         )
 
@@ -243,7 +267,8 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         .all()
     )
 
-    from datetime import datetime, timedelta
+    ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
+    nombres = _nombres_usuarios(db, ids)
 
     pruebas_lote = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).all()
     _ahora = datetime.now()
@@ -262,8 +287,10 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         cips_detalle=cips_detalle,
         ley_planta=calcular_ley_planta(db, lote.id),
         ley_minero=_ley_minero(db, lote.id),
-        analisis_ley=[_ley_out(a, lote.ip) for a in analisis_ley],
-        analisis_recuperacion=[_rec_out(a, lote.ip) for a in analisis_rec],
+        analisis_ley=[_ley_out(a, lote.ip, nombres.get(a.creado_por)) for a in analisis_ley],
+        analisis_recuperacion=[
+            _rec_out(a, lote.ip, nombres.get(a.creado_por)) for a in analisis_rec
+        ],
         tiene_dirimencia=bool(lote.dirimencia),
         tiene_prueba_pendiente=tiene_prueba_pendiente,
     )

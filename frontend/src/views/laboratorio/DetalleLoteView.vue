@@ -419,17 +419,40 @@
           <button class="btn-cerrar" @click="modalDescartar = null">×</button>
         </div>
         <div class="modal-body">
-          <div class="field">
+
+          <!-- Preview de impacto en ley planta -->
+          <div v-if="modalDescartar.tipo === 'ley' && previewLeyPlantaPostDescarte !== null"
+            class="descarte-preview"
+            :class="{ 'descarte-preview--sin-cambio': previewLeyPlantaPostDescarte === lote?.ley_planta }"
+          >
+            <div class="dp-titulo">IMPACTO EN LEY PLANTA</div>
+            <div class="dp-row">
+              <span class="dp-label">Actual:</span>
+              <span class="dp-val">{{ lote?.ley_planta != null ? Number(lote.ley_planta).toFixed(4) : '-' }} oz/TC</span>
+            </div>
+            <div class="dp-row">
+              <span class="dp-label">Tras descarte:</span>
+              <span class="dp-val" :class="{ 'dp-val--changed': previewLeyPlantaPostDescarte !== lote?.ley_planta }">
+                {{ previewLeyPlantaPostDescarte != null ? previewLeyPlantaPostDescarte.toFixed(4) : 'Sin análisis vigentes' }} oz/TC
+              </span>
+            </div>
+            <div v-if="previewLeyPlantaPostDescarte == null" class="dp-aviso">
+              Sin análisis vigentes restantes — la ley planta quedará vacía.
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:0.75rem">
             <label class="field-label">Justificación (obligatoria):</label>
             <textarea class="field-input" v-model="justificacion" rows="3" placeholder="Ej: Resultado discordante"></textarea>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" @click="modalDescartar = null">Cancelar</button>
-          <button class="btn-danger" @click="confirmarDescartar" :disabled="!justificacion.trim()">Confirmar</button>
+          <button class="btn-danger" @click="confirmarDescartar" :disabled="!justificacion.trim()">Confirmar descarte</button>
         </div>
       </div>
     </div>
+
 
     <div v-if="modalAgregarLey" class="modal-overlay" @click.self="modalAgregarLey = false">
       <div class="modal modal-sm">
@@ -625,6 +648,21 @@ async function recargarLeyComercial() {
     cargandoLeyComercial.value = false
   }
 }
+
+const previewLeyPlantaPostDescarte = computed<number | null>(() => {
+  if (!modalDescartar.value || modalDescartar.value.tipo !== 'ley') return null
+  if (!lote.value) return null
+  const idADescartar = modalDescartar.value.id
+  // Análisis vigentes excluyendo el que se va a descartar
+  // Solo contamos planta y externo (no minero, no dirimencia) - igual que calcular_ley_planta en backend
+  const restantes = lote.value.analisis_ley.filter(
+    a => a.vigente && !a.eliminado && a.id !== idADescartar
+      && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
+  )
+  if (restantes.length === 0) return null
+  const promedio = restantes.reduce((acc, a) => acc + Number(a.ley_final), 0) / restantes.length
+  return parseFloat(promedio.toFixed(4))
+})
 
 async function generarCertificado() {
   generando.value = true

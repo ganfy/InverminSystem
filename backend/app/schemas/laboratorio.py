@@ -50,6 +50,7 @@ class AnalisisLeyOut(BaseModel):
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
+    creado_por_nombre: str | None = None  # nombre del laboratorista que registró
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     justificacion_descarte: str | None = None
@@ -108,6 +109,7 @@ class AnalisisRecuperacionOut(BaseModel):
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
+    creado_por_nombre: str | None = None  # nombre del laboratorista que registró
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     eliminado: bool = False

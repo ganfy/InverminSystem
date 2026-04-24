@@ -93,6 +93,19 @@
         Ingrese el nombre del laboratorio antes de extraer
       </p>
       <p v-if="errExtraccion" class="error-msg" style="margin-top:0.75rem;text-align:center">{{ errExtraccion }}</p>
+
+      <div style="text-align:center;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--color-border)">
+        <p style="font-size:0.78rem;color:var(--color-text-faint);margin-bottom:0.5rem">
+          ¿No tiene el certificado disponible o el OCR falla?
+        </p>
+        <button
+          class="btn-secondary"
+          style="font-size:0.82rem"
+          @click="saltarOcr"
+        >
+          Ingresar datos manualmente →
+        </button>
+      </div>
     </section>
 
     <!-- PASO 3: Verificar y corregir datos extraídos -->
@@ -193,6 +206,8 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import type { TipoAnalisis } from '@/types/laboratorio'
 import { AlertTriangle } from 'lucide-vue-next'
+import { f } from 'vue-router/dist/router-CWoNjPRp.mjs'
+import type { OrigenDatos } from '@/types/laboratorio'
 const router    = useRouter()
 const route     = useRoute()
 const store     = useLaboratorioStore()
@@ -227,7 +242,7 @@ const form = ref({
   material:      'Au',
   ley_fino:      null as number | null,
   ley_grueso:    null as number | null,
-  origen_datos:  'certificado' as const,
+  origen_datos:  '' as OrigenDatos,
   fecha_analisis: new Date().toISOString().split('T')[0],
 })
 
@@ -295,6 +310,8 @@ async function extraer() {
         + 'Ingrese manualmente MALLA -140 y MALLA +140.'
     }
 
+    form.value.origen_datos = 'certificado'
+
     cipExtraido.value = datos.cip ?? ''
     validarCip()
     fase.value = 'form'
@@ -305,6 +322,14 @@ async function extraer() {
   } finally {
     extrayendo.value = false
   }
+}
+
+function saltarOcr() {
+  form.value.origen_datos = 'manual'
+  archivo.value = null
+  // Precarga el CIP esperado si no está ya
+  cipExtraido.value = cipActual
+  fase.value = 'form'
 }
 
 async function guardar() {

@@ -30,6 +30,7 @@ export interface AnalisisLeyOut {
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
+    creado_por_nombre?: string | null   // laboratorista responsable
     descartado_por?: number | null
     fecha_descarte?: string | null
     justificacion_descarte?: string | null
@@ -74,6 +75,7 @@ export interface AnalisisRecuperacionOut {
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
+    creado_por_nombre?: string | null   // laboratorista responsable
     descartado_por?: number | null
     fecha_descarte?: string | null
     eliminado: boolean
@@ -131,8 +133,7 @@ export interface AnalisisLeyOfflineItem {
 
 export interface AnalisisRecuperacionOfflineItem {
     offline_id: string
-    analisis_id?: number | null // Si existe, es un UPDATE. Si no, es un CREATE.
-    // Usamos una Unión de Tipos para decirle a TS que acepte cualquiera de los dos formatos
+    analisis_id?: number | null
     datos: AnalisisRecuperacionCreate | CompletarRecuperacionRequest
 }
 
