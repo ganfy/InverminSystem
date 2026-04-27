@@ -137,15 +137,28 @@
               LEY PLANTA
               <span v-if="excluidos.size > 0" class="badge-simulando">SIMULANDO</span>
             </span>
-            <button
-              class="btn-primary"
-              style="font-size:0.75rem;padding:0.35rem 0.9rem"
-              @click="abrirConfirmarGenerar"
-              :disabled="generando || leyPlantaSimulada === null"
-            >
-              <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
-              Generar certificado PDF
-            </button>
+            <div style="display:flex;gap:0.5rem">
+              <button
+                class="btn-secondary"
+                style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                @click="previsualizarCertLey"
+                :disabled="previsualizandoLey || leyPlantaSimulada === null"
+                title="Abrir previsualización del certificado"
+              >
+                <span v-if="previsualizandoLey" class="spinner" style="margin-right:0.4rem"></span>
+                <span v-else>👁 Previsualizar</span>
+              </button>
+              <button
+                class="btn-primary"
+                style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                @click="abrirConfirmarGenerar"
+                :disabled="generando || leyPlantaSimulada === null"
+                title="Guardar certificado PDF definitivo en el servidor"
+              >
+                <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
+                Guardar PDF definitivo
+              </button>
+            </div>
           </h2>
 
           <div v-if="cargandoLeyComercial" class="estado-tabla">
@@ -193,6 +206,11 @@
               Detalle: {{ leyComercialCalc.detalle }}
             </div>
           </template>
+
+          <div v-if="certLeyGuardado" class="cert-guardado-info">
+            ✓ Certificado guardado —
+            <a href="#" @click.prevent="verCertificado(certLeyGuardado)" class="link-cert">Ver PDF guardado</a>
+          </div>
 
           <div v-else class="info-box warning" style="margin-top:0.75rem">
             <AlertTriangle /> No se pudo calcular la ley comercial.
@@ -385,6 +403,42 @@
           </div>
         </div>
 
+        <!-- Sección: certificado de recuperación comercial -->
+        <section class="card" v-if="tieneRecuperacionVigente">
+          <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
+            <span>CERTIFICADO DE RECUPERACIÓN</span>
+            <div style="display:flex;gap:0.5rem">
+              <button
+                class="btn-secondary"
+                style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                @click="previsualizarCertRec"
+                :disabled="previsualizandoRec"
+                title="Abrir previsualización del certificado de recuperación"
+              >
+                <span v-if="previsualizandoRec" class="spinner" style="margin-right:0.4rem"></span>
+                <span v-else>👁 Previsualizar</span>
+              </button>
+              <button
+                class="btn-primary"
+                style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                @click="guardarCertRecuperacion"
+                :disabled="guardandoRec"
+                title="Guardar certificado PDF definitivo en el servidor"
+              >
+                <span v-if="guardandoRec" class="spinner" style="margin-right:0.4rem"></span>
+                Guardar PDF definitivo
+              </button>
+            </div>
+          </h2>
+          <p style="font-size:0.8rem;color:var(--color-text-muted)">
+            Genera el informe de recuperación (formato Paititi) para entregar al proveedor.
+          </p>
+          <div v-if="certRecGuardado" class="cert-guardado-info">
+            ✓ Certificado guardado —
+            <a href="#" @click.prevent="verCertificado(certRecGuardado)" class="link-cert">Ver PDF guardado</a>
+          </div>
+        </section>
+
         <div class="acciones-lote">
           <button
             v-if="lote.ley_planta != null && cipsRecuperacionDisponibles.length > 0"
@@ -418,7 +472,7 @@
     <div v-if="modalConfirmarGenerar" class="modal-overlay" @click.self="modalConfirmarGenerar = false">
       <div class="modal modal-sm">
         <div class="modal-header">
-          <h2>Confirmar y Generar</h2>
+          <h2>Confirmar y Guardar PDF</h2>
           <button class="btn-cerrar" @click="modalConfirmarGenerar = false"><X :size="18" /></button>
         </div>
         <div class="modal-body">
@@ -441,7 +495,7 @@
             </div>
           </div>
           <div v-else class="info-box" style="margin-bottom:0.75rem">
-            Se generará el certificado con todos los análisis vigentes.
+            Se guardará el certificado con todos los análisis vigentes.
             Ley planta: <strong style="font-family:var(--font-mono)">
               {{ lote?.ley_planta != null ? Number(lote.ley_planta).toFixed(4) : '-' }} oz/TC
             </strong>
@@ -452,10 +506,10 @@
           <button
             class="btn-primary"
             :disabled="(excluidos.size > 0 && !justificacionGenerar.trim()) || generando"
-            @click="confirmarYGenerar"
+            @click="confirmarYGuardar"
           >
             <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
-            Confirmar y generar PDF
+            Confirmar y guardar PDF
           </button>
         </div>
       </div>
@@ -579,11 +633,13 @@ const enviando  = ref(false)
 const lote      = ref<LoteLabOut | null>(null)
 const tabActual = ref<'ley' | 'rec'>('ley')
 
-// ── Flujo ley: exclusión local + generar ──────────────────────────────────────
-const excluidos          = ref<Set<number>>(new Set())
+// ── Flujo ley: exclusión local + guardar ──────────────────────────────────────
+const excluidos             = ref<Set<number>>(new Set())
 const modalConfirmarGenerar = ref(false)
-const justificacionGenerar  = ref('')   // solo para el flujo confirmar+generar
-const generando          = ref(false)
+const justificacionGenerar  = ref('')
+const generando             = ref(false)
+const previsualizandoLey    = ref(false)
+const certLeyGuardado       = ref<string | null>(null)
 
 function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)
@@ -593,6 +649,11 @@ function toggleExcluido(id: number) {
 
 const leyPlantaSimulada = computed<number | null>(() => {
   if (!lote.value) return null
+  // Sin exclusiones locales → usar el valor calculado por el servidor (incluye dirimencia)
+  if (excluidos.value.size === 0) {
+    return lote.value.ley_planta != null ? Number(lote.value.ley_planta) : null
+  }
+  // Simulación: recalcular excluyendo los marcados localmente (solo planta/externo)
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
       && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo'),
@@ -611,7 +672,18 @@ function abrirConfirmarGenerar() {
   modalConfirmarGenerar.value = true
 }
 
-async function confirmarYGenerar() {
+async function previsualizarCertLey() {
+  previsualizandoLey.value = true
+  try {
+    await laboratorioApi.previewCertificadoLeyPdf(ipActual)
+  } catch {
+    ui.toast('Error al generar previsualización', 'error')
+  } finally {
+    previsualizandoLey.value = false
+  }
+}
+
+async function confirmarYGuardar() {
   for (const id of excluidos.value) {
     const ok = await store.descartarLey(id, justificacionGenerar.value)
     if (!ok) {
@@ -625,12 +697,53 @@ async function confirmarYGenerar() {
   lote.value = await store.cargarDetalleLote(ipActual)
   leyComercialCalc.value = null
   await recargarLeyComercial()
-  await generarCertificado()
+
+  generando.value = true
+  try {
+    const res = await laboratorioApi.guardarCertificadoLey(ipActual)
+    certLeyGuardado.value = res.ruta
+    ui.toast('Certificado guardado correctamente', 'success')
+  } catch {
+    ui.toast('Error al guardar certificado PDF', 'error')
+  } finally {
+    generando.value = false
+  }
 }
 
-// ── Flujo rec: descartar individual ──────────────────────────────────────────
-const modalDescartarRec = ref<number | null>(null)   // guarda el id del análisis de rec
-const justificacionRec  = ref('')                    // solo para descarte de rec
+// ── Flujo rec: descartar + certificado ───────────────────────────────────────
+const modalDescartarRec  = ref<number | null>(null)
+const justificacionRec   = ref('')
+const previsualizandoRec = ref(false)
+const guardandoRec       = ref(false)
+const certRecGuardado    = ref<string | null>(null)
+
+const tieneRecuperacionVigente = computed(() =>
+  lote.value?.analisis_recuperacion.some(a => a.vigente && a.estado === 'COMPLETADO') ?? false
+)
+
+async function previsualizarCertRec() {
+  previsualizandoRec.value = true
+  try {
+    await laboratorioApi.previewCertificadoRecPdf(ipActual)
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al generar previsualización', 'error')
+  } finally {
+    previsualizandoRec.value = false
+  }
+}
+
+async function guardarCertRecuperacion() {
+  guardandoRec.value = true
+  try {
+    const res = await laboratorioApi.guardarCertificadoRec(ipActual)
+    certRecGuardado.value = res.ruta
+    ui.toast('Certificado de recuperación guardado', 'success')
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al guardar certificado', 'error')
+  } finally {
+    guardandoRec.value = false
+  }
+}
 
 function toggleDescartarRec(id: number) {
   justificacionRec.value = ''
@@ -670,17 +783,6 @@ async function recargarLeyComercial() {
     leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
   } catch { } finally {
     cargandoLeyComercial.value = false
-  }
-}
-
-async function generarCertificado() {
-  generando.value = true
-  try {
-    await laboratorioApi.descargarCertificadoPdf(ipActual)
-  } catch {
-    ui.toast('Error al generar certificado PDF', 'error')
-  } finally {
-    generando.value = false
   }
 }
 
@@ -1055,6 +1157,12 @@ onMounted(async () => {
   border: 1px solid rgba(234,179,8,0.35); border-radius: 3px;
   font-family: var(--font-mono); letter-spacing: 0.08em;
   vertical-align: middle; margin-left: 0.4rem;
+}
+
+.cert-guardado-info {
+  font-size: 0.78rem; color: var(--color-success);
+  margin-top: 0.6rem; padding: 0.4rem 0.75rem;
+  background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); border-radius: 5px;
 }
 
 /* Descarte preview (modal confirmar+generar) */

@@ -441,12 +441,14 @@ def registrar_ley_por_ip(
 @router.get("/lotes/{ip}/certificado-pdf")
 def generar_certificado_pdf(
     ip: str,
+    inline: bool = False,
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
     """
-    Genera el PDF del certificado de ley comercial para entregar al proveedor.
-    Aplica las reglas de parametros_comerciales.
+    Genera el PDF del certificado de ley comercial.
+    ?inline=true → previsualización en navegador.
+    ?inline=false → descarga (default).
     Solo Comercial, Gerencia, Admin.
     """
     from app.services import certificado_ley_pdf as cert_svc
@@ -459,11 +461,81 @@ def generar_certificado_pdf(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     nombre = f"certificado_ley_{ip.replace('-', '_')}.pdf"
+    disposition = "inline" if inline else f'attachment; filename="{nombre}"'
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        headers={"Content-Disposition": disposition},
     )
+
+
+@router.post("/lotes/{ip}/guardar-certificado-ley")
+def guardar_certificado_ley(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Genera y persiste el certificado de ley en storage. Retorna ruta relativa."""
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip)
+        ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "ley")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
+
+
+@router.get("/lotes/{ip}/certificado-recuperacion-pdf")
+def generar_certificado_recuperacion_pdf(
+    ip: str,
+    inline: bool = False,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera el PDF del certificado de recuperación (formato Paititi con marca de agua).
+    ?inline=true → previsualización. Solo Comercial, Gerencia, Admin.
+    """
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_comercial_pdf(db, ip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = f"certificado_rec_{ip.replace('-', '_')}.pdf"
+    disposition = "inline" if inline else f'attachment; filename="{nombre}"'
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.post("/lotes/{ip}/guardar-certificado-recuperacion")
+def guardar_certificado_recuperacion(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Genera y persiste el certificado de recuperación en storage."""
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_comercial_pdf(db, ip)
+        ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "rec")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
 
 
 @router.get("/cips/{cip}/certificado-ensayo")
