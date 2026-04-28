@@ -344,18 +344,22 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
             f"El CIP '{datos.cip}' es de tipo '{mapeo.tipo_muestra}' y no se usa para análisis de ley"
         )
 
+    # Actualizar laboratorio destino en el mapeo
+    if datos.laboratorio:
+        mapeo.laboratorio = datos.laboratorio or "Paititi"
+
     # Dirimencia: invalidar análisis previos vigentes del mismo lote
-    if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
-        previos = (
-            db.query(AnalisisLey)
-            .filter(
-                AnalisisLey.lote_id == mapeo.lote_id,
-                AnalisisLey.vigente == True,  # noqa: E712
-            )
-            .all()
-        )
-        for p in previos:
-            p.vigente = False
+    # if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
+    #     previos = (
+    #         db.query(AnalisisLey)
+    #         .filter(
+    #             AnalisisLey.lote_id == mapeo.lote_id,
+    #             AnalisisLey.vigente == True,  # noqa: E712
+    #         )
+    #         .all()
+    #     )
+    #     for p in previos:
+    #         p.vigente = False
 
     ley_final = _calcular_ley_final(datos.ley_fino, datos.ley_grueso)
     ley_gr_tm = _calcular_ley_gr_tm(ley_final)
@@ -403,17 +407,17 @@ def registrar_ley_por_ip(
         raise ValueError(f"Lote '{ip_lote}' no encontrado")
 
     # Dirimencia: invalidar todos los analisis previos vigentes del lote
-    if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
-        previos = (
-            db.query(AnalisisLey)
-            .filter(
-                AnalisisLey.lote_id == lote.id,
-                AnalisisLey.vigente == True,  # noqa: E712
-            )
-            .all()
-        )
-        for p in previos:
-            p.vigente = False
+    # if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
+    #     previos = (
+    #         db.query(AnalisisLey)
+    #         .filter(
+    #             AnalisisLey.lote_id == lote.id,
+    #             AnalisisLey.vigente == True,  # noqa: E712
+    #         )
+    #         .all()
+    #     )
+    #     for p in previos:
+    #         p.vigente = False
 
     ley_final = _calcular_ley_final(Decimal(str(datos.ley_fino)), Decimal(str(datos.ley_grueso)))
     ley_gr_tm = _calcular_ley_gr_tm(ley_final)
@@ -452,6 +456,10 @@ def registrar_analisis_recuperacion(
 
     if datos.ley_cola >= datos.ley_cabeza:
         raise ValueError("La ley cola debe ser estrictamente menor a la ley cabeza")
+
+    # Actualizar laboratorio destino en el mapeo
+    if datos.laboratorio:
+        mapeo.laboratorio = datos.laboratorio or "Paititi"
 
     nuevo = AnalisisRecuperacion(
         lote_id=mapeo.lote_id,
