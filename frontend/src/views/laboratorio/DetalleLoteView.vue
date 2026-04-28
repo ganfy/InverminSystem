@@ -212,7 +212,7 @@
             <a href="#" @click.prevent="verCertificado(certLeyGuardado)" class="link-cert">Ver PDF guardado</a>
           </div>
 
-          <div v-else class="info-box warning" style="margin-top:0.75rem">
+          <div v-else-if="!leyComercialCalc && !cargandoLeyComercial" class="info-box warning" style="margin-top:0.75rem">
             <AlertTriangle /> No se pudo calcular la ley comercial.
             <button class="btn-secondary" style="margin-left:0.5rem;font-size:0.75rem" @click="recargarLeyComercial">Reintentar</button>
           </div>

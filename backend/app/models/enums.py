@@ -224,6 +224,7 @@ class RolSistema(str, Enum):
     LABORATORISTA = "Laboratorista"
     OPERADOR_BALANZA = "OperadorBalanza"
     TECNICO_MUESTREO = "TecnicoMuestreo"
+    METALURGISTA = "Metalurgista"
 
 
 # =============================================================================

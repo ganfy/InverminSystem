@@ -33,6 +33,7 @@ ROLES = [
     {"codigo": "Laboratorista", "nombre": "Técnico Analista"},
     {"codigo": "OperadorBalanza", "nombre": "Operador de Balanza"},
     {"codigo": "TecnicoMuestreo", "nombre": "Técnico de Muestreo"},
+    {"codigo": "Metalurgista", "nombre": "Metalurgista"},
     # Roles comerciales de entidades
     {"codigo": "PROVEEDOR", "nombre": "Proveedor"},
     {"codigo": "ACOPIADOR", "nombre": "Acopiador"},
@@ -119,8 +120,8 @@ PERMISOS = [
     ("Admin", "PRUEBAS_MET", "VIEW", True),
     ("Gerencia", "PRUEBAS_MET", "VIEW", True),
     ("Comercial", "PRUEBAS_MET", "VIEW", True),
-    ("TecnicoMuestreo", "PRUEBAS_MET", "CREATE", True),
-    ("TecnicoMuestreo", "PRUEBAS_MET", "VIEW", True),
+    ("Metalurgista", "PRUEBAS_MET", "CREATE", True),
+    ("Metalurgista", "PRUEBAS_MET", "VIEW", True),
     # ── RUMAS ─────────────────────────────────────────────────────────────────
     ("Admin", "RUMAS", "CREATE", True),
     ("Admin", "RUMAS", "UPDATE", True),

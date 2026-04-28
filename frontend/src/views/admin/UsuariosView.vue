@@ -159,6 +159,7 @@ const ROLES = [
   'Laboratorista',
   'Operador Balanza',
   'Técnico Muestreo',
+  'Metalurgista',
 ]
 
 // Estado principal

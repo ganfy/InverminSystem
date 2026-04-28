@@ -27,6 +27,8 @@ export interface MapeoCIPOut {
     codigo_cip: string
     laboratorio?: string | null
     tipo_muestra?: string | null
+    tiene_analisis_ley?: boolean
+    tiene_analisis_recuperacion?: boolean
 }
 
 export interface MuestreoOfflineItem {

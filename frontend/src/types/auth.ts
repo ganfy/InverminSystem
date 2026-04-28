@@ -27,3 +27,4 @@ export type RolSistema =
   | 'Laboratorista'
   | 'OperadorBalanza'
   | 'TecnicoMuestreo'
+  | 'Metalurgista'
