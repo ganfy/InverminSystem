@@ -1,7 +1,7 @@
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.enums import RolSistema
-from app.models.models import Lote, MapeoCIP, Muestreo, Usuario, AnalisisLey, AnalisisRecuperacion
+from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, MapeoCIP, Muestreo, Usuario
 from app.schemas.muestreo import (
     ActualizarLabCIPRequest,
     GenerarCipsRequest,
@@ -117,17 +117,31 @@ def listar_cips_lote(
     cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).all()
     resultado = []
     for cip in cips:
-        tiene_ley = db.query(AnalisisLey).filter(
-            AnalisisLey.cip == cip.codigo_cip, AnalisisLey.vigente == True
-        ).first() is not None
-        tiene_rec = db.query(AnalisisRecuperacion).filter(
-            AnalisisRecuperacion.cip == cip.codigo_cip, AnalisisRecuperacion.vigente == True
-        ).first() is not None
-        resultado.append(MapeoCIPOut(
-            id=cip.id, lote_id=cip.lote_id, codigo_cip=cip.codigo_cip,
-            laboratorio=cip.laboratorio, tipo_muestra=cip.tipo_muestra,
-            tiene_analisis_ley=tiene_ley, tiene_analisis_recuperacion=tiene_rec,
-        ))
+        tiene_ley = (
+            db.query(AnalisisLey)
+            .filter(AnalisisLey.cip == cip.codigo_cip, AnalisisLey.vigente == True)
+            .first()
+            is not None
+        )
+        tiene_rec = (
+            db.query(AnalisisRecuperacion)
+            .filter(
+                AnalisisRecuperacion.cip == cip.codigo_cip, AnalisisRecuperacion.vigente == True
+            )
+            .first()
+            is not None
+        )
+        resultado.append(
+            MapeoCIPOut(
+                id=cip.id,
+                lote_id=cip.lote_id,
+                codigo_cip=cip.codigo_cip,
+                laboratorio=cip.laboratorio,
+                tipo_muestra=cip.tipo_muestra,
+                tiene_analisis_ley=tiene_ley,
+                tiene_analisis_recuperacion=tiene_rec,
+            )
+        )
     return resultado
 
 
