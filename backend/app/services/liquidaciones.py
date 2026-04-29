@@ -740,3 +740,154 @@ def lotes_disponibles_para_liquidar(
         )
 
     return resultado
+
+
+"""
+Router: Liquidaciones
+RF-LIQ-001 al RF-LIQ-005. Solo roles: Admin, Gerencia, Comercial.
+"""
+
+from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.models.enums import RolSistema
+from app.models.models import Usuario
+from app.schemas.liquidaciones import (
+    CambiarEstadoRequest,
+    LiquidacionesKPIOut,
+    LiquidacionListItem,
+    LiquidacionOut,
+    LoteLiquidableOut,
+    ProvacoPSelectorOut,
+)
+from app.services import liquidaciones as svc
+from fastapi import APIRouter, Depends, HTTPException, status
+
+router = APIRouter(prefix="/liquidaciones", tags=["Liquidaciones"])
+
+_ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
+
+
+def _verificar_rol(user: Usuario) -> None:
+    rol = user.rol.codigo if user.rol else None
+    if rol not in {r.value for r in _ROLES_COMERCIAL}:
+        raise HTTPException(status_code=403, detail="Sin permiso para gestionar liquidaciones")
+
+
+# ── KPIs ──────────────────────────────────────────────────────────────────────
+
+
+@router.get("/kpis", response_model=LiquidacionesKPIOut)
+def get_kpis(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    _verificar_rol(current_user)
+    return svc.obtener_kpis(db)
+
+
+# ── Selector provacops para wizard paso 1 ─────────────────────────────────────
+
+
+@router.get("/provacops", response_model=list[ProvacoPSelectorOut])
+def get_provacops_con_lotes(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Retorna relaciones proveedor-acopiador que tienen al menos 1 lote liquidable."""
+    _verificar_rol(current_user)
+    return svc.listar_provacops_con_lotes_liquidables(db)
+
+
+# ── Lotes liquidables ─────────────────────────────────────────────────────────
+
+
+@router.get("/lotes-liquidables", response_model=list[LoteLiquidableOut])
+def get_lotes_liquidables(
+    provacop_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Lotes con ley comercial + recuperación + TMS completos, listos para liquidar.
+    Opcional: filtrar por provacop_id para el wizard paso 2.
+    """
+    _verificar_rol(current_user)
+    return svc.listar_lotes_liquidables(db, provacop_id=provacop_id)
+
+
+# ── Lista de liquidaciones ────────────────────────────────────────────────────
+
+
+@router.get("", response_model=list[LiquidacionListItem])
+def listar_liquidaciones(
+    estado: str | None = None,
+    provacop_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    _verificar_rol(current_user)
+    return svc.listar_liquidaciones(db, estado=estado, provacop_id=provacop_id)
+
+
+# ── Crear liquidación (BORRADOR) ──────────────────────────────────────────────
+
+
+@router.post("", response_model=LiquidacionOut, status_code=status.HTTP_201_CREATED)
+def crear_liquidacion(
+    datos: LiquidacionCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Crea una nueva liquidación en estado BORRADOR con cálculos automáticos.
+    RF-LIQ-003: todos los valores son calculados por el sistema.
+    """
+    _verificar_rol(current_user)
+    return svc.crear_liquidacion(db, datos, current_user.id)
+
+
+# ── Detalle de liquidación ────────────────────────────────────────────────────
+
+
+@router.get("/{liquidacion_id}", response_model=LiquidacionOut)
+def get_liquidacion(
+    liquidacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    _verificar_rol(current_user)
+    return svc.obtener_liquidacion(db, liquidacion_id)
+
+
+# ── Cambiar estado ────────────────────────────────────────────────────────────
+
+
+@router.patch("/{liquidacion_id}/estado", response_model=LiquidacionOut)
+def cambiar_estado(
+    liquidacion_id: int,
+    body: CambiarEstadoRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Transiciones permitidas:
+    BORRADOR → GENERADA (emite PDF y marca lotes como LIQUIDADO)
+    GENERADA → FACTURADA
+    FACTURADA → PAGADA (irreversible, RF-SYS-001 regla 5)
+    """
+    _verificar_rol(current_user)
+    return svc.cambiar_estado(db, liquidacion_id, body.estado, current_user.id)
+
+
+# ── Eliminar borrador ─────────────────────────────────────────────────────────
+
+
+@router.delete("/{liquidacion_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_liquidacion(
+    liquidacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Solo se pueden eliminar liquidaciones en estado BORRADOR."""
+    _verificar_rol(current_user)
+    svc.eliminar_liquidacion(db, liquidacion_id)

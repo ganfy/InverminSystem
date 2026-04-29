@@ -108,6 +108,151 @@ export interface LiquidacionDetalleOut extends LiquidacionResumenOut {
     fecha_cierre: string | null
 }
 
+// ── Provacop selector (wizard paso 1) ────────────────────────────────────────
+
+export interface ProvacoPSelector {
+    id: number
+    proveedor: string
+    proveedor_ruc: string | null
+    acopiador: string
+    tiene_parametros: boolean
+    maquila: number | null
+    comision: number | null
+    gasto_acopio: number | null
+    gasto_consumo: number | null
+    riesgo_comercial: number | null
+}
+
+// ── Lote liquidable ───────────────────────────────────────────────────────────
+
+export interface LoteLiquidable {
+    lote_id: number
+    ip: string
+    provacop_id: number
+    proveedor: string
+    acopiador: string
+    ruc_proveedor: string | null
+    material: string | null
+    estado: string
+    fecha_recepcion: string | null
+    tms: number | null
+    ley_comercial: number | null
+    ley_gr_tm: number | null
+    usa_dirimencia: boolean
+    oz_tc_planta: number | null
+    oz_tc_minero: number | null
+    porcentaje_rec: number | null
+}
+
+// ── Crear liquidación ─────────────────────────────────────────────────────────
+
+export interface LiquidacionCreate {
+    provacop_id: number
+    precio_oro_usd: number
+    lote_ids: number[]
+}
+
+// ── Liquidación completa ──────────────────────────────────────────────────────
+
+export interface LiquidacionOut {
+    id: number
+    numero_liquidacion: string | null
+    provacop_id: number
+    proveedor: string
+    acopiador: string
+    ruc_proveedor: string | null
+    precio_oro_usd: number | null
+    valor_total_usd: number | null
+    estado: EstadoLiquidacion
+    pdf_url: string | null
+    creado_en: string | null
+    lotes: LiquidacionLoteOut[]
+}
+
+// ── Item de lista (tabla dashboard) ──────────────────────────────────────────
+
+export interface LiquidacionListItem {
+    id: number
+    numero_liquidacion: string | null
+    provacop_id: number
+    proveedor: string
+    acopiador: string
+    num_lotes: number
+    tms_total: number | null
+    precio_oro_usd: number | null
+    valor_total_usd: number | null
+    estado: EstadoLiquidacion
+    pdf_url: string | null
+    creado_en: string | null
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────────
+
+export interface LiquidacionesKPI {
+    borradores: number
+    generadas: number
+    lotes_liquidables: number
+    valor_pendiente_usd: number
+}
+
+// ── Estado ────────────────────────────────────────────────────────────────────
+
+export type EstadoLiquidacion = 'BORRADOR' | 'GENERADA' | 'FACTURADA' | 'PAGADA'
+
+export const ESTADO_LABELS: Record<EstadoLiquidacion, string> = {
+    BORRADOR: 'Borrador',
+    GENERADA: 'Generada',
+    FACTURADA: 'Facturada',
+    PAGADA: 'Pagada',
+}
+
+// ── Cálculo preview wizard paso 3 ────────────────────────────────────────────
+
+export interface LoteCalculo {
+    lote_id: number
+    ip: string
+    tms: number
+    ley_comercial: number   // oz/tc
+    ley_gr_tm: number
+    usa_dirimencia: boolean
+    porcentaje_rec: number
+    fino_recuperable: number  // oz
+    valor_bruto: number       // USD
+}
+
+export interface ResumenCalculos {
+    lotes: LoteCalculo[]
+    total_fino_oz: number
+    total_valor_bruto: number
+    gasto_acopio_total: number
+    gasto_consumo_total: number
+    maquila_usd: number
+    comision_usd: number
+    total_deducciones: number
+    valor_neto: number
+}
+
+// // ── Lote dentro de liquidación ────────────────────────────────────────────────
+
+// export interface LiquidacionLoteOut {
+//     lote_id: number
+//     ip: string
+//     material: string | null
+//     tms: number | null
+//     ley_comercial: number | null
+//     usa_dirimencia: boolean
+//     oz_tc_planta: number | null
+//     oz_tc_comercial: number | null
+//     oz_tc_minero: number | null
+//     oz_tc_promedio: number | null
+//     porcentaje_rec_liquido: number | null
+//     porcentaje_rec_planta: number | null
+//     fino_recuperable: number | null
+//     gasto_acopio_liquidacion: number | null
+//     bono: number | null
+//     insumos_liquidacion: number | null
+//}
+
 // ── API calls ──────────────────────────────────────────────────────────────────
 
 export function getLotesDisponibles(provacop_id: number) {
