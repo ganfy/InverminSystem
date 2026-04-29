@@ -4,7 +4,7 @@ import { createTestingPinia } from '@pinia/testing'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import LaboratorioDashboardView from '@/views/laboratorio/LaboratorioDashboardView.vue'
-import { obtenerCipsLabCache } from '@/composables/useOfflineQueue'
+import { obtenerCipsLabCache, encolarAnalisisLey, encolarAnalisisRecuperacion } from '@/composables/useOfflineQueue'
 import { useSync } from '@/composables/useSync'
 import { useUiStore } from '@/stores/ui'
 
@@ -174,7 +174,6 @@ describe('laboratorioStore.registrarLey - offline', () => {
     })
 
     it('encola el análisis en IndexedDB cuando no hay conexion', async () => {
-        const { encolarAnalisisLey } = await import('@/composables/useOfflineQueue')
         const pinia = createTestingPinia({ stubActions: false, createSpy: vi.fn })
         const ui = useUiStore(pinia)
         ui.toast = vi.fn() as any
@@ -245,7 +244,6 @@ describe('laboratorioStore.completarRecuperacion - offline', () => {
     })
 
     it('encola la recuperacion cuando no hay conexion', async () => {
-        const { encolarAnalisisRecuperacion } = await import('@/composables/useOfflineQueue')
         const pinia = createTestingPinia({ stubActions: false, createSpy: vi.fn })
 
         vi.mocked(useUiStore).mockReturnValue({

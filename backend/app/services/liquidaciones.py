@@ -1,0 +1,742 @@
+"""
+Service: Modulo de Liquidaciones - INVERMIN PAITITI
+
+Formulas basadas en el Excel PL_paititi.xlsx (sheets 'Analisis comercial'):
+
+  TMS          = round(TMH - TMH * %H2O / 100, 3)
+  oz_comercial = calcular_ley_comercial(ley_planta, params)  [ya existe en laboratorio.py]
+  oz_promedio  = round((oz_comercial + oz_minero) / 2, 4)
+  step         = floor(oz_promedio * 10) * 10               [ROUNDDOWN(oz,1)*100 en Excel]
+  maquila      = max(95, maquila_base + step)               [col S del Excel]
+  insumos      = gasto_acopio + gasto_consumo
+  precio_x_tms = ((oz_promedio * rec_liq/100 * (spot - riesgo))
+                   - maquila - insumos + bono) * 1.1023     [col AB del Excel]
+  total_usd    = max(0, precio_x_tms * tms)                 [col AM del Excel]
+  fino_recup   = 31.1035 * 1.1023 * tms * rec_liq/100 * oz_promedio / 100  [col AJ]
+
+REGLA VOLADO (de notas de liquidacion):
+  Ley Oz/tc < 0.100 => lote volado, habilitacion a ruma a los 30 dias
+"""
+
+from __future__ import annotations
+
+import math
+from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
+
+from app.models.enums import EstadoLiquidacion, EstadoLote, TipoAnalisis
+from app.models.models import (
+    AnalisisLey,
+    AnalisisRecuperacion,
+    Liquidacion,
+    LiquidacionLote,
+    Lote,
+    Muestreo,
+    ParametrosComerciales,
+    Pesaje,
+    ProveedorAcopiador,
+)
+from app.schemas.liquidaciones import (
+    AlertaLote,
+    LiquidacionCreate,
+    LiquidacionDetalleOut,
+    LiquidacionLoteOut,
+    LiquidacionPreviewOut,
+    LiquidacionPreviewRequest,
+    LiquidacionResumenOut,
+    LoteFinancieroOut,
+)
+from app.services.laboratorio import calcular_ley_comercial
+from app.services.pruebas import calcular_ley_planta
+from sqlalchemy.orm import Session, joinedload
+
+FACTOR = Decimal("1.1023")
+TROY_OZ = Decimal("31.1035")
+MIN_MAQUILA = Decimal("95")
+UMBRAL_VOLADO = Decimal("0.100")
+
+
+# ── Helpers de calculo (formulas del Excel) ────────────────────────────────────
+
+
+def _calc_maquila(oz_promedio: Decimal, maquila_base: Decimal) -> Decimal:
+    """
+    step = floor(oz_promedio * 10) * 10  (=ROUNDDOWN(oz,1)*100 en Excel)
+    maquila = max(95, maquila_base + step)
+    """
+    step = Decimal(str(math.floor(float(oz_promedio) * 10) * 10))
+    return max(MIN_MAQUILA, maquila_base + step)
+
+
+def _calc_precio_x_tms(
+    oz_promedio: Decimal,
+    rec_liq: Decimal,
+    spot: Decimal,
+    riesgo: Decimal,
+    maquila: Decimal,
+    insumos: Decimal,
+    bono: Decimal,
+) -> Decimal:
+    """col AB del Excel: ((oz*rec/100*(spot-riesgo)) - maquila - insumos + bono) * factor"""
+    val = (oz_promedio * rec_liq / 100 * (spot - riesgo)) - maquila - insumos + bono
+    return (val * FACTOR).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _calc_total(precio_x_tms: Decimal, tms: Decimal) -> Decimal:
+    """col AM del Excel: max(0, precio_x_tms * tms)"""
+    return max(Decimal("0"), (precio_x_tms * tms).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _calc_fino_recuperable(tms: Decimal, rec_liq: Decimal, oz_promedio: Decimal) -> Decimal:
+    """col AJ del Excel: 31.1035 * 1.1023 * tms * rec_liq/100 * oz_promedio / 100"""
+    return (TROY_OZ * FACTOR * tms * rec_liq / 100 * oz_promedio / 100).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
+
+
+# ── Helpers de datos ───────────────────────────────────────────────────────────
+
+
+def _ultimo_muestreo(db: Session, lote_id: int) -> Muestreo | None:
+    return (
+        db.query(Muestreo)
+        .filter(Muestreo.lote_id == lote_id)
+        .order_by(Muestreo.intento.desc())
+        .first()
+    )
+
+
+def _pesaje_principal(db: Session, lote_id: int) -> Pesaje | None:
+    return db.query(Pesaje).filter(Pesaje.lote_id == lote_id).order_by(Pesaje.id).first()
+
+
+def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
+    a = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.tipo_analisis == TipoAnalisis.MINERO,
+            AnalisisLey.vigente == True,  # noqa: E712
+        )
+        .order_by(AnalisisLey.id.desc())
+        .first()
+    )
+    return Decimal(str(a.ley_final)) if a and a.ley_final else None
+
+
+def _rec_liq(db: Session, lote_id: int) -> Decimal | None:
+    """% recuperacion liquidacion: campo 'recuperacion' del AnalisisRecuperacion vigente."""
+    a = (
+        db.query(AnalisisRecuperacion)
+        .filter(
+            AnalisisRecuperacion.lote_id == lote_id,
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+        )
+        .order_by(AnalisisRecuperacion.id.desc())
+        .first()
+    )
+    return Decimal(str(a.recuperacion)) if a and a.recuperacion else None
+
+
+def _rec_planta(db: Session, lote_id: int) -> Decimal | None:
+    """% recuperacion planta (porcentaje diferente al de liq en algunos casos)."""
+    a = (
+        db.query(AnalisisRecuperacion)
+        .filter(
+            AnalisisRecuperacion.lote_id == lote_id,
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+        )
+        .order_by(AnalisisRecuperacion.id.desc())
+        .first()
+    )
+    # Si el analisis tiene ley_cabeza y ley_cola calculamos planta aparte
+    # por ahora retorna el mismo campo recuperacion como aproximacion
+    return Decimal(str(a.recuperacion)) if a and a.recuperacion else None
+
+
+def _fecha_recepcion(lote: Lote) -> date | None:
+    if lote.pesajes:
+        dt = lote.pesajes[0].fecha_fin
+        return dt.date() if isinstance(dt, datetime) else dt
+    return None
+
+
+def _numero_liquidacion(db: Session) -> str:
+    """Genera numero correlativo LIQ-YYYY-NNNN."""
+    anio = datetime.now().year
+    prefix = f"LIQ-{anio}-"
+    ultimo = (
+        db.query(Liquidacion.numero_liquidacion)
+        .filter(Liquidacion.numero_liquidacion.like(f"{prefix}%"))
+        .order_by(Liquidacion.id.desc())
+        .first()
+    )
+    if ultimo and ultimo[0]:
+        try:
+            n = int(ultimo[0].split("-")[-1]) + 1
+        except (ValueError, IndexError):
+            n = 1
+    else:
+        n = 1
+    return f"{prefix}{n:04d}"
+
+
+# ── Calculo de snapshot de un lote ────────────────────────────────────────────
+
+
+def _calcular_lote(
+    db: Session,
+    lote: Lote,
+    spot_usd: Decimal,
+    bono: Decimal,
+    rec_liq_override: Decimal | None,
+) -> tuple[dict[str, Any], list[AlertaLote]]:
+    """
+    Calcula todos los valores financieros para un lote.
+    Retorna (snapshot_dict, alertas).
+    alertas con critico=True bloquean la liquidacion.
+    """
+    alertas: list[AlertaLote] = []
+    params: ParametrosComerciales | None = lote.sesion.provacop.parametros
+
+    # ── TMS / TMH ─────────────────────────────────────────────────────────────
+    muestreo = _ultimo_muestreo(db, lote.id)
+    pesaje = _pesaje_principal(db, lote.id)
+
+    if not muestreo or not muestreo.tms_calculado:
+        alertas.append(
+            AlertaLote(
+                tipo="SIN_MUESTREO", mensaje=f"{lote.ip}: sin muestreo registrado", critico=True
+            )
+        )
+        return {}, alertas
+
+    tms = Decimal(str(muestreo.tms_calculado))
+    humedad = (
+        Decimal(str(muestreo.porcentaje_humedad)) if muestreo.porcentaje_humedad else Decimal("0")
+    )
+    tmh = (
+        (tms / (1 - humedad / 100)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        if humedad < 100
+        else tms
+    )
+    sacos = pesaje.sacos if pesaje else None
+    fecha_rec = _fecha_recepcion(lote)
+
+    # ── Parametros comerciales ────────────────────────────────────────────────
+    if not params:
+        alertas.append(
+            AlertaLote(
+                tipo="SIN_PARAMS", mensaje=f"{lote.ip}: sin parametros comerciales", critico=True
+            )
+        )
+        return {}, alertas
+
+    riesgo = Decimal(str(params.riesgo_comercial)) if params.riesgo_comercial else Decimal("0")
+    maquila_base = Decimal(str(params.maquila_base)) if params.maquila_base else Decimal("0")
+    gasto_acopio = Decimal(str(params.gasto_acopio)) if params.gasto_acopio else Decimal("0")
+    gasto_consumo = Decimal(str(params.gasto_consumo)) if params.gasto_consumo else Decimal("0")
+    insumos = gasto_acopio + gasto_consumo
+
+    # ── Ley Planta ────────────────────────────────────────────────────────────
+    ley_planta = calcular_ley_planta(db, lote.id)
+    if ley_planta is None:
+        alertas.append(
+            AlertaLote(
+                tipo="SIN_LEY_PLANTA",
+                mensaje=f"{lote.ip}: sin analisis de ley vigente",
+                critico=True,
+            )
+        )
+        return {}, alertas
+
+    # ── Ley Comercial (usa logica existente de laboratorio) ───────────────────
+    lc_result = calcular_ley_comercial(ley_planta, params)
+    oz_tc_comercial = Decimal(str(lc_result["ley_comercial"])).quantize(Decimal("0.0001"))
+
+    # ── Ley Minero ────────────────────────────────────────────────────────────
+    oz_tc_minero = _ley_minero(db, lote.id)
+    if oz_tc_minero is None:
+        alertas.append(
+            AlertaLote(
+                tipo="SIN_LEY_MINERO",
+                mensaje=f"{lote.ip}: sin ley del minero registrada",
+                critico=True,
+            )
+        )
+        return {}, alertas
+
+    # ── Promedio ──────────────────────────────────────────────────────────────
+    oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
+
+    # ── Recuperacion ──────────────────────────────────────────────────────────
+    rec_liq = rec_liq_override if rec_liq_override is not None else _rec_liq(db, lote.id)
+    if rec_liq is None:
+        alertas.append(
+            AlertaLote(
+                tipo="SIN_RECUPERACION",
+                mensaje=f"{lote.ip}: sin analisis de recuperacion vigente",
+                critico=True,
+            )
+        )
+        return {}, alertas
+    rec_planta_val = _rec_planta(db, lote.id) or rec_liq
+
+    # ── Maquila y precio ──────────────────────────────────────────────────────
+    maquila = _calc_maquila(oz_promedio, maquila_base)
+    precio_x_tms = _calc_precio_x_tms(
+        oz_promedio, rec_liq, spot_usd, riesgo, maquila, insumos, bono
+    )
+    total_usd = _calc_total(precio_x_tms, tms)
+    fino_recuperable = _calc_fino_recuperable(tms, rec_liq, oz_promedio)
+
+    # ── Alertas no criticas ───────────────────────────────────────────────────
+    if lote.volado:
+        dias = (date.today() - fecha_rec).days if fecha_rec else 0
+        alertas.append(
+            AlertaLote(
+                tipo="VOLADO",
+                mensaje=f"{lote.ip}: lote VOLADO (ley < 0.100 Oz/tc). Dias en almacen: {dias}",
+                critico=False,
+            )
+        )
+    if fecha_rec and (date.today() - fecha_rec).days >= 25:
+        dias = (date.today() - fecha_rec).days
+        alertas.append(
+            AlertaLote(
+                tipo="VENCIMIENTO_30D",
+                mensaje=f"{lote.ip}: {dias} dias en almacen (limite 30 dias)",
+                critico=False,
+            )
+        )
+
+    snapshot = {
+        "ip": lote.ip,
+        "fecha_recepcion": fecha_rec,
+        "tmh": tmh,
+        "pct_humedad": humedad,
+        "tms": tms,
+        "sacos": sacos,
+        "oz_tc_planta": ley_planta,
+        "oz_tc_planta_raw": ley_planta,
+        "oz_tc_comercial": oz_tc_comercial,
+        "oz_tc_minero": oz_tc_minero,
+        "oz_tc_promedio": oz_promedio,
+        "pct_rec_liq": rec_liq,
+        "pct_rec_planta": rec_planta_val,
+        "maquila": maquila,
+        "riesgo": riesgo,
+        "spot_usd": spot_usd,
+        "insumos_acopio": gasto_acopio,
+        "insumos_consumo": gasto_consumo,
+        "insumos_total": insumos,
+        "bono": bono,
+        "factor": FACTOR,
+        "precio_x_tms": precio_x_tms,
+        "total_usd": total_usd,
+        "fino_recuperable": fino_recuperable,
+        "usa_dirimencia": lote.dirimencia,
+        "alertas": alertas,
+        # campos para el modelo LiquidacionLote
+        "tms_snapshot": tms,
+        "tmh_snapshot": tmh,
+        "humedad_snapshot": humedad,
+        "sacos_snapshot": sacos,
+        "fecha_recepcion_lote": fecha_rec,
+        "maquila_aplicada": maquila,
+        "riesgo_aplicado": riesgo,
+        "spot_usd_snapshot": spot_usd,
+        "insumos_liquidacion": insumos,
+        "gasto_acopio_liquidacion": gasto_acopio,
+    }
+    return snapshot, alertas
+
+
+# ── API publica del servicio ───────────────────────────────────────────────────
+
+
+def preview_liquidacion(
+    db: Session,
+    req: LiquidacionPreviewRequest,
+) -> LiquidacionPreviewOut:
+    """
+    Calcula preview sin guardar. Usado antes de confirmar la liquidacion.
+    """
+    provacop: ProveedorAcopiador = (
+        db.query(ProveedorAcopiador)
+        .options(
+            joinedload(ProveedorAcopiador.proveedor),
+            joinedload(ProveedorAcopiador.acopiador),
+            joinedload(ProveedorAcopiador.parametros),
+        )
+        .filter(ProveedorAcopiador.id == req.provacop_id)
+        .first()
+    )
+    if not provacop:
+        raise ValueError(f"ProveedorAcopiador {req.provacop_id} no encontrado")
+
+    spot = req.spot_usd
+    lotes_out: list[LoteFinancieroOut] = []
+    alertas_globales: list[AlertaLote] = []
+    puede_generar = True
+
+    for item in req.lotes:
+        lote = (
+            db.query(Lote)
+            .options(
+                joinedload(Lote.pesajes),
+                joinedload(Lote.muestreos),
+                joinedload(Lote.sesion).joinedload("provacop").joinedload("parametros"),
+            )
+            .filter(Lote.ip == item.ip, Lote.eliminado == False)  # noqa: E712
+            .first()
+        )
+        if not lote:
+            alertas_globales.append(
+                AlertaLote(
+                    tipo="LOTE_NO_ENCONTRADO", mensaje=f"Lote {item.ip} no encontrado", critico=True
+                )
+            )
+            puede_generar = False
+            continue
+
+        snap, alertas = _calcular_lote(
+            db, lote, spot, item.bono or Decimal("0"), item.rec_liq_override
+        )
+
+        if any(a.critico for a in alertas):
+            puede_generar = False
+
+        if not snap:
+            continue
+
+        lotes_out.append(
+            LoteFinancieroOut(
+                **{k: v for k, v in snap.items() if k in LoteFinancieroOut.model_fields}
+            )
+        )
+
+    total_usd = sum(lo.total_usd for lo in lotes_out)
+    total_tms = sum(lo.tms for lo in lotes_out)
+    total_tmh = sum(lo.tmh for lo in lotes_out)
+    total_oz = sum(lo.fino_recuperable for lo in lotes_out)
+
+    return LiquidacionPreviewOut(
+        provacop_id=req.provacop_id,
+        proveedor_razon_social=provacop.proveedor.razon_social if provacop.proveedor else "-",
+        proveedor_ruc=provacop.proveedor.ruc if provacop.proveedor else None,
+        acopiador_nombre=provacop.acopiador.razon_social if provacop.acopiador else "-",
+        spot_usd=spot,
+        lotes=lotes_out,
+        total_usd=total_usd,
+        total_tms=total_tms,
+        total_tmh=total_tmh,
+        total_oz_compradas=total_oz,
+        count_lotes=len(lotes_out),
+        alertas_globales=alertas_globales,
+        puede_generar=puede_generar and bool(lotes_out),
+    )
+
+
+def crear_liquidacion(
+    db: Session,
+    req: LiquidacionCreate,
+    usuario_id: int,
+) -> Liquidacion:
+    """
+    Crea la liquidacion con snapshot completo de valores financieros.
+    Actualiza estado de lotes a LIQUIDADO.
+    """
+    provacop = db.query(ProveedorAcopiador).filter(ProveedorAcopiador.id == req.provacop_id).first()
+    if not provacop:
+        raise ValueError(f"ProveedorAcopiador {req.provacop_id} no encontrado")
+
+    numero = req.numero_liquidacion or _numero_liquidacion(db)
+
+    liq = Liquidacion(
+        numero_liquidacion=numero,
+        provacop_id=req.provacop_id,
+        precio_oro_usd=req.spot_usd,
+        estado=EstadoLiquidacion.GENERADA,
+        creado_por=usuario_id,
+    )
+    db.add(liq)
+    db.flush()
+
+    total_general = Decimal("0")
+
+    for item in req.lotes:
+        lote = (
+            db.query(Lote)
+            .options(
+                joinedload(Lote.pesajes),
+                joinedload(Lote.muestreos),
+                joinedload(Lote.sesion).joinedload("provacop").joinedload("parametros"),
+            )
+            .filter(Lote.ip == item.ip, Lote.eliminado == False)  # noqa: E712
+            .first()
+        )
+        if not lote:
+            raise ValueError(f"Lote {item.ip} no encontrado")
+
+        snap, alertas = _calcular_lote(
+            db, lote, req.spot_usd, item.bono or Decimal("0"), item.rec_liq_override
+        )
+
+        if any(a.critico for a in alertas):
+            msgs = [a.mensaje for a in alertas if a.critico]
+            raise ValueError(f"No se puede liquidar {item.ip}: {'; '.join(msgs)}")
+
+        ll = LiquidacionLote(
+            liquidacion_id=liq.id,
+            lote_id=lote.id,
+            fecha_emision=req.fecha_liquidacion or date.today(),
+            fecha_recepcion=snap["fecha_recepcion"],
+            fecha_recepcion_lote=snap["fecha_recepcion"],
+            ley_comercial=snap["oz_tc_promedio"],
+            usa_dirimencia=snap["usa_dirimencia"],
+            oz_tc_planta=snap["oz_tc_planta"],
+            oz_tc_planta_raw=snap["oz_tc_planta_raw"],
+            oz_tc_comercial=snap["oz_tc_comercial"],
+            oz_tc_minero=snap["oz_tc_minero"],
+            oz_tc_promedio=snap["oz_tc_promedio"],
+            porcentaje_rec_liquido=snap["pct_rec_liq"],
+            porcentaje_rec_planta=snap["pct_rec_planta"],
+            fino_recuperable=snap["fino_recuperable"],
+            gasto_acopio_liquidacion=snap["insumos_acopio"],
+            bono=snap["bono"],
+            insumos_liquidacion=snap["insumos_total"],
+            maquila_aplicada=snap["maquila"],
+            riesgo_aplicado=snap["riesgo"],
+            spot_usd_snapshot=snap["spot_usd"],
+            precio_x_tms=snap["precio_x_tms"],
+            total_usd=snap["total_usd"],
+            tms_snapshot=snap["tms"],
+            tmh_snapshot=snap["tmh"],
+            humedad_snapshot=snap["pct_humedad"],
+            sacos_snapshot=snap["sacos"],
+            creado_por=usuario_id,
+        )
+        db.add(ll)
+
+        lote.estado = EstadoLote.LIQUIDADO
+        lote.estado_modificado_por = usuario_id
+        lote.fecha_modificacion_estado = datetime.now()
+
+        total_general += snap["total_usd"]
+
+    liq.valor_total_usd = total_general
+    db.commit()
+    db.refresh(liq)
+    return liq
+
+
+def obtener_liquidaciones(
+    db: Session,
+    provacop_id: int | None = None,
+    estado: str | None = None,
+) -> list[LiquidacionResumenOut]:
+    q = (
+        db.query(Liquidacion)
+        .options(
+            joinedload(Liquidacion.provacop).joinedload(ProveedorAcopiador.proveedor),
+            joinedload(Liquidacion.provacop).joinedload(ProveedorAcopiador.acopiador),
+            joinedload(Liquidacion.liquidacion_lotes),
+        )
+        .order_by(Liquidacion.id.desc())
+    )
+    if provacop_id:
+        q = q.filter(Liquidacion.provacop_id == provacop_id)
+    if estado:
+        q = q.filter(Liquidacion.estado == estado)
+
+    result = []
+    for liq in q.all():
+        result.append(_to_resumen(liq))
+    return result
+
+
+def obtener_liquidacion(db: Session, liquidacion_id: int) -> LiquidacionDetalleOut | None:
+    liq = (
+        db.query(Liquidacion)
+        .options(
+            joinedload(Liquidacion.provacop).joinedload(ProveedorAcopiador.proveedor),
+            joinedload(Liquidacion.provacop).joinedload(ProveedorAcopiador.acopiador),
+            joinedload(Liquidacion.liquidacion_lotes)
+            .joinedload(LiquidacionLote.lote)
+            .joinedload(Lote.pesajes),
+        )
+        .filter(Liquidacion.id == liquidacion_id)
+        .first()
+    )
+    if not liq:
+        return None
+    return _to_detalle(liq)
+
+
+def cambiar_estado(
+    db: Session,
+    liquidacion_id: int,
+    nuevo_estado: str,
+    usuario_id: int,
+) -> Liquidacion:
+    liq = db.query(Liquidacion).filter(Liquidacion.id == liquidacion_id).first()
+    if not liq:
+        raise ValueError("Liquidacion no encontrada")
+    if liq.estado == EstadoLiquidacion.PAGADA:
+        raise ValueError("Una liquidacion PAGADA no puede modificarse")
+
+    liq.estado = nuevo_estado
+    if nuevo_estado == EstadoLiquidacion.PAGADA:
+        liq.cerrado_por = usuario_id
+        liq.fecha_cierre = datetime.now()
+
+    db.commit()
+    db.refresh(liq)
+    return liq
+
+
+# ── Serializadores internos ───────────────────────────────────────────────────
+
+
+def _to_resumen(liq: Liquidacion) -> LiquidacionResumenOut:
+    prov = liq.provacop.proveedor if liq.provacop else None
+    acop = liq.provacop.acopiador if liq.provacop else None
+    return LiquidacionResumenOut(
+        id=liq.id,
+        numero_liquidacion=liq.numero_liquidacion or "",
+        estado=liq.estado,
+        provacop_id=liq.provacop_id,
+        proveedor_razon_social=prov.razon_social if prov else "-",
+        proveedor_ruc=prov.ruc if prov else None,
+        acopiador_nombre=acop.razon_social if acop else "-",
+        spot_usd=liq.precio_oro_usd or Decimal("0"),
+        total_usd=liq.valor_total_usd or Decimal("0"),
+        count_lotes=len(liq.liquidacion_lotes),
+        fecha_creacion=liq.creado_en or datetime.now(),
+    )
+
+
+def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
+    return LiquidacionLoteOut(
+        liquidacion_id=ll.liquidacion_id,
+        ip=ll.lote.ip if ll.lote else "",
+        fecha_recepcion=ll.fecha_recepcion_lote,
+        fecha_emision=ll.fecha_emision,
+        tmh=ll.tmh_snapshot or Decimal("0"),
+        pct_humedad=ll.humedad_snapshot or Decimal("0"),
+        tms=ll.tms_snapshot or Decimal("0"),
+        sacos=ll.sacos_snapshot,
+        oz_tc_planta=ll.oz_tc_planta or Decimal("0"),
+        oz_tc_comercial=ll.oz_tc_comercial or Decimal("0"),
+        oz_tc_minero=ll.oz_tc_minero or Decimal("0"),
+        oz_tc_promedio=ll.oz_tc_promedio or Decimal("0"),
+        pct_rec_liq=ll.porcentaje_rec_liquido or Decimal("0"),
+        pct_rec_planta=ll.porcentaje_rec_planta,
+        maquila=ll.maquila_aplicada or Decimal("0"),
+        riesgo=ll.riesgo_aplicado or Decimal("0"),
+        spot_usd=ll.spot_usd_snapshot or Decimal("0"),
+        insumos_acopio=ll.gasto_acopio_liquidacion or Decimal("0"),
+        insumos_consumo=(ll.insumos_liquidacion or Decimal("0"))
+        - (ll.gasto_acopio_liquidacion or Decimal("0")),
+        insumos_total=ll.insumos_liquidacion or Decimal("0"),
+        bono=ll.bono or Decimal("0"),
+        factor=FACTOR,
+        precio_x_tms=ll.precio_x_tms or Decimal("0"),
+        total_usd=ll.total_usd or Decimal("0"),
+        fino_recuperable=ll.fino_recuperable or Decimal("0"),
+        usa_dirimencia=ll.usa_dirimencia or False,
+        alertas=[],
+    )
+
+
+def _to_detalle(liq: Liquidacion) -> LiquidacionDetalleOut:
+    resumen = _to_resumen(liq)
+    lotes = [_to_lote_out(ll) for ll in liq.liquidacion_lotes]
+    return LiquidacionDetalleOut(
+        **resumen.model_dump(),
+        lotes=lotes,
+        pdf_url=liq.pdf_url,
+        fecha_cierre=liq.fecha_cierre,
+    )
+
+
+# ── Logica de volado (llamada desde laboratorio al registrar ley) ──────────────
+
+
+def evaluar_volado(db: Session, lote_id: int, ley_planta: Decimal, usuario_id: int) -> bool:
+    """
+    Marca el lote como volado si ley_planta < 0.100.
+    Retorna True si se marco como volado (nuevo).
+    """
+    lote = db.query(Lote).filter(Lote.id == lote_id).first()
+    if not lote:
+        return False
+    if not lote.volado and ley_planta < UMBRAL_VOLADO:
+        lote.volado = True
+        lote.modificado_por = usuario_id
+        return True
+    return False
+
+
+def lotes_disponibles_para_liquidar(
+    db: Session,
+    provacop_id: int,
+) -> list[dict]:
+    """
+    Retorna lotes del provacop en estado RECEPCIONADO sin liquidacion vigente.
+    Incluye alertas de volado y vencimiento para mostrar en UI.
+    """
+    lotes = (
+        db.query(Lote)
+        .options(joinedload(Lote.pesajes), joinedload(Lote.muestreos))
+        .join(Lote.sesion)
+        .filter(
+            Lote.sesion.has(provacop_id=provacop_id),
+            Lote.eliminado == False,  # noqa: E712
+            Lote.estado == EstadoLote.RECEPCIONADO,
+        )
+        .order_by(Lote.id.desc())
+        .all()
+    )
+
+    resultado = []
+    for lote in lotes:
+        # Verificar que no tiene liquidacion activa
+        ya_liquidado = (
+            db.query(LiquidacionLote)
+            .join(Liquidacion)
+            .filter(
+                LiquidacionLote.lote_id == lote.id,
+                Liquidacion.estado.notin_([EstadoLiquidacion.BORRADOR]),
+            )
+            .first()
+        )
+        if ya_liquidado:
+            continue
+
+        fecha_rec = _fecha_recepcion(lote)
+        dias = (date.today() - fecha_rec).days if fecha_rec else 0
+        muestreo = _ultimo_muestreo(db, lote.id)
+        pesaje = _pesaje_principal(db, lote.id)
+
+        resultado.append(
+            {
+                "ip": lote.ip,
+                "tipo_material": lote.tipo_material,
+                "fecha_recepcion": fecha_rec,
+                "dias_almacen": dias,
+                "tms": float(muestreo.tms_calculado)
+                if muestreo and muestreo.tms_calculado
+                else None,
+                "tmh": float(pesaje.peso_neto) if pesaje and pesaje.peso_neto else None,
+                "sacos": pesaje.sacos if pesaje else None,
+                "volado": lote.volado,
+                "alerta_vencimiento": dias >= 25,
+            }
+        )
+
+    return resultado

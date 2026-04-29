@@ -868,6 +868,16 @@ class LiquidacionLote(AuditMixin, Base):
     gasto_acopio_liquidacion = Column(Numeric(10, 2))
     bono = Column(Numeric(10, 2))
     insumos_liquidacion = Column(Numeric(10, 2))
+    # Snapshot
+    tms_snapshot = Column(Numeric(10, 3))
+    tmh_snapshot = Column(Numeric(10, 3))
+    humedad_snapshot = Column(Numeric(5, 2))
+    sacos_snapshot = Column(Integer)
+    fecha_recepcion_lote = Column(Date)
+    maquila_aplicada = Column(Numeric(10, 2))
+    riesgo_aplicado = Column(Numeric(10, 2))
+    precio_x_tms = Column(Numeric(10, 4))
+    total_usd = Column(Numeric(12, 2))
 
     liquidacion = relationship("Liquidacion", back_populates="liquidacion_lotes")
     lote = relationship("Lote", back_populates="liquidaciones_lotes")
