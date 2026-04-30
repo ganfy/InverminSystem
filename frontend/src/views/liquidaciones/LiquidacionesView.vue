@@ -1,315 +1,131 @@
 <template>
     <div class="page-container">
 
-      <!-- ── Header ────────────────────────────────────────────── -->
+      <!-- ── Header ─────────────────────────────────────────────── -->
       <header class="page-header">
-        <div style="display:flex;align-items:center;gap:0.75rem">
-          <button class="btn-back" @click="router.back()">
-            <ChevronLeft :size="20" />
+        <div>
+          <h1 class="page-title">
+            <FileText class="lucide" :size="24" style="margin-right:0.5rem" />
+            Liquidaciones
+          </h1>
+          <p class="page-subtitle">Historial y gestión de liquidaciones de mineral</p>
+        </div>
+        <div style="display:flex;gap:0.75rem;align-items:center">
+          <button class="btn-secondary" @click="cargar" :disabled="store.cargando">
+            <RefreshCw :size="16" :class="{ spinner: store.cargando }" style="margin-right:0.4rem" />
+            ACTUALIZAR
           </button>
-          <div>
-            <h1 class="page-title">
-              <FilePlus :size="24" style="margin-right:0.5rem" />
-              Nueva Liquidación
-            </h1>
-            <p class="page-subtitle">Paso {{ paso }} de 3 — {{ tituloPaso }}</p>
-          </div>
+          <button v-if="puedeCrear" class="btn-primary ready btn-con-icono" @click="irACrear">
+            <PlusCircle :size="18" />
+            <span>NUEVA LIQUIDACIÓN</span>
+          </button>
         </div>
       </header>
 
-      <!-- ── Stepper ───────────────────────────────────────────── -->
-      <div class="stepper">
-        <div v-for="n in 3" :key="n" class="step" :class="{ active: paso === n, done: paso > n }">
-          <span class="step-num">{{ paso > n ? '✓' : n }}</span>
-          <span class="step-label">{{ ['Selección', 'Preview', 'Confirmar'][n-1] }}</span>
+      <!-- ── Filtros ─────────────────────────────────────────────── -->
+      <div class="filtros-bar">
+        <div class="field" style="width:180px">
+          <label class="field-label">ESTADO</label>
+          <select class="field-input field-select" v-model="filtroEstado" @change="cargar">
+            <option value="">Todos</option>
+            <option value="GENERADA">Generada</option>
+            <option value="FACTURADA">Facturada</option>
+            <option value="PAGADA">Pagada</option>
+          </select>
         </div>
-        <div class="step-line" />
+        <div class="field" style="flex:1;min-width:220px">
+          <label class="field-label">BÚSQUEDA</label>
+          <input
+            type="text"
+            class="field-input"
+            v-model="busqueda"
+            placeholder="N° liquidación, proveedor, RUC…"
+          />
+        </div>
       </div>
 
-      <!-- ════════════════════════════════════════════════════════
-           PASO 1: Selección de provacop y lotes
-      ════════════════════════════════════════════════════════════ -->
-      <template v-if="paso === 1">
+      <!-- ── Error ──────────────────────────────────────────────── -->
+      <div v-if="store.error" class="estado-error">
+        <AlertTriangle :size="16" style="margin-right:0.4rem" />
+        {{ store.error }}
+      </div>
 
-        <!-- Selección de provacop -->
-        <div class="seccion-card">
-          <p class="seccion-titulo">PARÁMETROS DE LIQUIDACIÓN</p>
-          <div class="form-grid">
-            <div class="field">
-              <label class="field-label">PROVEEDOR / ACOPIADOR</label>
-              <select class="field-input field-select" v-model="provacopId" @change="onProvacopChange">
-                <option value="">Seleccionar…</option>
-                <option v-for="p in provacops" :key="p.id" :value="p.id">
-                  {{ p.proveedor }} – {{ p.acopiador }}
-                </option>
-              </select>
-            </div>
-            <div class="field">
-              <label class="field-label">PRECIO SPOT ORO (USD/Oz Troy)</label>
-              <input
-                type="number"
-                class="field-input"
-                v-model.number="spotUsd"
-                min="0"
-                step="0.01"
-                placeholder="ej: 3050.00"
-              />
-            </div>
-            <div class="field">
-              <label class="field-label">FECHA LIQUIDACIÓN</label>
-              <input type="date" class="field-input" v-model="fechaLiq" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Tabla de lotes disponibles -->
-        <div v-if="provacopId" class="seccion-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
-            <p class="seccion-titulo" style="margin:0">LOTES DISPONIBLES</p>
-            <span class="badge-lotes-sel">{{ lotesSeleccionados.length }} seleccionados</span>
-          </div>
-
-          <div v-if="store.cargando" class="cargando-inline">
-            <span class="spinner" /> Cargando lotes…
-          </div>
-          <div v-else-if="store.lotesDisponibles.length === 0" class="sin-lotes">
-            Sin lotes disponibles para este proveedor-acopiador
-          </div>
-          <div v-else class="tabla-wrapper">
-            <table class="tabla">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      :checked="todosSeleccionados"
-                      @change="toggleTodos"
-                      class="check"
-                    />
-                  </th>
-                  <th>IP</th>
-                  <th>MATERIAL</th>
-                  <th>RECEPCIÓN</th>
-                  <th>DÍAS ALMACÉN</th>
-                  <th>TMH</th>
-                  <th>TMS</th>
-                  <th>SACOS</th>
-                  <th>ALERTAS</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="lote in store.lotesDisponibles"
-                  :key="lote.ip"
-                  class="tabla-row"
-                  :class="{ 'fila-volado': lote.volado, 'fila-vencimiento': lote.alerta_vencimiento && !lote.volado }"
-                  @click="toggleLote(lote.ip)"
-                  style="cursor:pointer"
-                >
-                  <td @click.stop>
-                    <input
-                      type="checkbox"
-                      :checked="lotesSeleccionados.includes(lote.ip)"
-                      @change="toggleLote(lote.ip)"
-                      class="check"
-                    />
-                  </td>
-                  <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
-                  <td class="td-muted">{{ lote.tipo_material || '-' }}</td>
-                  <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
-                  <td class="td-center">
-                    <span
-                      class="dias-badge"
-                      :class="{ 'dias-warn': lote.alerta_vencimiento, 'dias-danger': lote.dias_almacen >= 30 }"
-                    >
-                      {{ lote.dias_almacen }}d
-                    </span>
-                  </td>
-                  <td class="td-mono td-right">{{ fmtNum(lote.tmh, 3) }}</td>
-                  <td class="td-mono td-right">{{ fmtNum(lote.tms, 3) }}</td>
-                  <td class="td-center td-muted">{{ lote.sacos ?? '-' }}</td>
-                  <td>
-                    <span v-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
-                    <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D — ALERTA</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="acciones-pie">
-          <span v-if="errorPaso1" class="error-inline">
-            <AlertTriangle :size="14" style="margin-right:0.3rem" /> {{ errorPaso1 }}
-          </span>
-          <button
-            class="btn-primary ready"
-            :disabled="!puedeCalcular"
-            @click="calcularPreview"
-          >
-            <template v-if="store.cargando">
-              <span class="spinner" style="margin-right:0.5rem" /> Calculando…
-            </template>
+      <!-- ── Tabla ──────────────────────────────────────────────── -->
+      <div class="tabla-wrapper">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th>N° LIQUIDACIÓN</th>
+              <th>PROVEEDOR</th>
+              <th>ACOPIADOR</th>
+              <th>LOTES</th>
+              <th>SPOT USD</th>
+              <th>TOTAL USD</th>
+              <th>ESTADO</th>
+              <th>FECHA</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="store.cargando">
+              <td colspan="9" class="estado-tabla">
+                <span class="spinner" style="margin-right:0.5rem" /> Cargando…
+              </td>
+            </tr>
             <template v-else>
-              Calcular Preview →
-            </template>
-          </button>
-        </div>
-      </template>
-
-      <!-- ════════════════════════════════════════════════════════
-           PASO 2: Preview de resultados
-      ════════════════════════════════════════════════════════════ -->
-      <template v-if="paso === 2 && store.preview">
-
-        <!-- Alertas críticas -->
-        <div v-if="alertasCriticas.length" class="alertas-bloque criticas">
-          <AlertTriangle :size="16" style="margin-right:0.5rem;flex-shrink:0" />
-          <div>
-            <p class="alerta-titulo">No se puede generar la liquidación:</p>
-            <ul>
-              <li v-for="a in alertasCriticas" :key="a.mensaje">{{ a.mensaje }}</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Alertas informativas -->
-        <div v-if="alertasInfo.length" class="alertas-bloque info">
-          <Info :size="16" style="margin-right:0.5rem;flex-shrink:0" />
-          <div>
-            <p class="alerta-titulo">Observaciones:</p>
-            <ul>
-              <li v-for="a in alertasInfo" :key="a.mensaje">{{ a.mensaje }}</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Encabezado proveedor -->
-        <div class="seccion-card resumen-header">
-          <div class="resumen-col">
-            <span class="resumen-lbl">PROVEEDOR</span>
-            <span class="resumen-val">{{ store.preview.proveedor_razon_social }}</span>
-            <span class="resumen-sub">RUC: {{ store.preview.proveedor_ruc ?? '-' }}</span>
-          </div>
-          <div class="resumen-col">
-            <span class="resumen-lbl">ACOPIADOR</span>
-            <span class="resumen-val">{{ store.preview.acopiador_nombre }}</span>
-          </div>
-          <div class="resumen-col">
-            <span class="resumen-lbl">SPOT ORO</span>
-            <span class="resumen-val">${{ fmtNum(store.preview.spot_usd, 2) }} /Oz</span>
-          </div>
-          <div class="resumen-col">
-            <span class="resumen-lbl">TOTAL TMS</span>
-            <span class="resumen-val">{{ fmtNum(store.preview.total_tms, 3) }} TMS</span>
-          </div>
-          <div class="resumen-col resumen-total">
-            <span class="resumen-lbl">TOTAL USD</span>
-            <span class="resumen-val-big">${{ fmtNum(store.preview.total_usd, 2) }}</span>
-          </div>
-        </div>
-
-        <!-- Tabla de detalle por lote -->
-        <div class="tabla-wrapper tabla-scroll-x">
-          <table class="tabla tabla-preview">
-            <thead>
-              <tr>
-                <th>LOTE</th>
-                <th>RECEPCIÓN</th>
-                <th>TMH</th>
-                <th>%H₂O</th>
-                <th>TMS</th>
-                <th>LEY PLANTA</th>
-                <th>LEY COMERC.</th>
-                <th>LEY MINERO</th>
-                <th>PROMEDIO</th>
-                <th>%REC LIQ</th>
-                <th>MAQUILA</th>
-                <th>INSUMOS</th>
-                <th>PRECIO/TMS</th>
-                <th>TOTAL USD</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="lote in store.preview.lotes"
-                :key="lote.ip"
-                class="tabla-row"
-              >
-                <td class="td-mono" style="color:var(--color-gold)">
-                  {{ lote.ip }}
-                  <span v-if="lote.usa_dirimencia" class="badge-dirimencia" title="Usó dirimencia">D</span>
+              <tr v-if="listaFiltrada.length === 0">
+                <td colspan="9" class="estado-tabla sin-datos">
+                  <FolderSearch :size="28" style="margin-bottom:0.5rem;opacity:0.4;display:block;margin-inline:auto" />
+                  Sin liquidaciones registradas
                 </td>
-                <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.tmh, 3) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.pct_humedad, 2) }}%</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.tms, 3) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.oz_tc_planta, 4) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.oz_tc_comercial, 4) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
-                <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtNum(lote.oz_tc_promedio, 4) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.pct_rec_liq, 1) }}%</td>
-                <td class="td-mono td-right">${{ fmtNum(lote.maquila, 2) }}</td>
-                <td class="td-mono td-right">${{ fmtNum(lote.insumos_total, 2) }}</td>
-                <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 4) }}</td>
-                <td class="td-mono td-right total-cel">${{ fmtNum(lote.total_usd, 2) }}</td>
               </tr>
-              <!-- Fila total -->
-              <tr class="fila-total">
-                <td colspan="4" style="text-align:right">TOTALES</td>
-                <td class="td-mono td-right">{{ fmtNum(store.preview.total_tms, 3) }}</td>
-                <td colspan="8" />
-                <td class="td-mono td-right total-cel">${{ fmtNum(store.preview.total_usd, 2) }}</td>
+              <tr
+                v-for="liq in listaFiltrada"
+                :key="liq.id"
+                class="tabla-row clickable"
+                @click="irADetalle(liq.id)"
+              >
+                <td class="td-mono" style="color:var(--color-gold)">{{ liq.numero_liquidacion }}</td>
+                <td>
+                  <span class="nombre-text">{{ liq.proveedor_razon_social }}</span>
+                  <span v-if="liq.proveedor_ruc" class="ruc-sub">{{ liq.proveedor_ruc }}</span>
+                </td>
+                <td class="td-muted">{{ liq.acopiador_nombre }}</td>
+                <td class="td-center">
+                  <span class="badge-count">{{ liq.count_lotes }}</span>
+                </td>
+                <td class="td-mono td-right">${{ fmtNum(liq.spot_usd, 2) }}</td>
+                <td class="td-mono td-right" style="color:var(--color-gold);font-weight:700">
+                  ${{ fmtNum(liq.total_usd, 2) }}
+                </td>
+                <td>
+                  <span class="badge-estado" :class="badgeClass(liq.estado)">{{ liq.estado }}</span>
+                </td>
+                <td class="td-fecha">{{ fmtDate(liq.fecha_creacion) }}</td>
+                <td class="td-acciones" @click.stop>
+                  <div class="acciones-grupo">
+                    <button class="btn-accion" title="Ver detalle" @click="irADetalle(liq.id)">
+                      <Eye :size="15" />
+                    </button>
+                    <button
+                      class="btn-accion"
+                      title="Descargar PDF"
+                      :disabled="descargando === liq.id"
+                      @click="descargarPdf(liq.id, liq.numero_liquidacion)"
+                    >
+                      <Download :size="15" :class="{ spinner: descargando === liq.id }" />
+                    </button>
+                  </div>
+                </td>
               </tr>
-            </tbody>
-          </table>
-        </div>
+            </template>
+          </tbody>
+        </table>
+      </div>
 
-        <div class="acciones-pie">
-          <button class="btn-secondary" @click="paso = 1">
-            ← Volver
-          </button>
-          <button
-            class="btn-primary ready"
-            :disabled="!store.preview.puede_generar || store.cargando"
-            @click="paso = 3"
-          >
-            Confirmar y Generar →
-          </button>
-        </div>
-      </template>
-
-      <!-- ════════════════════════════════════════════════════════
-           PASO 3: Confirmación
-      ════════════════════════════════════════════════════════════ -->
-      <template v-if="paso === 3 && store.preview">
-        <div class="confirm-panel">
-          <CheckCircle :size="48" class="confirm-icon" />
-          <h2 class="confirm-titulo">Confirmar liquidación</h2>
-          <p class="confirm-detalle">
-            Proveedor: <strong>{{ store.preview.proveedor_razon_social }}</strong><br/>
-            Lotes: <strong>{{ store.preview.count_lotes }}</strong> &nbsp;|&nbsp;
-            TMS: <strong>{{ fmtNum(store.preview.total_tms, 3) }}</strong> &nbsp;|&nbsp;
-            Total: <strong class="total-gold">${{ fmtNum(store.preview.total_usd, 2) }}</strong>
-          </p>
-          <p class="confirm-aviso">
-            Una vez generada, los lotes cambiarán a estado <strong>LIQUIDADO</strong> y
-            se generará el PDF. Esta acción no se puede deshacer.
-          </p>
-          <div style="display:flex;gap:1rem;justify-content:center;margin-top:1.5rem">
-            <button class="btn-secondary" @click="paso = 2" :disabled="store.cargando">Volver</button>
-            <button class="btn-primary ready" :disabled="store.cargando" @click="confirmarCreacion">
-              <template v-if="store.cargando">
-                <span class="spinner" style="margin-right:0.5rem" /> Generando…
-              </template>
-              <template v-else>
-                <FilePlus :size="18" style="margin-right:0.5rem" />
-                GENERAR LIQUIDACIÓN
-              </template>
-            </button>
-          </div>
-        </div>
-      </template>
+      <div v-if="!store.cargando" class="tabla-footer">
+        <span class="tabla-count">{{ listaFiltrada.length }} de {{ store.lista.length }} registros</span>
+      </div>
 
     </div>
   </template>
@@ -317,284 +133,151 @@
   <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
-  import {
-    ChevronLeft, FilePlus, AlertTriangle, Info, CheckCircle,
-  } from 'lucide-vue-next'
+  import { FileText, RefreshCw, PlusCircle, Eye, Download, AlertTriangle, FolderSearch } from 'lucide-vue-next'
   import { useLiquidacionesStore } from '@/stores/liquidaciones'
+  import { useAuthStore } from '@/stores/auth'
   import { useUiStore } from '@/stores/ui'
-  import api from '@/api/axios'
+  import { getPdfLiquidacion } from '@/api/liquidaciones'
 
   const router = useRouter()
   const store  = useLiquidacionesStore()
+  const auth   = useAuthStore()
   const ui     = useUiStore()
 
-  // ── State ──────────────────────────────────────────────────────────
-  const paso             = ref(1)
-  const provacopId       = ref<number | ''>('')
-  const spotUsd          = ref<number | null>(null)
-  const fechaLiq         = ref(new Date().toISOString().slice(0, 10))
-  const lotesSeleccionados = ref<string[]>([])
-  const errorPaso1       = ref('')
-  const provacops        = ref<{ id: number; proveedor: string; acopiador: string }[]>([])
+  const filtroEstado = ref('')
+  const busqueda     = ref('')
+  const descargando  = ref<number | null>(null)
 
-  // ── Computed ───────────────────────────────────────────────────────
-  const tituloPaso = computed(() => ['Selección de lotes', 'Revisión de valores', 'Confirmar'][paso.value - 1])
-
-  const todosSeleccionados = computed(() =>
-    store.lotesDisponibles.length > 0 &&
-    store.lotesDisponibles.every(l => lotesSeleccionados.value.includes(l.ip))
+  const puedeCrear = computed(() =>
+    ['Admin', 'Gerencia', 'Comercial'].includes(auth.user?.rol ?? '')
   )
 
-  const puedeCalcular = computed(() =>
-    provacopId.value !== '' &&
-    (spotUsd.value ?? 0) > 0 &&
-    lotesSeleccionados.value.length > 0
-  )
+  const listaFiltrada = computed(() => {
+    const q = busqueda.value.trim().toLowerCase()
+    return store.lista.filter(l => {
+      if (filtroEstado.value && l.estado !== filtroEstado.value) return false
+      if (!q) return true
+      return (
+        l.numero_liquidacion.toLowerCase().includes(q) ||
+        l.proveedor_razon_social.toLowerCase().includes(q) ||
+        (l.proveedor_ruc?.includes(q) ?? false) ||
+        l.acopiador_nombre.toLowerCase().includes(q)
+      )
+    })
+  })
 
-  const alertasCriticas = computed(() =>
-    [...(store.preview?.alertas_globales ?? []), ...(store.preview?.lotes.flatMap(l => l.alertas) ?? [])]
-      .filter(a => a.critico)
-  )
-  const alertasInfo = computed(() =>
-    [...(store.preview?.alertas_globales ?? []), ...(store.preview?.lotes.flatMap(l => l.alertas) ?? [])]
-      .filter(a => !a.critico)
-  )
+  async function cargar() {
+    await store.cargarLista(filtroEstado.value ? { estado: filtroEstado.value } : undefined)
+  }
 
-  // ── Methods ─────────────────────────────────────────────────────────
-  async function cargarProvacops() {
+  function irACrear()          { router.push('/liquidaciones/nueva') }
+  function irADetalle(id: number) { router.push(`/liquidaciones/${id}`) }
+
+  async function descargarPdf(id: number, numero: string) {
+    descargando.value = id
     try {
-      const r = await api.get('/terceros/provacop')
-      provacops.value = r.data
+      const link = document.createElement('a')
+      link.href = getPdfLiquidacion(id)
+      link.download = `Liquidacion_${numero}.pdf`
+      link.click()
     } catch {
-      provacops.value = []
+      ui.toast('Error al descargar PDF', 'error')
+    } finally {
+      descargando.value = null
     }
   }
 
-  async function onProvacopChange() {
-    lotesSeleccionados.value = []
-    if (!provacopId.value) return
-    await store.cargarLotesDisponibles(provacopId.value as number)
-  }
-
-  function toggleLote(ip: string) {
-    const idx = lotesSeleccionados.value.indexOf(ip)
-    if (idx >= 0) lotesSeleccionados.value.splice(idx, 1)
-    else lotesSeleccionados.value.push(ip)
-  }
-
-  function toggleTodos() {
-    if (todosSeleccionados.value) {
-      lotesSeleccionados.value = []
-    } else {
-      lotesSeleccionados.value = store.lotesDisponibles.map(l => l.ip)
-    }
-  }
-
-  async function calcularPreview() {
-    errorPaso1.value = ''
-    if (!provacopId.value) { errorPaso1.value = 'Seleccione un proveedor-acopiador'; return }
-    if (!spotUsd.value || spotUsd.value <= 0) { errorPaso1.value = 'Ingrese el precio spot del oro'; return }
-    if (lotesSeleccionados.value.length === 0) { errorPaso1.value = 'Seleccione al menos un lote'; return }
-
-    const result = await store.calcularPreview({
-      provacop_id: provacopId.value as number,
-      lotes: lotesSeleccionados.value.map(ip => ({ ip })),
-      spot_usd: spotUsd.value,
-      fecha_liquidacion: fechaLiq.value || null,
-    })
-
-    if (result) paso.value = 2
-    else ui.toast(store.error ?? 'Error al calcular preview', 'error')
-  }
-
-  async function confirmarCreacion() {
-    const confirmed = await ui.showConfirm({
-      title: 'Generar Liquidación',
-      message: `¿Confirmar la liquidación por $${fmtNum(store.preview?.total_usd ?? 0, 2)} USD? Los lotes cambiarán a estado LIQUIDADO.`,
-      confirmLabel: 'Generar',
-      danger: false,
-    })
-    if (!confirmed) return
-
-    const result = await store.crear({
-      provacop_id: provacopId.value as number,
-      lotes: lotesSeleccionados.value.map(ip => ({ ip })),
-      spot_usd: spotUsd.value!,
-      fecha_liquidacion: fechaLiq.value || null,
-    })
-
-    if (result) {
-      ui.toast(`Liquidación ${result.numero_liquidacion} generada correctamente`, 'success')
-      router.push(`/liquidaciones/${result.id}`)
-    } else {
-      ui.toast(store.error ?? 'Error al crear liquidación', 'error')
-    }
-  }
-
-  function fmtNum(v: number | null | undefined, d = 2) {
-    if (v == null) return '-'
+  function fmtNum(v: number, d = 2) {
     return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d })
   }
-  function fmtDate(s: string | null) {
+  function fmtDate(s: string) {
     if (!s) return '-'
     return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
+  function badgeClass(estado: string) {
+    return { GENERADA: 'parcial', FACTURADA: 'pendiente', PAGADA: 'completo' }[estado] ?? 'pendiente'
+  }
 
-  onMounted(() => {
-    store.limpiarPreview()
-    cargarProvacops()
-  })
+  onMounted(cargar)
   </script>
 
   <style scoped>
   @import '@/assets/base.css';
 
-  .page-subtitle { font-size:var(--text-sm); color:var(--color-text-muted); margin-top:0.25rem; font-family:var(--font-mono); }
+  .page-subtitle {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    margin-top: 0.25rem;
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+  }
 
-  .btn-back {
-    background:transparent; border:1px solid var(--color-border);
-    border-radius:var(--radius-sm); color:var(--color-text-muted);
-    width:36px; height:36px; display:flex; align-items:center; justify-content:center;
-    cursor:pointer; transition:all 0.15s;
-  }
-  .btn-back:hover { border-color:var(--color-gold); color:var(--color-gold); }
+  .filtros-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: flex-end; }
 
-  /* Stepper */
-  .stepper {
-    display:flex; gap:0; margin-bottom:2rem; position:relative;
-    border-bottom:1px solid var(--color-border); padding-bottom:1rem;
-  }
-  .step {
-    display:flex; align-items:center; gap:0.5rem;
-    padding:0.4rem 1.25rem 0.4rem 0;
-    font-family:var(--font-mono); font-size:var(--text-sm);
-    color:var(--color-text-faint); letter-spacing:0.1em;
-  }
-  .step.active { color:var(--color-gold); }
-  .step.done   { color:var(--color-success); }
-  .step-num {
-    width:22px; height:22px; border-radius:50%; border:1px solid currentColor;
-    display:flex; align-items:center; justify-content:center; font-size:0.7rem; flex-shrink:0;
-  }
-  .step-line { display:none; }
+  .btn-con-icono { display: flex; align-items: center; gap: 0.5rem; }
 
-  /* Secciones */
-  .seccion-card {
-    background:var(--color-bg-card); border:1px solid var(--color-border);
-    border-radius:var(--radius-sm); padding:1.25rem; margin-bottom:1.25rem;
+  .estado-error {
+    display: flex; align-items: center;
+    padding: 0.75rem 1rem; margin-bottom: 1rem;
+    background: var(--color-error-bg); border: 1px solid var(--color-error);
+    border-radius: var(--radius-sm); color: var(--color-error); font-size: var(--text-md);
   }
-  .seccion-titulo {
-    font-family:var(--font-mono); font-size:var(--text-xs); letter-spacing:0.2em;
-    color:var(--color-text-muted); text-transform:uppercase; margin-bottom:1rem;
-    border-left:2px solid var(--color-gold); padding-left:0.6rem;
-  }
-  .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; }
 
-  /* Tabla */
-  .tabla-wrapper { overflow-x:auto; border:1px solid var(--color-border); border-radius:var(--radius-sm); }
-  .tabla { width:100%; border-collapse:collapse; font-size:var(--text-md); }
-  .tabla thead tr { background:rgba(179,144,40,0.06); border-bottom:1px solid var(--color-border); }
+  .tabla-wrapper { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+  .tabla { width: 100%; border-collapse: collapse; font-size: var(--text-md); }
+  .tabla thead tr { background: rgba(179,144,40,0.06); border-bottom: 1px solid var(--color-border); }
   .tabla th {
-    padding:0.65rem 0.75rem; text-align:left;
-    font-family:var(--font-mono); font-size:var(--text-xs);
-    letter-spacing:0.12em; color:var(--color-text-muted); text-transform:uppercase; white-space:nowrap;
+    padding: 0.7rem 1rem; text-align: left;
+    font-family: var(--font-mono); font-size: var(--text-xs);
+    letter-spacing: 0.15em; color: var(--color-text-muted); text-transform: uppercase; white-space: nowrap;
   }
-  .tabla td { padding:0.65rem 0.75rem; color:var(--color-text); vertical-align:middle; }
-  .tabla-row { border-bottom:1px solid rgba(58,58,40,0.5); transition:background 0.1s; }
-  .tabla-row:hover { background:rgba(179,144,40,0.04); }
+  .tabla td { padding: 0.75rem 1rem; color: var(--color-text); vertical-align: middle; }
+  .tabla-row { border-bottom: 1px solid rgba(58,58,40,0.5); transition: background 0.1s; }
+  .tabla-row.clickable { cursor: pointer; }
+  .tabla-row:hover { background: rgba(179,144,40,0.04); }
 
-  .fila-volado   { background:rgba(207,151,61,0.05) !important; }
-  .fila-vencimiento { background:rgba(245,158,11,0.04) !important; }
-
-  .tabla-scroll-x { margin-bottom:1.25rem; }
-  .tabla-preview th, .tabla-preview td { padding:0.55rem 0.65rem; }
-
-  .fila-total { background:rgba(179,144,40,0.08) !important; font-weight:700; border-top:2px solid var(--color-border); }
-  .total-cel  { color:var(--color-gold) !important; font-weight:700; }
-
-  .td-mono  { font-family:var(--font-mono); }
-  .td-muted { color:var(--color-text-muted); }
-  .td-fecha { font-family:var(--font-mono); color:var(--color-text-dim); font-size:var(--text-sm); }
-  .td-right { text-align:right; }
-  .td-center { text-align:center; }
-
-  .check { width:15px; height:15px; cursor:pointer; accent-color:var(--color-gold); }
-
-  .dias-badge {
-    font-family:var(--font-mono); font-size:var(--text-xs); padding:0.1rem 0.4rem;
-    border-radius:2px; background:rgba(255,255,255,0.05); border:1px solid var(--color-border);
+  .estado-tabla {
+    text-align: center; padding: 3rem 1rem;
+    color: var(--color-text-faint); font-family: var(--font-mono); font-size: var(--text-md);
   }
-  .dias-badge.dias-warn   { background:var(--color-warning-bg); border-color:rgba(207,151,61,0.4); color:var(--color-warning); }
-  .dias-badge.dias-danger { background:var(--color-error-bg);   border-color:rgba(165,71,61,0.4);  color:var(--color-error); }
+  .sin-datos { display: table-cell; }
 
-  .alerta-tag {
-    font-family:var(--font-mono); font-size:var(--text-xs); letter-spacing:0.1em;
-    padding:0.1rem 0.5rem; border-radius:2px; font-weight:700;
-  }
-  .alerta-volado { background:var(--color-warning-bg); color:var(--color-warning); border:1px solid rgba(207,151,61,0.4); }
-  .alerta-venc   { background:var(--color-error-bg);   color:var(--color-error);   border:1px solid rgba(165,71,61,0.4); }
+  .td-mono   { font-family: var(--font-mono); }
+  .td-muted  { color: var(--color-text-muted); }
+  .td-fecha  { font-family: var(--font-mono); color: var(--color-text-dim); font-size: var(--text-sm); }
+  .td-right  { text-align: right; }
+  .td-center { text-align: center; }
 
-  .badge-lotes-sel {
-    font-family:var(--font-mono); font-size:var(--text-xs); letter-spacing:0.1em;
-    background:rgba(179,144,40,0.12); border:1px solid rgba(179,144,40,0.3);
-    color:var(--color-gold); padding:0.2rem 0.65rem; border-radius:2px;
-  }
-  .badge-dirimencia {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:16px; height:16px; background:var(--color-gold); color:var(--color-bg);
-    border-radius:50%; font-size:0.6rem; font-weight:700; margin-left:0.3rem; vertical-align:middle;
+  .nombre-text { display: block; font-weight: 600; }
+  .ruc-sub     { display: block; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+
+  .badge-count {
+    display: inline-block; padding: 0.15rem 0.6rem;
+    background: rgba(179,144,40,0.1); border: 1px solid rgba(179,144,40,0.25);
+    border-radius: 2px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-gold);
   }
 
-  /* Alertas */
-  .alertas-bloque {
-    display:flex; align-items:flex-start; gap:0; padding:0.85rem 1rem;
-    border-radius:var(--radius-sm); margin-bottom:1rem; font-size:var(--text-md);
+  .badge-estado {
+    display: inline-block; padding: 0.18rem 0.55rem; border-radius: 2px;
+    font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.12em; font-weight: 700;
   }
-  .alertas-bloque.criticas { background:var(--color-error-bg); border:1px solid rgba(165,71,61,0.4); color:var(--color-error); }
-  .alertas-bloque.info     { background:var(--color-warning-bg); border:1px solid rgba(207,151,61,0.35); color:var(--color-warning); }
-  .alerta-titulo { font-weight:700; margin:0 0 0.3rem; font-family:var(--font-mono); font-size:var(--text-sm); letter-spacing:0.1em; }
-  .alertas-bloque ul { margin:0; padding-left:1.2rem; }
-  .alertas-bloque li { margin:0.15rem 0; font-size:var(--text-sm); }
+  .badge-estado.completo  { background: var(--color-success-bg); color: #4ade80; border: 1px solid rgba(81,161,85,0.3); }
+  .badge-estado.parcial   { background: var(--color-gold-bg); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
+  .badge-estado.pendiente { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid rgba(207,151,61,0.3); }
 
-  /* Resumen header */
-  .resumen-header { display:flex; flex-wrap:wrap; gap:2rem; }
-  .resumen-col { display:flex; flex-direction:column; gap:0.15rem; }
-  .resumen-lbl { font-family:var(--font-mono); font-size:var(--text-xs); letter-spacing:0.15em; color:var(--color-text-muted); text-transform:uppercase; }
-  .resumen-val { font-size:var(--text-base); font-weight:600; color:var(--color-text); }
-  .resumen-sub { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--color-text-dim); }
-  .resumen-total { margin-left:auto; text-align:right; }
-  .resumen-val-big { font-family:var(--font-mono); font-size:var(--text-xl); font-weight:700; color:var(--color-gold); }
-
-  /* Confirmacion */
-  .confirm-panel {
-    display:flex; flex-direction:column; align-items:center;
-    background:var(--color-bg-card); border:1px solid var(--color-border);
-    border-radius:var(--radius-sm); padding:3rem 2rem; text-align:center; max-width:560px; margin:0 auto;
+  .acciones-grupo { display: flex; gap: 0.4rem; }
+  .btn-accion {
+    background: transparent; border: 1px solid var(--color-border);
+    color: var(--color-text-muted); width: 30px; height: 30px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
   }
-  .confirm-icon { color:var(--color-gold); margin-bottom:1rem; }
-  .confirm-titulo { font-size:var(--text-xl); color:var(--color-text); margin:0 0 0.75rem; }
-  .confirm-detalle { font-size:var(--text-md); color:var(--color-text-muted); margin:0 0 1rem; line-height:1.7; }
-  .confirm-aviso {
-    font-size:var(--text-sm); font-family:var(--font-mono);
-    background:var(--color-warning-bg); border:1px solid rgba(207,151,61,0.3);
-    color:var(--color-warning); padding:0.65rem 1rem; border-radius:var(--radius-sm); line-height:1.6;
-  }
-  .total-gold { color:var(--color-gold); }
+  .btn-accion:hover:not(:disabled) { border-color: var(--color-gold); color: var(--color-gold); }
+  .btn-accion:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* Cargando / sin lotes */
-  .cargando-inline { display:flex; align-items:center; gap:0.5rem; padding:1.5rem; font-family:var(--font-mono); font-size:var(--text-sm); color:var(--color-text-muted); }
-  .sin-lotes { padding:2rem 1rem; text-align:center; font-family:var(--font-mono); font-size:var(--text-sm); color:var(--color-text-faint); }
+  .tabla-footer { display: flex; justify-content: flex-end; padding: 0.6rem 1rem; border-top: 1px solid var(--color-border); }
+  .tabla-count  { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-faint); letter-spacing: 0.08em; }
 
-  .error-inline {
-    display:flex; align-items:center; font-size:var(--text-sm);
-    color:var(--color-error); font-family:var(--font-mono);
-  }
-
-  .acciones-pie {
-    display:flex; justify-content:flex-end; align-items:center;
-    gap:1rem; margin-top:1.25rem;
-  }
-
-  .spinner { animation:spin 0.8s linear infinite; display:inline-block; }
-  @keyframes spin { to { transform:rotate(360deg); } }
+  .spinner { animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   </style>
