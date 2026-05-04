@@ -533,3 +533,16 @@ def buscar_por_ruc(db: Session, ruc: str) -> dict | None:
         return None
     provacop = _get_provacop_de_entidad(db, entidad.id)
     return _serializar_tercero(entidad, provacop, db)
+
+
+def listar_provacops(db: Session) -> list[dict]:
+    """Lista todas las relaciones proveedor-acopiador para el dropdown de liquidaciones."""
+    rows = db.query(ProveedorAcopiador).all()
+    return [
+        {
+            "id": pa.id,
+            "proveedor": pa.proveedor.razon_social if pa.proveedor else "—",
+            "acopiador": pa.acopiador.razon_social if pa.acopiador else "—",
+        }
+        for pa in rows
+    ]

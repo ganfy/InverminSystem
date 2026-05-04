@@ -68,6 +68,30 @@ def preview(
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 
+@router.get("/kpis", response_model=LiquidacionesKPIOut)
+def kpis(
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    liquidaciones = svc.obtener_liquidaciones(db)
+    borradores = sum(1 for liq in liquidaciones if liq.estado == "BORRADOR")
+    generadas = sum(1 for liq in liquidaciones if liq.estado == "GENERADA")
+    pendiente = sum(
+        float(liq.total_usd) for liq in liquidaciones if liq.estado in ("GENERADA", "FACTURADA")
+    )
+    # lotes liquidables: count across all provacops — costoso, cachear en producción
+    from app.models.models import SesionDescarga
+
+    provacop_ids = [row[0] for row in db.query(SesionDescarga.provacop_id).distinct()]
+    lotes_liq = sum(len(svc.lotes_disponibles_para_liquidar(db, pid)) for pid in provacop_ids)
+    return LiquidacionesKPIOut(
+        borradores=borradores,
+        generadas=generadas,
+        lotes_liquidables=lotes_liq,
+        valor_pendiente_usd=round(pendiente, 2),
+    )
+
+
 @router.get("/", response_model=list[LiquidacionResumenOut])
 def listar(
     provacop_id: int | None = Query(None),
@@ -170,28 +194,4 @@ def descargar_pdf(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
-    )
-
-
-@router.get("/kpis", response_model=LiquidacionesKPIOut)
-def kpis(
-    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
-    db: Session = Depends(get_db),
-):
-    liquidaciones = svc.obtener_liquidaciones(db)
-    borradores = sum(1 for liq in liquidaciones if liq.estado == "BORRADOR")
-    generadas = sum(1 for liq in liquidaciones if liq.estado == "GENERADA")
-    pendiente = sum(
-        float(liq.total_usd) for liq in liquidaciones if liq.estado in ("GENERADA", "FACTURADA")
-    )
-    # lotes liquidables: count across all provacops — costoso, cachear en producción
-    from app.models.models import SesionDescarga
-
-    provacop_ids = [row[0] for row in db.query(SesionDescarga.provacop_id).distinct()]
-    lotes_liq = sum(len(svc.lotes_disponibles_para_liquidar(db, pid)) for pid in provacop_ids)
-    return LiquidacionesKPIOut(
-        borradores=borradores,
-        generadas=generadas,
-        lotes_liquidables=lotes_liq,
-        valor_pendiente_usd=round(pendiente, 2),
     )
