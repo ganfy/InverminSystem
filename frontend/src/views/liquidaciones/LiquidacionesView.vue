@@ -1,283 +1,682 @@
 <template>
-    <div class="page-container">
+  <div class="page-container">
 
-      <!-- ── Header ─────────────────────────────────────────────── -->
-      <header class="page-header">
-        <div>
-          <h1 class="page-title">
-            <FileText class="lucide" :size="24" style="margin-right:0.5rem" />
-            Liquidaciones
-          </h1>
-          <p class="page-subtitle">Historial y gestión de liquidaciones de mineral</p>
-        </div>
-        <div style="display:flex;gap:0.75rem;align-items:center">
-          <button class="btn-secondary" @click="cargar" :disabled="store.cargando">
-            <RefreshCw :size="16" :class="{ spinner: store.cargando }" style="margin-right:0.4rem" />
-            ACTUALIZAR
-          </button>
-          <button v-if="puedeCrear" class="btn-primary ready btn-con-icono" @click="irACrear">
-            <PlusCircle :size="18" />
-            <span>NUEVA LIQUIDACIÓN</span>
-          </button>
-        </div>
-      </header>
+    <!-- ── Header ─────────────────────────────────────────────── -->
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">
+          <FileText class="lucide" :size="24" style="margin-right:0.5rem" />
+          Liquidaciones
+        </h1>
+        <p class="page-subtitle">
+          Gestión comercial de lotes
+        </p>
+      </div>
+      <div style="display:flex;gap:0.75rem;align-items:center">
+        <button class="btn-secondary btn-con-icono" @click="router.push('/reportes')">
+          <Download :size="16" /> Exportar PL
+        </button>
+        <button class="btn-primary btn-con-icono" @click="router.push('/liquidaciones/nueva')">
+          <Plus :size="16" /> Nueva Liquidación
+        </button>
+      </div>
+    </header>
 
-      <!-- ── Filtros ─────────────────────────────────────────────── -->
-      <div class="filtros-bar">
-        <div class="field" style="width:180px">
-          <label class="field-label">ESTADO</label>
-          <select class="field-input field-select" v-model="filtroEstado" @change="cargar">
-            <option value="">Todos</option>
+    <!-- ── Precio oro ──────────────────────────────────────────── -->
+    <div class="precio-bar">
+      <span class="precio-dot" />
+      <span class="precio-label">Precio Au:</span>
+      <span class="precio-valor">$3,287.40 / oz</span>
+      <span class="precio-meta">Ingreso manual · actualizar antes de liquidar</span>
+    </div>
+
+    <!-- ── KPIs ────────────────────────────────────────────────── -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-accent">
+        <div class="kpi-label">Borradores</div>
+        <div class="kpi-val kpi-gold">{{ store.kpis?.borradores ?? '—' }}</div>
+        <div class="kpi-sub">pendientes de emitir</div>
+        <span v-if="(store.kpis?.borradores ?? 0) > 0" class="kpi-badge badge-warn">Acción requerida</span>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Generadas sin facturar</div>
+        <div class="kpi-val">{{ store.kpis?.generadas ?? '—' }}</div>
+        <div class="kpi-sub">esperan comprobante</div>
+        <span v-if="(store.kpis?.generadas ?? 0) > 0" class="kpi-badge badge-warn">Pendiente</span>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Lotes liquidables</div>
+        <div class="kpi-val">{{ store.kpis?.lotes_liquidables ?? '—' }}</div>
+        <div class="kpi-sub">con análisis completos</div>
+        <span v-if="(store.kpis?.lotes_liquidables ?? 0) > 0" class="kpi-badge badge-ok">Disponibles</span>
+      </div>
+      <div class="kpi-card kpi-accent">
+        <div class="kpi-label">Valor pendiente cobro</div>
+        <div class="kpi-val kpi-gold">${{ fmtNum(store.kpis?.valor_pendiente_usd, 0) }}</div>
+        <div class="kpi-sub">USD · generadas + facturadas</div>
+      </div>
+    </div>
+
+    <!-- ── Panel principal ────────────────────────────────────── -->
+    <div class="panel">
+
+      <!-- Tabs -->
+      <div class="tabs-row">
+        <button
+          class="tab-btn"
+          :class="{ active: tab === 'liquidaciones' }"
+          @click="tab = 'liquidaciones'"
+        >
+          Liquidaciones
+          <span class="tab-count">{{ store.lista.length }}</span>
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: tab === 'lotes' }"
+          @click="tab = 'lotes'; cargarLotesLiquidables()"
+        >
+          Lotes liquidables
+          <span class="tab-count tab-count-ok">{{ store.kpis?.lotes_liquidables ?? 0 }}</span>
+        </button>
+      </div>
+
+      <!-- ── TAB: Liquidaciones ─────────────────────────────────── -->
+      <template v-if="tab === 'liquidaciones'">
+
+        <!-- Filtros -->
+        <div class="filtros-row">
+          <input
+            class="filtro-input"
+            placeholder="Buscar N° liq, proveedor…"
+            v-model="filtroTexto"
+          />
+          <select class="filtro-select" v-model="filtroEstado">
+            <option value="">Todos los estados</option>
+            <option value="BORRADOR">Borrador</option>
             <option value="GENERADA">Generada</option>
             <option value="FACTURADA">Facturada</option>
             <option value="PAGADA">Pagada</option>
           </select>
+          <button class="filtro-btn" @click="aplicarFiltros">Filtrar</button>
         </div>
-        <div class="field" style="flex:1;min-width:220px">
-          <label class="field-label">BÚSQUEDA</label>
-          <input
-            type="text"
-            class="field-input"
-            v-model="busqueda"
-            placeholder="N° liquidación, proveedor, RUC…"
-          />
+
+        <!-- Loading -->
+        <div v-if="store.cargando" class="estado-cargando">
+          <span class="spinner-sm" /> Cargando…
         </div>
-      </div>
 
-      <!-- ── Error ──────────────────────────────────────────────── -->
-      <div v-if="store.error" class="estado-error">
-        <AlertTriangle :size="16" style="margin-right:0.4rem" />
-        {{ store.error }}
-      </div>
-
-      <!-- ── Tabla ──────────────────────────────────────────────── -->
-      <div class="tabla-wrapper">
-        <table class="tabla">
-          <thead>
-            <tr>
-              <th>N° LIQUIDACIÓN</th>
-              <th>PROVEEDOR</th>
-              <th>ACOPIADOR</th>
-              <th>LOTES</th>
-              <th>SPOT USD</th>
-              <th>TOTAL USD</th>
-              <th>ESTADO</th>
-              <th>FECHA</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="store.cargando">
-              <td colspan="9" class="estado-tabla">
-                <span class="spinner" style="margin-right:0.5rem" /> Cargando…
-              </td>
-            </tr>
-            <template v-else>
-              <tr v-if="listaFiltrada.length === 0">
-                <td colspan="9" class="estado-tabla sin-datos">
-                  <FolderSearch :size="28" style="margin-bottom:0.5rem;opacity:0.4;display:block;margin-inline:auto" />
-                  Sin liquidaciones registradas
-                </td>
+        <!-- Tabla liquidaciones -->
+        <div v-else-if="listaFiltrada.length" class="tabla-wrapper">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>N° LIQUIDACIÓN</th>
+                <th>PROVEEDOR</th>
+                <th>ACOPIADOR</th>
+                <th class="col-r">LOTES</th>
+                <th class="col-r">SPOT</th>
+                <th class="col-r">TOTAL USD</th>
+                <th>ESTADO</th>
+                <th>FECHA</th>
+                <th />
               </tr>
+            </thead>
+            <tbody>
               <tr
                 v-for="liq in listaFiltrada"
                 :key="liq.id"
-                class="tabla-row clickable"
-                @click="irADetalle(liq.id)"
+                class="tabla-row"
+                @click="router.push(`/liquidaciones/${liq.id}`)"
+                style="cursor:pointer"
               >
-                <td class="td-mono" style="color:var(--color-gold)">{{ liq.numero_liquidacion }}</td>
-                <td>
-                  <span class="nombre-text">{{ liq.proveedor_razon_social }}</span>
-                  <span v-if="liq.proveedor_ruc" class="ruc-sub">{{ liq.proveedor_ruc }}</span>
-                </td>
-                <td class="td-muted">{{ liq.acopiador_nombre }}</td>
-                <td class="td-center">
-                  <span class="badge-count">{{ liq.count_lotes }}</span>
-                </td>
-                <td class="td-mono td-right">${{ fmtNum(liq.spot_usd, 2) }}</td>
-                <td class="td-mono td-right" style="color:var(--color-gold);font-weight:700">
-                  ${{ fmtNum(liq.total_usd, 2) }}
-                </td>
-                <td>
-                  <span class="badge-estado" :class="badgeClass(liq.estado)">{{ liq.estado }}</span>
-                </td>
-                <td class="td-fecha">{{ fmtDate(liq.fecha_creacion) }}</td>
-                <td class="td-acciones" @click.stop>
-                  <div class="acciones-grupo">
-                    <button class="btn-accion" title="Ver detalle" @click="irADetalle(liq.id)">
-                      <Eye :size="15" />
+                <td class="td-mono td-gold">{{ liq.numero_liquidacion || '—' }}</td>
+                <td class="td-truncate">{{ liq.proveedor_razon_social }}</td>
+                <td class="td-muted td-truncate">{{ liq.acopiador_nombre }}</td>
+                <td class="col-r td-mono td-muted">{{ liq.count_lotes }}</td>
+                <td class="col-r td-mono td-muted">${{ fmtNum(liq.spot_usd, 2) }}</td>
+                <td class="col-r td-mono td-bold">${{ fmtNum(liq.total_usd, 2) }}</td>
+                <td><span class="badge-estado" :class="badgeClass(liq.estado)">{{ liq.estado }}</span></td>
+                <td class="td-fecha td-muted">{{ fmtDate(liq.fecha_creacion) }}</td>
+                <td class="col-acciones" @click.stop>
+                  <div class="acciones">
+                    <button class="accion-btn" @click="router.push(`/liquidaciones/${liq.id}`)">
+                      Ver
                     </button>
                     <button
-                      class="btn-accion"
-                      title="Descargar PDF"
-                      :disabled="descargando === liq.id"
-                      @click="descargarPdf(liq.id, liq.numero_liquidacion)"
+                      v-if="liq.estado === 'BORRADOR'"
+                      class="accion-btn accion-gold"
+                      @click="emitirLiquidacion(liq)"
                     >
-                      <Download :size="15" :class="{ spinner: descargando === liq.id }" />
+                      Emitir
+                    </button>
+                    <button
+                      v-if="liq.estado === 'GENERADA'"
+                      class="accion-btn"
+                      @click="cambiarEstadoRapido(liq, 'FACTURADA')"
+                    >
+                      Facturar
+                    </button>
+                    <button
+                      v-if="liq.estado === 'FACTURADA'"
+                      class="accion-btn"
+                      @click="cambiarEstadoRapido(liq, 'PAGADA')"
+                    >
+                      Registrar pago
                     </button>
                   </div>
                 </td>
               </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
 
-      <div v-if="!store.cargando" class="tabla-footer">
-        <span class="tabla-count">{{ listaFiltrada.length }} de {{ store.lista.length }} registros</span>
-      </div>
+        <div v-else class="estado-vacio">
+          Sin liquidaciones{{ filtroEstado ? ` con estado ${filtroEstado}` : '' }}
+        </div>
+
+      </template>
+
+      <!-- ── TAB: Lotes liquidables ─────────────────────────────── -->
+      <template v-else-if="tab === 'lotes'">
+
+        <div v-if="cargandoLotes" class="estado-cargando">
+          <span class="spinner-sm" /> Cargando lotes…
+        </div>
+
+        <div v-else-if="!lotesLiquidables.length" class="estado-vacio">
+          No hay lotes con análisis de ley y recuperación completos
+        </div>
+
+        <!-- Agrupado por provacop -->
+        <template v-else>
+          <div
+            v-for="grupo in lotesAgrupados"
+            :key="grupo.provacop_label"
+            class="grupo-provacop"
+          >
+            <!-- Header del grupo -->
+            <div class="grupo-header">
+              <div>
+                <span class="grupo-nombre">{{ grupo.proveedor }}</span>
+                <span class="grupo-sep">→</span>
+                <span class="grupo-acop">{{ grupo.acopiador }}</span>
+                <span class="grupo-meta">
+                  {{ grupo.lotes.length }} lote{{ grupo.lotes.length > 1 ? 's' : '' }} ·
+                  {{ fmtNum(grupo.tms_total, 3) }} TMS ·
+                  Ley prom. {{ fmtNum(grupo.ley_prom, 4) }} oz/tc
+                </span>
+              </div>
+              <button
+                class="btn-primary btn-sm"
+                @click="irACrearConProvacop(grupo)"
+              >
+                Crear liquidación →
+              </button>
+            </div>
+
+            <!-- Tabla lotes del grupo -->
+            <div class="tabla-wrapper" style="border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm)">
+              <table class="tabla">
+                <thead>
+                  <tr>
+                    <th>IP</th>
+                    <th>MATERIAL</th>
+                    <th class="col-r">TMS</th>
+                    <th class="col-r">LEY PLANTA</th>
+                    <th class="col-r">LEY MINERO</th>
+                    <th class="col-r">LEY COMERC.</th>
+                    <th class="col-r">% REC</th>
+                    <th>ESTADO LEY</th>
+                    <th class="col-r">DÍAS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="lote in grupo.lotes"
+                    :key="lote.ip"
+                    class="tabla-row"
+                    :class="{ 'fila-volado': lote.volado, 'fila-alerta': lote.alerta_vencimiento && !lote.volado }"
+                  >
+                    <td class="td-mono td-gold">{{ lote.ip }}</td>
+                    <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
+                    <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
+                    <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_planta, 4) }}</td>
+                    <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
+                    <td class="col-r td-mono td-gold">{{ fmtNum(lote.ley_comercial, 4) }}</td>
+                    <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
+                    <td>
+                      <span v-if="lote.usa_dirimencia" class="chip chip-dirim">Dirimencia</span>
+                      <span v-else class="chip chip-ok">2 labs</span>
+                    </td>
+                    <td class="col-r">
+                      <span
+                        class="dias-badge"
+                        :class="{
+                          'dias-warn': lote.alerta_vencimiento && !lote.volado,
+                          'dias-peligro': lote.dias_almacen >= 30
+                        }"
+                      >{{ lote.dias_almacen }}d</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+      </template>
 
     </div>
-  </template>
 
-  <script setup lang="ts">
-  import { ref, computed, onMounted } from 'vue'
-  import { useRouter } from 'vue-router'
-  import { FileText, RefreshCw, PlusCircle, Eye, Download, AlertTriangle, FolderSearch } from 'lucide-vue-next'
-  import { useLiquidacionesStore } from '@/stores/liquidaciones'
-  import { useAuthStore } from '@/stores/auth'
-  import { useUiStore } from '@/stores/ui'
-  import { getPdfLiquidacion } from '@/api/liquidaciones'
+  </div>
+</template>
 
-  const router = useRouter()
-  const store  = useLiquidacionesStore()
-  const auth   = useAuthStore()
-  const ui     = useUiStore()
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { FileText, Download, Plus } from 'lucide-vue-next'
+import { useLiquidacionesStore } from '@/stores/liquidaciones'
+import { useUiStore } from '@/stores/ui'
+import api from '@/api/axios'
+import type { LoteDisponible, LiquidacionResumenOut } from '@/api/liquidaciones'
 
-  const filtroEstado = ref('')
-  const busqueda     = ref('')
-  const descargando  = ref<number | null>(null)
+const router = useRouter()
+const store  = useLiquidacionesStore()
+const ui     = useUiStore()
 
-  const puedeCrear = computed(() =>
-    ['Admin', 'Gerencia', 'Comercial'].includes(auth.user?.rol ?? '')
-  )
+// ── Estado ──────────────────────────────────────────────────────────────────
 
-  const listaFiltrada = computed(() => {
-    const q = busqueda.value.trim().toLowerCase()
-    return store.lista.filter(l => {
-      if (filtroEstado.value && l.estado !== filtroEstado.value) return false
-      if (!q) return true
-      return (
-        l.numero_liquidacion.toLowerCase().includes(q) ||
-        l.proveedor_razon_social.toLowerCase().includes(q) ||
-        (l.proveedor_ruc?.includes(q) ?? false) ||
-        l.acopiador_nombre.toLowerCase().includes(q)
-      )
-    })
-  })
+const tab           = ref<'liquidaciones' | 'lotes'>('liquidaciones')
+const filtroTexto   = ref('')
+const filtroEstado  = ref('')
+const cargandoLotes = ref(false)
 
-  async function cargar() {
-    await store.cargarLista(filtroEstado.value ? { estado: filtroEstado.value } : undefined)
+// Lotes liquidables agrupados por provacop (cargados bajo demanda)
+interface GrupoProvacop {
+  provacop_id: number
+  proveedor: string
+  acopiador: string
+  provacop_label: string
+  lotes: LoteDisponible[]
+  tms_total: number
+  ley_prom: number
+}
+const lotesLiquidables = ref<LoteDisponible[]>([])
+
+// ── Computed ─────────────────────────────────────────────────────────────────
+
+const listaFiltrada = computed(() => {
+  let res = store.lista
+  if (filtroEstado.value) res = res.filter(l => l.estado === filtroEstado.value)
+  if (filtroTexto.value) {
+    const q = filtroTexto.value.toLowerCase()
+    res = res.filter(l =>
+      (l.numero_liquidacion ?? '').toLowerCase().includes(q) ||
+      l.proveedor_razon_social.toLowerCase().includes(q) ||
+      l.acopiador_nombre.toLowerCase().includes(q)
+    )
   }
+  return res
+})
 
-  function irACrear()          { router.push('/liquidaciones/nueva') }
-  function irADetalle(id: number) { router.push(`/liquidaciones/${id}`) }
-
-  async function descargarPdf(id: number, numero: string) {
-    descargando.value = id
-    try {
-      const link = document.createElement('a')
-      link.href = getPdfLiquidacion(id)
-      link.download = `Liquidacion_${numero}.pdf`
-      link.click()
-    } catch {
-      ui.toast('Error al descargar PDF', 'error')
-    } finally {
-      descargando.value = null
+const lotesAgrupados = computed<GrupoProvacop[]>(() => {
+  const map = new Map<number, GrupoProvacop>()  // keyed por provacop_id
+  for (const lote of lotesLiquidables.value) {
+    if (!map.has(lote.provacop_id)) {
+      map.set(lote.provacop_id, {
+        provacop_id: lote.provacop_id,
+        proveedor: lote.proveedor,
+        acopiador: lote.acopiador,
+        provacop_label: `${lote.proveedor}|${lote.acopiador}`,
+        lotes: [],
+        tms_total: 0,
+        ley_prom: 0,
+      })
+    }
+    map.get(lote.provacop_id)!.lotes.push(lote)
+    map.get(lote.provacop_id)!.tms_total += lote.tms ?? 0
+  }
+  for (const g of map.values()) {
+    const totalTms = g.lotes.reduce((s, l) => s + (l.tms ?? 0), 0)
+    if (totalTms > 0) {
+      g.ley_prom = g.lotes.reduce((s, l) => s + (l.ley_comercial ?? 0) * (l.tms ?? 0), 0) / totalTms
     }
   }
+  return [...map.values()]
+})
 
-  function fmtNum(v: number, d = 2) {
-    return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d })
+// ── Métodos ──────────────────────────────────────────────────────────────────
+
+async function cargarLotesLiquidables() {
+  if (lotesLiquidables.value.length) return  // ya cargado en esta sesión
+  cargandoLotes.value = true
+  try {
+    // Obtener todos los provacops con lotes recepcionados y pedir sus lotes disponibles
+    const provacops = await api.get<{ id: number }[]>('/terceros/provacop')
+    const todos: LoteDisponible[] = []
+    await Promise.all(
+      provacops.data.map(async (p) => {
+        try {
+          const r = await api.get<LoteDisponible[]>('/liquidaciones/lotes-disponibles', {
+            params: { provacop_id: p.id }
+          })
+          // Solo los listos para liquidar
+          todos.push(...r.data.filter(l => l.listo_para_liquidar))
+        } catch { /* provacop sin lotes */ }
+      })
+    )
+    lotesLiquidables.value = todos
+  } catch {
+    ui.toast('Error al cargar lotes liquidables', 'error')
+  } finally {
+    cargandoLotes.value = false
   }
-  function fmtDate(s: string) {
-    if (!s) return '-'
-    return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  }
-  function badgeClass(estado: string) {
-    return { GENERADA: 'parcial', FACTURADA: 'pendiente', PAGADA: 'completo' }[estado] ?? 'pendiente'
-  }
+}
 
-  onMounted(cargar)
-  </script>
+function aplicarFiltros() {
+  store.cargarLista({
+    estado: filtroEstado.value || undefined,
+  })
+}
 
-  <style scoped>
-  @import '@/assets/base.css';
+function irACrearConProvacop(grupo: GrupoProvacop) {
+  // Navegar al wizard con provacop pre-seleccionado via query param
+  router.push({
+    path: '/liquidaciones/nueva',
+    query: { proveedor: grupo.proveedor, acopiador: grupo.acopiador }
+  })
+}
 
-  .page-subtitle {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-    margin-top: 0.25rem;
-    font-family: var(--font-mono);
-    letter-spacing: 0.06em;
-  }
+async function emitirLiquidacion(liq: LiquidacionResumenOut) {
+  const ok = await ui.showConfirm({
+    title: 'Emitir Liquidación',
+    message: `¿Emitir ${liq.numero_liquidacion}? Los lotes pasarán a estado LIQUIDADO.`,
+    confirmLabel: 'Emitir',
+    danger: false,
+  })
+  if (!ok) return
+  const exito = await store.cambiarEstado(liq.id, 'GENERADA')
+  if (exito) ui.toast('Liquidación emitida', 'success')
+  else ui.toast(store.error ?? 'Error al emitir', 'error')
+}
 
-  .filtros-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; align-items: flex-end; }
+async function cambiarEstadoRapido(liq: LiquidacionResumenOut, nuevoEstado: string) {
+  const labels: Record<string, string> = { FACTURADA: 'facturar', PAGADA: 'marcar como pagada' }
+  const ok = await ui.showConfirm({
+    title: 'Cambiar estado',
+    message: `¿Desea ${labels[nuevoEstado] ?? nuevoEstado} la liquidación ${liq.numero_liquidacion}?`,
+    confirmLabel: 'Confirmar',
+    danger: nuevoEstado === 'PAGADA',
+  })
+  if (!ok) return
+  const exito = await store.cambiarEstado(liq.id, nuevoEstado)
+  if (exito) ui.toast(`Estado actualizado a ${nuevoEstado}`, 'success')
+  else ui.toast(store.error ?? 'Error al cambiar estado', 'error')
+}
 
-  .btn-con-icono { display: flex; align-items: center; gap: 0.5rem; }
+// ── Formatters ────────────────────────────────────────────────────────────────
 
-  .estado-error {
-    display: flex; align-items: center;
-    padding: 0.75rem 1rem; margin-bottom: 1rem;
-    background: var(--color-error-bg); border: 1px solid var(--color-error);
-    border-radius: var(--radius-sm); color: var(--color-error); font-size: var(--text-md);
-  }
+function fmtNum(v: number | null | undefined, d = 2) {
+  if (v == null) return '—'
+  return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d })
+}
+function fmtDate(s: string | null | undefined) {
+  if (!s) return '—'
+  return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+function badgeClass(estado: string) {
+  return {
+    BORRADOR:  'badge-borrador',
+    GENERADA:  'badge-generada',
+    FACTURADA: 'badge-facturada',
+    PAGADA:    'badge-pagada',
+  }[estado] ?? 'badge-generada'
+}
 
-  .tabla-wrapper { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
-  .tabla { width: 100%; border-collapse: collapse; font-size: var(--text-md); }
-  .tabla thead tr { background: rgba(179,144,40,0.06); border-bottom: 1px solid var(--color-border); }
-  .tabla th {
-    padding: 0.7rem 1rem; text-align: left;
-    font-family: var(--font-mono); font-size: var(--text-xs);
-    letter-spacing: 0.15em; color: var(--color-text-muted); text-transform: uppercase; white-space: nowrap;
-  }
-  .tabla td { padding: 0.75rem 1rem; color: var(--color-text); vertical-align: middle; }
-  .tabla-row { border-bottom: 1px solid rgba(58,58,40,0.5); transition: background 0.1s; }
-  .tabla-row.clickable { cursor: pointer; }
-  .tabla-row:hover { background: rgba(179,144,40,0.04); }
+// ── Init ──────────────────────────────────────────────────────────────────────
 
-  .estado-tabla {
-    text-align: center; padding: 3rem 1rem;
-    color: var(--color-text-faint); font-family: var(--font-mono); font-size: var(--text-md);
-  }
-  .sin-datos { display: table-cell; }
+onMounted(async () => {
+  await Promise.all([
+    store.cargarLista(),
+    store.cargarKPIs(),
+  ])
+})
+</script>
 
-  .td-mono   { font-family: var(--font-mono); }
-  .td-muted  { color: var(--color-text-muted); }
-  .td-fecha  { font-family: var(--font-mono); color: var(--color-text-dim); font-size: var(--text-sm); }
-  .td-right  { text-align: right; }
-  .td-center { text-align: center; }
+<style scoped>
+@import '@/assets/base.css';
 
-  .nombre-text { display: block; font-weight: 600; }
-  .ruc-sub     { display: block; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+.page-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: 0.2rem;
+  font-family: var(--font-mono);
+}
 
-  .badge-count {
-    display: inline-block; padding: 0.15rem 0.6rem;
-    background: rgba(179,144,40,0.1); border: 1px solid rgba(179,144,40,0.25);
-    border-radius: 2px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-gold);
-  }
+/* ── Precio bar ──────────────────────────────────────────────────── */
+.precio-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.25rem;
+  font-size: var(--text-sm);
+}
+.precio-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--color-success); flex-shrink: 0;
+}
+.precio-label { color: var(--color-text-muted); }
+.precio-valor { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-gold); font-weight: 600; }
+.precio-meta  { color: var(--color-text-faint); font-size: var(--text-xs); margin-left: 0.25rem; }
 
-  .badge-estado {
-    display: inline-block; padding: 0.18rem 0.55rem; border-radius: 2px;
-    font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.12em; font-weight: 700;
-  }
-  .badge-estado.completo  { background: var(--color-success-bg); color: #4ade80; border: 1px solid rgba(81,161,85,0.3); }
-  .badge-estado.parcial   { background: var(--color-gold-bg); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
-  .badge-estado.pendiente { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid rgba(207,151,61,0.3); }
+/* ── KPIs ────────────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+.kpi-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.1rem;
+  position: relative;
+}
+.kpi-card.kpi-accent { border-left: 2px solid var(--color-gold); }
+.kpi-label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 0.4rem; }
+.kpi-val   { font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700; color: var(--color-text); line-height: 1.1; }
+.kpi-val.kpi-gold { color: var(--color-gold); }
+.kpi-sub   { font-size: var(--text-xs); color: var(--color-text-faint); margin-top: 0.3rem; }
+.kpi-badge { position: absolute; top: 0.75rem; right: 0.75rem; font-family: var(--font-mono); font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 2px; letter-spacing: 0.08em; }
+.badge-warn { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid rgba(207,151,61,0.35); }
+.badge-ok   { background: var(--color-success-bg); color: var(--color-success); border: 1px solid rgba(81,161,85,0.35); }
 
-  .acciones-grupo { display: flex; gap: 0.4rem; }
-  .btn-accion {
-    background: transparent; border: 1px solid var(--color-border);
-    color: var(--color-text-muted); width: 30px; height: 30px;
-    border-radius: var(--radius-sm); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
-  }
-  .btn-accion:hover:not(:disabled) { border-color: var(--color-gold); color: var(--color-gold); }
-  .btn-accion:disabled { opacity: 0.4; cursor: not-allowed; }
+/* ── Panel + tabs ────────────────────────────────────────────────── */
+.panel {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.tabs-row {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 0.5rem;
+}
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.8rem 1rem;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: 0.05em;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn.active { color: var(--color-gold); border-bottom-color: var(--color-gold); }
+.tab-count {
+  font-size: 0.65rem;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 0.05rem 0.4rem;
+  border-radius: 2px;
+}
+.tab-count-ok {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border-color: rgba(81,161,85,0.3);
+}
 
-  .tabla-footer { display: flex; justify-content: flex-end; padding: 0.6rem 1rem; border-top: 1px solid var(--color-border); }
-  .tabla-count  { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-faint); letter-spacing: 0.08em; }
+/* ── Filtros ─────────────────────────────────────────────────────── */
+.filtros-row {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.filtro-input {
+  padding: 0.45rem 0.75rem;
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  min-width: 200px;
+}
+.filtro-select {
+  padding: 0.45rem 0.75rem;
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.filtro-btn {
+  padding: 0.45rem 1rem;
+  font-size: var(--text-sm);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+.filtro-btn:hover { border-color: var(--color-gold); color: var(--color-gold); }
 
-  .spinner { animation: spin 0.8s linear infinite; display: inline-block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+/* ── Tabla ───────────────────────────────────────────────────────── */
+.tabla-wrapper { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.tabla { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.tabla thead tr { background: rgba(179,144,40,0.05); border-bottom: 1px solid var(--color-border); }
+.tabla th {
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  letter-spacing: 0.12em; color: var(--color-text-muted);
+  text-transform: uppercase; white-space: nowrap; text-align: left;
+}
+.tabla td { padding: 0.65rem 0.8rem; color: var(--color-text); vertical-align: middle; white-space: nowrap; }
+.tabla-row { border-bottom: 1px solid rgba(58,58,40,0.4); transition: background 0.1s; }
+.tabla-row:hover { background: rgba(179,144,40,0.04); }
+.fila-volado { background: rgba(207,151,61,0.05) !important; }
+.fila-alerta { background: rgba(245,158,11,0.03) !important; }
+
+.col-r { text-align: right; }
+.col-acciones { text-align: right; white-space: nowrap; }
+.td-mono    { font-family: var(--font-mono); }
+.td-gold    { color: var(--color-gold); }
+.td-muted   { color: var(--color-text-dim); }
+.td-fecha   { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+.td-bold    { font-weight: 600; }
+.td-truncate { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Badges de estado ────────────────────────────────────────────── */
+.badge-estado {
+  display: inline-block;
+  font-family: var(--font-mono); font-size: 0.65rem;
+  padding: 0.18rem 0.55rem; border-radius: 2px;
+  letter-spacing: 0.1em; font-weight: 700; white-space: nowrap;
+}
+.badge-borrador  { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+.badge-generada  { background: rgba(207,151,61,0.12); color: var(--color-gold); border: 1px solid rgba(207,151,61,0.3); }
+.badge-facturada { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+.badge-pagada    { background: var(--color-success-bg); color: var(--color-success); border: 1px solid rgba(81,161,85,0.3); }
+
+/* ── Botones de acción inline ────────────────────────────────────── */
+.acciones    { display: flex; gap: 0.35rem; justify-content: flex-end; }
+.accion-btn  {
+  background: transparent; border: 1px solid var(--color-border);
+  border-radius: 4px; padding: 0.25rem 0.6rem;
+  font-size: var(--text-xs); font-family: var(--font-mono); letter-spacing: 0.05em;
+  color: var(--color-text-muted); cursor: pointer; transition: all 0.12s;
+}
+.accion-btn:hover  { border-color: var(--color-text-dim); color: var(--color-text); }
+.accion-btn.accion-gold { border-color: rgba(179,144,40,0.4); color: var(--color-gold); }
+.accion-btn.accion-gold:hover { background: rgba(179,144,40,0.1); }
+
+/* ── Grupo provacop (tab lotes) ──────────────────────────────────── */
+.grupo-provacop { border-bottom: 1px solid var(--color-border); }
+.grupo-provacop:last-child { border-bottom: none; }
+.grupo-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.85rem 1rem;
+  background: rgba(179,144,40,0.04);
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap; gap: 0.75rem;
+}
+.grupo-nombre { font-size: var(--text-md); font-weight: 600; color: var(--color-text); }
+.grupo-sep    { color: var(--color-text-faint); margin: 0 0.35rem; }
+.grupo-acop   { font-size: var(--text-md); color: var(--color-text-muted); }
+.grupo-meta   {
+  display: block; font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--color-text-faint); margin-top: 0.2rem; letter-spacing: 0.05em;
+}
+.btn-sm { padding: 0.4rem 0.9rem; font-size: var(--text-sm); white-space: nowrap; }
+
+/* ── Chips ────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-block; font-family: var(--font-mono); font-size: 0.65rem;
+  padding: 0.12rem 0.5rem; border-radius: 2px; letter-spacing: 0.06em; white-space: nowrap;
+}
+.chip-ok    { background: var(--color-success-bg); color: var(--color-success); border: 1px solid rgba(81,161,85,0.3); }
+.chip-dirim { background: rgba(179,144,40,0.12); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
+
+/* ── Días badge ──────────────────────────────────────────────────── */
+.dias-badge {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  padding: 0.1rem 0.4rem; border-radius: 2px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--color-border);
+}
+.dias-badge.dias-warn    { background: var(--color-warning-bg); border-color: rgba(207,151,61,0.4); color: var(--color-warning); }
+.dias-badge.dias-peligro { background: var(--color-error-bg);   border-color: rgba(165,71,61,0.4);  color: var(--color-error); }
+
+/* ── Estados vacíos / cargando ───────────────────────────────────── */
+.estado-vacio   { padding: 3rem; text-align: center; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-faint); }
+.estado-cargando {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 2rem 1rem; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.spinner-sm {
+  display: inline-block; width: 14px; height: 14px;
+  border: 1.5px solid var(--color-border); border-top-color: var(--color-gold);
+  border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.btn-con-icono { display: flex; align-items: center; gap: 0.4rem; }
+</style>

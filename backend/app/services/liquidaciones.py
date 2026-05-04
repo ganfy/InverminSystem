@@ -57,6 +57,10 @@ MIN_MAQUILA = Decimal("95")
 UMBRAL_VOLADO = Decimal("0.100")
 
 
+def _nombre_entidad(entidad) -> str:
+    return entidad.razon_social if entidad else "—"
+
+
 # ── Helpers de calculo (formulas del Excel) ────────────────────────────────────
 
 
@@ -686,10 +690,6 @@ def lotes_disponibles_para_liquidar(
     db: Session,
     provacop_id: int,
 ) -> list[dict]:
-    """
-    Retorna lotes del provacop en estado RECEPCIONADO sin liquidacion vigente.
-    Incluye alertas de volado y vencimiento para mostrar en UI.
-    """
     lotes = (
         db.query(Lote)
         .options(joinedload(Lote.pesajes), joinedload(Lote.muestreos))
@@ -705,7 +705,6 @@ def lotes_disponibles_para_liquidar(
 
     resultado = []
     for lote in lotes:
-        # Verificar que no tiene liquidacion activa
         ya_liquidado = (
             db.query(LiquidacionLote)
             .join(Liquidacion)
@@ -723,6 +722,28 @@ def lotes_disponibles_para_liquidar(
         muestreo = _ultimo_muestreo(db, lote.id)
         pesaje = _pesaje_principal(db, lote.id)
 
+        # ── Ley y recuperación ──────────────────────────────────────
+        ley_planta = calcular_ley_planta(db, lote.id)
+        oz_tc_planta = float(ley_planta) if ley_planta else None
+        oz_tc_minero_val = _ley_minero(db, lote.id)
+        oz_tc_minero = float(oz_tc_minero_val) if oz_tc_minero_val else None
+        usa_dir = bool(lote.dirimencia)
+
+        # Ley comercial: dirimencia > promedio planta+minero
+        ley_comercial = None
+        if usa_dir and ley_planta:
+            ley_comercial = oz_tc_planta
+        elif oz_tc_planta and oz_tc_minero:
+            params = (
+                lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
+            )
+            lc = calcular_ley_comercial(ley_planta, params)
+            ley_comercial = float(lc["ley_comercial"]) if lc else None
+
+        rec = _rec_liq(db, lote.id)
+        porcentaje_rec = float(rec) if rec else None
+        listo = all(x is not None for x in [ley_comercial, porcentaje_rec, muestreo])
+
         resultado.append(
             {
                 "ip": lote.ip,
@@ -736,6 +757,19 @@ def lotes_disponibles_para_liquidar(
                 "sacos": pesaje.sacos if pesaje else None,
                 "volado": lote.volado,
                 "alerta_vencimiento": dias >= 25,
+                "ley_comercial": ley_comercial,
+                "oz_tc_planta": oz_tc_planta,
+                "oz_tc_minero": oz_tc_minero,
+                "porcentaje_rec": porcentaje_rec,
+                "usa_dirimencia": usa_dir,
+                "listo_para_liquidar": listo,
+                "provacop_id": provacop_id,  # ya viene como parámetro de la función
+                "proveedor": _nombre_entidad(lote.sesion.provacop.proveedor)
+                if lote.sesion and lote.sesion.provacop
+                else "—",
+                "acopiador": _nombre_entidad(lote.sesion.provacop.acopiador)
+                if lote.sesion and lote.sesion.provacop
+                else "—",
             }
         )
 

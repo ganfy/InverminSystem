@@ -79,22 +79,17 @@
             <table class="tabla">
               <thead>
                 <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      :checked="todosSeleccionados"
-                      @change="toggleTodos"
-                      class="check"
-                    />
-                  </th>
+                  <th><input type="checkbox" :checked="todosSeleccionados" @change="toggleTodos" class="check" /></th>
                   <th>IP</th>
                   <th>MATERIAL</th>
                   <th>RECEPCIÓN</th>
-                  <th>DÍAS ALMACÉN</th>
-                  <th>TMH</th>
-                  <th>TMS</th>
-                  <th>SACOS</th>
-                  <th>ALERTAS</th>
+                  <th class="col-r">TMS</th>
+                  <th class="col-r">LEY PLANTA</th>
+                  <th class="col-r">LEY MINERO</th>
+                  <th class="col-r">LEY COMERC.</th>
+                  <th class="col-r">% REC</th>
+                  <th>ESTADO</th>
+                  <th class="col-r">DÍAS</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,30 +102,25 @@
                   style="cursor:pointer"
                 >
                   <td @click.stop>
-                    <input
-                      type="checkbox"
-                      :checked="lotesSeleccionados.includes(lote.ip)"
-                      @change="toggleLote(lote.ip)"
-                      class="check"
-                    />
+                    <input type="checkbox" :checked="lotesSeleccionados.includes(lote.ip)" @change="toggleLote(lote.ip)" class="check" />
                   </td>
                   <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
-                  <td class="td-muted">{{ lote.tipo_material || '-' }}</td>
+                  <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
                   <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
-                  <td class="td-center">
-                    <span
-                      class="dias-badge"
-                      :class="{ 'dias-warn': lote.alerta_vencimiento, 'dias-danger': lote.dias_almacen >= 30 }"
-                    >
+                  <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
+                  <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_planta, 4) }}</td>
+                  <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
+                  <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtNum(lote.ley_comercial, 4) }}</td>
+                  <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
+                  <td>
+                    <span v-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
+                    <span v-else-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
+                    <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D</span>
+                  </td>
+                  <td class="col-r">
+                    <span class="dias-badge" :class="{'dias-warn':lote.alerta_vencimiento,'dias-danger':lote.dias_almacen>=30}">
                       {{ lote.dias_almacen }}d
                     </span>
-                  </td>
-                  <td class="td-mono td-right">{{ fmtNum(lote.tmh, 3) }}</td>
-                  <td class="td-mono td-right">{{ fmtNum(lote.tms, 3) }}</td>
-                  <td class="td-center td-muted">{{ lote.sacos ?? '-' }}</td>
-                  <td>
-                    <span v-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
-                    <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D — ALERTA</span>
                   </td>
                 </tr>
               </tbody>
@@ -597,4 +587,7 @@
 
   .spinner { animation:spin 0.8s linear infinite; display:inline-block; }
   @keyframes spin { to { transform:rotate(360deg); } }
+
+  .col-r { text-align: right; }
+.alerta-dirim { background: rgba(179,144,40,0.12); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
   </style>

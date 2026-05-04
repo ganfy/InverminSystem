@@ -127,9 +127,19 @@ export const useLiquidacionesStore = defineStore('liquidaciones', () => {
         preview.value = null
     }
 
+    const kpis = ref<import('@/api/liquidaciones').LiquidacionesKPI | null>(null)
+
+    async function cargarKPIs() {
+        try {
+            const r = await api.getLiquidacionesKPIs()
+            kpis.value = r.data
+        } catch { /* silencioso */ }
+    }
+
     return {
         lista, detalle, preview, lotesDisponibles, cargando, error,
         cargarLista, cargarDetalle, cargarLotesDisponibles,
         calcularPreview, crear, cambiarEstado, limpiarPreview,
+        kpis, cargarKPIs
     }
 })

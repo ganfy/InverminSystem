@@ -44,6 +44,24 @@ class AlertaLote(BaseModel):
     critico: bool  # bloquea creacion si True
 
 
+class LoteDisponible(BaseModel):
+    ip: str
+    tipo_material: str | None
+    fecha_recepcion: date | None
+    dias_almacen: int
+    tms: float | None
+    tmh: float | None
+    sacos: int | None
+    volado: bool
+    alerta_vencimiento: bool
+    ley_comercial: float | None = None
+    oz_tc_planta: float | None = None
+    oz_tc_minero: float | None = None
+    porcentaje_rec: float | None = None
+    usa_dirimencia: bool = False
+    listo_para_liquidar: bool = False
+
+
 class LoteFinancieroOut(BaseModel):
     ip: str
     fecha_recepcion: date | None
@@ -131,3 +149,10 @@ class LiquidacionDetalleOut(LiquidacionResumenOut):
     fecha_cierre: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class LiquidacionesKPIOut(BaseModel):
+    borradores: int
+    generadas: int
+    lotes_liquidables: int
+    valor_pendiente_usd: float

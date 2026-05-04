@@ -1,3 +1,4 @@
+import type { ScriptElementKindModifier } from 'typescript'
 import api from './axios'
 
 // ── Requests ──────────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ export interface LiquidacionPreviewOut {
 
 export interface LoteDisponible {
     ip: string
-    tipo_material: string
+    tipo_material: string | null
     fecha_recepcion: string | null
     dias_almacen: number
     tms: number | null
@@ -89,6 +90,23 @@ export interface LoteDisponible {
     sacos: number | null
     volado: boolean
     alerta_vencimiento: boolean
+    ley_comercial: number | null
+    oz_tc_planta: number | null
+    oz_tc_minero: number | null
+    porcentaje_rec: number | null
+    usa_dirimencia: boolean
+    listo_para_liquidar: boolean
+    // identificación de acopiador y proveedor para agrupar
+    provacop_id: number
+    proveedor: string
+    acopiador: string
+}
+
+export interface LiquidacionesKPI {
+    borradores: number
+    generadas: number
+    lotes_liquidables: number
+    valor_pendiente_usd: number
 }
 
 export interface LiquidacionLoteOut extends LoteFinancieroOut {
@@ -147,4 +165,8 @@ export function cambiarEstadoLiquidacion(id: number, estado: string) {
 export function getPdfLiquidacion(id: number): string {
     const base = api.defaults.baseURL ?? ''
     return `${base}/liquidaciones/${id}/pdf`
+}
+
+export function getLiquidacionesKPIs() {
+    return api.get<LiquidacionesKPI>('/liquidaciones/kpis')
 }

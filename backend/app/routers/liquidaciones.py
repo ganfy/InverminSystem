@@ -14,10 +14,12 @@ from app.models.models import Liquidacion
 from app.schemas.liquidaciones import (
     LiquidacionCreate,
     LiquidacionDetalleOut,
+    LiquidacionesKPIOut,
     LiquidacionEstadoUpdate,
     LiquidacionPreviewOut,
     LiquidacionPreviewRequest,
     LiquidacionResumenOut,
+    LoteDisponible,
 )
 from app.services import liquidaciones as svc
 from app.services.liquidaciones_pdf import generar_liquidacion_pdf, guardar_pdf_liquidacion
@@ -31,7 +33,7 @@ router = APIRouter(prefix="/liquidaciones", tags=["Liquidaciones"])
 # ── Lotes disponibles para liquidar ──────────────────────────────────────────
 
 
-@router.get("/lotes-disponibles")
+@router.get("/lotes-disponibles", response_model=list[LoteDisponible])
 def lotes_disponibles(
     provacop_id: int = Query(...),
     current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
@@ -168,4 +170,28 @@ def descargar_pdf(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/kpis", response_model=LiquidacionesKPIOut)
+def kpis(
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    liquidaciones = svc.obtener_liquidaciones(db)
+    borradores = sum(1 for liq in liquidaciones if liq.estado == "BORRADOR")
+    generadas = sum(1 for liq in liquidaciones if liq.estado == "GENERADA")
+    pendiente = sum(
+        float(liq.total_usd) for liq in liquidaciones if liq.estado in ("GENERADA", "FACTURADA")
+    )
+    # lotes liquidables: count across all provacops — costoso, cachear en producción
+    from app.models.models import SesionDescarga
+
+    provacop_ids = [row[0] for row in db.query(SesionDescarga.provacop_id).distinct()]
+    lotes_liq = sum(len(svc.lotes_disponibles_para_liquidar(db, pid)) for pid in provacop_ids)
+    return LiquidacionesKPIOut(
+        borradores=borradores,
+        generadas=generadas,
+        lotes_liquidables=lotes_liq,
+        valor_pendiente_usd=round(pendiente, 2),
     )
