@@ -313,6 +313,7 @@
   import { useLiquidacionesStore } from '@/stores/liquidaciones'
   import { useUiStore } from '@/stores/ui'
   import api from '@/api/axios'
+  import { obtenerPrecioOro } from '@/api/liquidaciones'
 
   const router = useRouter()
   const store  = useLiquidacionesStore()
@@ -349,6 +350,14 @@
     [...(store.preview?.alertas_globales ?? []), ...(store.preview?.lotes.flatMap(l => l.alertas) ?? [])]
       .filter(a => !a.critico)
   )
+
+  const cargarPrecio = async () => {
+    try {
+      spotUsd.value = await obtenerPrecioOro()
+    } catch {
+      spotUsd.value = null
+    }
+  }
 
   // ── Methods ─────────────────────────────────────────────────────────
   async function cargarProvacops() {
@@ -433,6 +442,7 @@
   onMounted(() => {
     store.limpiarPreview()
     cargarProvacops()
+    cargarPrecio()
   })
   </script>
 

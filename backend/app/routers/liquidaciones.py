@@ -22,12 +22,23 @@ from app.schemas.liquidaciones import (
     LoteDisponible,
 )
 from app.services import liquidaciones as svc
+from app.services.liquidaciones_au import obtener_ultimo_valor_oro_pm
 from app.services.liquidaciones_pdf import generar_liquidacion_pdf, guardar_pdf_liquidacion
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/liquidaciones", tags=["Liquidaciones"])
+
+# Precio del oro para liquidaciones - se obtiene en tiempo real desde LBMA Fix (Gold PM) usando web scraping.
+
+
+@router.get("/precio-oro", response_model=float | None)
+def precio_oro(
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+):
+    """Obtiene el último valor del Gold PM desde LBMA Fix. Retorna null si falla."""
+    return obtener_ultimo_valor_oro_pm()
 
 
 # ── Lotes disponibles para liquidar ──────────────────────────────────────────

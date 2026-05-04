@@ -36,6 +36,7 @@ from app.models.models import (
     ParametrosComerciales,
     Pesaje,
     ProveedorAcopiador,
+    SesionDescarga,
 )
 from app.schemas.liquidaciones import (
     AlertaLote,
@@ -238,7 +239,7 @@ def _calcular_lote(
         return {}, alertas
 
     riesgo = Decimal(str(params.riesgo_comercial)) if params.riesgo_comercial else Decimal("0")
-    maquila_base = Decimal(str(params.maquila_base)) if params.maquila_base else Decimal("0")
+    maquila_base = Decimal(str(params.maquila)) if params.maquila else Decimal("0")
     gasto_acopio = Decimal(str(params.gasto_acopio)) if params.gasto_acopio else Decimal("0")
     gasto_consumo = Decimal(str(params.gasto_consumo)) if params.gasto_consumo else Decimal("0")
     insumos = gasto_acopio + gasto_consumo
@@ -262,14 +263,14 @@ def _calcular_lote(
     # ── Ley Minero ────────────────────────────────────────────────────────────
     oz_tc_minero = _ley_minero(db, lote.id)
     if oz_tc_minero is None:
+        oz_tc_minero = Decimal("0.00")
         alertas.append(
             AlertaLote(
                 tipo="SIN_LEY_MINERO",
                 mensaje=f"{lote.ip}: sin ley del minero registrada",
-                critico=True,
+                critico=False,
             )
         )
-        return {}, alertas
 
     # ── Promedio ──────────────────────────────────────────────────────────────
     oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(
@@ -356,6 +357,8 @@ def _calcular_lote(
         "insumos_liquidacion": insumos,
         "gasto_acopio_liquidacion": gasto_acopio,
     }
+
+    print(f"Debug: Snapshot calculado para lote {lote.ip}: {snapshot}")
     return snapshot, alertas
 
 
@@ -369,16 +372,18 @@ def preview_liquidacion(
     """
     Calcula preview sin guardar. Usado antes de confirmar la liquidacion.
     """
+    # 1. Consulta del ProveedorAcopiador usando tus relaciones exactas
     provacop: ProveedorAcopiador = (
         db.query(ProveedorAcopiador)
         .options(
             joinedload(ProveedorAcopiador.proveedor),
             joinedload(ProveedorAcopiador.acopiador),
-            joinedload(ProveedorAcopiador.parametros),
+            joinedload(ProveedorAcopiador.parametros),  # Basado en la línea 192 de tu models.py
         )
         .filter(ProveedorAcopiador.id == req.provacop_id)
         .first()
     )
+
     if not provacop:
         raise ValueError(f"ProveedorAcopiador {req.provacop_id} no encontrado")
 
@@ -388,16 +393,20 @@ def preview_liquidacion(
     puede_generar = True
 
     for item in req.lotes:
+        # 2. Consulta del Lote encadenando las relaciones hasta llegar a parámetros
         lote = (
             db.query(Lote)
             .options(
                 joinedload(Lote.pesajes),
                 joinedload(Lote.muestreos),
-                joinedload(Lote.sesion).joinedload("provacop").joinedload("parametros"),
+                joinedload(Lote.sesion)
+                .joinedload(SesionDescarga.provacop)
+                .joinedload(ProveedorAcopiador.parametros),
             )
-            .filter(Lote.ip == item.ip, Lote.eliminado == False)  # noqa: E712
+            .filter(Lote.ip == item.ip, ~Lote.eliminado)
             .first()
         )
+
         if not lote:
             alertas_globales.append(
                 AlertaLote(
@@ -410,6 +419,14 @@ def preview_liquidacion(
         snap, alertas = _calcular_lote(
             db, lote, spot, item.bono or Decimal("0"), item.rec_liq_override
         )
+
+        print(f"Debug: Lote {item.ip} - Snap: {snap} - Alertas: {[a.mensaje for a in alertas]}")
+
+        if alertas:
+            for alerta in alertas:
+                # Le añadimos el IP al inicio del mensaje para saber de qué lote proviene el error
+                alerta.mensaje = f"[{item.ip}] {alerta.mensaje}"
+                alertas_globales.append(alerta)
 
         if any(a.critico for a in alertas):
             puede_generar = False

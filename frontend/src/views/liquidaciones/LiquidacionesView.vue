@@ -26,8 +26,17 @@
     <div class="precio-bar">
       <span class="precio-dot" />
       <span class="precio-label">Precio Au:</span>
-      <span class="precio-valor">$3,287.40 / oz</span>
-      <span class="precio-meta">Ingreso manual · actualizar antes de liquidar</span>
+      <span class="precio-valor">
+        {{ cargandoPrecio ? 'Cargando…' : precioOro != null ? `$${fmtNum(precioOro, 2)}` : '—' }}
+      </span>
+      <button
+            type="button"
+            @click="cargarPrecioOro"
+            :disabled="cargandoPrecio"
+            class="filtro-btn"
+          >
+            {{ cargandoPrecio ? '...' : 'Actualizar Valor' }}
+          </button>
     </div>
 
     <!-- ── KPIs ────────────────────────────────────────────────── -->
@@ -279,6 +288,7 @@ import { useLiquidacionesStore } from '@/stores/liquidaciones'
 import { useUiStore } from '@/stores/ui'
 import api from '@/api/axios'
 import type { LoteDisponible, LiquidacionResumenOut } from '@/api/liquidaciones'
+import { obtenerPrecioOro } from '@/api/liquidaciones'
 
 const router = useRouter()
 const store  = useLiquidacionesStore()
@@ -290,6 +300,7 @@ const tab           = ref<'liquidaciones' | 'lotes'>('liquidaciones')
 const filtroTexto   = ref('')
 const filtroEstado  = ref('')
 const cargandoLotes = ref(false)
+const cargandoPrecio = ref(false)
 
 // Lotes liquidables agrupados por provacop (cargados bajo demanda)
 interface GrupoProvacop {
@@ -302,6 +313,8 @@ interface GrupoProvacop {
   ley_prom: number
 }
 const lotesLiquidables = ref<LoteDisponible[]>([])
+
+const precioOro = ref<number | null>(null)
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 
@@ -345,6 +358,16 @@ const lotesAgrupados = computed<GrupoProvacop[]>(() => {
   return [...map.values()]
 })
 
+const cargarPrecioOro = async () => {
+  cargandoPrecio.value = true
+  try {
+    precioOro.value = await obtenerPrecioOro()
+  } catch {
+    ui.toast('Error al obtener precio del oro', 'error')
+  } finally {
+    cargandoPrecio.value = false
+  }
+}
 // ── Métodos ──────────────────────────────────────────────────────────────────
 
 async function cargarLotesLiquidables() {
@@ -436,6 +459,7 @@ function badgeClass(estado: string) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
+  await cargarPrecioOro()
   await Promise.all([
     store.cargarLista(),
     store.cargarKPIs(),
