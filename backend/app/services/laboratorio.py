@@ -491,7 +491,7 @@ def enviar_recuperacion_interna(
 ) -> AnalisisRecuperacion:
     """
     Comercial crea un registro PENDIENTE de recuperación para el laboratorio interno.
-    - Calcula snapshot de ley_cabeza (ley planta actual).
+    - Calcula snapshot de ley_cabeza (ley comercial actual).
     - Selecciona el CIP: si datos.cip es None, usa el único RecuperacionInterno del lote.
     - Falla si ya existe un pending vigente para ese CIP.
     """
@@ -499,9 +499,9 @@ def enviar_recuperacion_interna(
     if not lote:
         raise ValueError(f"Lote '{ip_lote}' no encontrado")
 
-    # Calcular ley planta (snapshot)
-    ley_planta = calcular_ley_planta(db, lote.id)
-    if ley_planta is None:
+    # Calcular ley comercial (snapshot)
+    ley_comercial = datos.ley_cabeza
+    if ley_comercial is None:
         raise ValueError(
             "El lote no tiene análisis de ley vigentes. "
             "No es posible determinar la ley cabeza para recuperación."
@@ -560,7 +560,7 @@ def enviar_recuperacion_interna(
         lote_id=lote.id,
         cip=cip_obj.codigo_cip,
         laboratorio=datos.laboratorio,
-        ley_cabeza=ley_planta,  # snapshot: se congela aquí
+        ley_cabeza=ley_comercial,  # snapshot: se congela aquí
         ley_cola=None,
         ley_liquido=None,
         estado=EstadoRecuperacion.PENDIENTE,
@@ -650,7 +650,7 @@ def eliminar_analisis_ley(db: Session, analisis_id: int, usuario_id: int) -> Ana
     if a.eliminado:
         raise ValueError("El analisis ya esta eliminado")
     a.eliminado = True
-    a.eliminado_en = datetime.utcnow()
+    a.eliminado_en = datetime.now()
     a.eliminado_por = usuario_id
     # Si estaba vigente, marcarlo no vigente tambien para que no afecte calculos
     if a.vigente:

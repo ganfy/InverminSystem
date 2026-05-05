@@ -72,41 +72,6 @@ def listar_cips(
     return svc.obtener_cips_laboratorio(db, incluir_ip=incluir_ip)
 
 
-# ── Vista por Lote/IP (solo Comercial, Gerencia, Admin) ──────────────────────
-
-
-@router.get("/lotes", response_model=list[LoteLabOut])
-def listar_lotes(
-    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
-    db: Session = Depends(get_db),
-):
-    """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
-    if not _puede_ver_ip(current_user):
-        raise HTTPException(
-            status_code=403,
-            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
-        )
-    return svc.obtener_lotes_laboratorio(db)
-
-
-@router.get("/lotes/{ip}", response_model=LoteLabOut)
-def detalle_lote(
-    ip: str,
-    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
-    db: Session = Depends(get_db),
-):
-    """Detalle completo de un lote: todos sus análisis, vigentes y descartados."""
-    if not _puede_ver_ip(current_user):
-        raise HTTPException(
-            status_code=403,
-            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
-        )
-    result = svc.obtener_detalle_lote(db, ip)
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
-    return result
-
-
 # ── Registrar Análisis de Ley ────────────────────────────────────────────────
 
 
@@ -582,6 +547,41 @@ def descargar_archivo(
     if not ruta_completa.exists():
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     return FileResponse(ruta_completa)
+
+
+# ── Vista por Lote/IP (solo Comercial, Gerencia, Admin) ──────────────────────
+
+
+@router.get("/lotes", response_model=list[LoteLabOut])
+def listar_lotes(
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
+    if not _puede_ver_ip(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
+        )
+    return svc.obtener_lotes_laboratorio(db)
+
+
+@router.get("/lotes/{ip}", response_model=LoteLabOut)
+def detalle_lote(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Detalle completo de un lote: todos sus análisis, vigentes y descartados."""
+    if not _puede_ver_ip(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
+        )
+    result = svc.obtener_detalle_lote(db, ip)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
+    return result
 
 
 # ── Sync Offline ─────────────────────────────────────────────────────────────

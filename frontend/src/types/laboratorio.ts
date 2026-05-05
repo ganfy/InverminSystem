@@ -59,6 +59,7 @@ export interface CompletarRecuperacionRequest {
 export interface EnviarRecuperacionInternaRequest {
     cip?: string | null   // null → sistema elige el único RecuperacionInterno
     laboratorio?: string
+    ley_cabeza?: number | null
 }
 
 export interface AnalisisRecuperacionOut {

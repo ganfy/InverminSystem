@@ -93,6 +93,7 @@ class EnviarRecuperacionInternaRequest(BaseModel):
 
     cip: str | None = None  # None → sistema elige el único RecuperacionInterno del lote
     laboratorio: str | None = None
+    ley_cabeza: Decimal | None = None
 
 
 class AnalisisRecuperacionOut(BaseModel):

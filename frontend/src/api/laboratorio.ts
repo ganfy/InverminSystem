@@ -115,6 +115,7 @@ export const laboratorioApi = {
         ip: string,
         datos: EnviarRecuperacionInternaRequest = {},
     ): Promise<AnalisisRecuperacionOut> {
+        console.log('Enviando recuperación interna con datos:', { ip, datos })
         const { data } = await api.post(`/laboratorio/lotes/${ip}/enviar-recuperacion`, datos)
         return data
     },

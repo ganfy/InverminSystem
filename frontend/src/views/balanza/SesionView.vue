@@ -692,6 +692,11 @@ const editLoteModal = reactive({
   },
 })
 
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return ''
+  return iso.slice(0, 16) // "YYYY-MM-DDTHH:MM"
+}
+
 function abrirEditarLote(lote: LoteDetalle) {
   if (!online.value && lote.id !== -1) {
     ui.toast('No se puede editar un lote del servidor sin conexión a internet.', 'warning')
@@ -704,12 +709,14 @@ function abrirEditarLote(lote: LoteDetalle) {
     ip: lote.ip,
     error: '',
     form: {
-      tipo_material: lote.tipo_material ?? '',
-      peso_inicial:  lote.pesaje ? convertirParaInput(Number(lote.pesaje.peso_inicial), 'BALANZA') : null,
-      peso_final:    lote.pesaje ? convertirParaInput(Number(lote.pesaje.peso_final), 'BALANZA')   : null,
-      sacos:         lote.pesaje?.sacos ?? null,
-      granel:        lote.pesaje?.granel ?? false,
+      tipo_material:        lote.tipo_material ?? '',
+      peso_inicial:         lote.pesaje ? convertirParaInput(Number(lote.pesaje.peso_inicial), 'BALANZA') : null,
+      peso_final:           lote.pesaje ? convertirParaInput(Number(lote.pesaje.peso_final), 'BALANZA')   : null,
+      sacos:                lote.pesaje?.sacos ?? null,
+      granel:               lote.pesaje?.granel ?? false,
       justificacion_manual: '',
+      fecha_inicio:         toDatetimeLocal(lote.pesaje?.fecha_inicio),
+      fecha_fin:            toDatetimeLocal(lote.pesaje?.fecha_fin),
     },
   })
 }

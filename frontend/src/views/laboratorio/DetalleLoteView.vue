@@ -641,6 +641,8 @@ const generando             = ref(false)
 const previsualizandoLey    = ref(false)
 const certLeyGuardado       = ref<string | null>(null)
 
+const ley_cabeza = ref<number | null>(null)
+
 function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)
   s.has(id) ? s.delete(id) : s.add(id)
@@ -786,6 +788,13 @@ async function recargarLeyComercial() {
   }
 }
 
+//actualizar value de ley cabeza con ley comercial
+watch(leyComercialCalc, (nuevaLey) => {
+  if (nuevaLey?.ley_comercial != null) {
+    ley_cabeza.value = nuevaLey.ley_comercial
+  }
+})
+
 // ── Agregar nueva ley ─────────────────────────────────────────────────────────
 const modalAgregarLey = ref(false)
 const cipSeleccionado = ref('')
@@ -858,6 +867,7 @@ const cipsExternosPendienteCert = computed(() => {
 })
 
 function abrirModalRecup() {
+  console.log('Ley Cabeza para recuperación:', ley_cabeza.value)
   cipRecupElegido.value = cipsRecuperacionDisponibles.value[0]?.codigo_cip ?? null
   labRecupElegida.value = cipsRecuperacionDisponibles.value[0]?.laboratorio
     ?? labsRecupDisponibles.value[0] ?? 'Paititi'
@@ -873,9 +883,9 @@ async function confirmarEnvioRecuperacion() {
   if (!cipRecupElegido.value) return
   enviando.value = true
   modalRecup.value = false
-  const esInterno = labRecupElegida.value === 'Paititi' || labRecupElegida.value === 'Laboratorio Interno'
+  const esInterno = labRecupElegida.value === 'El Dorado - Invermin Paititi' || labRecupElegida.value === 'Laboratorio Interno'
   if (esInterno) {
-    await store.enviarRecuperacion(ipActual, { cip: cipRecupElegido.value, laboratorio: labRecupElegida.value })
+    await store.enviarRecuperacion(ipActual, { cip: cipRecupElegido.value, laboratorio: labRecupElegida.value, ley_cabeza: ley_cabeza.value })
   } else {
     try {
       const cips = await muestreoApi.obtenerEtiquetas(ipActual)
