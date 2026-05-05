@@ -19,7 +19,8 @@ class LoteDashboard(BaseModel):
     ley_avg: float | None
     rec_porc: float | None
     acopiador: str | None
-    estado: str
+    estado: str  # estado del lote: RECEPCIONADO, LIQUIDADO, etc.
+    estado_lote: str  # etiqueta operativa: EN_PROCESO, HABILITADO, COMPLETO, DIRIMENCIA, VOLADO
 
 
 class DashboardResponse(BaseModel):

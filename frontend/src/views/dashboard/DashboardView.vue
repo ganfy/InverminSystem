@@ -114,12 +114,13 @@
               <th class="align-right">LEY PROM.</th>
               <th class="align-right">% REC.</th>
               <th>ACOPIADOR</th>
+              <th class="align-center">ESTADO LOTE</th>
               <th class="align-center">ESTADO</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="lotesFiltrados.length === 0">
-              <td colspan="10" class="empty-state">Sin lotes para los filtros seleccionados.</td>
+              <td colspan="11" class="empty-state">Sin lotes para los filtros seleccionados.</td>
             </tr>
             <tr v-for="lote in lotesFiltrados" :key="lote.ip" class="tabla-row">
               <td class="td-mono gold">{{ lote.ip }}</td>
@@ -131,6 +132,11 @@
               <td class="align-right td-mono">{{ lote.ley_avg?.toFixed(4) ?? '—' }}</td>
               <td class="align-right td-mono">{{ lote.rec_porc != null ? lote.rec_porc + '%' : '—' }}</td>
               <td class="td-truncate td-muted" :title="lote.acopiador || ''">{{ lote.acopiador || '—' }}</td>
+              <td class="align-center">
+                <span class="badge-estado-lote" :class="badgeEstadoLote(lote.estado_lote)">
+                  {{ lote.estado_lote }}
+                </span>
+              </td>
               <td class="align-center">
                 <span class="badge-estado" :class="badgeLote(lote.estado)">{{ lote.estado }}</span>
               </td>
@@ -226,7 +232,7 @@
                 <button
                   class="btn-accion"
                   title="Descargar PDF"
-                  @click="descargarPdf(liq.id, liq.numero_liquidacion)"
+                  @click="descargarPDF(liq.id.toString())"
                 >
                   <Download :size="14" />
                 </button>
@@ -313,7 +319,7 @@ import {
 import { dashboardApi, type DashboardResponse } from '@/api/dashboard'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
 import { useUiStore } from '@/stores/ui'
-import { getPdfLiquidacion } from '@/api/liquidaciones'
+import { descargarPDF } from '@/api/liquidaciones'
 
 const router   = useRouter()
 const liqStore = useLiquidacionesStore()
@@ -381,17 +387,6 @@ async function recargar() {
   await Promise.all([cargarDashboard(), liqStore.cargarLista()])
 }
 
-async function descargarPdf(id: number, numero: string) {
-  try {
-    const link = document.createElement('a')
-    link.href = getPdfLiquidacion(id)
-    link.download = `Liquidacion_${numero}.pdf`
-    link.click()
-  } catch {
-    ui.toast('Error al descargar PDF', 'error')
-  }
-}
-
 // ── Formatters ────────────────────────────────────────────────────────
 function fmtNum(v: number, d = 2) {
   return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d })
@@ -409,6 +404,15 @@ function badgeLote(estado: string) {
 }
 function badgeLiq(estado: string) {
   return { GENERADA: 'parcial', FACTURADA: 'pendiente', PAGADA: 'pagado' }[estado] ?? 'parcial'
+}
+function badgeEstadoLote(estado: string) {
+  return {
+    'badge-completo':   estado === 'COMPLETO',
+    'badge-habilitado': estado === 'HABILITADO',
+    'badge-dirimencia': estado === 'DIRIMENCIA',
+    'badge-volado':     estado === 'VOLADO',
+    'badge-proceso':    estado === 'EN_PROCESO',
+  }
 }
 
 onMounted(() => {
@@ -528,6 +532,20 @@ onMounted(() => {
 .pagado      { background: var(--color-success-bg);   color: #4ade80;               border: 1px solid rgba(81,161,85,0.3); }
 .pendiente   { background: var(--color-error-bg);     color: var(--color-error);    border: 1px solid rgba(165,71,61,0.3); }
 
+.badge-estado-lote {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.badge-completo   { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.badge-habilitado { background: rgba(234, 179, 8, 0.15);  color: #eab308; }
+.badge-dirimencia { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+.badge-volado     { background: rgba(239, 68, 68, 0.15);  color: #ef4444; }
+.badge-proceso    { background: rgba(148, 163, 184, 0.12); color: var(--color-text-muted); }
 .badge-count-sm {
   display: inline-block; padding: 0.1rem 0.5rem;
   background: rgba(179,144,40,0.1); border: 1px solid rgba(179,144,40,0.25);

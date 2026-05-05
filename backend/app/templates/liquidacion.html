@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hoja de Liquidación</title>
+    <style>
+        @page {
+                size: A4 landscape;
+                margin: 1.5cm;
+            }
+        body {
+                font-family: Helvetica, Arial, sans-serif;
+                font-size: 10pt;
+                color: #333333;
+                line-height: 1.3;
+            }
+
+        .header-table {
+                width: 100%;
+                margin-bottom: 20px;
+            }
+
+        .title {
+                text-align: center;
+                font-size: 16pt;
+                text-decoration: underline;
+                font-weight: bold;
+            }
+
+        .section-title {
+                font-weight: bold;
+                font-size: 11pt;
+                background-color: #e0e0e0;
+                padding: 4px;
+                margin-top: 10px;
+                margin-bottom: 10px;
+                border: 1px solid #999;
+            }
+
+        .info-table {
+                width: 100%;
+                margin-bottom: 15px;
+            }
+
+        .info-table td {
+                padding: 4px;
+                vertical-align: top;
+            }
+
+        .info-label {
+                font-weight: bold;
+                width: 140px;
+                color: #1a1a1a;
+            }
+
+        table.data-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 9pt;
+            }
+
+        table.data-table th,
+        table.data-table td {
+                border: 1px solid #666;
+                padding: 5px;
+                text-align: right;
+            }
+
+        table.data-table th {
+                background-color: #d9d9d9;
+                text-align: center;
+                font-weight: bold;
+                vertical-align: middle;
+            }
+
+        .total-row td {
+                font-weight: bold;
+                background-color: #e0e0e0;
+                font-size: 10pt;
+            }
+
+        .footer-notes {
+                font-size: 8pt;
+                margin-top: 20px;
+                border-top: 1px solid #999;
+                padding-top: 10px;
+            }
+
+        .footer-notes p {
+                margin: 3px 0;
+            }
+    </style>
+</head>
+
+<body>
+    <!-- CABECERA PRINCIPAL CON MEMBRETE Y NÚMERO -->
+    <table class="header-table">
+        <tr>
+            <td style="width: 30%; text-align: left; vertical-align: middle;">
+                {membrete_tag}
+            </td>
+            <td style="width: 40%;" class="title">
+                HOJA DE LIQUIDACIÓN<br>MINERALES AURÍFEROS
+            </td>
+            <td style="width: 30%; text-align: right; font-weight: bold; font-size: 12pt; vertical-align: top;">
+                N° {numero_liquidacion}
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">DATOS DEL CLIENTE</div>
+
+    <!-- DATOS DEL PROVEEDOR Y ACOPIADOR -->
+    <table class="info-table">
+        <tr>
+            <td class="info-label">Razón social:</td>
+            <td>{proveedor_razon_social}</td>
+            <td class="info-label">Acopiador:</td>
+            <td>{acopiador_nombre}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Nro de RUC:</td>
+            <td>{proveedor_ruc}</td>
+            <td class="info-label">Producto:</td>
+            <td>Mineral aurífero sin procesar</td>
+        </tr>
+        <tr>
+            <td class="info-label">Fecha de entrega:</td>
+            <td>{fecha_entrega}</td>
+            <td class="info-label">GRR:</td>
+            <td>{guia_remision}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Fecha de liquidación:</td>
+            <td>{fecha_liquidacion}</td>
+            <td class="info-label">GRT:</td>
+            <td>{guia_transporte}</td>
+        </tr>
+    </table>
+
+    <!-- TABLA DE LOTES -->
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Lote</th>
+                <th>Fecha de<br>Recepción</th>
+                <th>TMH</th>
+                <th>%H2O</th>
+                <th>TMS</th>
+                <th>Sacos</th>
+                <th>Ley Oz/tc</th>
+                <th>% <br>Recup</th>
+                <th>Inter<br>US$</th>
+                <th>Maquila<br>US$ x TC</th>
+                <th>Riesgo<br>Comercial</th>
+                <th>Factor</th>
+                <th>Insumos<br>US$ x tc</th>
+                <th>Precio<br>TMS</th>
+                <th>Total US$</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Aquí el código Python inyecta los resultados de _build_fila() -->
+            {filas_lotes}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="4" style="text-align: right; padding-right: 10px;">Totales</td>
+                <td style="text-align: right;">{total_tms}</td>
+                <td colspan="9" style="text-align: right; padding-right: 15px;">Base imponible US$</td>
+                <td style="text-align: right;">{total_usd}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- NOTAS AL PIE CON LOS UMBRALES DINÁMICOS -->
+    <div class="footer-notes">
+        <p><strong>NOTA IMPORTANTE</strong></p>
+        <p>* Se promedia diferencia de leyes desde {lim_ley_inferior} hasta {lim_ley_superior} oz/Tc.</p>
+        <p>* Si existe una falsificación o adulteración de los datos serán denunciados penalmente.</p>
+        <p>* Si el proveedor minero desea retirar el mineral de nuestra planta deberá realizar un pago por almacenaje,
+            chancado y gastos operativos.</p>
+        <p>* Se aceptan reclamos y/o observaciones antes de que se efectúe la factura y por ende el pago
+            correspondiente, después queda sin efecto.</p>
+    </div>
+</body>
+
+</html>

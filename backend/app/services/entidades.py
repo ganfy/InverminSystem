@@ -9,6 +9,7 @@ from app.models.enums import RolEntidad, TipoEntidad
 from app.models.models import (
     Entidad,
     EntidadRol,
+    Muestreo,
     ParametrosComerciales,
     ProveedorAcopiador,
     Rol,
@@ -535,9 +536,31 @@ def buscar_por_ruc(db: Session, ruc: str) -> dict | None:
     return _serializar_tercero(entidad, provacop, db)
 
 
-def listar_provacops(db: Session) -> list[dict]:
-    """Lista todas las relaciones proveedor-acopiador para el dropdown de liquidaciones."""
+def listar_provacops(db: Session, con_lotes: bool = False) -> list[dict]:
+    """Lista relaciones proveedor-acopiador. con_lotes=True filtra solo los que
+    tienen al menos un lote RECEPCIONADO con recuperación registrada."""
     rows = db.query(ProveedorAcopiador).all()
+
+    if con_lotes:
+        from app.models.enums import EstadoLote
+        from app.models.models import AnalisisRecuperacion, Lote, SesionDescarga
+
+        ids_con_lotes: set[int] = {
+            row[0]
+            for row in db.query(SesionDescarga.provacop_id)
+            .join(Lote, Lote.sesion_id == SesionDescarga.id)
+            .join(AnalisisRecuperacion, AnalisisRecuperacion.lote_id == Lote.id)
+            .join(Muestreo, Muestreo.lote_id == Lote.id)
+            .filter(
+                Lote.estado == EstadoLote.RECEPCIONADO,
+                Lote.eliminado == False,  # noqa: E712
+                AnalisisRecuperacion.vigente == True,  # noqa: E712
+            )
+            .distinct()
+            .all()
+        }
+        rows = [r for r in rows if r.id in ids_con_lotes]
+
     return [
         {
             "id": pa.id,

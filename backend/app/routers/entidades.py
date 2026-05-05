@@ -89,11 +89,12 @@ def buscar_por_ruc(
 
 @router.get("/provacop", response_model=list[ProvacopDropdown])
 def listar_provacops(
+    con_lotes: bool = Query(False, description="Solo provacops con lotes listos para liquidar"),
     current_user=Depends(check_permiso("TERCEROS", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """Lista relaciones proveedor-acopiador para el dropdown de nueva liquidación."""
-    return svc.listar_provacops(db)
+    return svc.listar_provacops(db, con_lotes=con_lotes)
 
 
 @router.get("/{entidad_id}", response_model=TerceroRespuesta)

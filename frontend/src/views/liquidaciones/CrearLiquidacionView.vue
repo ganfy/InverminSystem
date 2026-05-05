@@ -362,7 +362,7 @@
   // ── Methods ─────────────────────────────────────────────────────────
   async function cargarProvacops() {
     try {
-      const r = await api.get('/terceros/provacop')
+      const r = await api.get('/terceros/provacop', { params: { con_lotes: true } })
       provacops.value = r.data
     } catch {
       provacops.value = []

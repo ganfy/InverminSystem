@@ -171,11 +171,16 @@ export function cambiarEstadoLiquidacion(id: number, estado: string) {
     return api.patch<LiquidacionDetalleOut>(`/liquidaciones/${id}/estado`, { estado })
 }
 
-export function getPdfLiquidacion(id: number): string {
-    const base = api.defaults.baseURL ?? ''
-    return `${base}/liquidaciones/${id}/pdf`
-}
-
 export function getLiquidacionesKPIs() {
     return api.get<LiquidacionesKPI>('/liquidaciones/kpis')
+}
+
+export async function descargarPDF(id: string) : Promise<void> {
+    const response = await api.get(`/liquidaciones/${id}/pdf`, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Liquidacion_${id}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
 }

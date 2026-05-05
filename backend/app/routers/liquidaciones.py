@@ -113,18 +113,6 @@ def listar(
     return svc.obtener_liquidaciones(db, provacop_id=provacop_id, estado=estado)
 
 
-@router.get("/{liquidacion_id}", response_model=LiquidacionDetalleOut)
-def detalle(
-    liquidacion_id: int,
-    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
-    db: Session = Depends(get_db),
-):
-    result = svc.obtener_liquidacion(db, liquidacion_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Liquidacion no encontrada")
-    return result
-
-
 @router.post("/", response_model=LiquidacionDetalleOut, status_code=201)
 def crear(
     req: LiquidacionCreate,
@@ -206,3 +194,15 @@ def descargar_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
+
+
+@router.get("/{liquidacion_id}", response_model=LiquidacionDetalleOut)
+def detalle(
+    liquidacion_id: int,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    result = svc.obtener_liquidacion(db, liquidacion_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Liquidacion no encontrada")
+    return result

@@ -107,7 +107,7 @@
                   <th>LEY MINERO</th>
                   <th>PROMEDIO</th>
                   <th>%REC LIQ</th>
-                  <th>MAQUILA</th>
+                  <th>TC US$ x tc</th>
                   <th>RIESGO</th>
                   <th>INSUMOS</th>
                   <th>BONO</th>
@@ -212,7 +212,7 @@
   import { useLiquidacionesStore } from '@/stores/liquidaciones'
   import { useAuthStore } from '@/stores/auth'
   import { useUiStore } from '@/stores/ui'
-  import { getPdfLiquidacion } from '@/api/liquidaciones'
+  import { descargarPDF } from '@/api/liquidaciones'
 
   const route  = useRoute()
   const router = useRouter()
@@ -259,11 +259,7 @@
   async function descargarPdf() {
     descargandoPdf.value = true
     try {
-      const url = getPdfLiquidacion(id)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `Liquidacion_${store.detalle?.numero_liquidacion ?? id}.pdf`
-      link.click()
+      await descargarPDF(id.toString())
     } catch {
       ui.toast('Error al descargar PDF', 'error')
     } finally {

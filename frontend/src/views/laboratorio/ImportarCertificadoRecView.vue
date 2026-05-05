@@ -19,7 +19,7 @@
       <div class="form-grid">
         <div class="field">
           <label class="field-label">IP:</label>
-          <<input class="field-input" :value="loteIp || '-'" disabled />
+          <input class="field-input" :value="loteIp || '-'" disabled />
         </div>
         <div class="field">
           <label class="field-label">CIP ESPERADO:</label>

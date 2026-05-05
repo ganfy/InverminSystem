@@ -876,6 +876,7 @@ class LiquidacionLote(AuditMixin, Base):
     fecha_recepcion_lote = Column(Date)
     maquila_aplicada = Column(Numeric(10, 2))
     riesgo_aplicado = Column(Numeric(10, 2))
+    spot_usd_snapshot = Column(Numeric(10, 2))
     precio_x_tms = Column(Numeric(10, 4))
     total_usd = Column(Numeric(12, 2))
 

@@ -19,6 +19,7 @@ export interface LoteDashboard {
     rec_porc: number | null
     acopiador: string | null
     estado: string
+    estado_lote: string
 }
 
 export interface DashboardResponse {

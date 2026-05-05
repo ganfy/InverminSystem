@@ -20,7 +20,6 @@ REGLA VOLADO (de notas de liquidacion):
 
 from __future__ import annotations
 
-import math
 from datetime import date, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any
@@ -67,10 +66,10 @@ def _nombre_entidad(entidad) -> str:
 
 def _calc_maquila(oz_promedio: Decimal, maquila_base: Decimal) -> Decimal:
     """
-    step = floor(oz_promedio * 10) * 10  (=ROUNDDOWN(oz,1)*100 en Excel)
-    maquila = max(95, maquila_base + step)
+    Excel: =SI((maquila_base + REDONDEAR.MENOS(oz,1)*100) < 95; 95; ...)
+    REDONDEAR.MENOS(oz, 1) = truncar a 1 decimal → * 100
     """
-    step = Decimal(str(math.floor(float(oz_promedio) * 10) * 10))
+    step = oz_promedio.quantize(Decimal("0.1"), rounding=ROUND_DOWN) * 100
     return max(MIN_MAQUILA, maquila_base + step)
 
 
@@ -287,8 +286,9 @@ def _calcular_lote(
 
     # ── Ley Comercial (usa logica existente de laboratorio) ───────────────────
     lc_result = calcular_ley_comercial(ley_planta, params)
-    oz_tc_comercial = Decimal(str(lc_result["ley_comercial"])).quantize(
-        Decimal("0.001"), rounding=ROUND_DOWN
+    oz_tc_comercial = max(
+        Decimal("0"),
+        Decimal(str(lc_result["ley_comercial"])).quantize(Decimal("0.001"), rounding=ROUND_DOWN),
     )
 
     # ── Ley Minero ────────────────────────────────────────────────────────────
@@ -529,7 +529,9 @@ def crear_liquidacion(
             .options(
                 joinedload(Lote.pesajes),
                 joinedload(Lote.muestreos),
-                joinedload(Lote.sesion).joinedload("provacop").joinedload("parametros"),
+                joinedload(Lote.sesion)
+                .joinedload(SesionDescarga.provacop)
+                .joinedload(ProveedorAcopiador.parametros),
             )
             .filter(Lote.ip == item.ip, Lote.eliminado == False)  # noqa: E712
             .first()
@@ -554,7 +556,6 @@ def crear_liquidacion(
             ley_comercial=snap["oz_tc_promedio"],
             usa_dirimencia=snap["usa_dirimencia"],
             oz_tc_planta=snap["oz_tc_planta"],
-            oz_tc_planta_raw=snap["oz_tc_planta_raw"],
             oz_tc_comercial=snap["oz_tc_comercial"],
             oz_tc_minero=snap["oz_tc_minero"],
             oz_tc_promedio=snap["oz_tc_promedio"],
@@ -787,7 +788,7 @@ def lotes_disponibles_para_liquidar(
             ley_comercial = oz_tc_planta
         elif oz_tc_planta:
             lc = calcular_ley_comercial(ley_planta, params)
-            ley_comercial = float(lc["ley_comercial"]) if lc else None
+            ley_comercial = max(0.0, float(lc["ley_comercial"])) if lc else None
 
         ley_comercial = (
             Decimal(str(ley_comercial)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
