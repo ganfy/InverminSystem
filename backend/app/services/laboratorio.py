@@ -1099,14 +1099,14 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
     params: instancia de ParametrosComerciales (puede ser None → sin reglas).
-    Retorna dict con ley_comercial y breakdown para mostrar al Comercial.
 
     Reglas (en orden):
     1. Si ley_planta < lim_ley_comercial → restar dscto_ley_comercial
-    2. Si lim_ley_inferior y lim_ley_superior definidos:
-         Si ley_planta < lim_ley_inferior → usar lim_ley_inferior
-         Si ley_planta > lim_ley_superior → usar lim_ley_superior
-    3. Multiplicar por porcentaje_ley_comercial (e.g. 0.95 = 95%)
+    2. Multiplicar por porcentaje_ley_comercial (factor, ej. 0.940)
+
+    NOTA: lim_ley_inferior y lim_ley_superior NO se usan aquí para
+    clamping de ley. Esos campos determinan el % de recuperación
+    en liquidaciones (ver liquidaciones.py → _determinar_rec_liq).
     """
     if params is None:
         return {
@@ -1122,10 +1122,9 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
     q = Decimal("0.0001")
     ley = ley_planta
     descuento = Decimal("0")
-    ajuste_rango = False
     detalle_pasos = []
 
-    # Regla 1: descuento si ley < límite
+    # Regla 1: descuento si ley < límite comercial
     if params.lim_ley_comercial and params.dscto_ley_comercial:
         lim = Decimal(str(params.lim_ley_comercial))
         dscto = Decimal(str(params.dscto_ley_comercial))
@@ -1137,20 +1136,7 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
                 f"descuento {float(dscto):.4f} → {float(ley):.4f}"
             )
 
-    # Regla 2: ajuste a rango [inferior, superior]
-    if params.lim_ley_inferior and params.lim_ley_superior:
-        inf = Decimal(str(params.lim_ley_inferior))
-        sup = Decimal(str(params.lim_ley_superior))
-        if ley < inf:
-            ley = inf
-            ajuste_rango = True
-            detalle_pasos.append(f"Ley ajustada a minimo de rango: {float(inf):.4f}")
-        elif ley > sup:
-            ley = sup
-            ajuste_rango = True
-            detalle_pasos.append(f"Ley ajustada a maximo de rango: {float(sup):.4f}")
-
-    # Regla 3: factor porcentual
+    # Regla 2: factor porcentual aplicado a ley_planta (sin clamping de rango)
     factor = Decimal("1")
     if params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
@@ -1165,7 +1151,7 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
         "ley_comercial": float(ley),
         "descuento_aplicado": float(descuento),
         "factor_aplicado": float(factor),
-        "ajuste_rango": ajuste_rango,
+        "ajuste_rango": False,
         "sin_parametros": False,
         "detalle": " | ".join(detalle_pasos) if detalle_pasos else "Sin ajustes aplicados",
     }

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 from datetime import date, datetime
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any
 
 from app.models.enums import EstadoLiquidacion, EstadoLote, TipoAnalisis
@@ -84,8 +84,12 @@ def _calc_precio_x_tms(
     bono: Decimal,
 ) -> Decimal:
     """col AB del Excel: ((oz*rec/100*(spot-riesgo)) - maquila - insumos + bono) * factor"""
-    val = (oz_promedio * rec_liq / 100 * (spot - riesgo)) - maquila - insumos + bono
-    return (val * FACTOR).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    val_1 = oz_promedio * rec_liq / 100 * (spot - riesgo)
+    val = val_1 - maquila - insumos + bono
+    print(
+        f"Debug: Precio x TMS - oz: {oz_promedio}, rec_liq: {rec_liq}, spot: {spot}, riesgo: {riesgo}, maquila: {maquila}, insumos: {insumos}, bono: {bono} => valor antes de factor: {val}, {val_1=}"
+    )
+    return (val * FACTOR).quantize(Decimal("0.0001"))
 
 
 def _calc_total(precio_x_tms: Decimal, tms: Decimal) -> Decimal:
@@ -130,8 +134,35 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
     return Decimal(str(a.ley_final)) if a and a.ley_final else None
 
 
-def _rec_liq(db: Session, lote_id: int) -> Decimal | None:
-    """% recuperacion liquidacion: campo 'recuperacion' del AnalisisRecuperacion vigente."""
+def _determinar_rec_liq(
+    oz_promedio: Decimal,
+    params: ParametrosComerciales | None,
+    db: Session,
+    lote_id: int,
+) -> Decimal | None:
+    """
+    % Recuperación para LIQUIDAR (col '% Rec Liq' del Excel).
+    Valor escalonado según umbrales de ley del acopiador:
+      oz_promedio >= umbral_recup_medio → recuperación = 90%
+      oz_promedio < umbral_recup_medio → recuperación = 85%
+      oz_promedio < umbral_recup_bajo → recuperación = 80%
+    El valor 80 para ley muy baja se logra poniendo umbral_recup_bajo=80 en parámetros.
+
+    Fallback: si faltan parámetros/umbrales → usa recuperación real del lab.
+    """
+    if params and params.umbral_recup_bajo is not None and params.umbral_recup_medio is not None:
+        bajo = 80
+        medio = 85
+        alto = 90
+
+        if oz_promedio >= params.umbral_recup_medio:
+            return alto
+        elif oz_promedio >= params.umbral_recup_bajo:
+            return medio
+        elif oz_promedio < params.umbral_recup_bajo:
+            return bajo
+
+    # Fallback: recuperación real del laboratorio
     a = (
         db.query(AnalisisRecuperacion)
         .filter(
@@ -145,7 +176,7 @@ def _rec_liq(db: Session, lote_id: int) -> Decimal | None:
 
 
 def _rec_planta(db: Session, lote_id: int) -> Decimal | None:
-    """% recuperacion planta (porcentaje diferente al de liq en algunos casos)."""
+    """% Recuperación REAL del laboratorio (col '% Rec Planta' del Excel)."""
     a = (
         db.query(AnalisisRecuperacion)
         .filter(
@@ -155,8 +186,6 @@ def _rec_planta(db: Session, lote_id: int) -> Decimal | None:
         .order_by(AnalisisRecuperacion.id.desc())
         .first()
     )
-    # Si el analisis tiene ley_cabeza y ley_cola calculamos planta aparte
-    # por ahora retorna el mismo campo recuperacion como aproximacion
     return Decimal(str(a.recuperacion)) if a and a.recuperacion else None
 
 
@@ -258,7 +287,9 @@ def _calcular_lote(
 
     # ── Ley Comercial (usa logica existente de laboratorio) ───────────────────
     lc_result = calcular_ley_comercial(ley_planta, params)
-    oz_tc_comercial = Decimal(str(lc_result["ley_comercial"])).quantize(Decimal("0.0001"))
+    oz_tc_comercial = Decimal(str(lc_result["ley_comercial"])).quantize(
+        Decimal("0.001"), rounding=ROUND_DOWN
+    )
 
     # ── Ley Minero ────────────────────────────────────────────────────────────
     oz_tc_minero = _ley_minero(db, lote.id)
@@ -273,12 +304,18 @@ def _calcular_lote(
         )
 
     # ── Promedio ──────────────────────────────────────────────────────────────
-    oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(
-        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    oz_promedio = (
+        ((oz_tc_comercial + oz_tc_minero) / 2).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+        if oz_tc_minero
+        else oz_tc_comercial
     )
 
     # ── Recuperacion ──────────────────────────────────────────────────────────
-    rec_liq = rec_liq_override if rec_liq_override is not None else _rec_liq(db, lote.id)
+    if rec_liq_override is not None:
+        rec_liq = rec_liq_override
+    else:
+        rec_liq = _determinar_rec_liq(oz_promedio, params, db, lote.id)
+
     if rec_liq is None:
         alertas.append(
             AlertaLote(
@@ -358,7 +395,6 @@ def _calcular_lote(
         "gasto_acopio_liquidacion": gasto_acopio,
     }
 
-    print(f"Debug: Snapshot calculado para lote {lote.ip}: {snapshot}")
     return snapshot, alertas
 
 
@@ -419,8 +455,6 @@ def preview_liquidacion(
         snap, alertas = _calcular_lote(
             db, lote, spot, item.bono or Decimal("0"), item.rec_liq_override
         )
-
-        print(f"Debug: Lote {item.ip} - Snap: {snap} - Alertas: {[a.mensaje for a in alertas]}")
 
         if alertas:
             for alerta in alertas:
@@ -748,16 +782,23 @@ def lotes_disponibles_para_liquidar(
 
         # Ley comercial: dirimencia > promedio planta+minero
         ley_comercial = None
+        params = lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
         if usa_dir and ley_planta:
             ley_comercial = oz_tc_planta
-        elif oz_tc_planta and oz_tc_minero:
-            params = (
-                lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
-            )
+        elif oz_tc_planta:
             lc = calcular_ley_comercial(ley_planta, params)
             ley_comercial = float(lc["ley_comercial"]) if lc else None
 
-        rec = _rec_liq(db, lote.id)
+        ley_comercial = (
+            Decimal(str(ley_comercial)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+            if ley_comercial is not None
+            else None
+        )
+        print(
+            f"Debug: Lote {lote.ip} - Ley Planta: {oz_tc_planta}, Ley Minero: {oz_tc_minero}, Usa Dirimencia: {usa_dir} => Ley Comercial: {ley_comercial}"
+        )
+        # rec_liq = _determinar_rec_liq(ley_comercial, params, db, lote.id)
+        rec = _rec_planta(db, lote.id)
         porcentaje_rec = float(rec) if rec else None
         listo = all(x is not None for x in [ley_comercial, porcentaje_rec, muestreo])
 

@@ -362,7 +362,7 @@ async def extraer_certificado_ley(
     return resultado
 
 
-@router.post("/certificado/extraer-recuperacion")
+@router.post("/certificado/extraer-leyrecuperacion")
 async def extraer_certificado_recuperacion(
     archivo: UploadFile = FastAPIFile(...),
     laboratorio: str = "",
