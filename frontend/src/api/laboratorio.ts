@@ -302,3 +302,23 @@ export const laboratorioApi = {
         return data
     },
 }
+
+export async function descargarCertificadoLey(analisisId: number): Promise<void> {
+    const response = await api.get(`/laboratorio/ley/${analisisId}/certificado`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Certificado_Ley_${analisisId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+}
+
+export async function descargarCertificadoRecuperacion(analisisId: number): Promise<void> {
+    const response = await api.get(`/laboratorio/recuperacion/${analisisId}/certificado`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Certificado_Rec_${analisisId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+}

@@ -42,6 +42,7 @@ from app.schemas.liquidaciones import (
     LiquidacionCreate,
     LiquidacionDetalleOut,
     LiquidacionLoteOut,
+    LiquidacionLoteParamsUpdate,
     LiquidacionPreviewOut,
     LiquidacionPreviewRequest,
     LiquidacionResumenOut,
@@ -224,6 +225,8 @@ def _calcular_lote(
     spot_usd: Decimal,
     bono: Decimal,
     rec_liq_override: Decimal | None,
+    gasto_acopio_override: Decimal | None = None,
+    gasto_consumo_override: Decimal | None = None,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
@@ -268,8 +271,16 @@ def _calcular_lote(
 
     riesgo = Decimal(str(params.riesgo_comercial)) if params.riesgo_comercial else Decimal("0")
     maquila_base = Decimal(str(params.maquila)) if params.maquila else Decimal("0")
-    gasto_acopio = Decimal(str(params.gasto_acopio)) if params.gasto_acopio else Decimal("0")
-    gasto_consumo = Decimal(str(params.gasto_consumo)) if params.gasto_consumo else Decimal("0")
+    gasto_acopio = (
+        Decimal(str(gasto_acopio_override))
+        if gasto_acopio_override is not None
+        else (Decimal(str(params.gasto_acopio)) if params.gasto_acopio else Decimal("0"))
+    )
+    gasto_consumo = (
+        Decimal(str(gasto_consumo_override))
+        if gasto_consumo_override is not None
+        else (Decimal(str(params.gasto_consumo)) if params.gasto_consumo else Decimal("0"))
+    )
     insumos = gasto_acopio + gasto_consumo
 
     # ── Ley Planta ────────────────────────────────────────────────────────────
@@ -453,7 +464,13 @@ def preview_liquidacion(
             continue
 
         snap, alertas = _calcular_lote(
-            db, lote, spot, item.bono or Decimal("0"), item.rec_liq_override
+            db,
+            lote,
+            spot,
+            item.bono or Decimal("0"),
+            item.rec_liq_override,
+            item.gasto_acopio_override,
+            item.gasto_consumo_override,
         )
 
         if alertas:
@@ -833,3 +850,70 @@ def lotes_disponibles_para_liquidar(
         )
 
     return resultado
+
+
+def editar_params_lote(
+    db: Session,
+    liquidacion_id: int,
+    ip: str,
+    params: LiquidacionLoteParamsUpdate,
+    usuario_id: int,
+) -> LiquidacionLote:
+    """
+    Admin/Gerencia editan parámetros de un lote en una liquidación no PAGADA.
+    Recalcula precio_x_tms, total_usd y fino_recuperable.
+    """
+    liq = db.query(Liquidacion).filter(Liquidacion.id == liquidacion_id).first()
+    if not liq:
+        raise ValueError("Liquidación no encontrada")
+    if liq.estado == EstadoLiquidacion.PAGADA:
+        raise ValueError("No se puede modificar una liquidación PAGADA")
+
+    ll = (
+        db.query(LiquidacionLote)
+        .join(Lote, Lote.id == LiquidacionLote.lote_id)
+        .filter(
+            LiquidacionLote.liquidacion_id == liquidacion_id,
+            Lote.ip == ip,
+        )
+        .first()
+    )
+    if not ll:
+        raise ValueError(f"Lote {ip} no encontrado en esta liquidación")
+
+    if params.bono is not None:
+        ll.bono = params.bono
+    if params.rec_liq_override is not None:
+        ll.porcentaje_rec_liquido = params.rec_liq_override
+    if params.riesgo_override is not None:
+        ll.riesgo_aplicado = params.riesgo_override
+    if params.maquila_override is not None:
+        ll.maquila_aplicada = params.maquila_override
+    if params.gasto_acopio_override is not None:
+        consumo_prev = (ll.insumos_liquidacion or Decimal("0")) - (
+            ll.gasto_acopio_liquidacion or Decimal("0")
+        )
+        ll.gasto_acopio_liquidacion = params.gasto_acopio_override
+        ll.insumos_liquidacion = params.gasto_acopio_override + consumo_prev
+    if params.gasto_consumo_override is not None:
+        ll.insumos_liquidacion = (
+            ll.gasto_acopio_liquidacion or Decimal("0")
+        ) + params.gasto_consumo_override
+
+    # Recalcular con valores actualizados
+    oz = ll.oz_tc_promedio or Decimal("0")
+    rec_liq = ll.porcentaje_rec_liquido or Decimal("0")
+    spot = ll.spot_usd_snapshot or Decimal("0")
+    riesgo = ll.riesgo_aplicado or Decimal("0")
+    maquila = ll.maquila_aplicada or Decimal("0")
+    insumos = ll.insumos_liquidacion or Decimal("0")
+    bono = ll.bono or Decimal("0")
+    tms = ll.tms_snapshot or Decimal("0")
+
+    ll.precio_x_tms = _calc_precio_x_tms(oz, rec_liq, spot, riesgo, maquila, insumos, bono)
+    ll.total_usd = _calc_total(ll.precio_x_tms, tms)
+    ll.fino_recuperable = _calc_fino_recuperable(tms, rec_liq, oz)
+    ll.modificado_por = usuario_id
+
+    db.flush()
+    return ll

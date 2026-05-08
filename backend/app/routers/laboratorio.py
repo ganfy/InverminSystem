@@ -17,11 +17,12 @@ Flujo de recuperación interna:
 
 import io
 import os
+from decimal import Decimal
 from pathlib import Path
 
 from app.core.database import get_db
 from app.core.deps import check_permiso
-from app.models.enums import RolSistema
+from app.models.enums import EstadoRecuperacion, RolSistema, TipoAnalisis
 from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, ParametrosComerciales
 from app.schemas.laboratorio import (
     AnalisisLeyCreate,
@@ -37,6 +38,7 @@ from app.schemas.laboratorio import (
     SyncLaboratorioRequest,
     SyncLaboratorioResponse,
 )
+from app.services import certificado_ley_pdf as cert_svc
 from app.services import laboratorio as svc
 from app.services.pruebas import calcular_ley_planta
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -441,8 +443,6 @@ def guardar_certificado_ley(
     db: Session = Depends(get_db),
 ):
     """Genera y persiste el certificado de ley en storage. Retorna ruta relativa."""
-    from app.services import certificado_ley_pdf as cert_svc
-
     try:
         pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip)
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "ley")
@@ -450,6 +450,36 @@ def guardar_certificado_ley(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+    lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
+    if lote_obj:
+        cert_record = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.lote_id == lote_obj.id,
+                AnalisisLey.tipo_analisis == TipoAnalisis.COMERCIAL,
+            )
+            .first()
+        )
+        if cert_record:
+            cert_record.certificado_url = ruta
+        else:
+            db.add(
+                AnalisisLey(
+                    lote_id=lote_obj.id,
+                    laboratorio="Paititi",
+                    tipo_analisis=TipoAnalisis.COMERCIAL,
+                    material="Au",
+                    ley_fino=Decimal("0"),
+                    ley_grueso=Decimal("0"),
+                    ley_final=Decimal("0"),
+                    ley_gr_tm=Decimal("0"),
+                    certificado_url=ruta,
+                    vigente=True,
+                    creado_por=current_user.id,
+                )
+            )
+        db.commit()
 
     return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
 
@@ -495,6 +525,32 @@ def guardar_certificado_recuperacion(
     try:
         pdf_bytes = cert_svc.generar_certificado_recuperacion_comercial_pdf(db, ip)
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "rec")
+
+        lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
+        if lote_obj:
+            cert_record = (
+                db.query(AnalisisRecuperacion)
+                .filter(
+                    AnalisisRecuperacion.lote_id == lote_obj.id,
+                    AnalisisRecuperacion.estado == EstadoRecuperacion.CERT_COMERCIAL,
+                )
+                .first()
+            )
+            if cert_record:
+                cert_record.certificado_url = ruta
+            else:
+                db.add(
+                    AnalisisRecuperacion(
+                        lote_id=lote_obj.id,
+                        cip=None,
+                        laboratorio="Paititi",
+                        estado=EstadoRecuperacion.CERT_COMERCIAL,
+                        certificado_url=ruta,
+                        vigente=True,
+                        creado_por=current_user.id,
+                    )
+                )
+            db.commit()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -525,6 +581,56 @@ def generar_certificado_ensayo(
     nombre = f"ensayo_{cip.replace('-', '_')}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/ley/{analisis_id}/certificado")
+def descargar_certificado_ley(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Descarga el certificado PDF de un análisis de ley guardado en disco."""
+    analisis = db.query(AnalisisLey).get(analisis_id)
+    if not analisis:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+    if not analisis.certificado_url or not os.path.exists(analisis.certificado_url):
+        raise HTTPException(status_code=404, detail="Certificado no generado aún")
+
+    def iterfile():
+        with open(analisis.certificado_url, "rb") as f:
+            yield from f
+
+    nombre = f"Certificado_Ley_{analisis_id}.pdf"
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/recuperacion/{analisis_id}/certificado")
+def descargar_certificado_recuperacion(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Descarga el certificado PDF de un análisis de recuperación guardado en disco."""
+    analisis = db.query(AnalisisRecuperacion).get(analisis_id)
+    if not analisis:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+    if not analisis.certificado_url or not os.path.exists(analisis.certificado_url):
+        raise HTTPException(status_code=404, detail="Certificado no generado aún")
+
+    def iterfile():
+        with open(analisis.certificado_url, "rb") as f:
+            yield from f
+
+    nombre = f"Certificado_Rec_{analisis_id}.pdf"
+    return StreamingResponse(
+        iterfile(),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )

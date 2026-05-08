@@ -134,6 +134,23 @@ export interface LiquidacionDetalleOut extends LiquidacionResumenOut {
     fecha_cierre: string | null
 }
 
+export interface LiquidacionLoteParamsUpdate {
+    bono?: number | null
+    rec_liq_override?: number | null
+    riesgo_override?: number | null
+    maquila_override?: number | null
+    gasto_acopio_override?: number | null
+    gasto_consumo_override?: number | null
+}
+
+// ── Edición de Parámetros de Lote ──────────────────────────────────────────────
+export interface EditOverrides {
+    gasto_acopio: number | null
+    gasto_consumo: number | null
+    bono: number
+    rec_liq: Record<string, number | null>
+  }
+
 // ── API calls ──────────────────────────────────────────────────────────────────
 /**
  * Obtiene el precio diario del oro (London Fix PM)
@@ -183,4 +200,8 @@ export async function descargarPDF(id: string) : Promise<void> {
     link.download = `Liquidacion_${id}.pdf`;
     link.click();
     URL.revokeObjectURL(url);
+}
+
+export function editarParamsLote(liquidacionId: number, ip: string, body: LiquidacionLoteParamsUpdate) {
+    return api.patch<LiquidacionDetalleOut>(`/liquidaciones/${liquidacionId}/lotes/${ip}/parametros`, body)
 }

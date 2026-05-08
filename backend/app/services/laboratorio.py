@@ -9,7 +9,7 @@ import re
 import shutil
 import tempfile
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -120,7 +120,7 @@ def _rec_out(
         cip=a.cip,
         laboratorio=a.laboratorio,
         ley_cabeza=a.ley_cabeza if a.ley_cabeza is not None else Decimal("0"),
-        ley_cola=a.ley_cola if a.ley_cola is not None else Decimal("0"),
+        ley_cola=a.ley_cola,
         ley_liquido=a.ley_liquido,
         recuperacion=a.recuperacion,
         estado=a.estado,
@@ -248,19 +248,37 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         for c in todos_cips
     ]
 
-    analisis_ley = (
+    todos_analisis_ley = (
         db.query(AnalisisLey)
         .filter(AnalisisLey.lote_id == lote.id)
         .filter(~AnalisisLey.eliminado)
         .order_by(AnalisisLey.id)
-        .all()  # noqa: E712
+        .all()
     )
-    analisis_rec = (
+    # Separar: registros de cert interno vs análisis reales
+    analisis_ley = [
+        a for a in todos_analisis_ley if a.tipo_analisis not in (TipoAnalisis.COMERCIAL,)
+    ]
+    cert_ley_rec = next(
+        (a for a in todos_analisis_ley if a.tipo_analisis == TipoAnalisis.COMERCIAL and a.vigente),
+        None,
+    )
+    todos_analisis_rec = (
         db.query(AnalisisRecuperacion)
         .filter(AnalisisRecuperacion.lote_id == lote.id)
         .filter(~AnalisisRecuperacion.eliminado)
         .order_by(AnalisisRecuperacion.id)
         .all()
+    )
+    # Separar cert comercial de análisis reales de laboratorio
+    analisis_rec = [a for a in todos_analisis_rec if a.estado != EstadoRecuperacion.CERT_COMERCIAL]
+    cert_rec_record = next(
+        (
+            a
+            for a in todos_analisis_rec
+            if a.estado == EstadoRecuperacion.CERT_COMERCIAL and a.vigente
+        ),
+        None,
     )
 
     ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
@@ -271,6 +289,17 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     tiene_prueba_pendiente = any(
         p.fecha_ingreso is None or _ahora < p.fecha_ingreso + timedelta(hours=48)
         for p in pruebas_lote
+    )
+
+    # CIP de recuperación con prueba COMPLETADA pero sin análisis de recuperación vigente
+    cips_con_rec_vigente = {a.cip for a in analisis_rec if a.vigente and not a.eliminado}
+    cips_recuperacion = [
+        c
+        for c in todos_cips
+        if c.tipo_muestra in (TipoMuestra.RECUPERACION_INTERNO, TipoMuestra.RECUPERACION_EXTERNO)
+    ]
+    tiene_cip_lista_sin_enviar = any(
+        c.codigo_cip not in cips_con_rec_vigente for c in cips_recuperacion
     )
 
     return LoteLabOut(
@@ -289,6 +318,9 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         ],
         tiene_dirimencia=bool(lote.dirimencia),
         tiene_prueba_pendiente=tiene_prueba_pendiente,
+        tiene_cip_lista_sin_enviar=tiene_cip_lista_sin_enviar,
+        cert_ley_url=cert_ley_rec.certificado_url if cert_ley_rec else None,
+        cert_rec_url=cert_rec_record.certificado_url if cert_rec_record else None,
     )
 
 
@@ -539,6 +571,8 @@ def enviar_recuperacion_interna(
     # Actualizar laboratorio destino en el mapeo
     if datos.laboratorio:
         cip_obj.laboratorio = datos.laboratorio or "Paititi"
+
+    cip_obj.fecha_envio = date.today()
 
     # Verificar que no haya pending vigente para ese CIP
     pending_existente = (
@@ -1038,7 +1072,7 @@ def generar_y_guardar_certificado_interno(db: Session, analisis_id: int, tipo: s
             raise ValueError("Análisis no encontrado")
         pdf_bytes = cert_svc.generar_certificado_recuperacion_cip_pdf(db, a.cip)
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()
     cip_str = (a.cip or "cert").replace("/", "_")
     carpeta = STORAGE_PATH / "certificados" / str(ahora.year) / f"{ahora.month:02d}"
     carpeta.mkdir(parents=True, exist_ok=True)

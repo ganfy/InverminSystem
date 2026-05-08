@@ -441,7 +441,7 @@
 
         <div class="acciones-lote">
           <button
-            v-if="lote.ley_planta != null && cipsRecuperacionDisponibles.length > 0"
+            v-if="ley_cabeza != null && cipsRecuperacionDisponibles.length > 0"
             class="btn-primary"
             @click="abrirModalRecup"
             :disabled="enviando"
@@ -452,6 +452,18 @@
           <span v-if="tienePendiente" class="info-inline" style="margin-left:0.5rem">
             <Hourglass :size="16" /> Análisis pendiente en laboratorio
           </span>
+        </div>
+
+        <!-- Alerta: CIP listo pero sin ley de planta aún -->
+        <div
+          v-if="cipsRecuperacionDisponibles.length > 0 && ley_cabeza == null"
+          class="alerta-warning"
+          style="margin-top:0.75rem"
+        >
+          <TriangleAlert :size="16" />
+          Prueba metalúrgica etiquetada y lista, pero falta la
+          <strong>ley comercial</strong> para poder oficializar el envío a recuperación.
+          Registre los análisis de ley primero.
         </div>
 
         <div v-if="lote.tiene_prueba_pendiente" class="alerta-warning" style="margin-top:0.75rem">
@@ -767,8 +779,8 @@ async function confirmarDescartarRec() {
 const cargandoLeyComercial = ref(false)
 const leyComercialCalc     = ref<LeyComercialCalc | null>(null)
 
-watch([tabActual, lote], async ([tab, l]: ['ley' | 'rec', LoteLabOut | null]) => {
-  if (tab === 'ley' && l?.ley_planta != null && !leyComercialCalc.value) {
+watch(lote, async (l: LoteLabOut | null) => {
+  if (l?.ley_planta != null && !leyComercialCalc.value) {
     cargandoLeyComercial.value = true
     try {
       leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
@@ -794,6 +806,14 @@ watch(leyComercialCalc, (nuevaLey) => {
     ley_cabeza.value = nuevaLey.ley_comercial
   }
 })
+
+//watch para certificados
+watch(lote, (l) => {
+  if (l?.cert_ley_url && !certLeyGuardado.value)
+    certLeyGuardado.value = l.cert_ley_url
+  if (l?.cert_rec_url && !certRecGuardado.value)
+    certRecGuardado.value = l.cert_rec_url
+}, { immediate: true })
 
 // ── Agregar nueva ley ─────────────────────────────────────────────────────────
 const modalAgregarLey = ref(false)
@@ -1173,6 +1193,12 @@ onMounted(async () => {
   font-size: 0.78rem; color: var(--color-success);
   margin-top: 0.6rem; padding: 0.4rem 0.75rem;
   background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); border-radius: 5px;
+}
+
+.alerta-inline {
+  color: var(--color-warning, #d97706);
+  font-size: 0.82rem;
+  font-weight: 500;
 }
 
 /* Descarte preview (modal confirmar+generar) */

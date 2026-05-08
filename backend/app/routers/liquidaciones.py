@@ -5,17 +5,18 @@ Permisos RBAC (RF-SYS-001):
   LIQUIDACIONES UPDATE → Admin, Gerencia, Comercial
 """
 
-import io
 import os
 
 from app.core.database import get_db
 from app.core.deps import check_permiso
+from app.models.enums import RolSistema
 from app.models.models import Liquidacion
 from app.schemas.liquidaciones import (
     LiquidacionCreate,
     LiquidacionDetalleOut,
     LiquidacionesKPIOut,
     LiquidacionEstadoUpdate,
+    LiquidacionLoteParamsUpdate,
     LiquidacionPreviewOut,
     LiquidacionPreviewRequest,
     LiquidacionResumenOut,
@@ -23,7 +24,7 @@ from app.schemas.liquidaciones import (
 )
 from app.services import liquidaciones as svc
 from app.services.liquidaciones_au import obtener_ultimo_valor_oro_pm
-from app.services.liquidaciones_pdf import generar_liquidacion_pdf, guardar_pdf_liquidacion
+from app.services.liquidaciones_pdf import guardar_pdf_liquidacion
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -184,16 +185,61 @@ def descargar_pdf(
         )
 
     try:
-        pdf_bytes = generar_liquidacion_pdf(db, liquidacion_id)
+        storage = os.getenv("STORAGE_PATH", "storage")
+        ruta_pdf = guardar_pdf_liquidacion(db, liquidacion_id, storage)
+        liq_db.pdf_url = ruta_pdf
+        db.commit()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generando PDF: {e}") from e
 
     nombre = f"Liquidacion_{liq_db.numero_liquidacion or liquidacion_id}.pdf"
+
+    def iterfile():
+        with open(liq_db.pdf_url, "rb") as f:
+            yield from f
+
     return StreamingResponse(
-        io.BytesIO(pdf_bytes),
+        iterfile(),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
+
+
+@router.patch(
+    "/{liquidacion_id}/lotes/{ip}/parametros",
+    response_model=LiquidacionDetalleOut,
+    summary="Admin/Gerencia editan parámetros de un lote en la liquidación",
+)
+def editar_params_lote(
+    liquidacion_id: int,
+    ip: str,
+    body: LiquidacionLoteParamsUpdate,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    rol = current_user.rol.codigo if current_user.rol else None
+    if rol not in {RolSistema.ADMIN.value, RolSistema.GERENCIA.value}:
+        raise HTTPException(
+            status_code=403, detail="Solo Admin y Gerencia pueden editar parámetros"
+        )
+    try:
+        svc.editar_params_lote(db, liquidacion_id, ip, body, current_user.id)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    # Regenerar PDF con nuevos valores
+    try:
+        storage = os.getenv("STORAGE_PATH", "storage")
+        ruta_pdf = guardar_pdf_liquidacion(db, liquidacion_id, storage)
+        liq_db = db.query(Liquidacion).filter(Liquidacion.id == liquidacion_id).first()
+        liq_db.pdf_url = ruta_pdf
+        db.commit()
+    except Exception:
+        pass  # PDF falla silenciosamente
+
+    return svc.obtener_liquidacion(db, liquidacion_id)
 
 
 @router.get("/{liquidacion_id}", response_model=LiquidacionDetalleOut)

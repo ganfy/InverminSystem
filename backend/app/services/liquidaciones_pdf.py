@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import io
 import os
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -48,6 +49,15 @@ def _fmt_date(d) -> str:
     return str(d)
 
 
+def _escape_css_braces(html_str: str) -> str:
+    """Duplica { } dentro de bloques <style> para que str.format() no los interprete como placeholders."""
+
+    def _esc(m):
+        return m.group(1) + m.group(2).replace("{", "{{").replace("}", "}}") + m.group(3)
+
+    return re.sub(r"(<style[^>]*>)(.*?)(</style>)", _esc, html_str, flags=re.DOTALL)
+
+
 _TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "liquidacion.html"
 
 
@@ -60,12 +70,11 @@ def _build_fila(ll: LiquidacionLote) -> str:
       <td>{_fmt_d(ll.tmh_snapshot, 3)}</td>
       <td>{_fmt_d(ll.humedad_snapshot, 2)}</td>
       <td>{_fmt_d(ll.tms_snapshot, 3)}</td>
-      <td>{ll.sacos_snapshot or '-'}</td>
+      <td class="col-sacos">{ll.sacos_snapshot or '-'}</td>
       <td>{_fmt_d(ll.oz_tc_promedio, 4)}</td>
       <td>{_fmt_d(ll.porcentaje_rec_liquido, 1)}</td>
       <td>{_fmt_d(ll.spot_usd_snapshot, 2)}</td>
       <td>{_fmt_d(ll.maquila_aplicada, 2)}</td>
-      <td>{_fmt_d(ll.riesgo_aplicado, 2)}</td>
       <td>1.1023</td>
       <td>{_fmt_d(ll.insumos_liquidacion, 2)}</td>
       <td>{_fmt_d(ll.precio_x_tms, 4)}</td>
@@ -143,7 +152,7 @@ def generar_liquidacion_pdf(db: Session, liquidacion_id: int) -> bytes:
         else "<b>INVERMIN PAITITI S.A.C.</b>"
     )
 
-    template = _TEMPLATE_PATH.read_text(encoding="utf-8")
+    template = _escape_css_braces(_TEMPLATE_PATH.read_text(encoding="utf-8"))
     html = template.format(
         logo_b64=logo_b64,
         membrete_tag=membrete_tag,

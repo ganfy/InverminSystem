@@ -1,6 +1,6 @@
-export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia'
+export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia' | 'comercial'
 export type OrigenDatos = 'manual' | 'certificado'
-export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO'
+export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO' | 'CERT_COMERCIAL'
 export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno'
 
 // ── Análisis de Ley ───────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export interface AnalisisRecuperacionOut {
     cip: string | null
     laboratorio: string
     ley_cabeza: number
-    ley_cola: number
+    ley_cola: number | null
     ley_liquido?: number | null
     recuperacion?: number | null
     estado: EstadoRecuperacion
@@ -119,6 +119,9 @@ export interface LoteLabOut {
     analisis_recuperacion: AnalisisRecuperacionOut[]
     tiene_dirimencia: boolean
     tiene_prueba_pendiente: boolean
+    tiene_cip_listo_sin_enviar: boolean
+    cert_ley_url?: string | null
+    cert_rec_url?: string | null
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────────

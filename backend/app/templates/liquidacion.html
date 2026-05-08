@@ -2,188 +2,237 @@
 <html lang="es">
 
 <head>
-    <meta charset="UTF-8">
-    <title>Hoja de Liquidación</title>
+    <meta charset="UTF-8" />
+    <title>Liquidacion {numero_liquidacion}</title>
     <style>
         @page {
-                size: A4 landscape;
-                margin: 1.5cm;
-            }
+            size: A4 landscape;
+            margin: 1.5cm 1.8cm 1.2cm 1.8cm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-                font-family: Helvetica, Arial, sans-serif;
-                font-size: 10pt;
-                color: #333333;
-                line-height: 1.3;
-            }
+            font-family: Times New Roman, serif;
+            font-size: 9pt;
+            color: #000000;
+            background: #ffffff;
+        }
 
-        .header-table {
-                width: 100%;
-                margin-bottom: 20px;
-            }
+        /* ── HEADER ── */
+        table.hdr {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 6px;
+        }
 
-        .title {
-                text-align: center;
-                font-size: 16pt;
-                text-decoration: underline;
-                font-weight: bold;
-            }
+        table.hdr td {
+            vertical-align: middle;
+            padding: 0;
+        }
 
-        .section-title {
-                font-weight: bold;
-                font-size: 11pt;
-                background-color: #e0e0e0;
-                padding: 4px;
-                margin-top: 10px;
-                margin-bottom: 10px;
-                border: 1px solid #999;
-            }
+        .hdr-logo {
+            width: 180px;
+        }
 
-        .info-table {
-                width: 100%;
-                margin-bottom: 15px;
-            }
+        .hdr-logo img {
+            height: 52px;
+        }
 
-        .info-table td {
-                padding: 4px;
-                vertical-align: top;
-            }
+        .hdr-titulo {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            font-family: Times New Roman, serif;
+        }
 
-        .info-label {
-                font-weight: bold;
-                width: 140px;
-                color: #1a1a1a;
-            }
+        .hdr-meta {
+            width: 160px;
+            text-align: right;
+            font-size: 8.5pt;
+            vertical-align: top;
+            padding-top: 4px;
+        }
 
-        table.data-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 9pt;
-            }
+        /* ── DATOS CLIENTE ── */
+        .sec-titulo {
+            font-weight: bold;
+            text-decoration: underline;
+            font-size: 9.5pt;
+            margin: 8px 0 4px 0;
+        }
 
-        table.data-table th,
-        table.data-table td {
-                border: 1px solid #666;
-                padding: 5px;
-                text-align: right;
-            }
+        table.datos {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
 
-        table.data-table th {
-                background-color: #d9d9d9;
-                text-align: center;
-                font-weight: bold;
-                vertical-align: middle;
-            }
+        table.datos td {
+            font-size: 8.5pt;
+            padding: 1px 4px;
+            vertical-align: top;
+        }
 
-        .total-row td {
-                font-weight: bold;
-                background-color: #e0e0e0;
-                font-size: 10pt;
-            }
+        .lbl {
+            font-weight: bold;
+            white-space: nowrap;
+        }
 
-        .footer-notes {
-                font-size: 8pt;
-                margin-top: 20px;
-                border-top: 1px solid #999;
-                padding-top: 10px;
-            }
+        /* ── MAIN TABLE ── */
+        table.main {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+        }
 
-        .footer-notes p {
-                margin: 3px 0;
-            }
+        table.main th {
+            background: #e8e8e8;
+            border: 1px solid #000000;
+            padding: 3px 4px;
+            font-size: 8pt;
+            text-align: center;
+            font-weight: bold;
+            vertical-align: middle;
+            font-family: Times New Roman, serif;
+        }
+
+        table.main td {
+            border: 1px solid #000000;
+            padding: 3px 5px;
+            font-size: 8.5pt;
+            text-align: right;
+            vertical-align: middle;
+            font-family: Times New Roman, serif;
+        }
+
+        table.main td.left {
+            text-align: left;
+        }
+
+        table.main td.ctr {
+            text-align: center;
+        }
+
+        /* Columna Sacos — amarillo */
+        .col-sacos-hdr {
+            background: #FFD700 !important;
+        }
+
+        .col-sacos {
+            background: #FFF9C4 !important;
+            text-align: center;
+        }
+
+        /* Fila de total */
+        .fila-total td {
+            background: #e8e8e8;
+            font-weight: bold;
+            font-size: 9pt;
+            border: 1px solid #000000;
+        }
+
+        /* ── NOTAS ── */
+        .nota-titulo {
+            font-weight: bold;
+            font-style: italic;
+            margin-top: 10px;
+            font-size: 8.5pt;
+        }
+
+        .nota-item {
+            font-style: italic;
+            font-size: 7.5pt;
+            margin: 2px 0 0 0;
+        }
     </style>
 </head>
 
 <body>
-    <!-- CABECERA PRINCIPAL CON MEMBRETE Y NÚMERO -->
-    <table class="header-table">
+
+    <!-- CABECERA -->
+    <table class="hdr">
         <tr>
-            <td style="width: 30%; text-align: left; vertical-align: middle;">
-                {membrete_tag}
-            </td>
-            <td style="width: 40%;" class="title">
-                HOJA DE LIQUIDACIÓN<br>MINERALES AURÍFEROS
-            </td>
-            <td style="width: 30%; text-align: right; font-weight: bold; font-size: 12pt; vertical-align: top;">
-                N° {numero_liquidacion}
+            <td class="hdr-logo">{membrete_tag}</td>
+            <td class="hdr-titulo">Hoja de liquidaci&oacute;n minerales aur&iacute;feros</td>
+            <td class="hdr-meta">
+                <b>N&uacute;m: {numero_liquidacion}</b><br />
+                Fecha: {fecha_liquidacion}
             </td>
         </tr>
     </table>
 
-    <div class="section-title">DATOS DEL CLIENTE</div>
-
-    <!-- DATOS DEL PROVEEDOR Y ACOPIADOR -->
-    <table class="info-table">
+    <!-- DATOS DEL CLIENTE -->
+    <p class="sec-titulo">DATOS DEL CLIENTE</p>
+    <table class="datos">
         <tr>
-            <td class="info-label">Razón social:</td>
-            <td>{proveedor_razon_social}</td>
-            <td class="info-label">Acopiador:</td>
-            <td>{acopiador_nombre}</td>
-        </tr>
-        <tr>
-            <td class="info-label">Nro de RUC:</td>
-            <td>{proveedor_ruc}</td>
-            <td class="info-label">Producto:</td>
-            <td>Mineral aurífero sin procesar</td>
-        </tr>
-        <tr>
-            <td class="info-label">Fecha de entrega:</td>
-            <td>{fecha_entrega}</td>
-            <td class="info-label">GRR:</td>
-            <td>{guia_remision}</td>
-        </tr>
-        <tr>
-            <td class="info-label">Fecha de liquidación:</td>
-            <td>{fecha_liquidacion}</td>
-            <td class="info-label">GRT:</td>
-            <td>{guia_transporte}</td>
+            <td style="width:50%">
+                <span class="lbl">Raz&oacute;n social:</span>&nbsp;{proveedor_razon_social}<br />
+                <span class="lbl">Nro de RUC:</span>&nbsp;{proveedor_ruc}<br />
+                <span class="lbl">Fecha de entrega:</span>&nbsp;{fecha_entrega}<br />
+                <span class="lbl">Fecha de liquidaci&oacute;n:</span>&nbsp;{fecha_liquidacion}
+            </td>
+            <td style="width:50%">
+                <span class="lbl">Acopiador:</span>&nbsp;{acopiador_nombre}<br />
+                <span class="lbl">Producto:</span>&nbsp;Mineral aur&iacute;fero sin procesar<br />
+                <span class="lbl">GRR&nbsp;:</span>&nbsp;{guia_remision}<br />
+                <span class="lbl">GRT&nbsp;:</span>&nbsp;{guia_transporte}
+            </td>
         </tr>
     </table>
 
-    <!-- TABLA DE LOTES -->
-    <table class="data-table">
+    <!-- TABLA PRINCIPAL -->
+    <table class="main">
         <thead>
-            <tr>
+            <tr class="col-sacos-hdr">
                 <th>Lote</th>
-                <th>Fecha de<br>Recepción</th>
+                <th>Fecha de<br />Recepcion</th>
                 <th>TMH</th>
                 <th>%H2O</th>
                 <th>TMS</th>
                 <th>Sacos</th>
                 <th>Ley Oz/tc</th>
-                <th>% <br>Recup</th>
-                <th>Inter<br>US$</th>
-                <th>Maquila<br>US$ x TC</th>
-                <th>Riesgo<br>Comercial</th>
+                <th>%<br />Recup</th>
+                <th>Inter<br />US$</th>
+                <th>Maquila<br />US$ x TC</th>
                 <th>Factor</th>
-                <th>Insumos<br>US$ x tc</th>
-                <th>Precio<br>TMS</th>
+                <th>Insumos<br />US$ x tc</th>
+                <th>Precio<br />TMS</th>
                 <th>Total US$</th>
             </tr>
         </thead>
         <tbody>
-            <!-- Aquí el código Python inyecta los resultados de _build_fila() -->
             {filas_lotes}
         </tbody>
         <tfoot>
-            <tr class="total-row">
-                <td colspan="4" style="text-align: right; padding-right: 10px;">Totales</td>
-                <td style="text-align: right;">{total_tms}</td>
-                <td colspan="9" style="text-align: right; padding-right: 15px;">Base imponible US$</td>
-                <td style="text-align: right;">{total_usd}</td>
+            <tr class="fila-total">
+                <td colspan="13" style="text-align:right;padding-right:6px">
+                    Base imponible US$
+                </td>
+                <td>{total_usd}</td>
             </tr>
         </tfoot>
     </table>
 
-    <!-- NOTAS AL PIE CON LOS UMBRALES DINÁMICOS -->
-    <div class="footer-notes">
-        <p><strong>NOTA IMPORTANTE</strong></p>
-        <p>* Se promedia diferencia de leyes desde {lim_ley_inferior} hasta {lim_ley_superior} oz/Tc.</p>
-        <p>* Si existe una falsificación o adulteración de los datos serán denunciados penalmente.</p>
-        <p>* Si el proveedor minero desea retirar el mineral de nuestra planta deberá realizar un pago por almacenaje,
-            chancado y gastos operativos.</p>
-        <p>* Se aceptan reclamos y/o observaciones antes de que se efectúe la factura y por ende el pago
-            correspondiente, después queda sin efecto.</p>
-    </div>
+    <!-- NOTAS -->
+    <p class="nota-titulo">NOTA IMPORTANTE</p>
+    <p class="nota-item">*Se promedia diferencia de leyes desde {lim_ley_inferior} hasta {lim_ley_superior} oz/Tc</p>
+    <p class="nota-item">*Si existe una falsificaci&oacute;n o adulteraci&oacute;n de los datos ser&aacute;n denunciados
+        penalmente.</p>
+    <p class="nota-item">*Si el proveedor minero desea retirar el mineral de nuestra planta deber&aacute; realizar un
+        pago por almacenaje, chancado y gastos operativos.</p>
+    <p class="nota-item">*Se acepta reclamos y/o observaciones antes de que se efect&uacute;e la factura y por ende el
+        pago correspondiente, despu&eacute;s queda sin efecto todo reclamo.</p>
+    <p class="nota-item">*Si el mineral ingresado es considerado Sin Valor Comercial (Ley Oz/tc menor a 0.100) y llega a
+        cumplir los 30 d&iacute;as en nuestro almac&eacute;n. Se dispondr&aacute; del mismo sin lugar a reclamo.</p>
+    <p class="nota-item">*Si el mineral ingresado es considerado Con Valor Comercial (Ley Oz/tc mayor a 0.100) y llega a
+        cumplir los 30 d&iacute;as en nuestro almac&eacute;n y no hay respuesta de confirmaci&oacute;n del proveedor
+        minero se liquidar&aacute; con las condiciones comerciales de la empresa.</p>
+
 </body>
 
 </html>

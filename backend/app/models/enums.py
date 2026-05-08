@@ -93,6 +93,7 @@ class EstadoRecuperacion(str, Enum):
 
     PENDIENTE = "PENDIENTE"
     COMPLETADO = "COMPLETADO"
+    CERT_COMERCIAL = "CERT_COMERCIAL"  # PDF Paititi generado por Comercial; no es análisis de lab
 
 
 class EstadoComprobante(str, Enum):
@@ -170,6 +171,7 @@ class TipoAnalisis(str, Enum):
     EXTERNO = "externo"
     MINERO = "minero"
     DIRIMENCIA = "dirimencia"
+    COMERCIAL = "ley_comercial"  # resultado final que se usa para liquidar, puede venir de cualquiera de los anteriores según decisión comercial/gerencia
 
 
 class OrigenDatos(str, Enum):

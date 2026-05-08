@@ -107,7 +107,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
         # CIPs de recuperación asignados a este lote
         cips_rec = _get_cips_recuperacion(db, lote.id)
 
-        # 🔴 Caso 1: NO hay pruebas → PENDIENTE
+        # Caso 1: NO hay pruebas → PENDIENTE
         if not pruebas:
             lista.append(
                 LotePruebaList(
@@ -124,7 +124,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
             )
             continue
 
-        # 🟢 Caso 2: SÍ hay pruebas → agregar TODAS
+        # Caso 2: SÍ hay pruebas → agregar TODAS
         for n, prueba in enumerate(pruebas):
             fecha_ingreso = prueba.fecha_ingreso
             fecha_salida = fecha_ingreso + timedelta(hours=48) if fecha_ingreso else None
@@ -252,27 +252,24 @@ def etiquetar_prueba(
     if not lote:
         raise ValueError(f"Lote '{ip_lote}' no encontrado")
 
-    prueba = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).first()
-    if not prueba:
-        raise ValueError(f"No hay prueba metalúrgica registrada para el lote '{ip_lote}'")
-
-    ahora = datetime.now()
-    if ahora < prueba.fecha_ingreso + timedelta(hours=48):
-        raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
-
-    cip_existente = (
-        db.query(MapeoCIP)
+    prueba = (
+        db.query(PruebaMetalurgica)
         .filter(
-            MapeoCIP.lote_id == lote.id,
-            MapeoCIP.tipo_muestra == tipo,
+            PruebaMetalurgica.lote_id == lote.id,
+            PruebaMetalurgica.cip.is_(None),
         )
-        .join(PruebaMetalurgica, PruebaMetalurgica.lote_id == MapeoCIP.lote_id)
-        .filter(PruebaMetalurgica.id == prueba.id)
+        .order_by(PruebaMetalurgica.id.desc())
         .first()
     )
+    if not prueba:
+        raise ValueError(
+            f"No hay prueba metalúrgica pendiente de etiquetar para '{ip_lote}'. "
+            "Todas las pruebas ya tienen CIP asignado."
+        )
 
-    if cip_existente:
-        raise ValueError("Esta prueba ya tiene un CIP asignado")
+    ahora = datetime.now()
+    if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=48):
+        raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
 
     total_cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).count()
     correlativo = total_cips + 1
@@ -287,7 +284,7 @@ def etiquetar_prueba(
         codigo_cip=codigo_cip,
         laboratorio=None,
         tipo_muestra=tipo,
-        fecha_envio=ahora.date(),
+        fecha_envio=None,
     )
     db.add(nuevo_cip)
 

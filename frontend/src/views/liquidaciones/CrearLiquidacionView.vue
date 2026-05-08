@@ -255,17 +255,59 @@
           </table>
         </div>
 
-        <div class="acciones-pie">
-          <button class="btn-secondary" @click="paso = 1">
-            ← Volver
+        <!-- Panel editable — solo Admin/Gerencia -->
+        <div v-if="puedeEditarParams" class="params-panel">
+          <p class="seccion-titulo">PARÁMETROS DE CÁLCULO</p>
+
+          <!-- Globales (aplican a todos los lotes) -->
+          <div class="params-globales">
+            <div class="pfield">
+              <span class="plbl">GASTO ACOPIO</span>
+              <input type="number" class="pinput" v-model.number="editOv.gasto_acopio"
+                step="0.01" @input="pendienteRecalculo = true" />
+            </div>
+            <div class="pfield">
+              <span class="plbl">GASTO CONSUMO (INSUMOS LIQ)</span>
+              <input type="number" class="pinput" v-model.number="editOv.gasto_consumo"
+                step="0.01" @input="pendienteRecalculo = true" />
+            </div>
+            <div class="pfield">
+              <span class="plbl">BONO</span>
+              <input type="number" class="pinput" v-model.number="editOv.bono"
+                step="0.01" @input="pendienteRecalculo = true" />
+            </div>
+          </div>
+
+          <!-- Por lote: % Rec Liq -->
+          <div class="params-por-lote">
+            <div v-for="lote in store.preview.lotes" :key="lote.ip" class="pfield">
+              <span class="plbl">{{ lote.ip }} — % REC LIQ</span>
+              <input type="number" class="pinput" v-model.number="editOv.rec_liq[lote.ip]"
+                step="0.1" min="0" max="100" @input="pendienteRecalculo = true" />
+            </div>
+          </div>
+
+          <button v-if="pendienteRecalculo" class="btn-primary"
+            style="margin-top:0.75rem;font-size:0.8rem"
+            :disabled="store.cargando" @click="recalcularConOverrides">
+            <span v-if="store.cargando" class="spinner" style="margin-right:0.4rem"/>
+            Recalcular →
           </button>
+        </div>
+
+        <div class="acciones-pie">
+          <button class="btn-secondary" @click="paso = 1">← Volver</button>
           <button
             class="btn-primary ready"
-            :disabled="!store.preview.puede_generar || store.cargando"
+            :disabled="!store.preview.puede_generar || store.cargando || pendienteRecalculo"
             @click="paso = 3"
           >
             Confirmar y Generar →
           </button>
+          <span v-if="pendienteRecalculo" class="warn-recalc">
+            <AlertTriangle :size="16" class="warn-icon" />
+            Hay cambios sin recalcular
+          </span>
         </div>
       </template>
 
@@ -312,12 +354,16 @@
   } from 'lucide-vue-next'
   import { useLiquidacionesStore } from '@/stores/liquidaciones'
   import { useUiStore } from '@/stores/ui'
+  import { useAuthStore } from '@/stores/auth'
   import api from '@/api/axios'
-  import { obtenerPrecioOro } from '@/api/liquidaciones'
+  import { obtenerPrecioOro, type EditOverrides } from '@/api/liquidaciones'
 
   const router = useRouter()
   const store  = useLiquidacionesStore()
   const ui     = useUiStore()
+  const auth   = useAuthStore()
+  const puedeEditarParams = computed(() => ['Admin', 'Gerencia'].includes(auth.user?.rol ?? ''))
+
 
   // ── State ──────────────────────────────────────────────────────────
   const paso             = ref(1)
@@ -389,6 +435,41 @@
     }
   }
 
+  //Editar
+  const editOv = ref<EditOverrides>({ gasto_acopio: null, gasto_consumo: null, bono: 0, rec_liq: {} })
+const pendienteRecalculo = ref(false)
+
+function initEditOverrides() {
+  const lotes = store.preview?.lotes ?? []
+  if (!lotes.length) return
+  const l0 = lotes[0]
+  if (!l0) return
+  editOv.value.gasto_acopio  = Number(l0.insumos_acopio)  || null
+  editOv.value.gasto_consumo = Number(l0.insumos_consumo) || null
+  editOv.value.bono          = Number(l0.bono)            || 0
+  for (const l of lotes) {
+    editOv.value.rec_liq[l.ip] = Number(l.pct_rec_liq) || null
+  }
+  pendienteRecalculo.value = false
+}
+
+async function recalcularConOverrides() {
+  if (!provacopId.value || !spotUsd.value) return
+  await store.calcularPreview({
+    provacop_id: provacopId.value as number,
+    spot_usd: spotUsd.value,
+    fecha_liquidacion: fechaLiq.value,
+    lotes: lotesSeleccionados.value.map(ip => ({
+      ip,
+      bono: editOv.value.bono ?? 0,
+      rec_liq_override: editOv.value.rec_liq[ip] ?? null,
+      gasto_acopio_override: editOv.value.gasto_acopio,
+      gasto_consumo_override: editOv.value.gasto_consumo,
+    })),
+  })
+  pendienteRecalculo.value = false
+}
+
   async function calcularPreview() {
     errorPaso1.value = ''
     if (!provacopId.value) { errorPaso1.value = 'Seleccione un proveedor-acopiador'; return }
@@ -401,6 +482,7 @@
       spot_usd: spotUsd.value,
       fecha_liquidacion: fechaLiq.value || null,
     })
+    initEditOverrides()
 
     if (result) paso.value = 2
     else ui.toast(store.error ?? 'Error al calcular preview', 'error')
@@ -564,6 +646,57 @@
   .resumen-sub { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--color-text-dim); }
   .resumen-total { margin-left:auto; text-align:right; }
   .resumen-val-big { font-family:var(--font-mono); font-size:var(--text-xl); font-weight:700; color:var(--color-gold); }
+
+  /* ── Params panel ── */
+.params-panel {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.params-globales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.params-por-lote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.pfield {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 140px;
+}
+.plbl {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+.pinput {
+  background: var(--color-bg-input, #1a2a1a);
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius-sm);
+  color: var(--color-gold);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  width: 100%;
+  outline: none;
+}
+.pinput:focus { box-shadow: 0 0 0 2px rgba(201,162,39,0.25); }
+.warn-recalc {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-warning);
+  align-self: center;
+}
 
   /* Confirmacion */
   .confirm-panel {

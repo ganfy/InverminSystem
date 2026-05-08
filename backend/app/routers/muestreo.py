@@ -1,3 +1,5 @@
+from datetime import date
+
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.enums import RolSistema
@@ -119,15 +121,13 @@ def listar_cips_lote(
     for cip in cips:
         tiene_ley = (
             db.query(AnalisisLey)
-            .filter(AnalisisLey.cip == cip.codigo_cip, AnalisisLey.vigente == True)
+            .filter(AnalisisLey.cip == cip.codigo_cip, AnalisisLey.vigente)
             .first()
             is not None
         )
         tiene_rec = (
             db.query(AnalisisRecuperacion)
-            .filter(
-                AnalisisRecuperacion.cip == cip.codigo_cip, AnalisisRecuperacion.vigente == True
-            )
+            .filter(AnalisisRecuperacion.cip == cip.codigo_cip, AnalisisRecuperacion.vigente)
             .first()
             is not None
         )
@@ -187,6 +187,8 @@ def actualizar_laboratorio_cip(
     if not cip:
         raise HTTPException(status_code=404, detail="CIP no encontrado")
     cip.laboratorio = datos.laboratorio
+    if not cip.fecha_envio:
+        cip.fecha_envio = date.today()
     db.commit()
     db.refresh(cip)
     return cip

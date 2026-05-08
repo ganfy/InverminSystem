@@ -14,6 +14,8 @@ class LotePreviewInput(BaseModel):
     ip: str
     bono: Decimal | None = Decimal("0")
     rec_liq_override: Decimal | None = None
+    gasto_acopio_override: Decimal | None = None
+    gasto_consumo_override: Decimal | None = None
 
 
 class LiquidacionPreviewRequest(BaseModel):
@@ -156,3 +158,14 @@ class LiquidacionesKPIOut(BaseModel):
     generadas: int
     lotes_liquidables: int
     valor_pendiente_usd: float
+
+
+class LiquidacionLoteParamsUpdate(BaseModel):
+    """Edición manual de parámetros por Admin/Gerencia en liquidaciones NO generadas."""
+
+    bono: Decimal | None = Decimal("0")
+    rec_liq_override: Decimal | None = None
+    riesgo_override: Decimal | None = None
+    maquila_override: Decimal | None = None
+    gasto_acopio_override: Decimal | None = None
+    gasto_consumo_override: Decimal | None = None

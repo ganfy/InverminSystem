@@ -70,7 +70,7 @@ class AnalisisRecuperacionCreate(BaseModel):
     cip: str
     laboratorio: str
     ley_cabeza: Decimal = Field(..., gt=0)
-    ley_cola: Decimal = Field(..., ge=0)
+    ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
@@ -79,7 +79,7 @@ class AnalisisRecuperacionCreate(BaseModel):
 class CompletarRecuperacionRequest(BaseModel):
     """Para que laboratorista complete un pending (ley_cola + ley_liquido)."""
 
-    ley_cola: Decimal = Field(..., ge=0)
+    ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     fecha_analisis: date | None = None
 
@@ -103,7 +103,7 @@ class AnalisisRecuperacionOut(BaseModel):
     cip: str | None
     laboratorio: str
     ley_cabeza: Decimal
-    ley_cola: Decimal
+    ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     recuperacion: Decimal | None = None
     estado: str
