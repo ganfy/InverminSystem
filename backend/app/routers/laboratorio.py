@@ -520,8 +520,6 @@ def guardar_certificado_recuperacion(
     db: Session = Depends(get_db),
 ):
     """Genera y persiste el certificado de recuperación en storage."""
-    from app.services import certificado_ley_pdf as cert_svc
-
     try:
         pdf_bytes = cert_svc.generar_certificado_recuperacion_comercial_pdf(db, ip)
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "rec")

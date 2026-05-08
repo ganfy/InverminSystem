@@ -146,17 +146,27 @@
                 title="Abrir previsualización del certificado"
               >
                 <span v-if="previsualizandoLey" class="spinner" style="margin-right:0.4rem"></span>
-                <span v-else>👁 Previsualizar</span>
+                <span v-else><Eye /> Previsualizar</span>
               </button>
               <button
+                v-if="certLeyGuardado"
+                class="btn-secondary"
+                style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                @click="verCertificado(certLeyGuardado)"
+                title="Ver el último PDF generado"
+              >
+                <File /> Ver último PDF
+              </button>
+              <button
+                v-if="!certLeyGuardado || puedeRegenerarCerts"
                 class="btn-primary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
                 @click="abrirConfirmarGenerar"
                 :disabled="generando || leyPlantaSimulada === null"
-                title="Guardar certificado PDF definitivo en el servidor"
+                :title="certLeyGuardado ? 'Regenerar certificado (sobreescribe el anterior)' : 'Guardar certificado PDF definitivo'"
               >
                 <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
-                Guardar PDF definitivo
+                {{ certLeyGuardado ? 'Regenerar PDF' : 'Guardar PDF definitivo' }}
               </button>
             </div>
           </h2>
@@ -191,7 +201,7 @@
               </div>
               <div class="lc-item" v-if="leyComercialCalc.factor_aplicado !== 1">
                 <span class="lc-label">FACTOR:</span>
-                <span class="lc-valor mono">× {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
+                <span class="lc-valor mono"> x {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
               </div>
             </div>
 
@@ -208,8 +218,10 @@
           </template>
 
           <div v-if="certLeyGuardado" class="cert-guardado-info">
-            ✓ Certificado guardado —
-            <a href="#" @click.prevent="verCertificado(certLeyGuardado)" class="link-cert">Ver PDF guardado</a>
+            ✓ Certificado de ley generado
+            <span v-if="!puedeRegenerarCerts" style="font-size:0.72rem;color:var(--color-text-faint);margin-left:0.4rem">
+              — solo Admin y Gerencia pueden regenerarlo
+            </span>
           </div>
 
           <div v-else-if="!leyComercialCalc && !cargandoLeyComercial" class="info-box warning" style="margin-top:0.75rem">
@@ -407,7 +419,7 @@
         <section class="card" v-if="tieneRecuperacionVigente">
           <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
             <span>CERTIFICADO DE RECUPERACIÓN</span>
-            <div style="display:flex;gap:0.5rem">
+            <div style="display:flex;gap:0.5rem;align-items:center">
               <button
                 class="btn-secondary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
@@ -416,17 +428,27 @@
                 title="Abrir previsualización del certificado de recuperación"
               >
                 <span v-if="previsualizandoRec" class="spinner" style="margin-right:0.4rem"></span>
-                <span v-else>👁 Previsualizar</span>
+                <span v-else><Eye /> Previsualizar</span>
               </button>
               <button
+                v-if="certRecGuardado"
+                class="btn-secondary"
+                style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                @click="verCertificado(certRecGuardado)"
+                title="Ver el último PDF generado"
+              >
+                <File /> Ver último PDF
+              </button>
+              <button
+                v-if="!certRecGuardado || puedeRegenerarCerts"
                 class="btn-primary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
                 @click="guardarCertRecuperacion"
                 :disabled="guardandoRec"
-                title="Guardar certificado PDF definitivo en el servidor"
+                :title="certRecGuardado ? 'Regenerar certificado (sobreescribe el anterior)' : 'Guardar certificado PDF definitivo'"
               >
                 <span v-if="guardandoRec" class="spinner" style="margin-right:0.4rem"></span>
-                Guardar PDF definitivo
+                {{ certRecGuardado ? 'Regenerar PDF' : 'Guardar PDF definitivo' }}
               </button>
             </div>
           </h2>
@@ -434,8 +456,10 @@
             Genera el informe de recuperación (formato Paititi) para entregar al proveedor.
           </p>
           <div v-if="certRecGuardado" class="cert-guardado-info">
-            ✓ Certificado guardado —
-            <a href="#" @click.prevent="verCertificado(certRecGuardado)" class="link-cert">Ver PDF guardado</a>
+            ✓ Certificado de recuperación generado
+            <span v-if="!puedeRegenerarCerts" style="font-size:0.72rem;color:var(--color-text-faint);margin-left:0.4rem">
+              — solo Admin y Gerencia pueden regenerarlo
+            </span>
           </div>
         </section>
 
@@ -624,7 +648,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { AlertTriangle, Hourglass, TriangleAlert, X } from 'lucide-vue-next'
+import { AlertTriangle, Eye, Hourglass, TriangleAlert, X, File} from 'lucide-vue-next'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -807,12 +831,17 @@ watch(leyComercialCalc, (nuevaLey) => {
   }
 })
 
+const puedeRegenerarCerts = computed(() => {
+  const rol = auth.user?.rol
+  return rol === 'Admin' || rol === 'Gerencia'
+})
+
 //watch para certificados
 watch(lote, (l) => {
-  if (l?.cert_ley_url && !certLeyGuardado.value)
-    certLeyGuardado.value = l.cert_ley_url
-  if (l?.cert_rec_url && !certRecGuardado.value)
-    certRecGuardado.value = l.cert_rec_url
+  // Siempre sincronizar desde el lote al cargar/recargar
+  // Solo sobreescribir si el lote trae valor (para no borrar lo que se acaba de guardar en sesión)
+  if (l?.cert_ley_url) certLeyGuardado.value = l.cert_ley_url
+  if (l?.cert_rec_url) certRecGuardado.value = l.cert_rec_url
 }, { immediate: true })
 
 // ── Agregar nueva ley ─────────────────────────────────────────────────────────

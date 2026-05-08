@@ -298,8 +298,19 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         for c in todos_cips
         if c.tipo_muestra in (TipoMuestra.RECUPERACION_INTERNO, TipoMuestra.RECUPERACION_EXTERNO)
     ]
-    tiene_cip_lista_sin_enviar = any(
+    tiene_cip_listo_sin_enviar = any(
         c.codigo_cip not in cips_con_rec_vigente for c in cips_recuperacion
+    )
+
+    # Debug
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "cert_ley_url=%s | cert_rec_url=%s | lote=%s",
+        cert_ley_rec.certificado_url if cert_ley_rec else None,
+        cert_rec_record.certificado_url if cert_rec_record else None,
+        lote.ip,
     )
 
     return LoteLabOut(
@@ -318,7 +329,7 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         ],
         tiene_dirimencia=bool(lote.dirimencia),
         tiene_prueba_pendiente=tiene_prueba_pendiente,
-        tiene_cip_lista_sin_enviar=tiene_cip_lista_sin_enviar,
+        tiene_cip_listo_sin_enviar=tiene_cip_listo_sin_enviar,
         cert_ley_url=cert_ley_rec.certificado_url if cert_ley_rec else None,
         cert_rec_url=cert_rec_record.certificado_url if cert_rec_record else None,
     )
