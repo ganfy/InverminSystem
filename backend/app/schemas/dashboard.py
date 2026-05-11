@@ -25,6 +25,7 @@ class LoteDashboard(BaseModel):
     volado: bool
     dirimencia: bool
     dias_almacen: int
+    tiene_rec_pendiente: bool = False
 
 
 class DashboardResponse(BaseModel):

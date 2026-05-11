@@ -24,6 +24,7 @@ export interface LoteDashboard {
     volado: boolean
     dirimencia: boolean
     dias_almacen: number
+    tiene_rec_pendiente: boolean
 }
 
 export interface DashboardResponse {

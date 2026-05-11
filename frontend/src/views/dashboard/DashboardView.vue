@@ -91,7 +91,8 @@
           <label class="field-label">ANÁLISIS</label>
           <select class="field-input field-select" v-model="filtroAnalisis">
             <option value="">Todos</option>
-            <option value="LISTO">Listo p/ liquidar</option>
+            <option value="LISTO">Listo para liquidar</option>
+            <option value="FALTA_MUESTREO">Falta humedad</option>
             <option value="FALTA_REC">Falta recuperación</option>
             <option value="FALTA_LEY">Falta ley</option>
             <option value="SIN_DATOS">Sin datos</option>
@@ -163,6 +164,11 @@
                       class="tag-sec tag-habilitado"
                       title="Habilitado para ingresar a ruma"
                     >RUMA ✓</span>
+                    <span
+                      v-if="lote.tiene_rec_pendiente"
+                      class="tag-sec tag-remu"
+                      title="Recuperación preliminar disponible — hay un segundo análisis pendiente"
+                    >REMU <Hourglass /></span>
                   </div>
                 </div>
               </td>
@@ -344,6 +350,7 @@ import { useRouter } from 'vue-router'
 import {
   Zap, TrendingUp, Scale, Database, Coins, Search,
   RefreshCw, Layers, FileText, PlusCircle, Download, LayoutDashboard,
+  Hourglass,
 } from 'lucide-vue-next'
 import { dashboardApi, type DashboardResponse } from '@/api/dashboard'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
@@ -444,15 +451,17 @@ function badgeLiq(estado: string) {
 }
 function badgeAnalisis(estado: string): string {
   return {
-    SIN_DATOS: 'analisis-sin-datos',
-    FALTA_LEY: 'analisis-falta-ley',
-    FALTA_REC: 'analisis-falta-rec',
-    LISTO:     'analisis-listo',
+      SIN_DATOS:       'analisis-sin-datos',
+      FALTA_MUESTREO:  'analisis-falta-muestreo',
+      FALTA_LEY:       'analisis-falta-ley',
+      FALTA_REC:       'analisis-falta-rec',
+      LISTO:           'analisis-listo',
   }[estado] ?? 'analisis-sin-datos'
 }
 function labelAnalisis(estado: string): string {
   return {
     SIN_DATOS: 'Sin datos',
+    FALTA_MUESTREO: 'Falta humedad',
     FALTA_LEY: 'Falta ley',
     FALTA_REC: 'Falta rec.',
     LISTO:     'Listo',
@@ -612,6 +621,7 @@ onMounted(() => {
 .analisis-falta-ley    { background: rgba(59,130,246,0.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
 .analisis-falta-rec { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
 .analisis-listo     { background: rgba(34,197,94,0.15);   color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+.analisis-falta-muestreo { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
 
 /* ── Tags secundarios ── */
 .tags-secundarios { display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: center; }
@@ -629,6 +639,7 @@ onMounted(() => {
 .tag-volado     { background: rgba(239,68,68,0.12);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
 .tag-dirimencia { background: rgba(168,85,247,0.12);  color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
 .tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+.tag-remu { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
 
 .btn-accion {
   background: transparent; border: 1px solid var(--color-border);

@@ -479,6 +479,8 @@ def guardar_certificado_ley(
                     creado_por=current_user.id,
                 )
             )
+
+        # Marcar como volado si ley = 0
         db.commit()
 
     return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}

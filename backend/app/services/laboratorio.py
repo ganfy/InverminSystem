@@ -45,6 +45,7 @@ FACTOR_OZ_TC = Decimal("34.2857")
 STORAGE_PATH = Path(os.getenv("STORAGE_PATH", "storage"))
 TIPOS_PERMITIDOS = {"pdf", "jpg", "jpeg", "png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+UMBRAL_VOLADO = 0.100
 
 
 # ── Helpers de cálculo ────────────────────────────────────────────────────────
@@ -1190,6 +1191,13 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
         detalle_pasos.append(
             f"Factor {float(factor):.3f}: {float(ley_antes):.4f} x {float(factor):.3f} = {float(ley):.4f}"
         )
+
+    # Check volado:
+    if ley < UMBRAL_VOLADO:
+        detalle_pasos.append(
+            f"Resultado {float(ley):.4f} < umbral volado {float(UMBRAL_VOLADO):.4f}: se marca como volado"
+        )
+        ley = Decimal("0")
 
     return {
         "ley_planta": float(ley_planta),

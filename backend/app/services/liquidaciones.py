@@ -302,6 +302,12 @@ def _calcular_lote(
         Decimal(str(lc_result["ley_comercial"])).quantize(Decimal("0.001"), rounding=ROUND_DOWN),
     )
 
+    # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
+    if not lote.volado and oz_tc_comercial < UMBRAL_VOLADO:
+        lote.volado = True  # se persiste al commit de crear_liquidacion
+    if lote.volado:
+        oz_tc_comercial = Decimal("0")
+
     # ── Ley Minero ────────────────────────────────────────────────────────────
     oz_tc_minero = _ley_minero(db, lote.id)
     if oz_tc_minero is None:
@@ -840,10 +846,16 @@ def lotes_disponibles_para_liquidar(
         oz_tc_minero = float(oz_tc_minero_val) if oz_tc_minero_val else None
         usa_dir = bool(lote.dirimencia)
 
+        if ley_planta is not None and not lote.volado and ley_planta < UMBRAL_VOLADO:
+            lote.volado = True
+            db.flush()
+
         # Ley comercial: dirimencia > promedio planta+minero
         ley_comercial = None
         params = lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
-        if usa_dir and ley_planta:
+        if lote.volado:
+            ley_comercial = Decimal("0")
+        elif usa_dir and ley_planta:
             ley_comercial = oz_tc_planta
         elif oz_tc_planta:
             lc = calcular_ley_comercial(ley_planta, params)
@@ -853,9 +865,6 @@ def lotes_disponibles_para_liquidar(
             Decimal(str(ley_comercial)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
             if ley_comercial is not None
             else None
-        )
-        print(
-            f"Debug: Lote {lote.ip} - Ley Planta: {oz_tc_planta}, Ley Minero: {oz_tc_minero}, Usa Dirimencia: {usa_dir} => Ley Comercial: {ley_comercial}"
         )
         # rec_liq = _determinar_rec_liq(ley_comercial, params, db, lote.id)
         rec = _rec_planta(db, lote.id)

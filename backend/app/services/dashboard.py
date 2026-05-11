@@ -17,13 +17,19 @@ from sqlalchemy.orm import Session
 _DIAS_HABILITADO = 30  # días de almacén para considerar lote "habilitado"
 
 
-def _calcular_estado_analisis(tiene_cip: bool, tiene_ley: bool, tiene_recuperacion: bool) -> str:
-    """Pipeline lineal: SIN_DATOS → FALTA_LEY → FALTA_REC → LISTO"""
+def _calcular_estado_analisis(
+    tiene_cip: bool,
+    tiene_ley: bool,
+    tiene_rec_completa: bool,
+    tiene_humedad: bool,
+) -> str:
     if not tiene_cip:
         return "SIN_DATOS"
+    if not tiene_humedad:
+        return "FALTA_MUESTREO"
     if not tiene_ley:
         return "FALTA_LEY"
-    if not tiene_recuperacion:
+    if not tiene_rec_completa:
         return "FALTA_REC"
     return "LISTO"
 
@@ -79,6 +85,17 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         ids_con_recuperacion.add(lote_id)
         recs_por_lote[lote_id].append({"estado": estado, "valor": valor})
 
+    # ids con recuperación COMPLETADA y sin ninguna PENDIENTE
+    ids_rec_completa: set[int] = set()
+    ids_rec_pendiente: set[int] = set()
+    for lote_id, recs in recs_por_lote.items():
+        has_completado = any(r["estado"] in ("COMPLETADO", "CERT_COMERCIAL") for r in recs)
+        has_pendiente = any(r["estado"] == "PENDIENTE" for r in recs)
+        if has_pendiente:
+            ids_rec_pendiente.add(lote_id)
+        if has_completado and not has_pendiente:
+            ids_rec_completa.add(lote_id)
+
     kpis = DashboardKPIs()
     lotes_resumen = []
 
@@ -93,6 +110,15 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
 
         h2o_porc = None
         tms = None
+
+        tiene_humedad = tms is not None  # tms solo existe si hay muestreo con porcentaje válido
+
+        estado_analisis = _calcular_estado_analisis(
+            tiene_cip=lote.id in ids_con_cip,
+            tiene_ley=lote.id in ids_con_ley,
+            tiene_rec_completa=lote.id in ids_rec_completa,
+            tiene_humedad=tiene_humedad,
+        )
 
         muestreo = (
             db.query(Muestreo)
@@ -131,7 +157,8 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         estado_analisis = _calcular_estado_analisis(
             tiene_cip=lote.id in ids_con_cip,
             tiene_ley=lote.id in ids_con_ley,
-            tiene_recuperacion=lote.id in ids_con_recuperacion,
+            tiene_rec_completa=lote.id in ids_rec_completa,
+            tiene_humedad=tiene_humedad,
         )
 
         # --- CÁLCULO DE LEY PROMEDIO O COMERCIAL ---
@@ -202,6 +229,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 volado=bool(lote.volado),
                 dirimencia=bool(lote.dirimencia),
                 dias_almacen=dias,
+                tiene_rec_pendiente=lote.id in ids_rec_pendiente,
             )
         )
 

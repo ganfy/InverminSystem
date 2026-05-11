@@ -72,7 +72,7 @@
           <div v-if="store.cargando" class="cargando-inline">
             <span class="spinner" /> Cargando lotes…
           </div>
-          <div v-else-if="store.lotesDisponibles.length === 0" class="sin-lotes">
+          <div v-else-if="lotesListos.length === 0" class="sin-lotes">
             Sin lotes disponibles para este proveedor-acopiador
           </div>
           <div v-else class="tabla-wrapper">
@@ -94,7 +94,7 @@
               </thead>
               <tbody>
                 <tr
-                  v-for="lote in store.lotesDisponibles"
+                  v-for="lote in lotesListos"
                   :key="lote.ip"
                   class="tabla-row"
                   :class="{ 'fila-volado': lote.volado, 'fila-vencimiento': lote.alerta_vencimiento && !lote.volado }"
@@ -393,6 +393,10 @@
   const todosSeleccionados = computed(() =>
     store.lotesDisponibles.length > 0 &&
     store.lotesDisponibles.every(l => lotesSeleccionados.value.includes(l.ip))
+  )
+
+  const lotesListos = computed(() =>
+    store.lotesDisponibles.filter(l => l.listo_para_liquidar)
   )
 
   const puedeCalcular = computed(() =>
