@@ -19,8 +19,12 @@ class LoteDashboard(BaseModel):
     ley_avg: float | None
     rec_porc: float | None
     acopiador: str | None
-    estado: str  # estado del lote: RECEPCIONADO, LIQUIDADO, etc.
-    estado_lote: str  # etiqueta operativa: EN_PROCESO, HABILITADO, COMPLETO, DIRIMENCIA, VOLADO
+    estado: str  # ciclo de vida: RECEPCIONADO, ASIGNADO_RUMA, LIQUIDADO…
+    estado_analisis: str  # pipeline análisis: SIN_DATOS | EN_LAB | FALTA_REC | LISTO
+    habilitado_ruma: bool
+    volado: bool
+    dirimencia: bool
+    dias_almacen: int
 
 
 class DashboardResponse(BaseModel):

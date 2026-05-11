@@ -5,11 +5,13 @@ Lógica de negocio pura - sin dependencias de FastAPI.
 
 from uuid import uuid4
 
-from app.models.enums import RolEntidad, TipoEntidad
+from app.models.enums import EstadoLote, RolEntidad, TipoAnalisis, TipoEntidad
 from app.models.models import (
+    AnalisisLey,
+    AnalisisRecuperacion,
     Entidad,
     EntidadRol,
-    Muestreo,
+    Lote,
     ParametrosComerciales,
     ProveedorAcopiador,
     Rol,
@@ -542,18 +544,17 @@ def listar_provacops(db: Session, con_lotes: bool = False) -> list[dict]:
     rows = db.query(ProveedorAcopiador).all()
 
     if con_lotes:
-        from app.models.enums import EstadoLote
-        from app.models.models import AnalisisRecuperacion, Lote, SesionDescarga
-
         ids_con_lotes: set[int] = {
             row[0]
             for row in db.query(SesionDescarga.provacop_id)
             .join(Lote, Lote.sesion_id == SesionDescarga.id)
+            .join(AnalisisLey, AnalisisLey.lote_id == Lote.id)
             .join(AnalisisRecuperacion, AnalisisRecuperacion.lote_id == Lote.id)
-            .join(Muestreo, Muestreo.lote_id == Lote.id)
             .filter(
                 Lote.estado == EstadoLote.RECEPCIONADO,
                 Lote.eliminado == False,  # noqa: E712
+                AnalisisLey.vigente == True,  # noqa: E712
+                AnalisisLey.tipo_analisis != TipoAnalisis.MINERO,
                 AnalisisRecuperacion.vigente == True,  # noqa: E712
             )
             .distinct()

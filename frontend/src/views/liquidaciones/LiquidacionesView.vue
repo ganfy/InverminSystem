@@ -55,7 +55,7 @@
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Lotes liquidables</div>
-        <div class="kpi-val">{{ store.kpis?.lotes_liquidables ?? '—' }}</div>
+        <div class="kpi-val">{{ countLotesLiquidables }}</div>
         <div class="kpi-sub">con análisis completos</div>
         <span v-if="(store.kpis?.lotes_liquidables ?? 0) > 0" class="kpi-badge badge-ok">Disponibles</span>
       </div>
@@ -77,7 +77,7 @@
           @click="tab = 'liquidaciones'"
         >
           Liquidaciones
-          <span class="tab-count">{{ store.lista.length }}</span>
+          <span class="tab-count">{{ listaFiltrada.length }}</span>
         </button>
         <button
           class="tab-btn"
@@ -85,7 +85,7 @@
           @click="tab = 'lotes'; cargarLotesLiquidables()"
         >
           Lotes liquidables
-          <span class="tab-count tab-count-ok">{{ store.kpis?.lotes_liquidables ?? 0 }}</span>
+          <span class="tab-count tab-count-ok">{{ countLotesLiquidables }}</span>
         </button>
       </div>
 
@@ -302,6 +302,9 @@ const filtroEstado  = ref('')
 const cargandoLotes = ref(false)
 const cargandoPrecio = ref(false)
 
+// En la sección de Estado
+const yaCargoLotes = ref(false)
+
 // Lotes liquidables agrupados por provacop (cargados bajo demanda)
 interface GrupoProvacop {
   provacop_id: number
@@ -330,6 +333,10 @@ const listaFiltrada = computed(() => {
     )
   }
   return res
+})
+
+const countLotesLiquidables = computed(() => {
+  return yaCargoLotes.value ? lotesLiquidables.value.length : (store.kpis?.lotes_liquidables ?? 0)
 })
 
 const lotesAgrupados = computed<GrupoProvacop[]>(() => {
@@ -371,7 +378,7 @@ const cargarPrecioOro = async () => {
 // ── Métodos ──────────────────────────────────────────────────────────────────
 
 async function cargarLotesLiquidables() {
-  if (lotesLiquidables.value.length) return  // ya cargado en esta sesión
+  if (yaCargoLotes.value) return  // ya cargado en esta sesión
   cargandoLotes.value = true
   try {
     // Obtener todos los provacops con lotes recepcionados y pedir sus lotes disponibles
@@ -389,6 +396,7 @@ async function cargarLotesLiquidables() {
       })
     )
     lotesLiquidables.value = todos
+    yaCargoLotes.value = true
   } catch {
     ui.toast('Error al cargar lotes liquidables', 'error')
   } finally {

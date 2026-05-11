@@ -111,7 +111,7 @@ def generar_base_cip(lote_id: int) -> str:
     return f"{base}{control}"
 
 
-def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 2) -> list[MapeoCIP]:
+def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 5) -> list[MapeoCIP]:
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado.")

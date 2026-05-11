@@ -6,149 +6,149 @@
     <title>Liquidacion {numero_liquidacion}</title>
     <style>
         @page {
-            size: A4 landscape;
-            margin: 1.5cm 1.8cm 1.2cm 1.8cm;
-        }
+                size: A4 landscape;
+                margin: 1.5cm 1.8cm 1.2cm 1.8cm;
+            }
 
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
 
         body {
-            font-family: Times New Roman, serif;
-            font-size: 9pt;
-            color: #000000;
-            background: #ffffff;
-        }
+                font-family: Times New Roman, serif;
+                font-size: 9pt;
+                color: #000000;
+                background: #ffffff;
+            }
 
         /* ── HEADER ── */
         table.hdr {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 6px;
-        }
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 6px;
+            }
 
         table.hdr td {
-            vertical-align: middle;
-            padding: 0;
-        }
+                vertical-align: middle;
+                padding: 0;
+            }
 
         .hdr-logo {
-            width: 180px;
-        }
+                width: 180px;
+            }
 
         .hdr-logo img {
-            height: 52px;
-        }
+                height: 52px;
+            }
 
         .hdr-titulo {
-            text-align: center;
-            font-size: 14pt;
-            font-weight: bold;
-            font-family: Times New Roman, serif;
-        }
+                text-align: center;
+                font-size: 14pt;
+                font-weight: bold;
+                font-family: Times New Roman, serif;
+            }
 
         .hdr-meta {
-            width: 160px;
-            text-align: right;
-            font-size: 8.5pt;
-            vertical-align: top;
-            padding-top: 4px;
-        }
+                width: 160px;
+                text-align: right;
+                font-size: 8.5pt;
+                vertical-align: top;
+                padding-top: 4px;
+            }
 
         /* ── DATOS CLIENTE ── */
         .sec-titulo {
-            font-weight: bold;
-            text-decoration: underline;
-            font-size: 9.5pt;
-            margin: 8px 0 4px 0;
-        }
+                font-weight: bold;
+                text-decoration: underline;
+                font-size: 9.5pt;
+                margin: 8px 0 4px 0;
+            }
 
         table.datos {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 8px;
-        }
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 8px;
+            }
 
         table.datos td {
-            font-size: 8.5pt;
-            padding: 1px 4px;
-            vertical-align: top;
-        }
+                font-size: 8.5pt;
+                padding: 1px 4px;
+                vertical-align: top;
+            }
 
         .lbl {
-            font-weight: bold;
-            white-space: nowrap;
-        }
+                font-weight: bold;
+                white-space: nowrap;
+            }
 
         /* ── MAIN TABLE ── */
         table.main {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 6px;
-        }
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 6px;
+            }
 
         table.main th {
-            background: #e8e8e8;
-            border: 1px solid #000000;
-            padding: 3px 4px;
-            font-size: 8pt;
-            text-align: center;
-            font-weight: bold;
-            vertical-align: middle;
-            font-family: Times New Roman, serif;
-        }
+                background: #e8e8e8;
+                border: 1px solid #000000;
+                padding: 3px 4px;
+                font-size: 8pt;
+                text-align: center;
+                font-weight: bold;
+                vertical-align: middle;
+                font-family: Times New Roman, serif;
+            }
 
         table.main td {
-            border: 1px solid #000000;
-            padding: 3px 5px;
-            font-size: 8.5pt;
-            text-align: right;
-            vertical-align: middle;
-            font-family: Times New Roman, serif;
-        }
+                border: 1px solid #000000;
+                padding: 3px 5px;
+                font-size: 8.5pt;
+                text-align: right;
+                vertical-align: middle;
+                font-family: Times New Roman, serif;
+            }
 
         table.main td.left {
-            text-align: left;
-        }
+                text-align: left;
+            }
 
         table.main td.ctr {
-            text-align: center;
-        }
+                text-align: center;
+            }
 
         /* Columna Sacos — amarillo */
         .col-sacos-hdr {
-            background: #FFD700 !important;
-        }
+                background: #FFD700 !important;
+            }
 
         .col-sacos {
-            background: #FFF9C4 !important;
-            text-align: center;
-        }
+                background: #FFF9C4 !important;
+                text-align: center;
+            }
 
         /* Fila de total */
         .fila-total td {
-            background: #e8e8e8;
-            font-weight: bold;
-            font-size: 9pt;
-            border: 1px solid #000000;
-        }
+                background: #e8e8e8;
+                font-weight: bold;
+                font-size: 9pt;
+                border: 1px solid #000000;
+            }
 
         /* ── NOTAS ── */
         .nota-titulo {
-            font-weight: bold;
-            font-style: italic;
-            margin-top: 10px;
-            font-size: 8.5pt;
-        }
+                font-weight: bold;
+                font-style: italic;
+                margin-top: 10px;
+                font-size: 8.5pt;
+            }
 
         .nota-item {
-            font-style: italic;
-            font-size: 7.5pt;
-            margin: 2px 0 0 0;
-        }
+                font-style: italic;
+                font-size: 7.5pt;
+                margin: 2px 0 0 0;
+            }
     </style>
 </head>
 
@@ -188,13 +188,13 @@
     <!-- TABLA PRINCIPAL -->
     <table class="main">
         <thead>
-            <tr class="col-sacos-hdr">
+            <tr>
                 <th>Lote</th>
                 <th>Fecha de<br />Recepcion</th>
                 <th>TMH</th>
                 <th>%H2O</th>
                 <th>TMS</th>
-                <th>Sacos</th>
+                <th class="col-sacos-hdr">Sacos</th>
                 <th>Ley Oz/tc</th>
                 <th>%<br />Recup</th>
                 <th>Inter<br />US$</th>

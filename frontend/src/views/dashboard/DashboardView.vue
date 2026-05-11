@@ -87,6 +87,16 @@
             <option value="PAGADO">Pagado</option>
           </select>
         </div>
+        <div class="field" style="width:160px">
+          <label class="field-label">ANÁLISIS</label>
+          <select class="field-input field-select" v-model="filtroAnalisis">
+            <option value="">Todos</option>
+            <option value="LISTO">Listo p/ liquidar</option>
+            <option value="FALTA_REC">Falta recuperación</option>
+            <option value="FALTA_LEY">Falta ley</option>
+            <option value="SIN_DATOS">Sin datos</option>
+          </select>
+        </div>
         <div class="field" style="flex:1;min-width:200px">
           <label class="field-label">BÚSQUEDA</label>
           <div class="search-wrapper">
@@ -100,7 +110,6 @@
           </div>
         </div>
       </div>
-
       <div class="table-wrapper">
         <table class="data-table">
           <thead>
@@ -114,7 +123,7 @@
               <th class="align-right">LEY PROM.</th>
               <th class="align-right">% REC.</th>
               <th>ACOPIADOR</th>
-              <th class="align-center">ESTADO LOTE</th>
+              <th class="align-center">ANÁLISIS</th>
               <th class="align-center">ESTADO</th>
             </tr>
           </thead>
@@ -132,10 +141,30 @@
               <td class="align-right td-mono">{{ lote.ley_avg?.toFixed(4) ?? '—' }}</td>
               <td class="align-right td-mono">{{ lote.rec_porc != null ? lote.rec_porc + '%' : '—' }}</td>
               <td class="td-truncate td-muted" :title="lote.acopiador || ''">{{ lote.acopiador || '—' }}</td>
+              <!-- Análisis: badge principal + tags secundarios -->
               <td class="align-center">
-                <span class="badge-estado-lote" :class="badgeEstadoLote(lote.estado_lote)">
-                  {{ lote.estado_lote }}
-                </span>
+                <div class="celda-analisis">
+                  <span class="badge-analisis" :class="badgeAnalisis(lote.estado_analisis)">
+                    {{ labelAnalisis(lote.estado_analisis) }}
+                  </span>
+                  <div class="tags-secundarios">
+                    <span
+                      v-if="lote.volado"
+                      class="tag-sec tag-volado"
+                      :title="`Ley baja — ${lote.dias_almacen}d en almacén. Auto-habilita a los 30 días.`"
+                    >VOLADO · {{ lote.dias_almacen }}d</span>
+                    <span
+                      v-if="lote.dirimencia"
+                      class="tag-sec tag-dirimencia"
+                      title="Este lote tiene o tuvo análisis de dirimencia"
+                    >DIRIM</span>
+                    <span
+                      v-if="lote.habilitado_ruma"
+                      class="tag-sec tag-habilitado"
+                      title="Habilitado para ingresar a ruma"
+                    >RUMA ✓</span>
+                  </div>
+                </div>
               </td>
               <td class="align-center">
                 <span class="badge-estado" :class="badgeLote(lote.estado)">{{ lote.estado }}</span>
@@ -345,12 +374,14 @@ const busquedaLote     = ref('')
 const filtroEstadoLote = ref('')
 const busquedaLiq      = ref('')
 const filtroEstadoLiq  = ref('')
+const filtroAnalisis   = ref('')
 
 // ── Computed ──────────────────────────────────────────────────────────
 const lotesFiltrados = computed(() => {
   if (!data.value) return []
   return data.value.lotes.filter(l => {
     if (filtroEstadoLote.value && l.estado !== filtroEstadoLote.value) return false
+    if (filtroAnalisis.value && l.estado_analisis !== filtroAnalisis.value) return false
     const q = busquedaLote.value.toLowerCase()
     if (!q) return true
     return l.ip.toLowerCase().includes(q) || l.proveedor.toLowerCase().includes(q)
@@ -405,14 +436,21 @@ function badgeLote(estado: string) {
 function badgeLiq(estado: string) {
   return { GENERADA: 'parcial', FACTURADA: 'pendiente', PAGADA: 'pagado' }[estado] ?? 'parcial'
 }
-function badgeEstadoLote(estado: string) {
+function badgeAnalisis(estado: string): string {
   return {
-    'badge-completo':   estado === 'COMPLETO',
-    'badge-habilitado': estado === 'HABILITADO',
-    'badge-dirimencia': estado === 'DIRIMENCIA',
-    'badge-volado':     estado === 'VOLADO',
-    'badge-proceso':    estado === 'EN_PROCESO',
-  }
+    SIN_DATOS: 'analisis-sin-datos',
+    FALTA_LEY: 'analisis-falta-ley',
+    FALTA_REC: 'analisis-falta-rec',
+    LISTO:     'analisis-listo',
+  }[estado] ?? 'analisis-sin-datos'
+}
+function labelAnalisis(estado: string): string {
+  return {
+    SIN_DATOS: 'Sin datos',
+    FALTA_LEY: 'Falta ley',
+    FALTA_REC: 'Falta rec.',
+    LISTO:     'Listo',
+  }[estado] ?? estado
 }
 
 onMounted(() => {
@@ -551,6 +589,40 @@ onMounted(() => {
   background: rgba(179,144,40,0.1); border: 1px solid rgba(179,144,40,0.25);
   border-radius: 2px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-gold);
 }
+
+/* ── Badge análisis ── */
+.celda-analisis { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.badge-analisis {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.analisis-sin-datos { background: rgba(148,163,184,0.1);  color: var(--color-text-muted); }
+.analisis-falta-ley    { background: rgba(59,130,246,0.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+.analisis-falta-rec { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.analisis-listo     { background: rgba(34,197,94,0.15);   color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+
+/* ── Tags secundarios ── */
+.tags-secundarios { display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: center; }
+.tag-sec {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: default;
+  white-space: nowrap;
+}
+.tag-volado     { background: rgba(239,68,68,0.12);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+.tag-dirimencia { background: rgba(168,85,247,0.12);  color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
+.tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
 
 .btn-accion {
   background: transparent; border: 1px solid var(--color-border);

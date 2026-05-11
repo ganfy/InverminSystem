@@ -647,57 +647,6 @@ async function recalcularConOverrides() {
   .resumen-total { margin-left:auto; text-align:right; }
   .resumen-val-big { font-family:var(--font-mono); font-size:var(--text-xl); font-weight:700; color:var(--color-gold); }
 
-  /* ── Params panel ── */
-.params-panel {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.25rem;
-}
-.params-globales {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-.params-por-lote {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-.pfield {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  min-width: 140px;
-}
-.plbl {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-}
-.pinput {
-  background: var(--color-bg-input, #1a2a1a);
-  border: 1px solid var(--color-gold);
-  border-radius: var(--radius-sm);
-  color: var(--color-gold);
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  padding: 0.3rem 0.5rem;
-  width: 100%;
-  outline: none;
-}
-.pinput:focus { box-shadow: 0 0 0 2px rgba(201,162,39,0.25); }
-.warn-recalc {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--color-warning);
-  align-self: center;
-}
-
   /* Confirmacion */
   .confirm-panel {
     display:flex; flex-direction:column; align-items:center;

@@ -19,7 +19,11 @@ export interface LoteDashboard {
     rec_porc: number | null
     acopiador: string | null
     estado: string
-    estado_lote: string
+    estado_analisis: string  // SIN_DATOS | EN_LAB | FALTA_REC | LISTO
+    habilitado_ruma: boolean
+    volado: boolean
+    dirimencia: boolean
+    dias_almacen: number
 }
 
 export interface DashboardResponse {
