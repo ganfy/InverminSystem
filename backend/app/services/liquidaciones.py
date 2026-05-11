@@ -532,7 +532,7 @@ def crear_liquidacion(
         numero_liquidacion=numero,
         provacop_id=req.provacop_id,
         precio_oro_usd=req.spot_usd,
-        estado=EstadoLiquidacion.GENERADA,
+        estado=EstadoLiquidacion.BORRADOR if req.como_borrador else EstadoLiquidacion.GENERADA,
         creado_por=usuario_id,
     )
     db.add(liq)
@@ -595,9 +595,11 @@ def crear_liquidacion(
         )
         db.add(ll)
 
-        lote.estado = EstadoLote.LIQUIDADO
-        lote.estado_modificado_por = usuario_id
-        lote.fecha_modificacion_estado = datetime.now()
+        # Solo actualizar estado del lote si NO es borrador
+        if not req.como_borrador:
+            lote.estado = EstadoLote.LIQUIDADO
+            lote.estado_modificado_por = usuario_id
+            lote.fecha_modificacion_estado = datetime.now()
 
         total_general += snap["total_usd"]
 
@@ -667,6 +669,46 @@ def cambiar_estado(
         liq.cerrado_por = usuario_id
         liq.fecha_cierre = datetime.now()
 
+    db.commit()
+    db.refresh(liq)
+    return liq
+
+
+def emitir_liquidacion(
+    db: Session,
+    liquidacion_id: int,
+    usuario_id: int,
+) -> Liquidacion:
+    """
+    Transicion BORRADOR → GENERADA.
+    Actualiza lotes a LIQUIDADO y recalcula totales desde snapshot guardado.
+    """
+    liq = (
+        db.query(Liquidacion)
+        .options(joinedload(Liquidacion.liquidacion_lotes).joinedload(LiquidacionLote.lote))
+        .filter(Liquidacion.id == liquidacion_id)
+        .first()
+    )
+    if not liq:
+        raise ValueError("Liquidacion no encontrada")
+    if liq.estado != EstadoLiquidacion.BORRADOR:
+        raise ValueError(
+            f"Solo se puede emitir una liquidacion en estado BORRADOR, estado actual: {liq.estado}"
+        )
+
+    for ll in liq.liquidacion_lotes:
+        lote = ll.lote
+        if not lote:
+            continue
+        if lote.estado != EstadoLote.RECEPCIONADO:
+            raise ValueError(
+                f"Lote {lote.ip} ya no está en estado RECEPCIONADO (estado: {lote.estado})"
+            )
+        lote.estado = EstadoLote.LIQUIDADO
+        lote.estado_modificado_por = usuario_id
+        lote.fecha_modificacion_estado = datetime.now()
+
+    liq.estado = EstadoLiquidacion.GENERADA
     db.commit()
     db.refresh(liq)
     return liq

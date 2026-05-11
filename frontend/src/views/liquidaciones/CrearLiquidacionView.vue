@@ -297,6 +297,22 @@
 
         <div class="acciones-pie">
           <button class="btn-secondary" @click="paso = 1">← Volver</button>
+          <span v-if="pendienteRecalculo" class="warn-recalc">
+            <AlertTriangle :size="16" class="warn-icon" />
+            Hay cambios sin recalcular
+          </span>
+          <button
+            class="btn-secondary"
+            :disabled="store.cargando || pendienteRecalculo"
+            @click="guardarBorrador"
+          >
+            <template v-if="store.cargando && guardandoBorrador">
+              <span class="spinner" style="margin-right:0.4rem" /> Guardando…
+            </template>
+            <template v-else>
+              Guardar borrador
+            </template>
+          </button>
           <button
             class="btn-primary ready"
             :disabled="!store.preview.puede_generar || store.cargando || pendienteRecalculo"
@@ -304,10 +320,6 @@
           >
             Confirmar y Generar →
           </button>
-          <span v-if="pendienteRecalculo" class="warn-recalc">
-            <AlertTriangle :size="16" class="warn-icon" />
-            Hay cambios sin recalcular
-          </span>
         </div>
       </template>
 
@@ -373,6 +385,7 @@
   const lotesSeleccionados = ref<string[]>([])
   const errorPaso1       = ref('')
   const provacops        = ref<{ id: number; proveedor: string; acopiador: string }[]>([])
+  const guardandoBorrador = ref(false)
 
   // ── Computed ───────────────────────────────────────────────────────
   const tituloPaso = computed(() => ['Selección de lotes', 'Revisión de valores', 'Confirmar'][paso.value - 1])
@@ -393,7 +406,7 @@
       .filter(a => a.critico)
   )
   const alertasInfo = computed(() =>
-    [...(store.preview?.alertas_globales ?? []), ...(store.preview?.lotes.flatMap(l => l.alertas) ?? [])]
+    [...(store.preview?.alertas_globales ?? [])]
       .filter(a => !a.critico)
   )
 
@@ -509,6 +522,32 @@ async function recalcularConOverrides() {
       router.push(`/liquidaciones/${result.id}`)
     } else {
       ui.toast(store.error ?? 'Error al crear liquidación', 'error')
+    }
+  }
+
+  async function guardarBorrador() {
+    if (!provacopId.value || !spotUsd.value) return
+    guardandoBorrador.value = true
+    const result = await store.crear({
+      provacop_id: provacopId.value as number,
+      lotes: lotesSeleccionados.value.map(ip => ({
+        ip,
+        bono: editOv.value.bono ?? 0,
+        rec_liq_override: editOv.value.rec_liq[ip] ?? null,
+        gasto_acopio_override: editOv.value.gasto_acopio,
+        gasto_consumo_override: editOv.value.gasto_consumo,
+      })),
+      spot_usd: spotUsd.value,
+      fecha_liquidacion: fechaLiq.value || null,
+      como_borrador: true,
+    })
+    guardandoBorrador.value = false
+
+    if (result) {
+      ui.toast(`Borrador ${result.numero_liquidacion} guardado`, 'success')
+      router.push('/liquidaciones')
+    } else {
+      ui.toast(store.error ?? 'Error al guardar borrador', 'error')
     }
   }
 

@@ -157,6 +157,30 @@ def cambiar_estado(
     return svc.obtener_liquidacion(db, liq.id)
 
 
+@router.post("/{liquidacion_id}/emitir", response_model=LiquidacionDetalleOut)
+def emitir(
+    liquidacion_id: int,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Emite un borrador: BORRADOR → GENERADA, actualiza lotes y genera PDF."""
+    try:
+        liq = svc.emitir_liquidacion(db, liquidacion_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    try:
+        storage = os.getenv("STORAGE_PATH", "storage")
+        ruta_pdf = guardar_pdf_liquidacion(db, liq.id, storage)
+        liq.pdf_url = ruta_pdf
+        db.commit()
+        db.refresh(liq)
+    except Exception:
+        pass
+
+    return svc.obtener_liquidacion(db, liq.id)
+
+
 # ── PDF ───────────────────────────────────────────────────────────────────────
 
 

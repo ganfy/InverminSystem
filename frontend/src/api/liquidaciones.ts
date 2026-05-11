@@ -22,6 +22,7 @@ export interface LiquidacionCreate {
     spot_usd: number
     fecha_liquidacion?: string | null
     numero_liquidacion?: string | null
+    como_borrador?: boolean
 }
 
 export interface LiquidacionEstadoUpdate {
@@ -204,4 +205,8 @@ export async function descargarPDF(id: string) : Promise<void> {
 
 export function editarParamsLote(liquidacionId: number, ip: string, body: LiquidacionLoteParamsUpdate) {
     return api.patch<LiquidacionDetalleOut>(`/liquidaciones/${liquidacionId}/lotes/${ip}/parametros`, body)
+}
+
+export function emitirLiquidacion(id: number) {
+    return api.post<LiquidacionDetalleOut>(`/liquidaciones/${id}/emitir`)
 }

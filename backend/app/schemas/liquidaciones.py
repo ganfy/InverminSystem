@@ -31,6 +31,9 @@ class LiquidacionCreate(BaseModel):
     spot_usd: Decimal = Field(..., gt=0)
     fecha_liquidacion: date | None = None
     numero_liquidacion: str | None = None  # si None: auto-generado
+    como_borrador: bool = (
+        False  # si True, no se asigna número ni fecha de emisión, y estado queda en BORRADOR
+    )
 
 
 class LiquidacionEstadoUpdate(BaseModel):

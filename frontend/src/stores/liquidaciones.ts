@@ -123,6 +123,24 @@ export const useLiquidacionesStore = defineStore('liquidaciones', () => {
         }
     }
 
+    async function emitir(id: number): Promise<boolean> {
+        cargando.value = true
+        error.value = null
+        try {
+            const r = await api.emitirLiquidacion(id)
+            if (detalle.value?.id === id) detalle.value = r.data
+            const item = lista.value.find((l) => l.id === id)
+            if (item) item.estado = 'GENERADA'
+            return true
+        } catch (e: any) {
+            error.value = e?.response?.data?.detail ?? 'Error al emitir liquidacion'
+            return false
+        } finally {
+            cargando.value = false
+        }
+    }
+
+
     function limpiarPreview() {
         preview.value = null
     }
@@ -139,7 +157,8 @@ export const useLiquidacionesStore = defineStore('liquidaciones', () => {
     return {
         lista, detalle, preview, lotesDisponibles, cargando, error,
         cargarLista, cargarDetalle, cargarLotesDisponibles,
-        calcularPreview, crear, cambiarEstado, limpiarPreview,
+        calcularPreview, crear, cambiarEstado, emitir,
+        limpiarPreview,
         kpis, cargarKPIs
     }
 })

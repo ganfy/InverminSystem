@@ -421,14 +421,18 @@ function irACrearConProvacop(grupo: GrupoProvacop) {
 async function emitirLiquidacion(liq: LiquidacionResumenOut) {
   const ok = await ui.showConfirm({
     title: 'Emitir Liquidación',
-    message: `¿Emitir ${liq.numero_liquidacion}? Los lotes pasarán a estado LIQUIDADO.`,
+    message: `¿Emitir ${liq.numero_liquidacion}? Los lotes pasarán a estado LIQUIDADO y se generará el PDF.`,
     confirmLabel: 'Emitir',
     danger: false,
   })
   if (!ok) return
-  const exito = await store.cambiarEstado(liq.id, 'GENERADA')
-  if (exito) ui.toast('Liquidación emitida', 'success')
-  else ui.toast(store.error ?? 'Error al emitir', 'error')
+  const exito = await store.emitir(liq.id)
+  if (exito) {
+    ui.toast('Liquidación emitida correctamente', 'success')
+    await store.cargarKPIs()
+  } else {
+    ui.toast(store.error ?? 'Error al emitir', 'error')
+  }
 }
 
 async function cambiarEstadoRapido(liq: LiquidacionResumenOut, nuevoEstado: string) {
@@ -636,18 +640,6 @@ onMounted(async () => {
 .td-fecha   { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
 .td-bold    { font-weight: 600; }
 .td-truncate { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
-
-/* ── Badges de estado ────────────────────────────────────────────── */
-.badge-estado {
-  display: inline-block;
-  font-family: var(--font-mono); font-size: 0.65rem;
-  padding: 0.18rem 0.55rem; border-radius: 2px;
-  letter-spacing: 0.1em; font-weight: 700; white-space: nowrap;
-}
-.badge-borrador  { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
-.badge-generada  { background: rgba(207,151,61,0.12); color: var(--color-gold); border: 1px solid rgba(207,151,61,0.3); }
-.badge-facturada { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
-.badge-pagada    { background: var(--color-success-bg); color: var(--color-success); border: 1px solid rgba(81,161,85,0.3); }
 
 /* ── Botones de acción inline ────────────────────────────────────── */
 .acciones    { display: flex; gap: 0.35rem; justify-content: flex-end; }

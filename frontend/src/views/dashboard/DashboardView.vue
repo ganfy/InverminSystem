@@ -433,8 +433,14 @@ function badgeLote(estado: string) {
   }
   return m[estado] ?? 'en-proceso'
 }
+
 function badgeLiq(estado: string) {
-  return { GENERADA: 'parcial', FACTURADA: 'pendiente', PAGADA: 'pagado' }[estado] ?? 'parcial'
+  return {
+    BORRADOR:  'badge-borrador',
+    GENERADA:  'badge-generada',
+    FACTURADA: 'badge-facturada',
+    PAGADA:    'badge-pagada',
+  }[estado] ?? 'badge-generada'
 }
 function badgeAnalisis(estado: string): string {
   return {

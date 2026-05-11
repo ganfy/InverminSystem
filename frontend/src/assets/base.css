@@ -701,6 +701,42 @@ svg.lucide {
   border: 1px solid rgba(52, 211, 153, 0.3);
 }
 
+/* ── Badges de estado liquidaciones ────────────────────────────────────────────── */
+.badge-estado {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 2px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-borrador {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.badge-generada {
+  background: rgba(207, 151, 61, 0.12);
+  color: var(--color-gold);
+  border: 1px solid rgba(207, 151, 61, 0.3);
+}
+
+.badge-facturada {
+  background: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.badge-pagada {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid rgba(81, 161, 85, 0.3);
+}
+
 
 /* ── Params panel ── */
 .params-panel {
