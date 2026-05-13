@@ -343,6 +343,11 @@
               </span>
             </div>
 
+            <div v-if="a.estado === 'PENDIENTE'" class="lab-field" style="color:#f59e0b;font-size:0.75rem;margin-bottom:0.15rem">
+              <Hourglass :size="13" style="margin-right:0.3rem;flex-shrink:0" />
+              <span>Análisis en proceso — esperando resultado del laboratorio</span>
+            </div>
+
             <div class="lab-field"><span class="lf-label">CIP:</span>           <span class="lf-value td-mono" style="color:var(--color-gold)">{{ a.cip ?? '-' }}</span></div>
             <div class="lab-field"><span class="lf-label">LABORATORIO:</span>   <span class="lf-value">{{ a.laboratorio }}</span></div>
             <div class="lab-field" v-if="a.creado_por_nombre">
@@ -412,6 +417,14 @@
             >
               Subir certificado →
             </button>
+            <button
+              class="btn-danger-sm"
+              style="font-size:0.72rem;padding:0.25rem 0.65rem"
+              @click="cancelarEnvioExterno(c.codigo_cip)"
+              title="Revertir destino — el CIP vuelve a estar disponible"
+            >
+              Cancelar envío
+            </button>
           </div>
         </div>
 
@@ -473,9 +486,6 @@
             <span v-if="enviando" class="spinner" style="margin-right:0.4rem"></span>
             Enviar a recuperación
           </button>
-          <span v-if="tienePendiente" class="info-inline" style="margin-left:0.5rem">
-            <Hourglass :size="16" /> Análisis pendiente en laboratorio
-          </span>
         </div>
 
         <!-- Alerta: CIP listo pero sin ley de planta aún -->
@@ -885,13 +895,17 @@ const cipRecupElegido      = ref<string | null>(null)
 const labRecupElegida      = ref('')
 const labsRecupDisponibles = ref<string[]>([])
 
+const internos = new Set(['Paititi', 'Laboratorio Interno', 'El Dorado - Invermin Paititi'])
+
 const cipsRecuperacionDisponibles = computed(() => {
   if (!lote.value) return []
   return lote.value.cips_detalle.filter(
     c => (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno')
-      && !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente),
+      && !lote.value!.analisis_recuperacion.some(a => a.cip === c.codigo_cip && a.vigente)
+      && !(c.laboratorio && !internos.has(c.laboratorio)),  // bloqueado si ya envió a externo
   )
 })
+
 
 const cipRecupInterno = computed(() =>
   lote.value?.cips_detalle.find(
@@ -904,7 +918,6 @@ const tienePendiente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.vigente) ?? false,
 )
 
-const internos = new Set(['Paititi', 'Laboratorio Interno'])
 const cipsExternosPendienteCert = computed(() => {
   if (!lote.value) return []
   return lote.value.cips_detalle.filter(c => {
@@ -947,6 +960,24 @@ async function confirmarEnvioRecuperacion() {
   }
   enviando.value = false
   lote.value = await store.cargarDetalleLote(ipActual)
+}
+
+async function cancelarEnvioExterno(cipCodigo: string) {
+  const ok = await ui.showConfirm({
+    title: 'Cancelar envío externo',
+    message: `¿Cancelar el envío de ${cipCodigo}? El CIP quedará disponible para asignar a otro destino.`,
+    confirmLabel: 'Cancelar envío',
+  })
+  if (!ok) return
+  try {
+    const cips = await muestreoApi.obtenerEtiquetas(ipActual)
+    const cipConId = cips.find(c => c.codigo_cip === cipCodigo)
+    if (cipConId) await muestreoApi.actualizarLaboratorioCip(cipConId.id, '')
+    lote.value = await store.cargarDetalleLote(ipActual)
+    ui.toast('Envío cancelado. CIP disponible nuevamente.', 'success')
+  } catch {
+    ui.toast('Error al cancelar el envío', 'error')
+  }
 }
 
 // ── Alertas ───────────────────────────────────────────────────────────────────

@@ -34,6 +34,11 @@
   --color-offline-bg: rgb(221, 66, 45);
   --color-offline-total-bg: rgba(148, 50, 37, 0.158);
 
+  --color-volado: #447aef;
+  --color-dirimencia: #a855f7;
+  --color-volado-bg: rgba(68, 122, 239, 0.15);
+  --color-dirimencia-bg: rgba(168, 85, 247, 0.15);
+
   /* Tipografía */
   --font-main:          'Rajdhani', sans-serif;
   --font-mono:          'Share Tech Mono', monospace;

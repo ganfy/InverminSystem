@@ -453,6 +453,23 @@ def guardar_certificado_ley(
 
     lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
     if lote_obj:
+        # Recalcular ley_comercial para persistirla (misma lógica que el PDF)
+        ley_planta = calcular_ley_planta(db, lote_obj.id)
+        if ley_planta is not None:
+            try:
+                provacop = lote_obj.sesion.provacop
+                params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
+            except AttributeError:
+                params = None
+            calc = svc.calcular_ley_comercial(ley_planta, params)
+            ley_comercial_val = Decimal(str(calc["ley_comercial"]))
+            ley_gr_tm_val = (ley_comercial_val * Decimal("34.2857")).quantize(Decimal("0.001"))
+            es_volado = calc["ley_comercial"] == 0.0
+        else:
+            ley_comercial_val = Decimal("0")
+            ley_gr_tm_val = Decimal("0")
+            es_volado = False
+
         cert_record = (
             db.query(AnalisisLey)
             .filter(
@@ -463,6 +480,8 @@ def guardar_certificado_ley(
         )
         if cert_record:
             cert_record.certificado_url = ruta
+            cert_record.ley_final = ley_comercial_val
+            cert_record.ley_gr_tm = ley_gr_tm_val
         else:
             db.add(
                 AnalisisLey(
@@ -472,13 +491,17 @@ def guardar_certificado_ley(
                     material="Au",
                     ley_fino=Decimal("0"),
                     ley_grueso=Decimal("0"),
-                    ley_final=Decimal("0"),
-                    ley_gr_tm=Decimal("0"),
+                    ley_final=ley_comercial_val,
+                    ley_gr_tm=ley_gr_tm_val,
                     certificado_url=ruta,
                     vigente=True,
                     creado_por=current_user.id,
                 )
             )
+
+        # Marcar como volado si ley_comercial < UMBRAL_VOLADO (0.100 Oz/TC)
+        if es_volado and not lote_obj.volado:
+            lote_obj.volado = True
 
         # Marcar como volado si ley = 0
         db.commit()

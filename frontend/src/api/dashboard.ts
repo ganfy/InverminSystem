@@ -6,6 +6,7 @@ export interface DashboardKPIs {
     tmh_stock: number
     tms_stock: number
     oz_stock: number
+    oz_habilitados: number
 }
 
 export interface LoteDashboard {

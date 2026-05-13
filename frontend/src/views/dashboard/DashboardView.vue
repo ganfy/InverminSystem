@@ -50,6 +50,14 @@
         </div>
         <Coins class="kpi-icon" :size="32" />
       </div>
+
+      <div class="kpi-card">
+        <div class="kpi-info">
+          <span class="kpi-label">Oz Disponibles Ruma</span>
+          <span class="kpi-value highlight">{{ (data?.kpis.oz_habilitados ?? 0).toFixed(3) }} oz</span>
+        </div>
+        <Layers class="kpi-icon" :size="32" />
+      </div>
     </section>
 
     <!-- ── Tabs ────────────────────────────────────────────────── -->
@@ -168,7 +176,7 @@
                       v-if="lote.tiene_rec_pendiente"
                       class="tag-sec tag-remu"
                       title="Recuperación preliminar disponible — hay un segundo análisis pendiente"
-                    >REMU <Hourglass /></span>
+                    >REMU <Hourglass :size="11"/></span>
                   </div>
                 </div>
               </td>
@@ -372,7 +380,7 @@ const tabActual = ref<TabKey>('resumen')
 
 const tabs = computed(() => [
   { key: 'resumen'        as TabKey, label: 'Resumen',       icon: markRaw(LayoutDashboard), count: null },
-  { key: 'lotes'          as TabKey, label: 'Lotes',         icon: markRaw(Layers),           count: data.value?.lotes.length ?? 0 },
+  { key: 'lotes'          as TabKey, label: 'Lotes',         icon: markRaw(Layers),           count: lotesFiltrados.value.length || null },
   { key: 'liquidaciones'  as TabKey, label: 'Liquidaciones', icon: markRaw(FileText),          count: liqStore.lista.length || null },
 ])
 
@@ -596,8 +604,8 @@ onMounted(() => {
 }
 .badge-completo   { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
 .badge-habilitado { background: rgba(234, 179, 8, 0.15);  color: #eab308; }
-.badge-dirimencia { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
-.badge-volado     { background: rgba(239, 68, 68, 0.15);  color: #ef4444; }
+.badge-dirimencia { background: var(--color-dirimencia-bg); color: var(--color-dirimencia); }
+.badge-volado     { background: var(--color-volado-bg);  color: var(--color-volado); }
 .badge-proceso    { background: rgba(148, 163, 184, 0.12); color: var(--color-text-muted); }
 .badge-count-sm {
   display: inline-block; padding: 0.1rem 0.5rem;
@@ -636,8 +644,8 @@ onMounted(() => {
   cursor: default;
   white-space: nowrap;
 }
-.tag-volado     { background: rgba(239,68,68,0.12);   color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
-.tag-dirimencia { background: rgba(168,85,247,0.12);  color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
+.tag-volado     { background: var(--color-volado-bg);   color: var(--color-volado); border: 1px solid rgba(68, 122, 239, 0.25); }
+.tag-dirimencia { background: var(--color-dirimencia-bg);  color: var(--color-dirimencia); border: 1px solid rgba(168, 85, 247, 0.25); }
 .tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
 .tag-remu { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
 

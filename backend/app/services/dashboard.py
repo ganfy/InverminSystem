@@ -111,15 +111,6 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         h2o_porc = None
         tms = None
 
-        tiene_humedad = tms is not None  # tms solo existe si hay muestreo con porcentaje válido
-
-        estado_analisis = _calcular_estado_analisis(
-            tiene_cip=lote.id in ids_con_cip,
-            tiene_ley=lote.id in ids_con_ley,
-            tiene_rec_completa=lote.id in ids_rec_completa,
-            tiene_humedad=tiene_humedad,
-        )
-
         muestreo = (
             db.query(Muestreo)
             .filter(Muestreo.lote_id == lote.id)
@@ -134,6 +125,9 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 h2o_porc = round(((ph - ps) / ph) * 100, 2)
                 tms = round(tmh * (1 - (h2o_porc / 100)), 3)
                 kpis.tms_stock += tms
+
+        # tiene_humedad DEBE evaluarse después del bloque de muestreo
+        tiene_humedad = tms is not None
 
         sesion = db.query(SesionDescarga).filter(SesionDescarga.id == lote.sesion_id).first()
         proveedor_nombre = "---"
@@ -212,6 +206,14 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 if valores_rec:
                     rec_prom = round(sum(valores_rec) / len(valores_rec), 2)
 
+        if tms is not None and ley_prom is not None:
+            au_lote = tms * ley_prom  # gramos (TM × gr/TM)
+            kpis.au_real_100 += au_lote
+            if rec_prom is not None:
+                kpis.au_real_rec += au_lote * rec_prom / 100
+            if lote.habilitado_ruma and lote.ruma_id is None:
+                kpis.oz_habilitados += au_lote / 31.1035
+
         lotes_resumen.append(
             LoteDashboard(
                 ip=lote.ip,
@@ -235,6 +237,11 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
 
     kpis.tmh_stock = round(kpis.tmh_stock, 2)
     kpis.tms_stock = round(kpis.tms_stock, 2)
+    kpis.au_real_100 = round(kpis.au_real_100, 2)
+    kpis.au_real_rec = round(kpis.au_real_rec, 2)
+    kpis.oz_stock = round(kpis.au_real_100 / 31.1035, 3)
+    kpis.oz_habilitados = round(kpis.oz_habilitados, 3)
+
     lotes_resumen.sort(key=lambda x: x.ip, reverse=True)
 
     return DashboardResponse(kpis=kpis, lotes=lotes_resumen)
