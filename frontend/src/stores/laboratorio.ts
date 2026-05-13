@@ -14,7 +14,12 @@ import type {
     AnalisisLeyOut,
 } from '@/types/laboratorio'
 import { useSync } from '@/composables/useSync'
-import { encolarAnalisisLey } from '@/composables/useOfflineQueue'
+import {
+    encolarAnalisisLey,
+    guardarCipsLabCache,
+    obtenerCipsLabCache,
+    encolarAnalisisRecuperacion,
+} from '@/composables/useOfflineQueue'
 
 export const useLaboratorioStore = defineStore('laboratorio', () => {
     const ui = useUiStore()
@@ -39,10 +44,22 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
     // ── Carga ─────────────────────────────────────────────────────────────────
     async function cargarCips() {
         cargando.value = true
+        const { online } = useSync()
         try {
-            cips.value = await laboratorioApi.listarCips()
+            const data = await laboratorioApi.listarCips()
+            cips.value = data
+            await guardarCipsLabCache(data).catch(() => { }) // best-effort
         } catch {
-            ui.toast('Error al cargar CIPs de laboratorio', 'error')
+            // Fallback a caché IndexedDB cuando no hay conexión
+            const cached = await obtenerCipsLabCache<CIPAnalisisOut>()
+            if (cached.length > 0) {
+                cips.value = cached
+                if (!online.value) {
+                    ui.toast('Sin conexión: mostrando CIPs en caché local', 'warning')
+                }
+            } else {
+                ui.toast('Error al cargar CIPs de laboratorio', 'error')
+            }
         } finally {
             cargando.value = false
         }
@@ -140,12 +157,37 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         datos: CompletarRecuperacionRequest,
         archivo?: File | null,
     ): Promise<AnalisisRecuperacionOut | null> {
+        const { online } = useSync()
+
+        if (online.value) {
+            try {
+                const resultado = await laboratorioApi.completarRecuperacion(analisisId, datos)
+                if (archivo) await laboratorioApi.subirCertificadoRecuperacion(resultado.id, archivo)
+                return resultado
+            } catch (e: any) {
+                ui.toast(e?.response?.data?.detail ?? 'Error al completar recuperación', 'error')
+                return null
+            }
+        }
+
+        // Sin conexión: encolar
+        if (archivo) {
+            ui.toast('Sin conexión: el certificado no podrá adjuntarse hasta reconectar.', 'warning')
+        }
         try {
-            const resultado = await laboratorioApi.completarRecuperacion(analisisId, datos)
-            if (archivo) await laboratorioApi.subirCertificadoRecuperacion(resultado.id, archivo)
-            return resultado
-        } catch (e: any) {
-            ui.toast(e?.response?.data?.detail ?? 'Error al completar recuperación', 'error')
+            await encolarAnalisisRecuperacion({
+                offline_id: crypto.randomUUID(),
+                analisis_id: analisisId,
+                datos: {
+                    ley_cola: datos.ley_cola,
+                    ley_liquido: datos.ley_liquido ?? null,
+                    fecha_analisis: datos.fecha_analisis ?? new Date().toISOString().slice(0, 10),
+                },
+            })
+            ui.toast('Recuperación guardada localmente. Se sincronizará al reconectar.', 'info')
+            return null
+        } catch {
+            ui.toast('Error al guardar análisis de recuperación offline', 'error')
             return null
         }
     }

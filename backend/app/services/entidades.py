@@ -5,10 +5,13 @@ Lógica de negocio pura - sin dependencias de FastAPI.
 
 from uuid import uuid4
 
-from app.models.enums import RolEntidad, TipoEntidad
+from app.models.enums import EstadoLote, RolEntidad, TipoAnalisis, TipoEntidad
 from app.models.models import (
+    AnalisisLey,
+    AnalisisRecuperacion,
     Entidad,
     EntidadRol,
+    Lote,
     ParametrosComerciales,
     ProveedorAcopiador,
     Rol,
@@ -533,3 +536,37 @@ def buscar_por_ruc(db: Session, ruc: str) -> dict | None:
         return None
     provacop = _get_provacop_de_entidad(db, entidad.id)
     return _serializar_tercero(entidad, provacop, db)
+
+
+def listar_provacops(db: Session, con_lotes: bool = False) -> list[dict]:
+    """Lista relaciones proveedor-acopiador. con_lotes=True filtra solo los que
+    tienen al menos un lote RECEPCIONADO con recuperación registrada."""
+    rows = db.query(ProveedorAcopiador).all()
+
+    if con_lotes:
+        ids_con_lotes: set[int] = {
+            row[0]
+            for row in db.query(SesionDescarga.provacop_id)
+            .join(Lote, Lote.sesion_id == SesionDescarga.id)
+            .join(AnalisisLey, AnalisisLey.lote_id == Lote.id)
+            .join(AnalisisRecuperacion, AnalisisRecuperacion.lote_id == Lote.id)
+            .filter(
+                Lote.estado == EstadoLote.RECEPCIONADO,
+                Lote.eliminado == False,  # noqa: E712
+                AnalisisLey.vigente == True,  # noqa: E712
+                AnalisisLey.tipo_analisis != TipoAnalisis.MINERO,
+                AnalisisRecuperacion.vigente == True,  # noqa: E712
+            )
+            .distinct()
+            .all()
+        }
+        rows = [r for r in rows if r.id in ids_con_lotes]
+
+    return [
+        {
+            "id": pa.id,
+            "proveedor": pa.proveedor.razon_social if pa.proveedor else "—",
+            "acopiador": pa.acopiador.razon_social if pa.acopiador else "—",
+        }
+        for pa in rows
+    ]

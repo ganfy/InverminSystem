@@ -45,7 +45,14 @@
 
               <div v-if="puedeAsignarLab" class="lab-selector no-print">
                 <label style="font-size:0.68rem;color:var(--color-text-faint)">LABORATORIO DESTINO:</label>
+                <span
+                  v-if="cip.tiene_analisis_ley || cip.tiene_analisis_recuperacion"
+                  style="font-size:var(--font-size-sm);color:var(--color-text-faint);font-style:italic"
+                >
+                {{ labsPorCip[cip.id] || cip.laboratorio }} <em>(ya tiene análisis)</em>
+                </span>
                 <select
+                  v-else
                   class="field-select field-input"
                   style="font-size:0.75rem;padding:0.25rem 0.5rem"
                   :value="labsPorCip[cip.id] || cip.laboratorio"

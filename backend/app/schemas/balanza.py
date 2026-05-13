@@ -104,6 +104,8 @@ class LoteEditar(BaseModel):
     peso_final: Decimal | None = None  # TARA
     sacos: int | None = None
     granel: bool | None = None
+    fecha_inicio: datetime | None = None  # fecha/hora bruto (camión cargado)
+    fecha_fin: datetime | None = None  # fecha/hora tara (camión vacío)
     es_manual: Optional[bool] = None
     justificacion_manual: Optional[str] = None
 

@@ -51,10 +51,19 @@ import {
     marcarAnalisisLeySynced,
     marcarAnalisisLeyError,
     limpiarAnalisisLeySynced,
+    obtenerAnalisisRecuperacionPendientes,
+    marcarAnalisisRecuperacionSynced,
+    marcarAnalisisRecuperacionError,
+    limpiarAnalisisRecuperacionSynced,
 } from '@/composables/useOfflineQueue'
 import { laboratorioApi } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
 import { pruebasApi } from '@/api/pruebas'
+import type { SyncLaboratorioRequest,
+    AnalisisLeyCreate,
+    AnalisisRecuperacionCreate,
+    CompletarRecuperacionRequest,
+ } from '@/types/laboratorio'
 
 // ── Modo offline forzado (solo desarrollo) ─────────────────
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
@@ -311,16 +320,51 @@ export function useSync() {
     }
 
     async function sincronizarLaboratorio(): Promise<void> {
-        const pendientes = await obtenerAnalisisLeyPendientes()
-        if (pendientes.length === 0) return
+        const pendientesLey = await obtenerAnalisisLeyPendientes()
+        const pendientesRec = await obtenerAnalisisRecuperacionPendientes()
+        if (pendientesLey.length === 0 && pendientesRec.length === 0) return
 
         try {
-            const payload = {
-                analisis_ley: pendientes.map(p => ({
+            const payload: SyncLaboratorioRequest = {
+                analisis_ley: pendientesLey.map(p => ({
                     offline_id: p.offline_id,
                     datos: p.datos,
                 })),
-                analisis_recuperacion: [],
+
+                // Ahora TypeScript aceptará esto sin quejarse
+                analisis_recuperacion: pendientesRec.map(p => {
+                    const d = p.datos as any; // Usamos 'any' aquí temporalmente para extraer los valores crudos de IndexedDB sin que TS se queje
+
+                    // Variable que adoptará estrictamente uno de los dos tipos
+                    let datosProcesados: AnalisisRecuperacionCreate | CompletarRecuperacionRequest;
+
+                    if (p.analisis_id) {
+                        // MODO: COMPLETAR ANÁLISIS EXISTENTE
+                        datosProcesados = {
+                            ley_cola: Number(d.ley_cola),
+                            ley_liquido: d.ley_liquido != null ? Number(d.ley_liquido) : null,
+                            fecha_analisis: d.fecha_analisis || new Date().toISOString()
+                        };
+                    } else {
+                        // MODO: CREAR NUEVO ANÁLISIS OFFLINE
+                        datosProcesados = {
+                            cip: d.cip,
+                            laboratorio: d.laboratorio,
+                            // Eliminamos tipo_analisis de aquí, ya que Recuperación no lo usa
+                            ley_cabeza: Number(d.ley_cabeza),
+                            ley_cola: Number(d.ley_cola),
+                            ley_liquido: d.ley_liquido != null ? Number(d.ley_liquido) : null,
+                            origen_datos: d.origen_datos || 'manual',
+                            fecha_analisis: d.fecha_analisis || new Date().toISOString()
+                        };
+                    }
+
+                    return {
+                        offline_id: p.offline_id,
+                        analisis_id: p.analisis_id ?? null,
+                        datos: datosProcesados
+                    };
+                }),
             }
 
             const resp = await laboratorioApi.syncLaboratorio(payload)
@@ -333,6 +377,15 @@ export function useSync() {
                 }
             }
             await limpiarAnalisisLeySynced()
+
+            for (const resultado of resp.resultados_recuperacion ?? []) {
+                if (resultado.error) {
+                    await marcarAnalisisRecuperacionError(resultado.offline_id, resultado.error)
+                } else {
+                    await marcarAnalisisRecuperacionSynced(resultado.offline_id)
+                }
+            }
+            await limpiarAnalisisRecuperacionSynced()
         } catch (err) {
             console.error('[useSync] Error sincronizando analisis de laboratorio:', err)
         }

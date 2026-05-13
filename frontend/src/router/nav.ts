@@ -32,11 +32,11 @@ export const NAV_CONFIG: NavSection[] = [
   },
   {
     section: 'OPERACIONES',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza', 'Laboratorista', 'TecnicoMuestreo'],
+    roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza', 'Laboratorista', 'TecnicoMuestreo', 'Metalurgista'],
     items: [
       { label: 'Balanza', path: '/balanza', icon: Weight, roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] },
       { label: 'Muestreo',            path: '/muestreo',   icon: FlaskConical, roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] },
-      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] },
+      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'Metalurgista'] },
       { label: 'Laboratorio',         path: '/laboratorio',icon: Microscope, roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] },
       { label: 'Liquidaciones',       path: '/liquidaciones', icon: FileText, roles: ['Admin', 'Gerencia', 'Comercial'] },
       { label: 'Facturación',         path: '/facturacion',icon: Receipt, roles: ['Admin', 'Gerencia', 'Comercial'] },

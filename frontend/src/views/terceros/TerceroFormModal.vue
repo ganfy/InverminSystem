@@ -212,28 +212,28 @@
                 <p class="params-grupo-titulo">Umbrales de Recuperación</p>
                 <div class="form-grid">
                   <div class="field">
-                    <label class="field-label">Umbral Recup. Bajo (%)</label>
+                    <label class="field-label">Umbral Recup. Bajo (80%)</label>
                     <input v-model.number="form.params.umbral_recup_bajo" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.umbral_recup_bajo" class="field-error">
                         {{ errores.umbral_recup_bajo }}
                     </span>
                   </div>
                   <div class="field">
-                    <label class="field-label">Umbral Recup. Medio (%)</label>
+                    <label class="field-label">Umbral Recup. Medio (85%)</label>
                     <input v-model.number="form.params.umbral_recup_medio" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.umbral_recup_medio" class="field-error">
                         {{ errores.umbral_recup_medio }}
                     </span>
                 </div>
                   <div class="field">
-                    <label class="field-label">Ley Inferior</label>
+                    <label class="field-label">Límite Ley Inferior (promedio)</label>
                     <input v-model.number="form.params.lim_ley_inferior" type="number" step="0.001" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.lim_ley_inferior" class="field-error">
                         {{ errores.lim_ley_inferior }}
                     </span>
                   </div>
                   <div class="field">
-                    <label class="field-label">Ley Superior</label>
+                    <label class="field-label">Límite Ley Superior (promedio)</label>
                     <input v-model.number="form.params.lim_ley_superior" type="number" step="0.001" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.lim_ley_superior" class="field-error">
                         {{ errores.lim_ley_superior }}
@@ -260,14 +260,14 @@
                     </span>
                   </div>
                   <div class="field">
-                    <label class="field-label">Maquila (%)</label>
+                    <label class="field-label">Maquila (Ley +)</label>
                     <input v-model.number="form.params.maquila" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.maquila" class="field-error">
                         {{ errores.maquila }}
                     </span>
                   </div>
                   <div class="field">
-                    <label class="field-label">Comisión (%)</label>
+                    <label class="field-label">Comisión</label>
                     <input v-model.number="form.params.comision" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.comision" class="field-error">
                         {{ errores.comision }}

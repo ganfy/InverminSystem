@@ -5,7 +5,7 @@ Orientados a la pantalla de gestión de terceros.
 
 from enum import Enum
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 
 class TipoAcopiador(str, Enum):
@@ -188,3 +188,11 @@ class CambiarAcopiadorPayload(BaseModel):
     """Payload para cambiar el acopiador de un proveedor (sin sesiones)."""
 
     acopiador_id: int
+
+
+class ProvacopDropdown(BaseModel):
+    id: int
+    proveedor: str
+    acopiador: str
+
+    model_config = ConfigDict(from_attributes=True)

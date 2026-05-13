@@ -1,9 +1,19 @@
 <template>
   <div class="page-container">
     <header class="page-header">
-      <div>
-        <h1 class="page-title">Pruebas Metalúrgicas</h1>
-        <p class="page-subtitle">Gestión y registro de análisis de preparación</p>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+        <div>
+          <h1 class="page-title">Pruebas Metalúrgicas</h1>
+          <p class="page-subtitle">Gestión y registro de análisis de preparación</p>
+        </div>
+        <button
+          class="btn-refresh"
+          @click="cargarDatos"
+          :disabled="cargando"
+          title="Actualizar datos"
+        >
+          <RefreshCw :size="20" :class="{ 'spinning': cargando }" />
+        </button>
       </div>
     </header>
 
@@ -174,7 +184,7 @@ import { useUiStore } from '@/stores/ui'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
 import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'
-import { WifiOff, Tag } from 'lucide-vue-next'
+import { WifiOff, Tag, RefreshCw } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()
@@ -293,8 +303,10 @@ const pruebasFiltradas = computed(() => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(d: string | null | undefined) {
   if (!d) return '---'
-  const utc = (d.includes('+') || d.endsWith('Z')) ? d : d + 'Z'
-  return new Date(utc).toLocaleString('es-PE', {
+  const hasTz = d.endsWith('Z') || /([+-]\d{2}:\d{2})$/.test(d)
+  // Si es "ingenuo" (sin zona), forzamos que lo interprete como hora de Lima (-05:00)
+  const iso = hasTz ? d : d + '-05:00'
+  return new Date(iso).toLocaleString('es-PE', {
     timeZone: 'America/Lima', day: '2-digit', month: '2-digit',
     year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
@@ -312,17 +324,44 @@ function estadoClase(estado: string) {
 function estadoBotonRegistrar(p: LotePruebaList) {
   if (!p.fecha_ingreso) return { texto: 'Iniciar Prueba', disabled: false }
   if (p.estado === 'EN PROCESO') {
-    const h = calcularHorasRestantes(p.fecha_ingreso)
-    return { texto: `Rodando... (${h}h rest.)`, disabled: true }
+    const restante = obtenerTiempoRestante(p.fecha_ingreso)
+
+    if (restante.terminado) {
+      return { texto: 'Ver / Editar', disabled: false }
+    } else {
+      // Formateador dinámico: Muestra "2h 15m rest." o solo "45min rest."
+      const textoTiempo = restante.horas > 0
+        ? `${restante.horas}h ${restante.minutos}m rest.`
+        : `${restante.minutos}min rest.`
+
+      return { texto: `Rodando... (${textoTiempo})`, disabled: true }
+    }
   }
   return { texto: 'Ver / Editar', disabled: false }
 }
 
-function calcularHorasRestantes(fechaIngreso: string): number {
-  const utc = (fechaIngreso.includes('+') || fechaIngreso.endsWith('Z')) ? fechaIngreso : fechaIngreso + 'Z'
-  const salida = new Date(new Date(utc).getTime() + 48 * 3600000)
-  return Math.max(0, Math.ceil((salida.getTime() - Date.now()) / 3600000))
+function obtenerTiempoRestante(fechaIngreso: string) {
+  const hasTz = fechaIngreso.endsWith('Z') || /([+-]\d{2}:\d{2})$/.test(fechaIngreso)
+  const isoString = hasTz ? fechaIngreso : fechaIngreso + '-05:00'
+
+  const msIngreso = new Date(isoString).getTime()
+  const msSalida = msIngreso + (48 * 60 * 60 * 1000) // Sumamos 48 horas en milisegundos
+  const msAhora = new Date().getTime()
+
+  const msRestantes = msSalida - msAhora
+
+  // Si ya pasó la hora
+  if (msRestantes <= 0) {
+    return { horas: 0, minutos: 0, terminado: true }
+  }
+
+  // Calcular horas y minutos restantes
+  const horas = Math.floor(msRestantes / (1000 * 60 * 60))
+  const minutos = Math.floor((msRestantes % (1000 * 60 * 60)) / (1000 * 60))
+
+  return { horas, minutos, terminado: false }
 }
+
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
 function irARegistrar(ip: string) {
@@ -437,4 +476,45 @@ function imprimirEtiqueta(e: { ip: string; cip: string }) {
 .etiqueta-title { font-size: 0.6rem; font-weight: 900; letter-spacing: .1em; }
 .etiqueta-codigo { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 900; }
 .barcode-container { height: 40px; }
+
+.btn-refresh {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-gold);
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: var(--color-gold);
+}
+
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animación de rotación para el icono */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Ajuste opcional para el layout del header */
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
 </style>

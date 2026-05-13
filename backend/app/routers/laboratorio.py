@@ -17,11 +17,12 @@ Flujo de recuperación interna:
 
 import io
 import os
+from decimal import Decimal
 from pathlib import Path
 
 from app.core.database import get_db
 from app.core.deps import check_permiso
-from app.models.enums import RolSistema
+from app.models.enums import EstadoRecuperacion, RolSistema, TipoAnalisis
 from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, ParametrosComerciales
 from app.schemas.laboratorio import (
     AnalisisLeyCreate,
@@ -37,6 +38,7 @@ from app.schemas.laboratorio import (
     SyncLaboratorioRequest,
     SyncLaboratorioResponse,
 )
+from app.services import certificado_ley_pdf as cert_svc
 from app.services import laboratorio as svc
 from app.services.pruebas import calcular_ley_planta
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -70,41 +72,6 @@ def listar_cips(
     """
     incluir_ip = _puede_ver_ip(current_user)
     return svc.obtener_cips_laboratorio(db, incluir_ip=incluir_ip)
-
-
-# ── Vista por Lote/IP (solo Comercial, Gerencia, Admin) ──────────────────────
-
-
-@router.get("/lotes", response_model=list[LoteLabOut])
-def listar_lotes(
-    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
-    db: Session = Depends(get_db),
-):
-    """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
-    if not _puede_ver_ip(current_user):
-        raise HTTPException(
-            status_code=403,
-            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
-        )
-    return svc.obtener_lotes_laboratorio(db)
-
-
-@router.get("/lotes/{ip}", response_model=LoteLabOut)
-def detalle_lote(
-    ip: str,
-    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
-    db: Session = Depends(get_db),
-):
-    """Detalle completo de un lote: todos sus análisis, vigentes y descartados."""
-    if not _puede_ver_ip(current_user):
-        raise HTTPException(
-            status_code=403,
-            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
-        )
-    result = svc.obtener_detalle_lote(db, ip)
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
-    return result
 
 
 # ── Registrar Análisis de Ley ────────────────────────────────────────────────
@@ -362,7 +329,7 @@ async def extraer_certificado_ley(
     return resultado
 
 
-@router.post("/certificado/extraer-recuperacion")
+@router.post("/certificado/extraer-leyrecuperacion")
 async def extraer_certificado_recuperacion(
     archivo: UploadFile = FastAPIFile(...),
     laboratorio: str = "",
@@ -441,12 +408,14 @@ def registrar_ley_por_ip(
 @router.get("/lotes/{ip}/certificado-pdf")
 def generar_certificado_pdf(
     ip: str,
+    inline: bool = False,
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
     """
-    Genera el PDF del certificado de ley comercial para entregar al proveedor.
-    Aplica las reglas de parametros_comerciales.
+    Genera el PDF del certificado de ley comercial.
+    ?inline=true → previsualización en navegador.
+    ?inline=false → descarga (default).
     Solo Comercial, Gerencia, Admin.
     """
     from app.services import certificado_ley_pdf as cert_svc
@@ -459,11 +428,158 @@ def generar_certificado_pdf(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     nombre = f"certificado_ley_{ip.replace('-', '_')}.pdf"
+    disposition = "inline" if inline else f'attachment; filename="{nombre}"'
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+        headers={"Content-Disposition": disposition},
     )
+
+
+@router.post("/lotes/{ip}/guardar-certificado-ley")
+def guardar_certificado_ley(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Genera y persiste el certificado de ley en storage. Retorna ruta relativa."""
+    try:
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip)
+        ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "ley")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
+    if lote_obj:
+        # Recalcular ley_comercial para persistirla (misma lógica que el PDF)
+        ley_planta = calcular_ley_planta(db, lote_obj.id)
+        if ley_planta is not None:
+            try:
+                provacop = lote_obj.sesion.provacop
+                params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
+            except AttributeError:
+                params = None
+            calc = svc.calcular_ley_comercial(ley_planta, params)
+            ley_comercial_val = Decimal(str(calc["ley_comercial"]))
+            ley_gr_tm_val = (ley_comercial_val * Decimal("34.2857")).quantize(Decimal("0.001"))
+            es_volado = calc["ley_comercial"] == 0.0
+        else:
+            ley_comercial_val = Decimal("0")
+            ley_gr_tm_val = Decimal("0")
+            es_volado = False
+
+        cert_record = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.lote_id == lote_obj.id,
+                AnalisisLey.tipo_analisis == TipoAnalisis.COMERCIAL,
+            )
+            .first()
+        )
+        if cert_record:
+            cert_record.certificado_url = ruta
+            cert_record.ley_final = ley_comercial_val
+            cert_record.ley_gr_tm = ley_gr_tm_val
+        else:
+            db.add(
+                AnalisisLey(
+                    lote_id=lote_obj.id,
+                    laboratorio="Paititi",
+                    tipo_analisis=TipoAnalisis.COMERCIAL,
+                    material="Au",
+                    ley_fino=Decimal("0"),
+                    ley_grueso=Decimal("0"),
+                    ley_final=ley_comercial_val,
+                    ley_gr_tm=ley_gr_tm_val,
+                    certificado_url=ruta,
+                    vigente=True,
+                    creado_por=current_user.id,
+                )
+            )
+
+        # Marcar como volado si ley_comercial < UMBRAL_VOLADO (0.100 Oz/TC)
+        if es_volado and not lote_obj.volado:
+            lote_obj.volado = True
+
+        # Marcar como volado si ley = 0
+        db.commit()
+
+    return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
+
+
+@router.get("/lotes/{ip}/certificado-recuperacion-pdf")
+def generar_certificado_recuperacion_pdf(
+    ip: str,
+    inline: bool = False,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera el PDF del certificado de recuperación (formato Paititi con marca de agua).
+    ?inline=true → previsualización. Solo Comercial, Gerencia, Admin.
+    """
+    from app.services import certificado_ley_pdf as cert_svc
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_comercial_pdf(db, ip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = f"certificado_rec_{ip.replace('-', '_')}.pdf"
+    disposition = "inline" if inline else f'attachment; filename="{nombre}"'
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.post("/lotes/{ip}/guardar-certificado-recuperacion")
+def guardar_certificado_recuperacion(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Genera y persiste el certificado de recuperación en storage."""
+    try:
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_comercial_pdf(db, ip)
+        ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "rec")
+
+        lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
+        if lote_obj:
+            cert_record = (
+                db.query(AnalisisRecuperacion)
+                .filter(
+                    AnalisisRecuperacion.lote_id == lote_obj.id,
+                    AnalisisRecuperacion.estado == EstadoRecuperacion.CERT_COMERCIAL,
+                )
+                .first()
+            )
+            if cert_record:
+                cert_record.certificado_url = ruta
+            else:
+                db.add(
+                    AnalisisRecuperacion(
+                        lote_id=lote_obj.id,
+                        cip=None,
+                        laboratorio="Paititi",
+                        estado=EstadoRecuperacion.CERT_COMERCIAL,
+                        certificado_url=ruta,
+                        vigente=True,
+                        creado_por=current_user.id,
+                    )
+                )
+            db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
 
 
 @router.get("/cips/{cip}/certificado-ensayo")
@@ -493,6 +609,56 @@ def generar_certificado_ensayo(
     )
 
 
+@router.get("/ley/{analisis_id}/certificado")
+def descargar_certificado_ley(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Descarga el certificado PDF de un análisis de ley guardado en disco."""
+    analisis = db.query(AnalisisLey).get(analisis_id)
+    if not analisis:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+    if not analisis.certificado_url or not os.path.exists(analisis.certificado_url):
+        raise HTTPException(status_code=404, detail="Certificado no generado aún")
+
+    def iterfile():
+        with open(analisis.certificado_url, "rb") as f:
+            yield from f
+
+    nombre = f"Certificado_Ley_{analisis_id}.pdf"
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/recuperacion/{analisis_id}/certificado")
+def descargar_certificado_recuperacion(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Descarga el certificado PDF de un análisis de recuperación guardado en disco."""
+    analisis = db.query(AnalisisRecuperacion).get(analisis_id)
+    if not analisis:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+    if not analisis.certificado_url or not os.path.exists(analisis.certificado_url):
+        raise HTTPException(status_code=404, detail="Certificado no generado aún")
+
+    def iterfile():
+        with open(analisis.certificado_url, "rb") as f:
+            yield from f
+
+    nombre = f"Certificado_Rec_{analisis_id}.pdf"
+    return StreamingResponse(
+        iterfile(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 # Obtener certificado
 @router.get("/archivos/{ruta_archivo:path}")
 def descargar_archivo(
@@ -510,6 +676,41 @@ def descargar_archivo(
     if not ruta_completa.exists():
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     return FileResponse(ruta_completa)
+
+
+# ── Vista por Lote/IP (solo Comercial, Gerencia, Admin) ──────────────────────
+
+
+@router.get("/lotes", response_model=list[LoteLabOut])
+def listar_lotes(
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
+    if not _puede_ver_ip(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
+        )
+    return svc.obtener_lotes_laboratorio(db)
+
+
+@router.get("/lotes/{ip}", response_model=LoteLabOut)
+def detalle_lote(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Detalle completo de un lote: todos sus análisis, vigentes y descartados."""
+    if not _puede_ver_ip(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
+        )
+    result = svc.obtener_detalle_lote(db, ip)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
+    return result
 
 
 # ── Sync Offline ─────────────────────────────────────────────────────────────

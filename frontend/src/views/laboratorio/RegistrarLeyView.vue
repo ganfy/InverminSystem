@@ -14,6 +14,12 @@
       </div>
     </header>
 
+    <!-- Banner offline -->
+    <div v-if="!online" class="offline-banner">
+      <WifiOff :size="16" style="margin-right:0.5rem;vertical-align:middle" />
+      Sin conexión — el análisis se guardará localmente y se sincronizará al reconectar.
+    </div>
+
     <!-- DATOS DEL LOTE -->
     <section class="card">
       <h2 class="card-titulo">DATOS DEL LOTE</h2>
@@ -25,6 +31,12 @@
         <div class="field">
           <label class="field-label">MATERIAL:</label>
           <input class="field-input" :value="materialInfo" disabled />
+        </div>
+        <div class="field">
+          <label class="field-label">LABORATORIO:</label>
+          <!-- Siempre Paititi para análisis Newmont (planta propia).
+               Los análisis de laboratorios externos se ingresan vía importación de certificado. -->
+          <input class="field-input" value="Paititi" disabled />
         </div>
         <div class="field">
           <label class="field-label">MINERAL (Au/Ag):</label>
@@ -72,7 +84,7 @@
       </div>
     </section>
 
-    <!-- LEYES DE LA MUESTRA (triple sampling) - REEMPLAZAR sección card -->
+    <!-- LEYES DE LA MUESTRA (triple sampling) -->
     <section class="card">
       <h2 class="card-titulo">LEYES DE LA MUESTRA (Triple Sampling)</h2>
       <div class="muestras-cards">
@@ -82,7 +94,7 @@
           <h3 class="muestra-card-titulo">MUESTRA FINO 1</h3>
           <div class="form-grid">
             <div class="field">
-              <label class="field-label">Peso15 (g)</label>
+              <label class="field-label">Peso (g)</label>
               <input type="number" class="field-input" v-model.number="pFino1" step="0.001" placeholder="0.000" @input="recalc" />
             </div>
             <div class="field">
@@ -155,14 +167,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { WifiOff } from 'lucide-vue-next'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import type { TipoAnalisis } from '@/types/laboratorio'
 import { useUiStore } from '@/stores/ui'
+import { useSync } from '@/composables/useSync'
 
 const router = useRouter()
 const route  = useRoute()
 const ui = useUiStore()
 const store  = useLaboratorioStore()
+const { online } = useSync()
 
 const cipActual  = route.params.cip as string
 const guardando  = ref(false)
@@ -176,7 +191,9 @@ const punto      = ref('Cabeza')
 
 const form = ref({
   cip: cipActual,
-  laboratorio:    '',
+  // Este formulario es exclusivamente para análisis Newmont (laboratorio propio - Paititi).
+  // Los análisis de laboratorios externos ingresan via importación de certificado PDF.
+  laboratorio:    'Paititi',
   tipo_analisis: ((route.query.tipo as TipoAnalisis | undefined) ?? 'planta'),
   material:       'Au',
   ley_fino:       0,
@@ -251,26 +268,27 @@ function fmtNum(n: number | null | undefined) {
 }
 
 // ── Cargar info del CIP si está disponible ────────────────────────────────────
-onMounted(async () => {
+onMounted(() => {
   const cip = store.cips.find(c => c.cip === cipActual)
   if (cip?.tipo_muestra) materialInfo.value = cip.tipo_muestra
-  if (cip?.laboratorio_destino) form.value.laboratorio = cip.laboratorio_destino
+  // laboratorio siempre es 'Paititi' para análisis Newmont — no se sobreescribe
 })
 
 // ── Guardar ───────────────────────────────────────────────────────────────────
 async function guardar() {
   errCalc.value = ''
 
-  if (!form.value.laboratorio) { errCalc.value = 'Ingrese el laboratorio'; return }
   if (leyFinal.value == null || leyFinal.value <= 0) {
     errCalc.value = 'Ingrese los pesos y valores Au para calcular las leyes'
     return
   }
 
   const okConf = await ui.showConfirm({
-      title: 'Generar Certificado',
-      message: 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?',
-      confirmLabel: 'Generar y Guardar'
+      title: online.value ? 'Generar Certificado' : 'Guardar sin conexión',
+      message: online.value
+        ? 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?'
+        : 'Sin conexión: el análisis se guardará localmente y se sincronizará al reconectar. El certificado se generará después del sync. ¿Continuar?',
+      confirmLabel: online.value ? 'Generar y Guardar' : 'Guardar localmente'
   })
   if (!okConf) return
 
@@ -282,13 +300,27 @@ async function guardar() {
   if (result) {
       await store.generarCertificadoLeyInterno(result.id)
       router.push('/laboratorio')
+  } else if (!online.value) {
+      // Guardado offline exitoso
+      router.push('/laboratorio')
   }
   guardando.value = false
-
 }
 </script>
 
 <style scoped>
+/* Banner offline */
+.offline-banner {
+  background: rgba(245,158,11,.1);
+  border: 1px solid rgba(245,158,11,.35);
+  border-radius: var(--radius-md);
+  color: #f59e0b;
+  font-size: var(--text-sm);
+  padding: 0.6rem 1rem;
+  margin-bottom: 1.25rem;
+  font-family: var(--font-mono);
+}
+
 .muestras-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

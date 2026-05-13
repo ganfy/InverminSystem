@@ -36,6 +36,11 @@ export interface ExtraerRecResult {
     texto_raw: string
 }
 
+export interface GuardarCertResult {
+    ruta: string
+    url: string
+}
+
 export interface LeyComercialCalc {
     ley_planta: number
     ley_comercial: number
@@ -110,6 +115,7 @@ export const laboratorioApi = {
         ip: string,
         datos: EnviarRecuperacionInternaRequest = {},
     ): Promise<AnalisisRecuperacionOut> {
+        console.log('Enviando recuperación interna con datos:', { ip, datos })
         const { data } = await api.post(`/laboratorio/lotes/${ip}/enviar-recuperacion`, datos)
         return data
     },
@@ -186,6 +192,19 @@ export const laboratorioApi = {
         return data
     },
 
+    // ── Certificado LEY ───────────────────────────────────────────────────────
+
+    /** Abre el cert de ley en nueva pestaña para previsualizar */
+    async previewCertificadoLeyPdf(ip: string): Promise<void> {
+        const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf?inline=true`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    },
+
+    /** Descarga el cert de ley como archivo */
     async descargarCertificadoPdf(ip: string): Promise<void> {
         const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf`, {
             responseType: 'blob',
@@ -196,6 +215,43 @@ export const laboratorioApi = {
         a.download = `certificado_ley_${ip.replace(/-/g, '_')}.pdf`
         a.click()
         URL.revokeObjectURL(url)
+    },
+
+    /** Genera y guarda el cert de ley en storage del servidor */
+    async guardarCertificadoLey(ip: string): Promise<GuardarCertResult> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-ley`)
+        return data
+    },
+
+    // ── Certificado RECUPERACIÓN ──────────────────────────────────────────────
+
+    /** Abre el cert de recuperación en nueva pestaña para previsualizar */
+    async previewCertificadoRecPdf(ip: string): Promise<void> {
+        const response = await api.get(`/laboratorio/lotes/${ip}/certificado-recuperacion-pdf?inline=true`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    },
+
+    /** Descarga el cert de recuperación como archivo */
+    async descargarCertificadoRecPdf(ip: string): Promise<void> {
+        const response = await api.get(`/laboratorio/lotes/${ip}/certificado-recuperacion-pdf`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(response.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `certificado_rec_${ip.replace(/-/g, '_')}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+    },
+
+    /** Genera y guarda el cert de recuperación en storage del servidor */
+    async guardarCertificadoRec(ip: string): Promise<GuardarCertResult> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-recuperacion`)
+        return data
     },
 
     async descargarCertificadoEnsayo(cip: string): Promise<void> {
@@ -245,4 +301,24 @@ export const laboratorioApi = {
         const { data } = await api.post(`/laboratorio/lotes/${ip}/ley`, datos)
         return data
     },
+}
+
+export async function descargarCertificadoLey(analisisId: number): Promise<void> {
+    const response = await api.get(`/laboratorio/ley/${analisisId}/certificado`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Certificado_Ley_${analisisId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+}
+
+export async function descargarCertificadoRecuperacion(analisisId: number): Promise<void> {
+    const response = await api.get(`/laboratorio/recuperacion/${analisisId}/certificado`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `Certificado_Rec_${analisisId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
 }

@@ -23,7 +23,7 @@ router = APIRouter(prefix="/pruebas", tags=["Pruebas Metalúrgicas"])
 
 @router.get("/lista", response_model=list[LotePruebaList])
 def listar_pruebas(
-    current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "VIEW")),
     db: Session = Depends(get_db),
 ):
     return pruebas_service.obtener_lista_pruebas(db)
@@ -35,7 +35,7 @@ def listar_pruebas(
     summary="Pruebas completadas con ley planta disponible (listas para análisis de recuperación)",
 )
 def pruebas_para_recuperacion(
-    current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """
@@ -49,7 +49,7 @@ def pruebas_para_recuperacion(
 @router.post("/sync", response_model=SyncPruebasResponse)
 def sync_pruebas(
     payload: SyncPruebasRequest,
-    current_user=Depends(check_permiso("PRUEBAS", "CREATE")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "CREATE")),
     db: Session = Depends(get_db),
 ):
     return pruebas_service.sync_batch(db, payload.pruebas, current_user.id)
@@ -61,7 +61,7 @@ def sync_pruebas(
 @router.get("/{ip_lote}", response_model=PruebaMetalurgicaOut)
 def obtener_detalle_prueba(
     ip_lote: str,
-    current_user=Depends(check_permiso("PRUEBAS", "VIEW")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "VIEW")),
     db: Session = Depends(get_db),
 ):
     prueba = pruebas_service.obtener_prueba_por_ip(db, ip_lote)
@@ -94,7 +94,7 @@ def obtener_detalle_prueba(
 def registrar_prueba(
     ip_lote: str,
     datos: PruebaMetalurgicaCreate,
-    current_user=Depends(check_permiso("PRUEBAS", "CREATE")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "CREATE")),
     db: Session = Depends(get_db),
 ):
     try:
@@ -119,7 +119,7 @@ def registrar_prueba(
 )
 def solicitar_remuestreo(
     ip_lote: str,
-    current_user=Depends(check_permiso("PRUEBAS", "CREATE")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "CREATE")),
     db: Session = Depends(get_db),
 ):
     """
@@ -144,7 +144,7 @@ def solicitar_remuestreo(
 def etiquetar_prueba(
     ip_lote: str,
     datos: EtiquetarPruebaRequest = EtiquetarPruebaRequest(),
-    current_user=Depends(check_permiso("PRUEBAS", "UPDATE")),
+    current_user=Depends(check_permiso("PRUEBAS_MET", "UPDATE")),
     db: Session = Depends(get_db),
 ):
     """

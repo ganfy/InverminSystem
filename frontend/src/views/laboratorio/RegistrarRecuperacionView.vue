@@ -85,11 +85,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import type { AnalisisRecuperacionOut, EstadoRecuperacion, TipoMuestra } from '@/types/laboratorio'
+import { useSync } from '@/composables/useSync'
 
 const router = useRouter()
 const route  = useRoute()
 const store  = useLaboratorioStore()
 const ui     = useUiStore()
+const { online } = useSync()
 
 const cipActual  = route.params.cip as string
 // analisis_id puede venir como query param desde el dashboard
@@ -187,6 +189,8 @@ async function guardar() {
   )
   if (result) {
       await store.generarCertificadoRecInterno(result.id)
+      router.push('/laboratorio')
+  } else if (!online.value) {
       router.push('/laboratorio')
   }
   guardando.value = false

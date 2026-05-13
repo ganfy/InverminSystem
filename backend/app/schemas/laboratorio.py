@@ -50,6 +50,7 @@ class AnalisisLeyOut(BaseModel):
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
+    creado_por_nombre: str | None = None  # nombre del laboratorista que registró
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     justificacion_descarte: str | None = None
@@ -69,7 +70,7 @@ class AnalisisRecuperacionCreate(BaseModel):
     cip: str
     laboratorio: str
     ley_cabeza: Decimal = Field(..., gt=0)
-    ley_cola: Decimal = Field(..., ge=0)
+    ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
@@ -78,7 +79,7 @@ class AnalisisRecuperacionCreate(BaseModel):
 class CompletarRecuperacionRequest(BaseModel):
     """Para que laboratorista complete un pending (ley_cola + ley_liquido)."""
 
-    ley_cola: Decimal = Field(..., ge=0)
+    ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     fecha_analisis: date | None = None
 
@@ -92,6 +93,7 @@ class EnviarRecuperacionInternaRequest(BaseModel):
 
     cip: str | None = None  # None → sistema elige el único RecuperacionInterno del lote
     laboratorio: str | None = None
+    ley_cabeza: Decimal | None = None
 
 
 class AnalisisRecuperacionOut(BaseModel):
@@ -101,13 +103,14 @@ class AnalisisRecuperacionOut(BaseModel):
     cip: str | None
     laboratorio: str
     ley_cabeza: Decimal
-    ley_cola: Decimal
+    ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     recuperacion: Decimal | None = None
     estado: str
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
+    creado_por_nombre: str | None = None  # nombre del laboratorista que registró
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     eliminado: bool = False
@@ -165,6 +168,8 @@ class LoteLabOut(BaseModel):
     analisis_recuperacion: list[AnalisisRecuperacionOut]
     tiene_dirimencia: bool
     tiene_prueba_pendiente: bool = False
+    cert_ley_url: str | None = None
+    cert_rec_url: str | None = None
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

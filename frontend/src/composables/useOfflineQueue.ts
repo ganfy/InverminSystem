@@ -20,7 +20,7 @@ import type { LoteMuestreo } from '@/api/muestreo'
 import type { TipoAnalisis, OrigenDatos } from '@/types/laboratorio'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 8
+const DB_VERSION = 9
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -166,6 +166,18 @@ export interface AnalisisLeyOfflineItem {
     synced?: boolean
 }
 
+export interface AnalisisRecuperacionOfflineItem {
+    offline_id: string
+    analisis_id: number   // ID real en servidor del registro PENDIENTE
+    datos: {
+        ley_cola: number
+        ley_liquido: number | null
+        fecha_analisis: string
+    }
+    synced?: boolean
+    error?: string
+}
+
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -213,6 +225,10 @@ async function openDB(): Promise<IDBDatabase> {
             }
             if (oldVersion < 8) {
                 db.createObjectStore('analisis_lab_q', { keyPath: 'offline_id' })
+            }
+            if (oldVersion < 9) {
+                db.createObjectStore('cips_lab_cache', { keyPath: 'cip' })
+                db.createObjectStore('analisis_rec_q', { keyPath: 'offline_id' })
             }
         }
 
@@ -404,19 +420,23 @@ export async function limpiarSynced(): Promise<number> {
 
 export async function contarPendientes(): Promise<number> {
     try {
-        const [sesiones, lotes, fin, pruebas, analisisLab] = await Promise.all([
+        const [sesiones, lotes, fin, pruebas, analisisLab, analisisRec] = await Promise.all([
             getAll<SesionOfflineData>('sesiones_q').catch(() => []),
             getAll<LoteOnlineData>('lotes_online_q').catch(() => []),
             getAll<FinalizacionPendiente>('finalizaciones_q').catch(() => []),
             getAll<PruebaQueueData>('pruebas_q').catch(() => []),
-            getAll<AnalisisLeyOfflineItem>('analisis_lab_q').catch(() => [])
+            getAll<AnalisisLeyOfflineItem>('analisis_lab_q').catch(() => []),
+            getAll<AnalisisRecuperacionOfflineItem>('analisis_rec_q').catch(() => []),
         ])
-        return sesiones.filter(s => !s.synced).length +
+        return (
+            sesiones.filter(s => !s.synced).length +
             lotes.filter(l => !l.synced).length +
             fin.length +
             pruebas.filter(p => !p.synced).length +
-            analisisLab.filter(a => !a.synced).length
-    } catch (e) {
+            analisisLab.filter(a => !a.synced).length +
+            analisisRec.filter(a => !a.synced).length
+        )
+    } catch {
         return 0
     }
 }
@@ -762,6 +782,79 @@ export async function limpiarAnalisisLeySynced(): Promise<void> {
         req.onsuccess = () => {
             const synced = (req.result as AnalisisLeyOfflineItem[]).filter(x => x.synced)
             synced.forEach(x => store.delete(x.offline_id))
+            res()
+        }
+        req.onerror = () => rej(req.error)
+    })
+}
+
+// ── Caché de CIPs de laboratorio ─────────────────────────────────────────────
+
+export async function guardarCipsLabCache(cips: object[]): Promise<void> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('cips_lab_cache', 'readwrite')
+        const store = tx.objectStore('cips_lab_cache')
+        store.clear()
+        for (const cip of cips) store.put(cip)
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+    })
+}
+
+export async function obtenerCipsLabCache<T = unknown>(): Promise<T[]> {
+    return getAll<T>('cips_lab_cache')
+}
+
+// ── Cola de analisis_recuperacion offline ────────────────────────────────────
+
+export async function encolarAnalisisRecuperacion(item: AnalisisRecuperacionOfflineItem): Promise<void> {
+    await put('analisis_rec_q', { ...item, synced: false })
+}
+
+export async function obtenerAnalisisRecuperacionPendientes(): Promise<AnalisisRecuperacionOfflineItem[]> {
+    const todos = await getAll<AnalisisRecuperacionOfflineItem>('analisis_rec_q')
+    return todos.filter(x => !x.synced)
+}
+
+export async function marcarAnalisisRecuperacionSynced(offline_id: string): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_rec_q', 'readwrite')
+        const store = tx.objectStore('analisis_rec_q')
+        const req = store.get(offline_id)
+        req.onsuccess = () => {
+            if (req.result) store.put({ ...req.result, synced: true, error: undefined })
+            res()
+        }
+        req.onerror = () => rej(req.error)
+    })
+}
+
+export async function marcarAnalisisRecuperacionError(offline_id: string, error: string): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_rec_q', 'readwrite')
+        const store = tx.objectStore('analisis_rec_q')
+        const req = store.get(offline_id)
+        req.onsuccess = () => {
+            if (req.result) store.put({ ...req.result, error })
+            res()
+        }
+        req.onerror = () => rej(req.error)
+    })
+}
+
+export async function limpiarAnalisisRecuperacionSynced(): Promise<void> {
+    const db = await openDB()
+    return new Promise((res, rej) => {
+        const tx = db.transaction('analisis_rec_q', 'readwrite')
+        const store = tx.objectStore('analisis_rec_q')
+        const req = store.getAll()
+        req.onsuccess = () => {
+            ; (req.result as AnalisisRecuperacionOfflineItem[])
+                .filter(x => x.synced)
+                .forEach(x => store.delete(x.offline_id))
             res()
         }
         req.onerror = () => rej(req.error)

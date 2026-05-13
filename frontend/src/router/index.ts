@@ -18,6 +18,9 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import RegistrarHumedadView from '@/views/muestreo/RegistrarHumedadView.vue'
 import ImportarCertificadoLeyView from '@/views/laboratorio/ImportarCertificadoLeyView.vue'
 import ImportarCertificadoRecuperacionView from '@/views/laboratorio/ImportarCertificadoRecView.vue'
+import LiquidacionesView from '@/views/liquidaciones/LiquidacionesView.vue'
+import CrearLiquidacionView from '@/views/liquidaciones/CrearLiquidacionView.vue'
+import DetalleLiquidacionView from '@/views/liquidaciones/DetalleLiquidacionView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
 import UsuariosView from '@/views/admin/UsuariosView.vue'  // ← AÑADIDO
 
@@ -56,6 +59,11 @@ const router = createRouter({
         { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
         { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView },
         { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView },
+
+        // Liquidaciones
+        { path: 'liquidaciones', name: 'Liquidaciones', component: LiquidacionesView },
+        { path: 'liquidaciones/nueva', name: 'CrearLiquidacion', component: CrearLiquidacionView },
+        { path: 'liquidaciones/:id', name: 'DetalleLiquidacion', component: DetalleLiquidacionView },
 
         // Gestión
         { path: 'terceros', name: 'Terceros', component: TercerosView },

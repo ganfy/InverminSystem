@@ -27,6 +27,8 @@ export interface MapeoCIPOut {
     codigo_cip: string
     laboratorio?: string | null
     tipo_muestra?: string | null
+    tiene_analisis_ley?: boolean
+    tiene_analisis_recuperacion?: boolean
 }
 
 export interface MuestreoOfflineItem {
@@ -80,9 +82,9 @@ export const muestreoApi = {
     },
 
     /**
-     * Genera los códigos CIP (Muestreo Ciego) para el laboratorio.
+     * Genera los códigos CIP (Muestreo Ciego) para el laboratorio. (y minero y testigo)
      */
-    async generarCips(ipLote: string, cantidad: number = 2): Promise<MapeoCIPOut[]> {
+    async generarCips(ipLote: string, cantidad: number = 5): Promise<MapeoCIPOut[]> {
         const response = await api.post<MapeoCIPOut[]>(`/muestreo/lotes/${ipLote}/etiquetas`, {
             cantidad,
             laboratorio: 'Por definir'

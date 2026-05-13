@@ -6,6 +6,7 @@ export interface DashboardKPIs {
     tmh_stock: number
     tms_stock: number
     oz_stock: number
+    oz_habilitados: number
 }
 
 export interface LoteDashboard {
@@ -19,6 +20,12 @@ export interface LoteDashboard {
     rec_porc: number | null
     acopiador: string | null
     estado: string
+    estado_analisis: string  // SIN_DATOS | EN_LAB | FALTA_REC | LISTO
+    habilitado_ruma: boolean
+    volado: boolean
+    dirimencia: boolean
+    dias_almacen: number
+    tiene_rec_pendiente: boolean
 }
 
 export interface DashboardResponse {

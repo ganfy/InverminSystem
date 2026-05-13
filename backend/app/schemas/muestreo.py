@@ -44,6 +44,8 @@ class MapeoCIPOut(BaseModel):
     codigo_cip: str
     laboratorio: str | None
     tipo_muestra: str | None
+    tiene_analisis_ley: bool = False
+    tiene_analisis_recuperacion: bool = False
 
     model_config = {"from_attributes": True}
 

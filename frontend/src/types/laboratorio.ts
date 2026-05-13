@@ -1,6 +1,6 @@
-export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia'
+export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia' | 'comercial'
 export type OrigenDatos = 'manual' | 'certificado'
-export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO'
+export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO' | 'CERT_COMERCIAL'
 export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno'
 
 // ── Análisis de Ley ───────────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ export interface AnalisisLeyOut {
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
+    creado_por_nombre?: string | null   // laboratorista responsable
     descartado_por?: number | null
     fecha_descarte?: string | null
     justificacion_descarte?: string | null
@@ -58,6 +59,7 @@ export interface CompletarRecuperacionRequest {
 export interface EnviarRecuperacionInternaRequest {
     cip?: string | null   // null → sistema elige el único RecuperacionInterno
     laboratorio?: string
+    ley_cabeza?: number | null
 }
 
 export interface AnalisisRecuperacionOut {
@@ -67,13 +69,14 @@ export interface AnalisisRecuperacionOut {
     cip: string | null
     laboratorio: string
     ley_cabeza: number
-    ley_cola: number
+    ley_cola: number | null
     ley_liquido?: number | null
     recuperacion?: number | null
     estado: EstadoRecuperacion
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
+    creado_por_nombre?: string | null   // laboratorista responsable
     descartado_por?: number | null
     fecha_descarte?: string | null
     eliminado: boolean
@@ -116,6 +119,9 @@ export interface LoteLabOut {
     analisis_recuperacion: AnalisisRecuperacionOut[]
     tiene_dirimencia: boolean
     tiene_prueba_pendiente: boolean
+    tiene_cip_listo_sin_enviar: boolean
+    cert_ley_url?: string | null
+    cert_rec_url?: string | null
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
@@ -131,7 +137,8 @@ export interface AnalisisLeyOfflineItem {
 
 export interface AnalisisRecuperacionOfflineItem {
     offline_id: string
-    datos: AnalisisRecuperacionCreate
+    analisis_id?: number | null
+    datos: AnalisisRecuperacionCreate | CompletarRecuperacionRequest
 }
 
 export interface SyncLaboratorioRequest {

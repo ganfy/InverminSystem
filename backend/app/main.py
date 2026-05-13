@@ -14,6 +14,7 @@ from app.routers import (
     dashboard,
     entidades,
     laboratorio,
+    liquidaciones,
     muestreo,
     pruebas,
     usuarios,
@@ -83,7 +84,7 @@ app.include_router(entidades.router, prefix=PREFIX)
 app.include_router(muestreo.router, prefix=PREFIX)
 app.include_router(pruebas.router, prefix=PREFIX)
 app.include_router(laboratorio.router, prefix=PREFIX)
-# app.include_router(liquidaciones.router, prefix="/api/v1")
+app.include_router(liquidaciones.router, prefix="/api/v1")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

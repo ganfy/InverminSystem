@@ -9,7 +9,7 @@ import re
 import shutil
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -45,6 +45,7 @@ FACTOR_OZ_TC = Decimal("34.2857")
 STORAGE_PATH = Path(os.getenv("STORAGE_PATH", "storage"))
 TIPOS_PERMITIDOS = {"pdf", "jpg", "jpeg", "png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+UMBRAL_VOLADO = 0.100
 
 
 # ── Helpers de cálculo ────────────────────────────────────────────────────────
@@ -72,10 +73,22 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
     return a.ley_final if a else None
 
 
+def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
+    """Batch lookup: {user_id: nombre_completo}"""
+    if not ids:
+        return {}
+    from app.models.models import Usuario
+
+    rows = db.query(Usuario.id, Usuario.nombre_completo).filter(Usuario.id.in_(ids)).all()
+    return {r.id: r.nombre_completo for r in rows}
+
+
 # ── Serializadores ────────────────────────────────────────────────────────────
 
 
-def _ley_out(a: AnalisisLey, lote_ip: str | None = None) -> AnalisisLeyOut:
+def _ley_out(
+    a: AnalisisLey, lote_ip: str | None = None, creado_por_nombre: str | None = None
+) -> AnalisisLeyOut:
     return AnalisisLeyOut(
         id=a.id,
         lote_id=a.lote_id,
@@ -94,17 +107,20 @@ def _ley_out(a: AnalisisLey, lote_ip: str | None = None) -> AnalisisLeyOut:
         descartado_por=a.descartado_por,
         fecha_descarte=a.fecha_descarte,
         justificacion_descarte=a.justificacion_descarte,
+        creado_por_nombre=creado_por_nombre,
     )
 
 
-def _rec_out(a: AnalisisRecuperacion, lote_ip: str | None = None) -> AnalisisRecuperacionOut:
+def _rec_out(
+    a: AnalisisRecuperacion, lote_ip: str | None = None, creado_por_nombre: str | None = None
+) -> AnalisisRecuperacionOut:
     return AnalisisRecuperacionOut(
         id=a.id,
         lote_id=a.lote_id,
         lote_ip=lote_ip,
         cip=a.cip,
         laboratorio=a.laboratorio,
-        ley_cabeza=a.ley_cabeza,
+        ley_cabeza=a.ley_cabeza if a.ley_cabeza is not None else Decimal("0"),
         ley_cola=a.ley_cola,
         ley_liquido=a.ley_liquido,
         recuperacion=a.recuperacion,
@@ -114,6 +130,7 @@ def _rec_out(a: AnalisisRecuperacion, lote_ip: str | None = None) -> AnalisisRec
         certificado_url=a.certificado_url,
         descartado_por=a.descartado_por,
         fecha_descarte=a.fecha_descarte,
+        creado_por_nombre=creado_por_nombre,
     )
 
 
@@ -140,9 +157,6 @@ def obtener_cips_laboratorio(
 
     resultados: list[CIPAnalisisOut] = []
     for cip in cips:
-        print(
-            f"Procesando CIP: {cip.codigo_cip}, Laboratorio: {cip.laboratorio}, Tipo muestra: {cip.tipo_muestra}"
-        )  # Debug
         if not incluir_ip and cip.laboratorio not in [
             "Paititi",
             "Laboratorio Interno",
@@ -190,6 +204,9 @@ def obtener_cips_laboratorio(
 
         ip = lote.ip if incluir_ip else None
 
+        ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
+        nombres = _nombres_usuarios(db, ids)
+
         resultados.append(
             CIPAnalisisOut(
                 cip=cip.codigo_cip,
@@ -200,8 +217,12 @@ def obtener_cips_laboratorio(
                 laboratorio_destino=cip.laboratorio,
                 estado_ley=estado_ley,
                 estado_recuperacion=estado_rec,
-                analisis_ley=[_ley_out(a, ip) for a in no_eliminados_ley],
-                analisis_recuperacion=[_rec_out(a, ip) for a in no_eliminados_rec],
+                analisis_ley=[
+                    _ley_out(a, ip, nombres.get(a.creado_por)) for a in no_eliminados_ley
+                ],
+                analisis_recuperacion=[
+                    _rec_out(a, ip, nombres.get(a.creado_por)) for a in no_eliminados_rec
+                ],
             )
         )
 
@@ -228,28 +249,69 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         for c in todos_cips
     ]
 
-    analisis_ley = (
+    todos_analisis_ley = (
         db.query(AnalisisLey)
         .filter(AnalisisLey.lote_id == lote.id)
         .filter(~AnalisisLey.eliminado)
         .order_by(AnalisisLey.id)
-        .all()  # noqa: E712
+        .all()
     )
-    analisis_rec = (
+    # Separar: registros de cert interno vs análisis reales
+    analisis_ley = [
+        a for a in todos_analisis_ley if a.tipo_analisis not in (TipoAnalisis.COMERCIAL,)
+    ]
+    cert_ley_rec = next(
+        (a for a in todos_analisis_ley if a.tipo_analisis == TipoAnalisis.COMERCIAL and a.vigente),
+        None,
+    )
+    todos_analisis_rec = (
         db.query(AnalisisRecuperacion)
         .filter(AnalisisRecuperacion.lote_id == lote.id)
         .filter(~AnalisisRecuperacion.eliminado)
         .order_by(AnalisisRecuperacion.id)
         .all()
     )
+    # Separar cert comercial de análisis reales de laboratorio
+    analisis_rec = [a for a in todos_analisis_rec if a.estado != EstadoRecuperacion.CERT_COMERCIAL]
+    cert_rec_record = next(
+        (
+            a
+            for a in todos_analisis_rec
+            if a.estado == EstadoRecuperacion.CERT_COMERCIAL and a.vigente
+        ),
+        None,
+    )
 
-    from datetime import datetime, timedelta
+    ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
+    nombres = _nombres_usuarios(db, ids)
 
     pruebas_lote = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).all()
     _ahora = datetime.now()
     tiene_prueba_pendiente = any(
         p.fecha_ingreso is None or _ahora < p.fecha_ingreso + timedelta(hours=48)
         for p in pruebas_lote
+    )
+
+    # CIP de recuperación con prueba COMPLETADA pero sin análisis de recuperación vigente
+    cips_con_rec_vigente = {a.cip for a in analisis_rec if a.vigente and not a.eliminado}
+    cips_recuperacion = [
+        c
+        for c in todos_cips
+        if c.tipo_muestra in (TipoMuestra.RECUPERACION_INTERNO, TipoMuestra.RECUPERACION_EXTERNO)
+    ]
+    tiene_cip_listo_sin_enviar = any(
+        c.codigo_cip not in cips_con_rec_vigente for c in cips_recuperacion
+    )
+
+    # Debug
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "cert_ley_url=%s | cert_rec_url=%s | lote=%s",
+        cert_ley_rec.certificado_url if cert_ley_rec else None,
+        cert_rec_record.certificado_url if cert_rec_record else None,
+        lote.ip,
     )
 
     return LoteLabOut(
@@ -262,10 +324,15 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         cips_detalle=cips_detalle,
         ley_planta=calcular_ley_planta(db, lote.id),
         ley_minero=_ley_minero(db, lote.id),
-        analisis_ley=[_ley_out(a, lote.ip) for a in analisis_ley],
-        analisis_recuperacion=[_rec_out(a, lote.ip) for a in analisis_rec],
+        analisis_ley=[_ley_out(a, lote.ip, nombres.get(a.creado_por)) for a in analisis_ley],
+        analisis_recuperacion=[
+            _rec_out(a, lote.ip, nombres.get(a.creado_por)) for a in analisis_rec
+        ],
         tiene_dirimencia=bool(lote.dirimencia),
         tiene_prueba_pendiente=tiene_prueba_pendiente,
+        tiene_cip_listo_sin_enviar=tiene_cip_listo_sin_enviar,
+        cert_ley_url=cert_ley_rec.certificado_url if cert_ley_rec else None,
+        cert_rec_url=cert_rec_record.certificado_url if cert_rec_record else None,
     )
 
 
@@ -321,18 +388,22 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
             f"El CIP '{datos.cip}' es de tipo '{mapeo.tipo_muestra}' y no se usa para análisis de ley"
         )
 
+    # Actualizar laboratorio destino en el mapeo
+    if datos.laboratorio:
+        mapeo.laboratorio = datos.laboratorio or "Paititi"
+
     # Dirimencia: invalidar análisis previos vigentes del mismo lote
-    if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
-        previos = (
-            db.query(AnalisisLey)
-            .filter(
-                AnalisisLey.lote_id == mapeo.lote_id,
-                AnalisisLey.vigente == True,  # noqa: E712
-            )
-            .all()
-        )
-        for p in previos:
-            p.vigente = False
+    # if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
+    #     previos = (
+    #         db.query(AnalisisLey)
+    #         .filter(
+    #             AnalisisLey.lote_id == mapeo.lote_id,
+    #             AnalisisLey.vigente == True,  # noqa: E712
+    #         )
+    #         .all()
+    #     )
+    #     for p in previos:
+    #         p.vigente = False
 
     ley_final = _calcular_ley_final(datos.ley_fino, datos.ley_grueso)
     ley_gr_tm = _calcular_ley_gr_tm(ley_final)
@@ -380,17 +451,17 @@ def registrar_ley_por_ip(
         raise ValueError(f"Lote '{ip_lote}' no encontrado")
 
     # Dirimencia: invalidar todos los analisis previos vigentes del lote
-    if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
-        previos = (
-            db.query(AnalisisLey)
-            .filter(
-                AnalisisLey.lote_id == lote.id,
-                AnalisisLey.vigente == True,  # noqa: E712
-            )
-            .all()
-        )
-        for p in previos:
-            p.vigente = False
+    # if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
+    #     previos = (
+    #         db.query(AnalisisLey)
+    #         .filter(
+    #             AnalisisLey.lote_id == lote.id,
+    #             AnalisisLey.vigente == True,  # noqa: E712
+    #         )
+    #         .all()
+    #     )
+    #     for p in previos:
+    #         p.vigente = False
 
     ley_final = _calcular_ley_final(Decimal(str(datos.ley_fino)), Decimal(str(datos.ley_grueso)))
     ley_gr_tm = _calcular_ley_gr_tm(ley_final)
@@ -430,6 +501,10 @@ def registrar_analisis_recuperacion(
     if datos.ley_cola >= datos.ley_cabeza:
         raise ValueError("La ley cola debe ser estrictamente menor a la ley cabeza")
 
+    # Actualizar laboratorio destino en el mapeo
+    if datos.laboratorio:
+        mapeo.laboratorio = datos.laboratorio or "Paititi"
+
     nuevo = AnalisisRecuperacion(
         lote_id=mapeo.lote_id,
         cip=datos.cip,
@@ -460,7 +535,7 @@ def enviar_recuperacion_interna(
 ) -> AnalisisRecuperacion:
     """
     Comercial crea un registro PENDIENTE de recuperación para el laboratorio interno.
-    - Calcula snapshot de ley_cabeza (ley planta actual).
+    - Calcula snapshot de ley_cabeza (ley comercial actual).
     - Selecciona el CIP: si datos.cip es None, usa el único RecuperacionInterno del lote.
     - Falla si ya existe un pending vigente para ese CIP.
     """
@@ -468,9 +543,9 @@ def enviar_recuperacion_interna(
     if not lote:
         raise ValueError(f"Lote '{ip_lote}' no encontrado")
 
-    # Calcular ley planta (snapshot)
-    ley_planta = calcular_ley_planta(db, lote.id)
-    if ley_planta is None:
+    # Calcular ley comercial (snapshot)
+    ley_comercial = datos.ley_cabeza
+    if ley_comercial is None:
         raise ValueError(
             "El lote no tiene análisis de ley vigentes. "
             "No es posible determinar la ley cabeza para recuperación."
@@ -509,6 +584,8 @@ def enviar_recuperacion_interna(
     if datos.laboratorio:
         cip_obj.laboratorio = datos.laboratorio or "Paititi"
 
+    cip_obj.fecha_envio = date.today()
+
     # Verificar que no haya pending vigente para ese CIP
     pending_existente = (
         db.query(AnalisisRecuperacion)
@@ -529,7 +606,7 @@ def enviar_recuperacion_interna(
         lote_id=lote.id,
         cip=cip_obj.codigo_cip,
         laboratorio=datos.laboratorio,
-        ley_cabeza=ley_planta,  # snapshot: se congela aquí
+        ley_cabeza=ley_comercial,  # snapshot: se congela aquí
         ley_cola=None,
         ley_liquido=None,
         estado=EstadoRecuperacion.PENDIENTE,
@@ -619,7 +696,7 @@ def eliminar_analisis_ley(db: Session, analisis_id: int, usuario_id: int) -> Ana
     if a.eliminado:
         raise ValueError("El analisis ya esta eliminado")
     a.eliminado = True
-    a.eliminado_en = datetime.utcnow()
+    a.eliminado_en = datetime.now()
     a.eliminado_por = usuario_id
     # Si estaba vigente, marcarlo no vigente tambien para que no afecte calculos
     if a.vigente:
@@ -1007,7 +1084,7 @@ def generar_y_guardar_certificado_interno(db: Session, analisis_id: int, tipo: s
             raise ValueError("Análisis no encontrado")
         pdf_bytes = cert_svc.generar_certificado_recuperacion_cip_pdf(db, a.cip)
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()
     cip_str = (a.cip or "cert").replace("/", "_")
     carpeta = STORAGE_PATH / "certificados" / str(ahora.year) / f"{ahora.month:02d}"
     carpeta.mkdir(parents=True, exist_ok=True)
@@ -1068,14 +1145,14 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
     params: instancia de ParametrosComerciales (puede ser None → sin reglas).
-    Retorna dict con ley_comercial y breakdown para mostrar al Comercial.
 
     Reglas (en orden):
     1. Si ley_planta < lim_ley_comercial → restar dscto_ley_comercial
-    2. Si lim_ley_inferior y lim_ley_superior definidos:
-         Si ley_planta < lim_ley_inferior → usar lim_ley_inferior
-         Si ley_planta > lim_ley_superior → usar lim_ley_superior
-    3. Multiplicar por porcentaje_ley_comercial (e.g. 0.95 = 95%)
+    2. Multiplicar por porcentaje_ley_comercial (factor, ej. 0.940)
+
+    NOTA: lim_ley_inferior y lim_ley_superior NO se usan aquí para
+    clamping de ley. Esos campos determinan el % de recuperación
+    en liquidaciones (ver liquidaciones.py → _determinar_rec_liq).
     """
     if params is None:
         return {
@@ -1091,10 +1168,9 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
     q = Decimal("0.0001")
     ley = ley_planta
     descuento = Decimal("0")
-    ajuste_rango = False
     detalle_pasos = []
 
-    # Regla 1: descuento si ley < límite
+    # Regla 1: descuento si ley < límite comercial
     if params.lim_ley_comercial and params.dscto_ley_comercial:
         lim = Decimal(str(params.lim_ley_comercial))
         dscto = Decimal(str(params.dscto_ley_comercial))
@@ -1106,20 +1182,7 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
                 f"descuento {float(dscto):.4f} → {float(ley):.4f}"
             )
 
-    # Regla 2: ajuste a rango [inferior, superior]
-    if params.lim_ley_inferior and params.lim_ley_superior:
-        inf = Decimal(str(params.lim_ley_inferior))
-        sup = Decimal(str(params.lim_ley_superior))
-        if ley < inf:
-            ley = inf
-            ajuste_rango = True
-            detalle_pasos.append(f"Ley ajustada a minimo de rango: {float(inf):.4f}")
-        elif ley > sup:
-            ley = sup
-            ajuste_rango = True
-            detalle_pasos.append(f"Ley ajustada a maximo de rango: {float(sup):.4f}")
-
-    # Regla 3: factor porcentual
+    # Regla 2: factor porcentual aplicado a ley_planta (sin clamping de rango)
     factor = Decimal("1")
     if params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
@@ -1129,12 +1192,19 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
             f"Factor {float(factor):.3f}: {float(ley_antes):.4f} x {float(factor):.3f} = {float(ley):.4f}"
         )
 
+    # Check volado:
+    if ley < UMBRAL_VOLADO:
+        detalle_pasos.append(
+            f"Resultado {float(ley):.4f} < umbral volado {float(UMBRAL_VOLADO):.4f}: se marca como volado"
+        )
+        ley = Decimal("0")
+
     return {
         "ley_planta": float(ley_planta),
         "ley_comercial": float(ley),
         "descuento_aplicado": float(descuento),
         "factor_aplicado": float(factor),
-        "ajuste_rango": ajuste_rango,
+        "ajuste_rango": False,
         "sin_parametros": False,
         "detalle": " | ".join(detalle_pasos) if detalle_pasos else "Sin ajustes aplicados",
     }

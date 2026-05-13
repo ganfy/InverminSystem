@@ -2,11 +2,12 @@ from pydantic import BaseModel
 
 
 class DashboardKPIs(BaseModel):
-    au_real_100: float = 0.0
-    au_real_rec: float = 0.0
+    au_real_100: float = 0.0  # gr: Σ(TMS × ley_gr_tm)
+    au_real_rec: float = 0.0  # gr: Σ(TMS × ley_gr_tm × rec%)
     tmh_stock: float = 0.0
     tms_stock: float = 0.0
-    oz_stock: float = 0.0
+    oz_stock: float = 0.0  # oz totales: au_real_100 / 31.1035
+    oz_habilitados: float = 0.0  # oz de lotes habilitados_ruma sin asignar a ruma
 
 
 class LoteDashboard(BaseModel):
@@ -19,7 +20,13 @@ class LoteDashboard(BaseModel):
     ley_avg: float | None
     rec_porc: float | None
     acopiador: str | None
-    estado: str
+    estado: str  # ciclo de vida: RECEPCIONADO, ASIGNADO_RUMA, LIQUIDADO…
+    estado_analisis: str  # pipeline análisis: SIN_DATOS | EN_LAB | FALTA_REC | LISTO
+    habilitado_ruma: bool
+    volado: bool
+    dirimencia: bool
+    dias_almacen: int
+    tiene_rec_pendiente: bool = False
 
 
 class DashboardResponse(BaseModel):
