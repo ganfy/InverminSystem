@@ -336,7 +336,8 @@ const listaFiltrada = computed(() => {
 })
 
 const countLotesLiquidables = computed(() => {
-  return yaCargoLotes.value ? lotesLiquidables.value.length : (store.kpis?.lotes_liquidables ?? 0)
+  if (yaCargoLotes.value) return lotesLiquidables.value.length
+  return store.kpis?.lotes_liquidables ?? 0
 })
 
 const lotesAgrupados = computed<GrupoProvacop[]>(() => {
@@ -445,7 +446,15 @@ async function cambiarEstadoRapido(liq: LiquidacionResumenOut, nuevoEstado: stri
   })
   if (!ok) return
   const exito = await store.cambiarEstado(liq.id, nuevoEstado)
-  if (exito) ui.toast(`Estado actualizado a ${nuevoEstado}`, 'success')
+  if (exito) {
+    ui.toast(`Estado actualizado a ${nuevoEstado}`, 'success')
+    await store.cargarKPIs()
+    // Si ya cargamos lotes, refrescar también ese listado
+    if (yaCargoLotes.value) {
+      yaCargoLotes.value = false
+      await cargarLotesLiquidables()
+    }
+  }
   else ui.toast(store.error ?? 'Error al cambiar estado', 'error')
 }
 
@@ -474,7 +483,7 @@ onMounted(async () => {
   await cargarPrecioOro()
   await Promise.all([
     store.cargarLista(),
-    store.cargarKPIs(),
+    store.cargarLista().then(() => store.cargarKPIs())
   ])
 })
 </script>

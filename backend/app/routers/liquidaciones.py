@@ -95,7 +95,15 @@ def kpis(
     from app.models.models import SesionDescarga
 
     provacop_ids = [row[0] for row in db.query(SesionDescarga.provacop_id).distinct()]
-    lotes_liq = sum(len(svc.lotes_disponibles_para_liquidar(db, pid)) for pid in provacop_ids)
+    lotes_liq = sum(
+        sum(
+            1
+            for lot in svc.lotes_disponibles_para_liquidar(db, pid)
+            if lot.get("listo_para_liquidar")
+        )
+        for pid in provacop_ids
+    )
+
     return LiquidacionesKPIOut(
         borradores=borradores,
         generadas=generadas,

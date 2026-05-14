@@ -49,7 +49,6 @@ from app.schemas.liquidaciones import (
     LoteFinancieroOut,
 )
 from app.services.laboratorio import calcular_ley_comercial
-from app.services.pruebas import calcular_ley_planta
 from sqlalchemy.orm import Session, joinedload
 
 FACTOR = Decimal("1.1023")
@@ -129,6 +128,37 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
             AnalisisLey.vigente == True,  # noqa: E712
         )
         .order_by(AnalisisLey.id.desc())
+        .first()
+    )
+    return Decimal(str(a.ley_final)) if a and a.ley_final else None
+
+
+def _ley_base_planta(db: Session, lote_id: int) -> Decimal | None:
+    """Promedio de análisis planta/externo vigentes. No incluye dirimencia."""
+    analisis = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
+        )
+        .all()
+    )
+    if not analisis:
+        return None
+    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
+    return (total / len(analisis)).quantize(Decimal("0.0001"))
+
+
+def _ley_dirimencia_raw(db: Session, lote_id: int) -> Decimal | None:
+    """Ley final del análisis de dirimencia vigente, si existe."""
+    a = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.tipo_analisis == TipoAnalisis.DIRIMENCIA,
+            AnalisisLey.vigente == True,  # noqa: E712
+        )
         .first()
     )
     return Decimal(str(a.ley_final)) if a and a.ley_final else None
@@ -283,9 +313,11 @@ def _calcular_lote(
     )
     insumos = gasto_acopio + gasto_consumo
 
-    # ── Ley Planta ────────────────────────────────────────────────────────────
-    ley_planta = calcular_ley_planta(db, lote.id)
-    if ley_planta is None:
+    # ── Ley Base Planta (solo planta/externo) y dirimencia ───────────────────
+    ley_paititi_raw = _ley_base_planta(db, lote.id)
+    ley_dirim_raw = _ley_dirimencia_raw(db, lote.id)
+
+    if ley_paititi_raw is None and ley_dirim_raw is None:
         alertas.append(
             AlertaLote(
                 tipo="SIN_LEY_PLANTA",
@@ -295,7 +327,10 @@ def _calcular_lote(
         )
         return {}, alertas
 
-    # ── Ley Comercial (usa logica existente de laboratorio) ───────────────────
+    # ley_planta para snapshot: ley paititi base (o dirimencia como fallback)
+    ley_planta = ley_paititi_raw if ley_paititi_raw is not None else ley_dirim_raw
+
+    # ── Ley Comercial (parámetros aplicados a ley paititi) ───────────────────
     lc_result = calcular_ley_comercial(ley_planta, params)
     oz_tc_comercial = max(
         Decimal("0"),
@@ -320,12 +355,29 @@ def _calcular_lote(
             )
         )
 
-    # ── Promedio ──────────────────────────────────────────────────────────────
-    oz_promedio = (
-        ((oz_tc_comercial + oz_tc_minero) / 2).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
-        if oz_tc_minero
-        else oz_tc_comercial
-    )
+    # ── Promedio con lógica de dirimencia ────────────────────────────────────
+    # Sin dirimencia: promedio simple (paititi + minero) / 2
+    # Con dirimencia: clamp(dirimencia, min(paititi,minero), max(paititi,minero))
+    #   - dirimencia entre ambos  → se usa dirimencia directamente
+    #   - dirimencia > ley_minero → se usa ley_minero (cap)
+    #   - dirimencia < ley_paititi → se usa ley_paititi (piso)
+    if ley_dirim_raw is not None and oz_tc_minero:
+        lc_dir = calcular_ley_comercial(ley_dirim_raw, params)
+        oz_tc_dirimencia = max(
+            Decimal("0"),
+            Decimal(str(lc_dir["ley_comercial"])).quantize(Decimal("0.001"), rounding=ROUND_DOWN),
+        )
+        ley_low = min(oz_tc_comercial, oz_tc_minero)
+        ley_high = max(oz_tc_comercial, oz_tc_minero)
+        oz_promedio = max(ley_low, min(ley_high, oz_tc_dirimencia)).quantize(
+            Decimal("0.001"), rounding=ROUND_DOWN
+        )
+    elif oz_tc_minero:
+        oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(
+            Decimal("0.001"), rounding=ROUND_DOWN
+        )
+    else:
+        oz_promedio = oz_tc_comercial
 
     # ── Recuperacion ──────────────────────────────────────────────────────────
     if rec_liq_override is not None:
@@ -840,26 +892,45 @@ def lotes_disponibles_para_liquidar(
         pesaje = _pesaje_principal(db, lote.id)
 
         # ── Ley y recuperación ──────────────────────────────────────
-        ley_planta = calcular_ley_planta(db, lote.id)
-        oz_tc_planta = float(ley_planta) if ley_planta else None
+        ley_paititi_r = _ley_base_planta(db, lote.id)
+        ley_dirim_r = _ley_dirimencia_raw(db, lote.id)
+        oz_tc_planta = float(ley_paititi_r) if ley_paititi_r else None
         oz_tc_minero_val = _ley_minero(db, lote.id)
         oz_tc_minero = float(oz_tc_minero_val) if oz_tc_minero_val else None
         usa_dir = bool(lote.dirimencia)
 
-        if ley_planta is not None and not lote.volado and ley_planta < UMBRAL_VOLADO:
-            lote.volado = True
-            db.flush()
-
-        # Ley comercial: dirimencia > promedio planta+minero
-        ley_comercial = None
         params = lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
-        if lote.volado:
-            ley_comercial = Decimal("0")
-        elif usa_dir and ley_planta:
-            ley_comercial = oz_tc_planta
-        elif oz_tc_planta:
-            lc = calcular_ley_comercial(ley_planta, params)
-            ley_comercial = max(0.0, float(lc["ley_comercial"])) if lc else None
+        ley_comercial = None
+        ley_base = ley_paititi_r if ley_paititi_r is not None else ley_dirim_r
+
+        if ley_base is not None:
+            lc = calcular_ley_comercial(ley_base, params)
+            oz_com_paititi = Decimal(
+                str(max(0.0, float(lc["ley_comercial"])) if lc else 0)
+            ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+
+            # Auto-set volado basado en ley comercial paititi
+            if not lote.volado and oz_com_paititi < UMBRAL_VOLADO:
+                lote.volado = True
+                db.flush()
+
+            if lote.volado:
+                ley_comercial = Decimal("0")
+            elif ley_dirim_r is not None and oz_tc_minero_val:
+                # Dirimencia: clamp(dir, min(paititi,minero), max(paititi,minero))
+                lc_dir = calcular_ley_comercial(ley_dirim_r, params)
+                oz_dir = Decimal(
+                    str(max(0.0, float(lc_dir["ley_comercial"])) if lc_dir else 0)
+                ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+                ley_low = min(oz_com_paititi, oz_tc_minero_val)
+                ley_high = max(oz_com_paititi, oz_tc_minero_val)
+                ley_comercial = max(ley_low, min(ley_high, oz_dir))
+            elif oz_tc_minero_val:
+                ley_comercial = ((oz_com_paititi + oz_tc_minero_val) / 2).quantize(
+                    Decimal("0.001"), rounding=ROUND_DOWN
+                )
+            else:
+                ley_comercial = oz_com_paititi
 
         ley_comercial = (
             Decimal(str(ley_comercial)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)

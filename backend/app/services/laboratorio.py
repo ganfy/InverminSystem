@@ -1165,7 +1165,7 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
             "detalle": "Sin parametros comerciales configurados para este proveedor-acopiador",
         }
 
-    q = Decimal("0.0001")
+    q = Decimal("0.001")
     ley = ley_planta
     descuento = Decimal("0")
     detalle_pasos = []
