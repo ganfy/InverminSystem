@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.models.enums import TipoMuestra
 from app.models.models import (
+    AnalisisLey,
     AnalisisRecuperacion,
     Lote,
     MapeoCIP,
@@ -47,23 +48,9 @@ def _get_cips_recuperacion(db: Session, lote_id: int) -> list[MapeoCIP]:
 def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
     """
     Calcula ley planta = promedio de análisis de ley VIGENTES del lote.
-    Excluye tipo 'minero'. Si hay dirimencia, usa solo ese.
+    Excluye tipo 'minero'.
     Función compartida usada por pruebas y laboratorio.
     """
-    from app.models.models import AnalisisLey
-
-    dirimencia = (
-        db.query(AnalisisLey)
-        .filter(
-            AnalisisLey.lote_id == lote_id,
-            AnalisisLey.tipo_analisis == "dirimencia",
-            AnalisisLey.vigente == True,  # noqa: E712
-        )
-        .first()
-    )
-    if dirimencia:
-        return dirimencia.ley_final
-
     analisis = (
         db.query(AnalisisLey)
         .filter(
@@ -77,7 +64,7 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
         return None
 
     total = sum(a.ley_final for a in analisis if a.ley_final is not None)
-    return (total / len(analisis)).quantize(Decimal("0.0001"))
+    return (total / len(analisis)).quantize(Decimal("0.001"))
 
 
 # ── Lista principal ───────────────────────────────────────────────────────────

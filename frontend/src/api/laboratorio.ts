@@ -42,8 +42,13 @@ export interface GuardarCertResult {
 }
 
 export interface LeyComercialCalc {
-    ley_planta: number
-    ley_comercial: number
+    ley_planta: number              // base para factores = average(planta+externo)
+    ley_planta_solo: number | null  // solo lab propio — para display
+    ley_externo: number | null      // labs externos — para display
+    ley_comercial: number           // ley_base → factores aplicados
+    ley_minero: number | null
+    ley_promedio: number | null     // (comercial+minero)/2 o clamp dirimencia
+    tiene_dirimencia: boolean
     descuento_aplicado: number
     factor_aplicado: number
     ajuste_rango: boolean

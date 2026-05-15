@@ -357,13 +357,20 @@ def preview_ley_comercial(
     Calcula y devuelve la ley comercial del lote aplicando las reglas
     de parametros_comerciales del proveedor-acopiador.
     Solo visible para Comercial, Gerencia, Admin (pueden ver IP).
+
+    Desglose completo de leyes del lote:
+        ley_planta_solo : solo lab propio (tipo 'planta')
+        ley_externo     : labs externos (tipo 'externo')
+        ley_comercial   : average(planta, externo) → factores aplicados
+        ley_minero      : ley declarada por el minero
+        ley_promedio    : (comercial + minero) / 2, o clamp con dirimencia
     """
     lote = db.query(Lote).filter(Lote.ip == ip, ~Lote.eliminado).first()
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
-    ley_planta = calcular_ley_planta(db, lote.id)
-    if ley_planta is None:
+    ley_base = calcular_ley_planta(db, lote.id)
+    if ley_base is None:
         raise HTTPException(
             status_code=422, detail="Sin análisis de ley vigentes para calcular ley planta"
         )
@@ -374,7 +381,35 @@ def preview_ley_comercial(
     except AttributeError:
         params = None
 
-    return svc.calcular_ley_comercial(ley_planta, params)
+    result = svc.calcular_ley_comercial(ley_base, params)
+
+    ley_solo_planta = svc._ley_solo_planta(db, lote.id)
+    ley_externo = svc._ley_solo_externo(db, lote.id)
+    ley_minero = svc._ley_minero(db, lote.id)
+    ley_dirimencia = svc._ley_dirimencia(db, lote.id)
+
+    ley_comercial_dec = Decimal(str(result["ley_comercial"])).quantize(Decimal("0.001"))
+    ley_promedio: Decimal | None = None
+
+    if ley_minero is not None:
+        if ley_dirimencia is not None:
+            # Clamping
+            ley_low = min(ley_comercial_dec, Decimal(str(ley_minero)))
+            ley_high = max(ley_comercial_dec, Decimal(str(ley_minero)))
+            ley_promedio = max(min(ley_dirimencia, ley_high), ley_low)
+        else:
+            ley_promedio = (ley_comercial_dec + Decimal(str(ley_minero))) / 2
+
+        if ley_promedio is not None:
+            ley_promedio = ley_promedio.quantize(Decimal("0.001"))
+
+    result["ley_planta_solo"] = float(ley_solo_planta) if ley_solo_planta is not None else None
+    result["ley_externo"] = float(ley_externo) if ley_externo is not None else None
+    result["ley_minero"] = float(ley_minero) if ley_minero is not None else None
+    result["ley_promedio"] = float(ley_promedio) if ley_promedio is not None else None
+    result["tiene_dirimencia"] = ley_dirimencia is not None
+
+    return result
 
 
 @router.post(

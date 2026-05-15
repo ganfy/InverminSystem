@@ -73,6 +73,54 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
     return a.ley_final if a else None
 
 
+def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
+    """Solo análisis tipo 'planta' (lab propio). Para display."""
+    analisis = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipo_analisis == TipoAnalisis.PLANTA,
+        )
+        .all()
+    )
+    if not analisis:
+        return None
+    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
+    return (total / len(analisis)).quantize(Decimal("0.0001"))
+
+
+def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
+    """Solo análisis tipo 'externo'. Para display."""
+    analisis = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipo_analisis == TipoAnalisis.EXTERNO,
+        )
+        .all()
+    )
+    if not analisis:
+        return None
+    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
+    return (total / len(analisis)).quantize(Decimal("0.0001"))
+
+
+def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
+    """Ley del análisis de dirimencia vigente, si existe."""
+    a = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.tipo_analisis == TipoAnalisis.DIRIMENCIA,
+            AnalisisLey.vigente == True,  # noqa: E712
+        )
+        .first()
+    )
+    return Decimal(str(a.ley_final)) if a and a.ley_final else None
+
+
 def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
     """Batch lookup: {user_id: nombre_completo}"""
     if not ids:
@@ -1168,6 +1216,7 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
     q = Decimal("0.001")
     ley = ley_planta
     descuento = Decimal("0")
+    factor = Decimal("1")
     detalle_pasos = []
 
     # Regla 1: descuento si ley < límite comercial
@@ -1183,19 +1232,18 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
             )
 
     # Regla 2: factor porcentual aplicado a ley_planta (sin clamping de rango)
-    factor = Decimal("1")
-    if params.porcentaje_ley_comercial:
+    elif params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
         ley_antes = ley
         ley = (ley * factor).quantize(q, rounding=ROUND_HALF_UP)
         detalle_pasos.append(
-            f"Factor {float(factor):.3f}: {float(ley_antes):.4f} x {float(factor):.3f} = {float(ley):.4f}"
+            f"Factor {float(factor):.3f}: {float(ley_antes):.3f} x {float(factor):.3f} = {float(ley):.3f}"
         )
 
     # Check volado:
     if ley < UMBRAL_VOLADO:
         detalle_pasos.append(
-            f"Resultado {float(ley):.4f} < umbral volado {float(UMBRAL_VOLADO):.4f}: se marca como volado"
+            f"Resultado {float(ley):.3f} < umbral volado {float(UMBRAL_VOLADO):.4f}: se marca como volado"
         )
         ley = Decimal("0")
 

@@ -53,3 +53,5 @@ BalanzaAgent.spec
 
 app-balanza
 storage
+
+*.bat

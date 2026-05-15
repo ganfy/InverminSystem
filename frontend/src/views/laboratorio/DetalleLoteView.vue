@@ -43,18 +43,6 @@
             <span class="di-label">MATERIAL:</span>
             <span class="di-value">{{ lote.material ?? '-' }}</span>
           </div>
-          <div class="detalle-item" v-if="lote.ley_planta != null">
-            <span class="di-label">LEY PLANTA (promedio):</span>
-            <span class="di-value" style="color:var(--color-gold);font-family:var(--font-mono)">
-              {{ Number(lote.ley_planta).toFixed(4) }} oz/TC
-            </span>
-          </div>
-          <div class="detalle-item" v-if="lote.ley_minero != null">
-            <span class="di-label">LEY MINERO:</span>
-            <span class="di-value" style="font-family:var(--font-mono)">
-              {{ Number(lote.ley_minero).toFixed(4) }} oz/TC
-            </span>
-          </div>
         </div>
 
         <div v-if="lote.tiene_dirimencia" class="dirimencia-alert" style="margin-top:0.75rem">
@@ -177,31 +165,76 @@
 
           <template v-else-if="leyComercialCalc">
             <div class="lc-grid">
+              <!-- Ley Planta — solo lab propio -->
               <div class="lc-item">
-                <span class="lc-label">LEY PLANTA (vigentes seleccionados):</span>
+                <span class="lc-label">
+                  LEY PLANTA
+                  <span style="font-size:0.7rem;color:var(--color-text-faint)">(lab propio)</span>
+                  <span v-if="excluidos.size > 0" class="badge-simulando" style="margin-left:0.4rem;font-size:0.6rem">SIM</span>
+                </span>
                 <span class="lc-valor mono" :class="{ gold: excluidos.size === 0 }">
-                  {{ leyPlantaSimulada != null ? Number(leyPlantaSimulada).toFixed(4) : '-' }} oz/TC
-                  <span v-if="excluidos.size > 0 && lote.ley_planta != null"
+                  {{ leyPlantaSoloSimulada != null ? Number(leyPlantaSoloSimulada).toFixed(4) : '-' }} oz/TC
+                  <span v-if="excluidos.size > 0 && leyComercialCalc?.ley_planta_solo != null"
                     style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.35rem">
-                    (antes: {{ Number(lote.ley_planta).toFixed(4) }})
+                    (antes: {{ Number(leyComercialCalc.ley_planta_solo).toFixed(4) }})
                   </span>
                 </span>
               </div>
-              <div class="lc-item" v-if="lote.ley_minero">
-                <span class="lc-label">LEY MINERO:</span>
-                <span class="lc-valor mono">{{ Number(lote.ley_minero).toFixed(4) }} oz/TC</span>
+
+              <!-- Ley Externo — labs externos (si hay) -->
+              <div class="lc-item" v-if="leyComercialCalc?.ley_externo != null">
+                <span class="lc-label">
+                  LEY EXTERNO
+                  <span style="font-size:0.7rem;color:var(--color-text-faint)">(labs externos)</span>
+                </span>
+                <span class="lc-valor mono">{{ Number(leyComercialCalc.ley_externo).toFixed(4) }} oz/TC</span>
               </div>
+
+              <div v-if="leyComercialCalc?.ley_externo != null"
+                style="grid-column:1/-1;border-top:1px dashed var(--color-border);opacity:0.4;margin:0.1rem 0" />
+
+              <!-- Ley Comercial -->
               <div class="lc-item">
-                <span class="lc-label">LEY COMERCIAL (a entregar):</span>
+                <span class="lc-label">
+                  LEY COMERCIAL
+                  <span style="font-size:0.7rem;color:var(--color-text-faint)">(a entregar)</span>
+                </span>
                 <span class="lc-valor mono gold">{{ leyComercialCalc.ley_comercial.toFixed(4) }} oz/TC</span>
               </div>
+
               <div class="lc-item" v-if="leyComercialCalc.descuento_aplicado">
                 <span class="lc-label">DESCUENTO APLICADO:</span>
                 <span class="lc-valor mono">- {{ leyComercialCalc.descuento_aplicado.toFixed(4) }}</span>
               </div>
               <div class="lc-item" v-if="leyComercialCalc.factor_aplicado !== 1">
                 <span class="lc-label">FACTOR:</span>
-                <span class="lc-valor mono"> x {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
+                <span class="lc-valor mono">× {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
+              </div>
+
+              <!-- Ley Minero -->
+              <div class="lc-item" v-if="leyComercialCalc?.ley_minero != null">
+                <span class="lc-label">LEY MINERO:</span>
+                <span class="lc-valor mono">{{ Number(leyComercialCalc.ley_minero).toFixed(4) }} oz/TC</span>
+              </div>
+
+              <div v-if="leyComercialCalc?.ley_promedio != null"
+                style="grid-column:1/-1;border-top:1px solid var(--color-border);opacity:0.5;margin:0.1rem 0" />
+
+              <!-- Ley Promedio — resultado final para liquidación -->
+              <div class="lc-item" v-if="leyComercialCalc?.ley_promedio != null">
+                <span class="lc-label">
+                  LEY PROMEDIO
+                  <span v-if="leyComercialCalc.tiene_dirimencia"
+                    style="font-size:0.7rem;color:var(--color-warning);margin-left:0.3rem">
+                    (clamp dirimencia)
+                  </span>
+                  <span v-else style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.3rem">
+                    (comercial + minero) / 2
+                  </span>
+                </span>
+                <span class="lc-valor mono" style="color:var(--color-gold);font-weight:700;font-size:1.05em">
+                  {{ Number(leyComercialCalc.ley_promedio).toFixed(4) }} oz/TC
+                </span>
               </div>
             </div>
 
@@ -269,7 +302,10 @@
                 de la ley de planta, se habilitará la solicitud de dirimencia.
               </p>
               <div class="field" style="margin-bottom:0.75rem">
-                <label class="field-label">CERTIFICADO (opcional — pre-llena los campos)</label>
+                <label class="field-label">
+                  CERTIFICADO
+                  <span style="font-weight:400;opacity:.65;margin-left:0.3rem">(opcional — pre-llena los campos)</span>
+                </label>
                 <label
                   class="upload-zone-sm"
                   :class="{ uploading: extrayendoMinero }"
@@ -288,20 +324,36 @@
                   {{ errOcrMinero }}
                 </p>
               </div>
-              <div class="field">
+              <div class="field" style="margin-bottom:0.75rem">
                 <label class="field-label">LABORATORIO / ORIGEN</label>
-                <input class="field-input" v-model="formLeyMinero.laboratorio" placeholder="Ej: Laboratorio del Minero" />
+                <input class="field-input" v-model="formLeyMinero.laboratorio"
+                  placeholder="Ej: Laboratorio del Minero" />
               </div>
-              <div class="form-grid" style="grid-template-columns:1fr 1fr">
+
+              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
                 <div class="field">
                   <label class="field-label">LEY FINO (Oz/TC)</label>
-                  <input type="number" class="field-input" v-model.number="formLeyMinero.ley_fino" step="0.0001" placeholder="0.0000" />
+                  <input type="number" class="field-input" style="font-family:var(--font-mono)"
+                    v-model.number="formLeyMinero.ley_fino" step="0.0001" min="0" placeholder="0.0000" />
                 </div>
                 <div class="field">
                   <label class="field-label">LEY GRUESO (Oz/TC)</label>
-                  <input type="number" class="field-input" v-model.number="formLeyMinero.ley_grueso" step="0.0001" placeholder="0.0000" />
+                  <input type="number" class="field-input" style="font-family:var(--font-mono)"
+                    v-model.number="formLeyMinero.ley_grueso" step="0.0001" min="0" placeholder="0.0000" />
                 </div>
               </div>
+
+              <div
+                v-if="(formLeyMinero.ley_fino || 0) + (formLeyMinero.ley_grueso || 0) > 0"
+                style="background:var(--color-bg-alt);border:1px solid var(--color-border);border-radius:6px;
+                      padding:0.5rem 0.75rem;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center"
+              >
+                <span style="font-size:0.78rem;color:var(--color-text-muted)">LEY CALCULADA (fino + grueso):</span>
+                <span style="font-family:var(--font-mono);color:var(--color-gold);font-weight:600">
+                  {{ ((formLeyMinero.ley_fino || 0) + (formLeyMinero.ley_grueso || 0)).toFixed(4) }} oz/TC
+                </span>
+              </div>
+
               <div class="field">
                 <label class="field-label">FECHA ANÁLISIS</label>
                 <input type="date" class="field-input" v-model="formLeyMinero.fecha_analisis" />
@@ -309,7 +361,11 @@
             </div>
             <div class="modal-footer">
               <button class="btn-secondary" @click="modalLeyMinero = false">Cancelar</button>
-              <button class="btn-primary" @click="guardarLeyMinero" :disabled="guardandoLeyMinero || extrayendoMinero">
+              <button
+                class="btn-primary"
+                :disabled="!formLeyMinero.fecha_analisis || formLeyMinero.ley_fino == null || formLeyMinero.ley_grueso == null || guardandoLeyMinero"
+                @click="guardarLeyMinero"
+              >
                 <span v-if="guardandoLeyMinero" class="spinner" style="margin-right:0.4rem"></span>
                 Guardar Ley Minero
               </button>
@@ -695,13 +751,25 @@ function toggleExcluido(id: number) {
   excluidos.value = s
 }
 
+// Simula ley_planta_solo (solo tipo 'planta') para display con exclusiones
+const leyPlantaSoloSimulada = computed<number | null>(() => {
+  if (!lote.value) return null
+  if (excluidos.value.size === 0)
+    return leyComercialCalc.value?.ley_planta_solo ?? null
+  const vigentes = lote.value.analisis_ley.filter(
+    a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
+      && a.tipo_analisis === 'planta',
+  )
+  if (vigentes.length === 0) return null
+  const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
+  return parseFloat(prom.toFixed(4))
+})
+
+// Base para deshabilitar botones: average(planta+externo)
 const leyPlantaSimulada = computed<number | null>(() => {
   if (!lote.value) return null
-  // Sin exclusiones locales → usar el valor calculado por el servidor (incluye dirimencia)
-  if (excluidos.value.size === 0) {
+  if (excluidos.value.size === 0)
     return lote.value.ley_planta != null ? Number(lote.value.ley_planta) : null
-  }
-  // Simulación: recalcular excluyendo los marcados localmente (solo planta/externo)
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
       && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo'),
