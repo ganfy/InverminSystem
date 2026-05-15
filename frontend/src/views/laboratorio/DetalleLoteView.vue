@@ -299,8 +299,10 @@
             <div class="modal-body">
               <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem">
                 Ley declarada por el proveedor. Si difiere más de 0.10 oz/TC
-                de la ley de planta, se habilitará la solicitud de dirimencia.
+                de la ley comercial, se habilitará la solicitud de dirimencia.
               </p>
+
+              <!-- Certificado opcional -->
               <div class="field" style="margin-bottom:0.75rem">
                 <label class="field-label">
                   CERTIFICADO
@@ -309,7 +311,8 @@
                 <label
                   class="upload-zone-sm"
                   :class="{ uploading: extrayendoMinero }"
-                  style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 0.75rem;border:1px dashed var(--color-border);border-radius:6px;cursor:pointer"
+                  style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 0.75rem;
+                        border:1px dashed var(--color-border);border-radius:6px;cursor:pointer"
                 >
                   <span v-if="extrayendoMinero" class="spinner"></span>
                   <span v-else-if="archivoMinero" style="color:var(--color-success);font-size:0.82rem">
@@ -324,36 +327,95 @@
                   {{ errOcrMinero }}
                 </p>
               </div>
+
+              <!-- Laboratorio con autocomplete -->
               <div class="field" style="margin-bottom:0.75rem">
                 <label class="field-label">LABORATORIO / ORIGEN</label>
-                <input class="field-input" v-model="formLeyMinero.laboratorio"
-                  placeholder="Ej: Laboratorio del Minero" />
+                <input
+                  class="field-input"
+                  v-model="formLeyMinero.laboratorio"
+                  list="labs-minero-list"
+                  placeholder="Ej: Laboratorio del Minero"
+                  autocomplete="off"
+                />
+                <datalist id="labs-minero-list">
+                  <option v-for="lab in labsConocidos" :key="lab" :value="lab" />
+                </datalist>
               </div>
 
-              <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
-                <div class="field">
-                  <label class="field-label">LEY FINO (Oz/TC)</label>
-                  <input type="number" class="field-input" style="font-family:var(--font-mono)"
-                    v-model.number="formLeyMinero.ley_fino" step="0.0001" min="0" placeholder="0.0000" />
+              <!-- Toggle: modo de ingreso -->
+              <div style="display:flex;gap:0;margin-bottom:0.75rem;border:1px solid var(--color-border);border-radius:6px;overflow:hidden">
+                <button
+                  type="button"
+                  class="btn-toggle-tab"
+                  :class="{ active: !formLeyMinero.modoFinal }"
+                  style="flex:1;padding:0.45rem;font-size:0.78rem;border:none;cursor:pointer;
+                        background:transparent;transition:background .15s"
+                  @click="toggleModoFinal(false)"
+                >
+                  Fino + Grueso
+                </button>
+                <button
+                  type="button"
+                  class="btn-toggle-tab"
+                  :class="{ active: formLeyMinero.modoFinal }"
+                  style="flex:1;padding:0.45rem;font-size:0.78rem;border:none;border-left:1px solid var(--color-border);
+                        cursor:pointer;background:transparent;transition:background .15s"
+                  @click="toggleModoFinal(true)"
+                >
+                  Solo Ley Final
+                </button>
+              </div>
+
+              <!-- Modo: Fino + Grueso -->
+              <template v-if="!formLeyMinero.modoFinal">
+                <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+                  <div class="field">
+                    <label class="field-label">LEY FINO — malla -140 (Oz/TC)</label>
+                    <input type="number" class="field-input" style="font-family:var(--font-mono)"
+                      v-model.number="formLeyMinero.ley_fino"
+                      step="0.0001" min="0" placeholder="0.0000" />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">LEY GRUESO — malla +140 (Oz/TC)</label>
+                    <input type="number" class="field-input" style="font-family:var(--font-mono)"
+                      v-model.number="formLeyMinero.ley_grueso"
+                      step="0.0001" min="0" placeholder="0.0000" />
+                  </div>
                 </div>
-                <div class="field">
-                  <label class="field-label">LEY GRUESO (Oz/TC)</label>
-                  <input type="number" class="field-input" style="font-family:var(--font-mono)"
-                    v-model.number="formLeyMinero.ley_grueso" step="0.0001" min="0" placeholder="0.0000" />
+
+                <!-- Preview ley_final calculada -->
+                <div
+                  v-if="formLeyMinero.ley_final != null"
+                  style="background:var(--color-bg-alt);border:1px solid var(--color-border);border-radius:6px;
+                        padding:0.5rem 0.75rem;margin-bottom:0.75rem;display:flex;
+                        justify-content:space-between;align-items:center"
+                >
+                  <span style="font-size:0.78rem;color:var(--color-text-muted)">LEY FINAL (fino + grueso):</span>
+                  <span style="font-family:var(--font-mono);color:var(--color-gold);font-weight:600">
+                    {{ formLeyMinero.ley_final.toFixed(4) }} oz/TC
+                  </span>
                 </div>
-              </div>
+              </template>
 
-              <div
-                v-if="(formLeyMinero.ley_fino || 0) + (formLeyMinero.ley_grueso || 0) > 0"
-                style="background:var(--color-bg-alt);border:1px solid var(--color-border);border-radius:6px;
-                      padding:0.5rem 0.75rem;margin-bottom:0.75rem;display:flex;justify-content:space-between;align-items:center"
-              >
-                <span style="font-size:0.78rem;color:var(--color-text-muted)">LEY CALCULADA (fino + grueso):</span>
-                <span style="font-family:var(--font-mono);color:var(--color-gold);font-weight:600">
-                  {{ ((formLeyMinero.ley_fino || 0) + (formLeyMinero.ley_grueso || 0)).toFixed(4) }} oz/TC
-                </span>
-              </div>
+              <!-- Modo: Solo Ley Final -->
+              <template v-else>
+                <div class="field" style="margin-bottom:0.75rem">
+                  <label class="field-label">LEY FINAL (Oz/TC)</label>
+                  <input
+                    type="number"
+                    class="field-input"
+                    style="font-family:var(--font-mono);font-size:1.05em"
+                    v-model.number="formLeyMinero.ley_final"
+                    step="0.0001" min="0" placeholder="0.0000"
+                  />
+                  <p style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.3rem">
+                    Se registrará como ley_fino = ley_final, ley_grueso = 0.
+                  </p>
+                </div>
+              </template>
 
+              <!-- Fecha -->
               <div class="field">
                 <label class="field-label">FECHA ANÁLISIS</label>
                 <input type="date" class="field-input" v-model="formLeyMinero.fecha_analisis" />
@@ -1066,9 +1128,38 @@ const formLeyMinero = ref({
   laboratorio:    '',
   ley_fino:       null as number | null,
   ley_grueso:     null as number | null,
+  ley_final:      null as number | null,
+  modoFinal:      false,
   fecha_analisis: new Date().toISOString().split('T')[0],
 })
 
+const labsConocidos = computed<string[]>(() => {
+  if (!lote.value) return []
+  const nombres = lote.value.analisis_ley
+    .map(a => a.laboratorio)
+    .filter((l): l is string => !!l)
+  return [...new Set(nombres)]
+})
+
+
+// Auto-calcular ley_final cuando cambian fino o grueso
+watch(
+  () => [formLeyMinero.value.ley_fino, formLeyMinero.value.ley_grueso],
+  ([fino, grueso]) => {
+    if (formLeyMinero.value.modoFinal) return
+    if (fino != null && grueso != null)
+      formLeyMinero.value.ley_final = parseFloat((fino + grueso).toFixed(4))
+    else
+      formLeyMinero.value.ley_final = null
+  },
+)
+
+function toggleModoFinal(val: boolean) {
+  formLeyMinero.value.modoFinal = val
+  formLeyMinero.value.ley_final = null
+  formLeyMinero.value.ley_fino = null
+  formLeyMinero.value.ley_grueso = null
+}
 async function extraerCertMinero(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -1083,6 +1174,13 @@ async function extraerCertMinero(e: Event) {
     if (res.laboratorio && !formLeyMinero.value.laboratorio) formLeyMinero.value.laboratorio = res.laboratorio
     if (!res.ley_fino && !res.ley_grueso)
       errOcrMinero.value = 'No se pudieron extraer las leyes. Ingrese los valores manualmente.'
+    // Si el cert solo trajo ley_final (sin fino/grueso), cambiar a modoFinal
+    if (res.ley_fino == null && res.ley_grueso == null && res.ley_final != null) {
+      formLeyMinero.value.modoFinal  = true
+      formLeyMinero.value.ley_final  = res.ley_final
+    }
+    if (!res.ley_fino && !res.ley_grueso && !res.ley_final)
+      errOcrMinero.value = 'No se pudieron extraer las leyes. Ingrese los valores manualmente.'
   } catch {
     errOcrMinero.value = 'Error al procesar el certificado. Ingrese los valores manualmente.'
   } finally {
@@ -1094,16 +1192,30 @@ async function guardarLeyMinero() {
   if (!formLeyMinero.value.laboratorio.trim()) {
     ui.toast('Ingrese el nombre del laboratorio o minero', 'error'); return
   }
-  if (formLeyMinero.value.ley_fino == null || formLeyMinero.value.ley_grueso == null) {
-    ui.toast('Ingrese ambas leyes (fino y grueso)', 'error'); return
+
+  let ley_fino: number
+  let ley_grueso: number
+
+  if (formLeyMinero.value.modoFinal) {
+    if (!formLeyMinero.value.ley_final) {
+      ui.toast('Ingrese la ley final', 'error'); return
+    }
+    ley_fino   = formLeyMinero.value.ley_final   // ley_final = ley_fino + 0
+    ley_grueso = 0
+  } else {
+    if (formLeyMinero.value.ley_fino == null || formLeyMinero.value.ley_grueso == null) {
+      ui.toast('Ingrese ambas leyes (fino y grueso)', 'error'); return
+    }
+    ley_fino   = formLeyMinero.value.ley_fino
+    ley_grueso = formLeyMinero.value.ley_grueso
   }
   guardandoLeyMinero.value = true
   try {
     const nuevo = await laboratorioApi.registrarLeyPorIP(ipActual, {
       tipo_analisis:  'minero',
       laboratorio:    formLeyMinero.value.laboratorio,
-      ley_fino:       formLeyMinero.value.ley_fino,
-      ley_grueso:     formLeyMinero.value.ley_grueso,
+      ley_fino,
+      ley_grueso,
       fecha_analisis: formLeyMinero.value.fecha_analisis,
     })
     if (archivoMinero.value) await laboratorioApi.subirCertificadoLey(nuevo.id, archivoMinero.value)
@@ -1279,6 +1391,15 @@ onMounted(async () => {
 }
 .btn-excluir-sm--activo {
   background: rgba(239,68,68,0.12); color: #f87171; border-color: rgba(239,68,68,0.3);
+}
+
+.btn-toggle-tab {
+  color: var(--color-text-muted);
+}
+.btn-toggle-tab.active {
+  background: var(--color-primary-muted, color-mix(in srgb, var(--color-gold) 15%, transparent));
+  color: var(--color-gold);
+  font-weight: 600;
 }
 
 .link-cert { font-size: 0.75rem; color: var(--color-gold); text-decoration: underline; cursor: pointer; }
