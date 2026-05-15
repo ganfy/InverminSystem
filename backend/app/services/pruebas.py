@@ -160,6 +160,8 @@ def registrar_prueba(
                 f"Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
             )
 
+    datos.fecha_ingreso = datetime.now()
+
     prueba_existente = (
         db.query(PruebaMetalurgica)
         .filter(PruebaMetalurgica.lote_id == lote.id)
