@@ -76,6 +76,27 @@ export interface SyncResultado {
     error: string | null
 }
 
+export interface AnalisisAgCreate {
+    au_ag_mg: number
+    au_mg: number
+    peso_muestra: number
+    laboratorio: string
+    fecha_analisis?: string | null
+}
+
+export interface AnalisisAgOut {
+    id: number
+    lote_id: number
+    lote_ip: string | null
+    laboratorio: string
+    ley_ag_gr_tm: number
+    ley_ag_oz_tc: number
+    fecha_analisis: string | null
+    vigente: boolean
+    creado_por: number
+    creado_en: string
+}
+
 export const laboratorioApi = {
 
     // ── Vista por CIP (Laboratorista + Comercial) ─────────────────────────────
@@ -98,6 +119,11 @@ export const laboratorioApi = {
     // ── Análisis de Ley ───────────────────────────────────────────────────────
     async registrarLey(datos: AnalisisLeyCreate): Promise<AnalisisLeyOut> {
         const { data } = await api.post('/laboratorio/ley', datos)
+        return data
+    },
+
+    async registrarLeyAg(analisisId: number, datos: AnalisisAgCreate): Promise<AnalisisAgOut> {
+        const { data } = await api.post(`/laboratorio/ley/${analisisId}/ag`, datos)
         return data
     },
 

@@ -13,6 +13,7 @@ export interface LiquidacionPreviewRequest {
     provacop_id: number
     lotes: LotePreviewInput[]
     spot_usd: number
+    spot_ag_usd?: number | null
     fecha_liquidacion?: string | null
 }
 
@@ -20,6 +21,7 @@ export interface LiquidacionCreate {
     provacop_id: number
     lotes: LotePreviewInput[]
     spot_usd: number
+    spot_ag_usd?: number | null
     fecha_liquidacion?: string | null
     numero_liquidacion?: string | null
     como_borrador?: boolean
@@ -63,6 +65,12 @@ export interface LoteFinancieroOut {
     fino_recuperable: number
     usa_dirimencia: boolean
     alertas: AlertaLote[]
+    // Plata (Ag) — opcionales
+    ley_ag_gr_tm?: number | null
+    ley_ag_oz_tc?: number | null
+    spot_ag_usd?: number | null
+    valor_ag_usd?: number | null
+    aplica_ag?: boolean
 }
 
 export interface LiquidacionPreviewOut {
@@ -79,6 +87,8 @@ export interface LiquidacionPreviewOut {
     count_lotes: number
     alertas_globales: AlertaLote[]
     puede_generar: boolean
+    total_ag_usd: number
+    hay_ag: boolean
 }
 
 export interface LoteDisponible {

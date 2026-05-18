@@ -48,7 +48,7 @@ from app.schemas.liquidaciones import (
     LiquidacionResumenOut,
     LoteFinancieroOut,
 )
-from app.services.laboratorio import calcular_ley_comercial
+from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
 from sqlalchemy.orm import Session, joinedload
 
 FACTOR = Decimal("1.1023")
@@ -85,9 +85,6 @@ def _calc_precio_x_tms(
     """col AB del Excel: ((oz*rec/100*(spot-riesgo)) - maquila - insumos + bono) * factor"""
     val_1 = oz_promedio * rec_liq / 100 * (spot - riesgo)
     val = val_1 - maquila - insumos + bono
-    print(
-        f"Debug: Precio x TMS - oz: {oz_promedio}, rec_liq: {rec_liq}, spot: {spot}, riesgo: {riesgo}, maquila: {maquila}, insumos: {insumos}, bono: {bono} => valor antes de factor: {val}, {val_1=}"
-    )
     return (val * FACTOR).quantize(Decimal("0.0001"))
 
 
@@ -257,6 +254,7 @@ def _calcular_lote(
     rec_liq_override: Decimal | None,
     gasto_acopio_override: Decimal | None = None,
     gasto_consumo_override: Decimal | None = None,
+    spot_ag_usd: Decimal | None = None,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
@@ -404,6 +402,39 @@ def _calcular_lote(
     total_usd = _calc_total(precio_x_tms, tms)
     fino_recuperable = _calc_fino_recuperable(tms, rec_liq, oz_promedio)
 
+    # ── Plata (Ag) ────────────────────────────────────────────────────────────
+    # Parámetros contractuales (todos deben estar presentes para pagar Ag)
+    ag_result = obtener_ley_ag_vigente(db, lote.id)
+    ley_ag_gr_tm: Decimal | None = None
+    ley_ag_oz_tc: Decimal | None = None
+    valor_ag_usd = Decimal("0")
+    aplica_ag = False
+
+    umbral_ag = Decimal(str(params.umbral_ag_oz_tc)) if params and params.umbral_ag_oz_tc else None
+    rec_ag = Decimal(str(params.rec_ag_pct)) if params and params.rec_ag_pct else None
+    dscto_ag = (
+        Decimal(str(params.descuento_ag_usd))
+        if params and params.descuento_ag_usd is not None
+        else None
+    )
+
+    params_ag_completos = all(v is not None for v in (umbral_ag, rec_ag, dscto_ag))
+
+    if ag_result is not None and params_ag_completos and spot_ag_usd:
+        ley_ag_gr_tm, ley_ag_oz_tc = ag_result
+        if ley_ag_oz_tc >= umbral_ag:
+            # oz_ag_pagables = TMS × ley_ag_oz_tc × (rec_ag / 100)
+            oz_ag_pagables = (tms * ley_ag_oz_tc * rec_ag / 100).quantize(
+                Decimal("0.0001"), rounding=ROUND_HALF_UP
+            )
+            precio_neto_ag = spot_ag_usd - dscto_ag
+            if precio_neto_ag > 0:
+                valor_ag_usd = (oz_ag_pagables * precio_neto_ag).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                aplica_ag = True
+        # ley_ag_gr_tm se expone siempre que exista análisis (para mostrar en UI aunque no se pague)
+
     # ── Alertas no criticas ───────────────────────────────────────────────────
     if lote.volado:
         dias = (date.today() - fecha_rec).days if fecha_rec else 0
@@ -451,6 +482,12 @@ def _calcular_lote(
         "fino_recuperable": fino_recuperable,
         "usa_dirimencia": lote.dirimencia,
         "alertas": alertas,
+        # Ag
+        "ley_ag_gr_tm": ley_ag_gr_tm if aplica_ag else None,
+        "ley_ag_oz_tc": ley_ag_oz_tc if aplica_ag else None,
+        "spot_ag_usd": spot_ag_usd if aplica_ag else None,
+        "valor_ag_usd": valor_ag_usd if aplica_ag else None,
+        "aplica_ag": aplica_ag,
         # campos para el modelo LiquidacionLote
         "tms_snapshot": tms,
         "tmh_snapshot": tmh,
@@ -529,6 +566,7 @@ def preview_liquidacion(
             item.rec_liq_override,
             item.gasto_acopio_override,
             item.gasto_consumo_override,
+            spot_ag_usd=req.spot_ag_usd,
         )
 
         if alertas:
@@ -553,6 +591,7 @@ def preview_liquidacion(
     total_tms = sum(lo.tms for lo in lotes_out)
     total_tmh = sum(lo.tmh for lo in lotes_out)
     total_oz = sum(lo.fino_recuperable for lo in lotes_out)
+    total_ag = sum((lo.valor_ag_usd or Decimal("0")) for lo in lotes_out)
 
     return LiquidacionPreviewOut(
         provacop_id=req.provacop_id,
@@ -568,6 +607,8 @@ def preview_liquidacion(
         count_lotes=len(lotes_out),
         alertas_globales=alertas_globales,
         puede_generar=puede_generar and bool(lotes_out),
+        total_ag_usd=total_ag,
+        hay_ag=total_ag > 0,
     )
 
 
@@ -615,7 +656,14 @@ def crear_liquidacion(
             raise ValueError(f"Lote {item.ip} no encontrado")
 
         snap, alertas = _calcular_lote(
-            db, lote, req.spot_usd, item.bono or Decimal("0"), item.rec_liq_override
+            db,
+            lote,
+            req.spot_usd,
+            item.bono or Decimal("0"),
+            item.rec_liq_override,
+            item.gasto_acopio_override,
+            item.gasto_consumo_override,
+            spot_ag_usd=req.spot_ag_usd,
         )
 
         if any(a.critico for a in alertas):
@@ -649,6 +697,9 @@ def crear_liquidacion(
             tmh_snapshot=snap["tmh"],
             humedad_snapshot=snap["pct_humedad"],
             sacos_snapshot=snap["sacos"],
+            ley_ag_gr_tm_snapshot=snap.get("ley_ag_gr_tm"),
+            spot_ag_snapshot=snap.get("spot_ag_usd"),
+            valor_ag_usd=snap.get("valor_ag_usd"),
             creado_por=usuario_id,
         )
         db.add(ll)
@@ -726,6 +777,19 @@ def cambiar_estado(
     if nuevo_estado == EstadoLiquidacion.PAGADA:
         liq.cerrado_por = usuario_id
         liq.fecha_cierre = datetime.now()
+
+    # Actualizar estado de lotes
+    for ll in liq.liquidacion_lotes:
+        lote = ll.lote
+        if lote:
+            if nuevo_estado == EstadoLiquidacion.FACTURADA:
+                lote.estado = EstadoLote.FACTURADO
+                lote.estado_modificado_por = usuario_id
+                lote.fecha_modificacion_estado = datetime.now()
+            elif nuevo_estado == EstadoLiquidacion.PAGADA:
+                lote.estado = EstadoLote.PAGADO
+                lote.estado_modificado_por = usuario_id
+                lote.fecha_modificacion_estado = datetime.now()
 
     db.commit()
     db.refresh(liq)
@@ -823,6 +887,10 @@ def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
         fino_recuperable=ll.fino_recuperable or Decimal("0"),
         usa_dirimencia=ll.usa_dirimencia or False,
         alertas=[],
+        ley_ag_gr_tm=ll.ley_ag_gr_tm_snapshot,
+        spot_ag_usd=ll.spot_ag_snapshot,
+        valor_ag_usd=ll.valor_ag_usd,
+        aplica_ag=bool(ll.valor_ag_usd and ll.valor_ag_usd > 0),
     )
 
 

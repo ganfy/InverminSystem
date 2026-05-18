@@ -309,6 +309,75 @@
                   </div>
                 </div>
               </div>
+
+              <!-- ─── Parámetros Plata (Ag) ───────────────────── -->
+              <div class="params-grupo params-grupo--ag">
+                <p class="params-grupo-titulo">
+                  <span class="ag-badge">Ag</span>
+                  Plata — Condiciones contractuales
+                  <span class="params-grupo-hint">
+                    Dejar en blanco si el contrato no incluye pago de plata.
+                  </span>
+                </p>
+                <div class="form-grid">
+                  <div class="field">
+                    <label class="field-label">
+                      Umbral mínimo Ag (Oz/TC)
+                      <span class="field-tooltip" title="Se paga Ag solo si la ley supera este valor (x del contrato)">?</span>
+                    </label>
+                    <input
+                      v-model.number="form.params.umbral_ag_oz_tc"
+                      type="number" step="0.0001" min="0"
+                      class="field-input"
+                      placeholder="Ej: 0.0100"
+                      :disabled="soloLecturaParams"
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">
+                      Recuperación Ag (%)
+                      <span class="field-tooltip" title="% del contenido de Ag que se reconoce al proveedor (y del contrato)">?</span>
+                    </label>
+                    <input
+                      v-model.number="form.params.rec_ag_pct"
+                      type="number" step="0.01" min="0" max="100"
+                      class="field-input"
+                      placeholder="Ej: 70"
+                      :disabled="soloLecturaParams"
+                    />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">
+                      Descuento al spot Ag (USD/Oz)
+                      <span class="field-tooltip" title="Castigo sobre el spot: valor_ag = oz × (spot − z). (z del contrato)">?</span>
+                    </label>
+                    <input
+                      v-model.number="form.params.descuento_ag_usd"
+                      type="number" step="0.01" min="0"
+                      class="field-input"
+                      placeholder="Ej: 1.50"
+                      :disabled="soloLecturaParams"
+                    />
+                  </div>
+                </div>
+
+                <!-- Preview de fórmula cuando los 3 campos están completos -->
+                <div
+                  v-if="form.params.umbral_ag_oz_tc && form.params.rec_ag_pct && form.params.descuento_ag_usd !== null"
+                  class="ag-formula-preview"
+                >
+                  <span class="ag-formula-label">Fórmula:</span>
+                  <code>
+                    Si Ley Ag ≥ {{ form.params.umbral_ag_oz_tc }} Oz/TC →
+                    Valor Ag = TMS × Ley Ag × {{ form.params.rec_ag_pct }}% × (spot − {{ form.params.descuento_ag_usd }} USD)
+                  </code>
+                </div>
+
+                <p v-if="agParamsIncompletos" class="ag-params-warn">
+                  ⚠ Para activar el pago de Ag debes completar los 3 campos. Con campos parciales no se calculará Ag.
+                </p>
+              </div>
+
             </div>
 
           </div><!-- /modal-body -->
@@ -419,6 +488,13 @@ const soloLecturaParams = computed(() => {
   return rol === 'Comercial'
 })
 
+const agParamsIncompletos = computed(() => {
+  const p = form.value.params
+  const campos = [p.umbral_ag_oz_tc, p.rec_ag_pct, p.descuento_ag_usd]
+  const rellenos = campos.filter(v => v !== null && v !== undefined)
+  return rellenos.length > 0 && rellenos.length < 3
+})
+
 // ── Form model ───────────────────────────────────────────────────────────────
 function emptyParams(): ParametrosComerciales {
   return {
@@ -428,6 +504,8 @@ function emptyParams(): ParametrosComerciales {
     maquila: null,           comision: null,
     lim_ley_comercial: null, dscto_ley_comercial: null,
     porcentaje_ley_comercial: null, riesgo_comercial: null,
+    // Plata (Ag)
+    umbral_ag_oz_tc: null, rec_ag_pct: null, descuento_ag_usd: null,
   }
 }
 
@@ -1085,6 +1163,75 @@ font-size: var(--text-sm);
 
 .field-input.encontrado {
   border-color: var(--color-success);
+}
+
+.params-grupo--ag {
+  border: 1px solid #e0d7fa;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #faf8ff;
+}
+
+.ag-badge {
+  background: #6366f1;
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.params-grupo-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-3);
+  margin-left: 8px;
+}
+
+.field-tooltip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-border);
+  color: var(--color-text-2);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: help;
+  margin-left: 4px;
+}
+
+.ag-formula-preview {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #ede9fe;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.ag-formula-label {
+  font-weight: 600;
+  color: #5b21b6;
+  white-space: nowrap;
+}
+
+.ag-formula-preview code {
+  font-size: 0.78rem;
+  color: #3730a3;
+  background: none;
+}
+
+.ag-params-warn {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: #d97706;
 }
 
 /* ── Footer ──────────────────────────────────────────────────── */

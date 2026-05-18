@@ -9,6 +9,23 @@ export interface DashboardKPIs {
     oz_habilitados: number
 }
 
+interface AcopiadorTMH {
+    acopiador: string;
+    enero: number;
+    febrero: number;
+    marzo: number;
+    abril: number;
+    mayo: number;
+    junio: number;
+    julio: number;
+    agosto: number;
+    septiembre: number;
+    octubre: number;
+    noviembre: number;
+    diciembre: number;
+    total: number;
+  }
+
 export interface LoteDashboard {
     ip: string
     tmh: number
@@ -31,6 +48,7 @@ export interface LoteDashboard {
 export interface DashboardResponse {
     kpis: DashboardKPIs
     lotes: LoteDashboard[]
+    acopiadores_tmh: AcopiadorTMH[]
 }
 
 export const dashboardApi = {

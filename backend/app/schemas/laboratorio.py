@@ -61,6 +61,39 @@ class AnalisisLeyOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Análisis de Plata (Ag) ────────────────────────────────────────────────────
+
+
+class AnalisisAgCreate(BaseModel):
+    """
+    Ingreso de señal combinada Au+Ag para calcular ley de plata.
+    Blank correction fija: 0.1444 (no editable por usuario).
+    ley_ag_gr_tm = ((au_ag_mg - au_mg - 0.1444) * 1000) / peso_muestra
+    ley_ag_oz_tc = ley_ag_gr_tm / 34.2857
+    """
+
+    au_ag_mg: float = Field(..., gt=0, description="Señal combinada Au+Ag (mg)")
+    au_mg: float = Field(..., ge=0, description="Señal Au pura (mg)")
+    peso_muestra: float = Field(..., gt=0, description="Peso de la muestra (g)")
+    laboratorio: str = Field(..., description="Nombre del laboratorio")
+    fecha_analisis: date | None = None
+
+
+class AnalisisAgOut(BaseModel):
+    id: int
+    lote_id: int
+    lote_ip: str | None = None
+    laboratorio: str
+    ley_ag_gr_tm: Decimal
+    ley_ag_oz_tc: Decimal
+    fecha_analisis: date | None
+    vigente: bool
+    creado_por: int
+    creado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Análisis de Recuperación ──────────────────────────────────────────────────
 
 
@@ -170,6 +203,8 @@ class LoteLabOut(BaseModel):
     tiene_prueba_pendiente: bool = False
     cert_ley_url: str | None = None
     cert_rec_url: str | None = None
+    ley_ag_gr_tm: float | None = None  # ley de plata vigente (g/TM), None si no hay
+    ley_ag_oz_tc: float | None = None
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

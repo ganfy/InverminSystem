@@ -1,7 +1,6 @@
 <template>
   <div class="dashboard-page">
 
-    <!-- ── Header ─────────────────────────────────────────────── -->
     <header class="page-header">
       <div>
         <h1 class="page-title">Dashboard</h1>
@@ -13,19 +12,18 @@
       </button>
     </header>
 
-    <!-- ── KPIs ────────────────────────────────────────────────── -->
     <section class="kpi-grid">
       <div class="kpi-card gold-accent">
         <div class="kpi-info">
           <span class="kpi-label">Au Real 100%</span>
-          <span class="kpi-value">{{ data?.kpis.au_real_100.toLocaleString('es-PE') }}g</span>
+          <span class="kpi-value">{{ data?.kpis.au_real_100 ? fmtNum(data.kpis.au_real_100) : '0.00' }}g</span>
         </div>
         <Zap class="kpi-icon" :size="32" />
       </div>
       <div class="kpi-card gold-accent">
         <div class="kpi-info">
           <span class="kpi-label">Au Real Rec.</span>
-          <span class="kpi-value">{{ data?.kpis.au_real_rec.toLocaleString('es-PE') }}g</span>
+          <span class="kpi-value">{{ data?.kpis.au_real_rec ? fmtNum(data.kpis.au_real_rec) : '0.00' }}g</span>
         </div>
         <TrendingUp class="kpi-icon" :size="32" />
       </div>
@@ -60,7 +58,6 @@
       </div>
     </section>
 
-    <!-- ── Tabs ────────────────────────────────────────────────── -->
     <div class="tabs-bar">
       <button
         v-for="tab in tabs"
@@ -79,9 +76,6 @@
       <span class="spinner" style="margin-right:0.5rem" /> Cargando…
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════
-         TAB: LOTES
-    ══════════════════════════════════════════════════════════ -->
     <template v-else-if="tabActual === 'lotes'">
       <div class="filtros-bar">
         <div class="field" style="width:160px">
@@ -150,7 +144,6 @@
               <td class="align-right td-mono">{{ lote.ley_avg?.toFixed(4) ?? '—' }}</td>
               <td class="align-right td-mono">{{ lote.rec_porc != null ? lote.rec_porc + '%' : '—' }}</td>
               <td class="td-truncate td-muted" :title="lote.acopiador || ''">{{ lote.acopiador || '—' }}</td>
-              <!-- Análisis: badge principal + tags secundarios -->
               <td class="align-center">
                 <div class="celda-analisis">
                   <span class="badge-analisis" :class="badgeAnalisis(lote.estado_analisis)">
@@ -192,9 +185,61 @@
       </div>
     </template>
 
-    <!-- ══════════════════════════════════════════════════════════
-         TAB: LIQUIDACIONES
-    ══════════════════════════════════════════════════════════ -->
+    <template v-else-if="tabActual === 'acopiadores'">
+      <div class="section-header">
+        <h2>Análisis de Toneladas Húmedas (TMH) por Acopiador</h2>
+        <span class="badge-info">Resumen Mensualizado</span>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="matrix-table data-table">
+          <thead>
+            <tr>
+              <th class="text-left">Acopiador</th>
+              <th class="align-right">Ene</th>
+              <th class="align-right">Feb</th>
+              <th class="align-right">Mar</th>
+              <th class="align-right">Abr</th>
+              <th class="align-right">May</th>
+              <th class="align-right">Jun</th>
+              <th class="align-right">Jul</th>
+              <th class="align-right">Ago</th>
+              <th class="align-right">Set</th>
+              <th class="align-right">Oct</th>
+              <th class="align-right">Nov</th>
+              <th class="align-right">Dic</th>
+              <th class="total-cell align-right">Total General</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in data?.acopiadores_tmh" :key="item.acopiador" class="tabla-row">
+              <td class="font-bold text-left" style="min-width: 200px;">{{ item.acopiador || 'SIN ACOPIADOR' }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.enero) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.febrero) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.marzo) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.abril) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.mayo) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.junio) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.julio) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.agosto) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.septiembre) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.octubre) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.noviembre) }}</td>
+              <td class="align-right td-mono">{{ formatVolume(item.diciembre) }}</td>
+              <td class="total-cell font-bold align-right td-mono">{{ formatVolume(item.total) }}</td>
+            </tr>
+            <tr class="totals-row">
+              <td class="text-left font-bold">TOTAL GENERAL</td>
+              <td v-for="mes in mesesClaves" :key="mes" class="align-right td-mono">
+                {{ formatVolume(calcularTotalMes(mes)) }}
+              </td>
+              <td class="total-cell font-bold align-right td-mono">{{ formatVolume(totalGeneralMatriz) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
     <template v-else-if="tabActual === 'liquidaciones'">
       <div class="filtros-bar">
         <div class="field" style="width:160px">
@@ -289,63 +334,57 @@
       </div>
     </template>
 
-    <!-- ══════════════════════════════════════════════════════════
-         TAB: RESUMEN (default)
-    ══════════════════════════════════════════════════════════ -->
     <template v-else>
-      <div class="filtros-bar">
-        <div class="field" style="flex:1;min-width:200px">
-          <label class="field-label">BÚSQUEDA RÁPIDA</label>
-          <div class="search-wrapper">
-            <Search :size="15" class="search-icon" />
-            <input
-              type="text"
-              class="field-input search-input"
-              v-model="busquedaLote"
-              placeholder="IP, proveedor…"
-            />
+      <div class="charts-grid">
+
+        <div class="analytics-card">
+          <div class="card-header-mini">
+            <h3>Distribución de Lotes por Estado Operativo</h3>
+            <span class="text-muted font-mono" style="font-size: var(--text-xs)">Total: {{ totalLotes }}</span>
+          </div>
+          <div class="chart-container-bars">
+            <div v-for="(item, estado) in distribucionEstados" :key="estado" class="chart-row">
+              <div class="row-info">
+                <span class="badge-estado" :class="badgeLote(estado.toString())">{{ estado }}</span>
+                <span class="row-count font-mono">{{ item.count }} lotes</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div
+                  class="progress-bar-fill transition-all"
+                  :class="badgeLote(estado.toString())"
+                  :style="{ width: `${item.porcentaje}%` }"
+                ></div>
+              </div>
+              <span class="row-pct font-mono">{{ item.porcentaje }}%</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>LOTE</th>
-              <th class="align-right">TMH</th>
-              <th class="align-right">TMS</th>
-              <th class="align-right">%H₂O</th>
-              <th>PROVEEDOR</th>
-              <th>RUC</th>
-              <th class="align-right">LEY PROM.</th>
-              <th class="align-right">% REC.</th>
-              <th>ACOPIADOR</th>
-              <th class="align-center">ESTADO</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="lotesFiltrados.length === 0">
-              <td colspan="10" class="empty-state">No hay lotes registrados.</td>
-            </tr>
-            <tr v-for="lote in lotesFiltrados.slice(0, 25)" :key="lote.ip" class="tabla-row">
-              <td class="td-mono gold">{{ lote.ip }}</td>
-              <td class="align-right td-mono">{{ lote.tmh.toFixed(3) }}</td>
-              <td class="align-right td-mono">{{ lote.tms?.toFixed(3) ?? '—' }}</td>
-              <td class="align-right td-mono">{{ lote.h2o_porc != null ? lote.h2o_porc + '%' : '—' }}</td>
-              <td class="td-truncate" :title="lote.proveedor">{{ lote.proveedor }}</td>
-              <td class="td-mono td-muted">{{ lote.ruc ?? '—' }}</td>
-              <td class="align-right td-mono">{{ lote.ley_avg?.toFixed(4) ?? '—' }}</td>
-              <td class="align-right td-mono">{{ lote.rec_porc != null ? lote.rec_porc + '%' : '—' }}</td>
-              <td class="td-truncate td-muted" :title="lote.acopiador || ''">{{ lote.acopiador || '—' }}</td>
-              <td class="align-center">
-                <span class="badge-estado" :class="badgeLote(lote.estado)">{{ lote.estado }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="table-footer" v-if="(data?.lotes.length ?? 0) > 25">
-        <span class="table-count">Mostrando 25 de {{ data?.lotes.length }} — usa la pestaña Lotes para ver todos</span>
+
+        <div class="analytics-card">
+          <div class="card-header-mini">
+            <h3>Estado del Pipeline de Análisis (Laboratorio)</h3>
+            <span class="text-muted font-mono" style="font-size: var(--text-xs)">Muestras activas</span>
+          </div>
+          <div class="chart-container-bars">
+            <div v-for="(item, estAnalisis) in distribucionAnalisis" :key="estAnalisis" class="chart-row">
+              <div class="row-info">
+                <span class="badge-analisis" :class="badgeAnalisis(estAnalisis.toString())">
+                  {{ labelAnalisis(estAnalisis.toString()) }}
+                </span>
+                <span class="row-count font-mono">{{ item.count }} muestras</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div
+                  class="progress-bar-fill transition-all"
+                  :class="badgeAnalisis(estAnalisis.toString())"
+                  :style="{ width: `${item.porcentaje}%` }"
+                ></div>
+              </div>
+              <span class="row-pct font-mono">{{ item.porcentaje }}%</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </template>
 
@@ -375,14 +414,37 @@ const cargando   = ref(true)
 const lastUpdate = ref<string | null>(null)
 
 // ── Tabs ──────────────────────────────────────────────────────────────
-type TabKey = 'resumen' | 'lotes' | 'liquidaciones'
+type TabKey = 'resumen' | 'lotes' | 'liquidaciones' | 'acopiadores'
 const tabActual = ref<TabKey>('resumen')
 
 const tabs = computed(() => [
   { key: 'resumen'        as TabKey, label: 'Resumen',       icon: markRaw(LayoutDashboard), count: null },
   { key: 'lotes'          as TabKey, label: 'Lotes',         icon: markRaw(Layers),           count: lotesFiltrados.value.length || null },
   { key: 'liquidaciones'  as TabKey, label: 'Liquidaciones', icon: markRaw(FileText),          count: liqStore.lista.length || null },
+  { key: 'acopiadores'    as TabKey, label: 'Acopiadores',   icon: markRaw(Scale),            count: data.value?.acopiadores_tmh?.length || null },
 ])
+
+// Mapeo ordenado de meses de claves de la estructura de datos
+const mesesClaves = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+] as const;
+
+const formatVolume = (val: number) => {
+  if (!val || val === 0) return '-';
+  return val.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Funciones computadas para calcular la fila inferior de totales dinámicos basados en "data"
+const calcularTotalMes = (mes: typeof mesesClaves[number]): number => {
+  if (!data.value?.acopiadores_tmh) return 0;
+  return data.value.acopiadores_tmh.reduce((acc, current) => acc + (current[mes] || 0), 0);
+};
+
+const totalGeneralMatriz = computed(() => {
+  if (!data.value?.acopiadores_tmh) return 0;
+  return data.value.acopiadores_tmh.reduce((acc, current) => acc + (current.total || 0), 0);
+});
 
 // ── Filtros ───────────────────────────────────────────────────────────
 const busquedaLote     = ref('')
@@ -414,6 +476,49 @@ const liquidacionesFiltradas = computed(() => {
       (l.proveedor_ruc?.includes(q) ?? false)
     )
   })
+})
+
+// ── Total global de lotes en memoria ──────────────────────────────────
+const totalLotes = computed(() => data.value?.lotes.length || 0)
+
+// ── Agrupación computada para Gráfico de Estados Operativos ──────────
+const distribucionEstados = computed(() => {
+  if (!data.value || totalLotes.value === 0) return {}
+
+  const grupos: Record<string, number> = {}
+  data.value.lotes.forEach(lote => {
+    grupos[lote.estado] = (grupos[lote.estado] || 0) + 1
+  })
+
+  const resultado: Record<string, { count: number; porcentaje: string }> = {}
+  Object.keys(grupos).forEach(key => {
+    const count = grupos[key] ?? 0
+    resultado[key] = {
+      count,
+      porcentaje: ((count / (totalLotes.value ?? 1)) * 100).toFixed(1)
+    }
+  })
+  return resultado
+})
+
+// ── Agrupación computada para Gráfico de Pipeline de Análisis ────────
+const distribucionAnalisis = computed(() => {
+  if (!data.value || totalLotes.value === 0) return {}
+
+  const grupos: Record<string, number> = {}
+  data.value.lotes.forEach(lote => {
+    grupos[lote.estado_analisis] = (grupos[lote.estado_analisis] || 0) + 1
+  })
+
+  const resultado: Record<string, { count: number; porcentaje: string }> = {}
+  Object.keys(grupos).forEach(key => {
+    const count = grupos[key] ?? 0
+    resultado[key] = {
+      count,
+      porcentaje: ((count / (totalLotes.value ?? 1)) * 100).toFixed(1)
+    }
+  })
+  return resultado
 })
 
 // ── Actions ───────────────────────────────────────────────────────────
@@ -492,12 +597,12 @@ onMounted(() => {
   gap: 1.5rem;
 }
 
-/* ── Header ── */
+/* Header */
 .page-header { display: flex; justify-content: space-between; align-items: flex-end; }
 .last-sync { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
 .btn-refresh { display: flex; align-items: center; }
 
-/* ── KPIs ── */
+/* KPIs */
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -524,7 +629,7 @@ onMounted(() => {
 .kpi-value.highlight { color: var(--color-gold); }
 .kpi-icon { color: var(--color-text-muted); opacity: 0.3; }
 
-/* ── Tabs ── */
+/* Tabs */
 .tabs-bar {
   display: flex;
   border-bottom: 1px solid var(--color-border);
@@ -550,15 +655,15 @@ onMounted(() => {
   padding: 0.05rem 0.45rem; border-radius: 999px; font-family: var(--font-mono);
 }
 
-/* ── Filtros ── */
+/* Filtros */
 .filtros-bar { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
 .search-wrapper { position: relative; display: flex; align-items: center; }
 .search-icon { position: absolute; left: 10px; color: var(--color-text-muted); pointer-events: none; }
 .search-input { padding-left: 32px; }
 .btn-con-icono { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1rem; min-height: 40px; }
 
-/* ── Tabla ── */
-.table-wrapper { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+/* Tabla */
+.table-wrapper { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-card); }
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .data-table thead tr { background: rgba(179,144,40,0.06); border-bottom: 1px solid var(--color-border); }
 .data-table th {
@@ -581,7 +686,112 @@ onMounted(() => {
 .nombre-bold { display: block; font-weight: 600; }
 .ruc-sub     { display: block; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
 
-/* ── Badges estado ── */
+/* Matriz de Totales (Excel Style) */
+.matrix-table th { padding: 10px 8px; font-size: 11px; }
+.matrix-table td { padding: 10px 8px; }
+.total-cell { background-color: rgba(148, 163, 184, 0.12) !important; font-weight: bold; }
+.totals-row { background-color: rgba(179,144,40,0.08); font-weight: 700; border-top: 2px solid var(--color-gold); }
+
+/* Grid de Gráficos del Resumen */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.analytics-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.card-header-mini {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(179,144,40,0.15);
+  padding-bottom: 0.75rem;
+}
+
+.card-header-mini h3 {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.chart-container-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.row-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 180px;
+  min-width: 180px;
+}
+
+.row-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.progress-bar-bg {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  width: 0;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.row-pct {
+  width: 50px;
+  text-align: right;
+  font-size: var(--text-xs);
+  font-weight: bold;
+  color: var(--color-gold);
+}
+
+/* Soporte de compatibilidad de colores para los fondos de las barras */
+.progress-bar-fill.en-proceso   { background: var(--color-warning) !important; }
+.progress-bar-fill.parcial      { background: var(--color-gold) !important; }
+.progress-bar-fill.completado   { background: #4ade80 !important; }
+.progress-bar-fill.pagado       { background: #22c55e !important; }
+.progress-bar-fill.pendiente    { background: var(--color-error) !important; }
+
+.progress-bar-fill.analisis-sin-datos     { background: var(--color-text-muted) !important; }
+.progress-bar-fill.analisis-falta-ley     { background: #3b82f6 !important; }
+.progress-bar-fill.analisis-falta-rec     { background: #f59e0b !important; }
+.progress-bar-fill.analisis-listo         { background: #22c55e !important; }
+.progress-bar-fill.analisis-falta-muestreo { background: #a855f7 !important; }
+
+.transition-all {
+  transition: all 0.4s ease-in-out;
+}
+
+/* Badges estado */
 .badge-estado {
   padding: 0.2rem 0.55rem; border-radius: 2px;
   font-size: var(--text-xs); font-weight: 700; font-family: var(--font-mono);
@@ -593,37 +803,18 @@ onMounted(() => {
 .pagado      { background: var(--color-success-bg);   color: #4ade80;               border: 1px solid rgba(81,161,85,0.3); }
 .pendiente   { background: var(--color-error-bg);     color: var(--color-error);    border: 1px solid rgba(165,71,61,0.3); }
 
-.badge-estado-lote {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-}
-.badge-completo   { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
-.badge-habilitado { background: rgba(234, 179, 8, 0.15);  color: #eab308; }
-.badge-dirimencia { background: var(--color-dirimencia-bg); color: var(--color-dirimencia); }
-.badge-volado     { background: var(--color-volado-bg);  color: var(--color-volado); }
-.badge-proceso    { background: rgba(148, 163, 184, 0.12); color: var(--color-text-muted); }
 .badge-count-sm {
   display: inline-block; padding: 0.1rem 0.5rem;
   background: rgba(179,144,40,0.1); border: 1px solid rgba(179,144,40,0.25);
   border-radius: 2px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-gold);
 }
 
-/* ── Badge análisis ── */
+/* Badge análisis */
 .celda-analisis { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
 .badge-analisis {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 3px;
-  font-size: 0.68rem;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 3px;
+  font-size: 0.68rem; font-family: var(--font-mono); font-weight: 700;
+  letter-spacing: 0.06em; white-space: nowrap;
 }
 .analisis-sin-datos { background: rgba(148,163,184,0.1);  color: var(--color-text-muted); }
 .analisis-falta-ley    { background: rgba(59,130,246,0.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
@@ -631,20 +822,14 @@ onMounted(() => {
 .analisis-listo     { background: rgba(34,197,94,0.15);   color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
 .analisis-falta-muestreo { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
 
-/* ── Tags secundarios ── */
+/* Tags secundarios */
 .tags-secundarios { display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: center; }
 .tag-sec {
-  display: inline-block;
-  padding: 0.1rem 0.4rem;
-  border-radius: 2px;
-  font-size: 0.62rem;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: default;
-  white-space: nowrap;
+  display: inline-block; padding: 0.1rem 0.4rem; border-radius: 2px;
+  font-size: 0.62rem; font-family: var(--font-mono); font-weight: 600;
+  letter-spacing: 0.04em; cursor: default; white-space: nowrap;
 }
-.tag-volado     { background: var(--color-volado-bg);   color: var(--color-volado); border: 1px solid rgba(68, 122, 239, 0.25); }
+.tag-volado     { background: var(--color-volado-bg);  color: var(--color-volado); border: 1px solid rgba(68, 122, 239, 0.25); }
 .tag-dirimencia { background: var(--color-dirimencia-bg);  color: var(--color-dirimencia); border: 1px solid rgba(168, 85, 247, 0.25); }
 .tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
 .tag-remu { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
@@ -657,11 +842,11 @@ onMounted(() => {
 }
 .btn-accion:hover { border-color: var(--color-gold); color: var(--color-gold); }
 
-/* ── Footer tabla ── */
+/* Footer tabla */
 .table-footer { display: flex; justify-content: flex-end; padding: 0.5rem 1rem; border-top: 1px solid var(--color-border); }
 .table-count  { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-faint); }
 
-/* ── Empty / loading ── */
+/* Empty / loading */
 .estado-tabla { text-align: center; padding: 3rem; font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text-muted); display: flex; align-items: center; justify-content: center; }
 .empty-state  { text-align: center; padding: 2.5rem; color: var(--color-text-faint); font-family: var(--font-mono); font-size: var(--text-md); font-style: italic; }
 

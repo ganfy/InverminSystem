@@ -22,6 +22,7 @@ class LiquidacionPreviewRequest(BaseModel):
     provacop_id: int
     lotes: list[LotePreviewInput]
     spot_usd: Decimal = Field(..., gt=0, description="Precio spot del oro en USD/Oz Troy")
+    spot_ag_usd: Decimal | None = Field(None, gt=0, description="Precio spot plata USD/Oz Troy")
     fecha_liquidacion: date | None = None
 
 
@@ -29,6 +30,7 @@ class LiquidacionCreate(BaseModel):
     provacop_id: int
     lotes: list[LotePreviewInput]
     spot_usd: Decimal = Field(..., gt=0)
+    spot_ag_usd: Decimal | None = Field(None, gt=0, description="Precio spot plata USD/Oz Troy")
     fecha_liquidacion: date | None = None
     numero_liquidacion: str | None = None  # si None: auto-generado
     como_borrador: bool = (
@@ -103,6 +105,13 @@ class LoteFinancieroOut(BaseModel):
     usa_dirimencia: bool
     alertas: list[AlertaLote]
 
+    # Plata (Ag) — presentes solo si aplica
+    ley_ag_gr_tm: Decimal | None = None
+    ley_ag_oz_tc: Decimal | None = None
+    spot_ag_usd: Decimal | None = None
+    valor_ag_usd: Decimal | None = None
+    aplica_ag: bool = False
+
     model_config = {"from_attributes": True}
 
 
@@ -123,6 +132,8 @@ class LiquidacionPreviewOut(BaseModel):
 
     alertas_globales: list[AlertaLote]
     puede_generar: bool
+    total_ag_usd: Decimal = Decimal("0")  # solo si aplica Ag
+    hay_ag: bool = False
 
 
 class LiquidacionLoteOut(LoteFinancieroOut):

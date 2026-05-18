@@ -29,6 +29,24 @@ class LoteDashboard(BaseModel):
     tiene_rec_pendiente: bool = False
 
 
+class AcopiadorTMH(BaseModel):
+    acopiador: str
+    enero: float = 0.0
+    febrero: float = 0.0
+    marzo: float = 0.0
+    abril: float = 0.0
+    mayo: float = 0.0
+    junio: float = 0.0
+    julio: float = 0.0
+    agosto: float = 0.0
+    septiembre: float = 0.0
+    octubre: float = 0.0
+    noviembre: float = 0.0
+    diciembre: float = 0.0
+    total: float = 0.0
+
+
 class DashboardResponse(BaseModel):
     kpis: DashboardKPIs
     lotes: list[LoteDashboard]
+    acopiadores_tmh: list[AcopiadorTMH]

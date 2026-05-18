@@ -25,6 +25,8 @@ from app.core.deps import check_permiso
 from app.models.enums import EstadoRecuperacion, RolSistema, TipoAnalisis
 from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, ParametrosComerciales
 from app.schemas.laboratorio import (
+    AnalisisAgCreate,
+    AnalisisAgOut,
     AnalisisLeyCreate,
     AnalisisLeyOut,
     AnalisisLeyPorIPCreate,
@@ -93,6 +95,27 @@ def registrar_ley(
         lote = db.query(Lote).filter(Lote.id == nuevo.lote_id).first()
         ip = lote.ip if lote else None
         return svc._ley_out(nuevo, ip)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/ley/{analisis_id}/ag", response_model=AnalisisAgOut, status_code=201)
+def registrar_ley_ag(
+    analisis_id: int,
+    datos: AnalisisAgCreate,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Registra un análisis de ley de Plata (Ag) vinculado a un análisis Au existente.
+    Calcula ley_ag_gr_tm = ((au_ag_mg - au_mg - 0.1444) * 1000) / peso_muestra
+    Accesible por Laboratorista, Comercial y Admin.
+    """
+    try:
+        resultado = svc.registrar_analisis_ag(db, analisis_id, datos, usuario_id=current_user.id)
+        db.commit()
+        return resultado
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e

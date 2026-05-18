@@ -139,6 +139,23 @@ def generar_liquidacion_pdf(db: Session, liquidacion_id: int) -> bytes:
     # Filas de lotes
     filas = "".join(_build_fila(ll) for ll in liq.liquidacion_lotes)
 
+    valor_ag_total = sum(float(ll.valor_ag_usd or 0) for ll in liq.liquidacion_lotes)
+    spot_ag = next(
+        (float(ll.spot_ag_snapshot) for ll in liq.liquidacion_lotes if ll.spot_ag_snapshot), None
+    )
+
+    if valor_ag_total > 0 and spot_ag:
+        fila_ag = f"""
+        <tr class="fila-total" style="background:#fffde7">
+            <td colspan="11" style="text-align:right;padding-right:6px;font-style:italic">
+                Plata (Ag) — Precio US$ {spot_ag:.2f}/Oz
+            </td>
+            <td colspan="2" style="text-align:right">US$ {valor_ag_total:,.2f}</td>
+        </tr>
+        """
+    else:
+        fila_ag = ""
+
     # Totales
     total_tms = sum((ll.tms_snapshot or Decimal("0")) for ll in liq.liquidacion_lotes)
     total_usd = liq.valor_total_usd or Decimal("0")
@@ -169,6 +186,7 @@ def generar_liquidacion_pdf(db: Session, liquidacion_id: int) -> bytes:
         total_usd=_fmt_d(total_usd, 2),
         lim_ley_inferior=lim_inf,
         lim_ley_superior=lim_sup,
+        fila_ag=fila_ag,
     )
 
     from xhtml2pdf import pisa

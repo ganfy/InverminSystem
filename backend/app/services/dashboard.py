@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import date
 
-from app.models.enums import TipoAnalisis
+from app.models.enums import EstadoLote, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
     AnalisisRecuperacion,
@@ -11,7 +11,7 @@ from app.models.models import (
     Pesaje,
     SesionDescarga,
 )
-from app.schemas.dashboard import DashboardKPIs, DashboardResponse, LoteDashboard
+from app.schemas.dashboard import AcopiadorTMH, DashboardKPIs, DashboardResponse, LoteDashboard
 from sqlalchemy.orm import Session
 
 _DIAS_HABILITADO = 30  # días de almacén para considerar lote "habilitado"
@@ -99,6 +99,9 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     kpis = DashboardKPIs()
     lotes_resumen = []
 
+    # Estructura para almacenar sumatorias: { acopiador: { mes_num: sum_tmh } }
+    tmh_por_acopiador_mes = defaultdict(lambda: defaultdict(float))
+
     for lote in lotes_db:
         pesaje = db.query(Pesaje).filter(Pesaje.lote_id == lote.id).first()
         tmh = 0.0
@@ -147,6 +150,22 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
             dt = lote.pesajes[0].fecha_fin
             fecha_rec = dt.date() if hasattr(dt, "date") else dt
         dias = (date.today() - fecha_rec).days if fecha_rec else 0
+
+        is_volado_30d = bool(lote.volado) and dias >= _DIAS_HABILITADO
+        is_facturado_o_pagado = lote.estado in (EstadoLote.FACTURADO, EstadoLote.PAGADO)
+        habilitado_ruma = bool(lote.habilitado_ruma) or is_volado_30d or is_facturado_o_pagado
+
+        estado_analisis = _calcular_estado_analisis(
+            tiene_cip=lote.id in ids_con_cip,
+            tiene_ley=lote.id in ids_con_ley,
+            tiene_rec_completa=lote.id in ids_rec_completa,
+            tiene_humedad=tiene_humedad,
+        )
+
+        # --- ACUMULACIÓN DE TMH POR MES Y ACOPIADOR ---
+        if acopiador_nombre and fecha_rec:
+            mes_num = fecha_rec.month
+            tmh_por_acopiador_mes[acopiador_nombre][mes_num] += tmh
 
         estado_analisis = _calcular_estado_analisis(
             tiene_cip=lote.id in ids_con_cip,
@@ -207,11 +226,12 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                     rec_prom = round(sum(valores_rec) / len(valores_rec), 2)
 
         if tms is not None and ley_prom is not None:
-            au_lote = tms * ley_prom  # gramos (TM × gr/TM)
+            au_lote = tms * ley_prom
             kpis.au_real_100 += au_lote
             if rec_prom is not None:
                 kpis.au_real_rec += au_lote * rec_prom / 100
-            if lote.habilitado_ruma and lote.ruma_id is None:
+            # Usamos el flag unificado para las Onzas Habilitadas del KPI global
+            if habilitado_ruma and lote.ruma_id is None:
                 kpis.oz_habilitados += au_lote / 31.1035
 
         lotes_resumen.append(
@@ -227,7 +247,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 acopiador=acopiador_nombre,
                 estado=lote.estado if lote.estado else "RECEPCIONADO",
                 estado_analisis=estado_analisis,
-                habilitado_ruma=bool(lote.habilitado_ruma),
+                habilitado_ruma=habilitado_ruma,
                 volado=bool(lote.volado),
                 dirimencia=bool(lote.dirimencia),
                 dias_almacen=dias,
@@ -244,4 +264,28 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
 
     lotes_resumen.sort(key=lambda x: x.ip, reverse=True)
 
-    return DashboardResponse(kpis=kpis, lotes=lotes_resumen)
+    acopiadores_tmh_list = []
+    for acop_name, meses_dict in tmh_por_acopiador_mes.items():
+        acopiadores_tmh_list.append(
+            AcopiadorTMH(
+                acopiador=acop_name,
+                enero=round(meses_dict[1], 2),
+                febrero=round(meses_dict[2], 2),
+                marzo=round(meses_dict[3], 2),
+                abril=round(meses_dict[4], 2),
+                mayo=round(meses_dict[5], 2),
+                junio=round(meses_dict[6], 2),
+                julio=round(meses_dict[7], 2),
+                agosto=round(meses_dict[8], 2),
+                septiembre=round(meses_dict[9], 2),
+                octubre=round(meses_dict[10], 2),
+                noviembre=round(meses_dict[11], 2),
+                diciembre=round(meses_dict[12], 2),
+                total=round(sum(meses_dict.values()), 2),
+            )
+        )
+
+    # Ordenamos de mayor a menor según el tonelaje total traído
+    acopiadores_tmh_list.sort(key=lambda x: x.total, reverse=True)
+
+    return DashboardResponse(kpis=kpis, lotes=lotes_resumen, acopiadores_tmh=acopiadores_tmh_list)
