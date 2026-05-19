@@ -46,7 +46,25 @@ class AcopiadorTMH(BaseModel):
     total: float = 0.0
 
 
+class AnalisisConteo(BaseModel):
+    listo: int = 0
+    falta_rec: int = 0
+    falta_ley: int = 0
+    falta_muestreo: int = 0
+    sin_datos: int = 0
+
+
+class AcopiadorStats(BaseModel):
+    acopiador: str
+    lotes: int = 0
+    tms: float = 0.0
+    oz: float = 0.0
+    ley_prom: float | None = None
+
+
 class DashboardResponse(BaseModel):
     kpis: DashboardKPIs
     lotes: list[LoteDashboard]
     acopiadores_tmh: list[AcopiadorTMH]
+    analisis_conteo: AnalisisConteo = AnalisisConteo()
+    acopiadores_stats: list[AcopiadorStats] = []

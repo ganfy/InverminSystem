@@ -11,7 +11,14 @@ from app.models.models import (
     Pesaje,
     SesionDescarga,
 )
-from app.schemas.dashboard import AcopiadorTMH, DashboardKPIs, DashboardResponse, LoteDashboard
+from app.schemas.dashboard import (
+    AcopiadorStats,
+    AcopiadorTMH,
+    AnalisisConteo,
+    DashboardKPIs,
+    DashboardResponse,
+    LoteDashboard,
+)
 from sqlalchemy.orm import Session
 
 _DIAS_HABILITADO = 30  # días de almacén para considerar lote "habilitado"
@@ -98,6 +105,8 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
 
     kpis = DashboardKPIs()
     lotes_resumen = []
+    analisis_counts: dict[str, int] = {}
+    stats_acop: dict[str, dict] = {}
 
     # Estructura para almacenar sumatorias: { acopiador: { mes_num: sum_tmh } }
     tmh_por_acopiador_mes = defaultdict(lambda: defaultdict(float))
@@ -155,13 +164,6 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         is_facturado_o_pagado = lote.estado in (EstadoLote.FACTURADO, EstadoLote.PAGADO)
         habilitado_ruma = bool(lote.habilitado_ruma) or is_volado_30d or is_facturado_o_pagado
 
-        estado_analisis = _calcular_estado_analisis(
-            tiene_cip=lote.id in ids_con_cip,
-            tiene_ley=lote.id in ids_con_ley,
-            tiene_rec_completa=lote.id in ids_rec_completa,
-            tiene_humedad=tiene_humedad,
-        )
-
         # --- ACUMULACIÓN DE TMH POR MES Y ACOPIADOR ---
         if acopiador_nombre and fecha_rec:
             mes_num = fecha_rec.month
@@ -173,6 +175,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
             tiene_rec_completa=lote.id in ids_rec_completa,
             tiene_humedad=tiene_humedad,
         )
+        analisis_counts[estado_analisis] = analisis_counts.get(estado_analisis, 0) + 1
 
         # --- CÁLCULO DE LEY PROMEDIO O COMERCIAL ---
         ley_prom = None
@@ -230,9 +233,25 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
             kpis.au_real_100 += au_lote
             if rec_prom is not None:
                 kpis.au_real_rec += au_lote * rec_prom / 100
-            # Usamos el flag unificado para las Onzas Habilitadas del KPI global
-            if habilitado_ruma and lote.ruma_id is None:
+
+            # oz_habilitados: solo lotes habilitados por flag/volado, NO por ya estar facturados
+            habilitado_para_kpi = (
+                bool(lote.habilitado_ruma) or is_volado_30d
+            ) and not is_facturado_o_pagado
+            if habilitado_para_kpi and lote.ruma_id is None:
                 kpis.oz_habilitados += au_lote / 31.1035
+
+        # Stats por acopiador (acumular fuera del bloque de ley para contar lotes siempre)
+        if acopiador_nombre and acopiador_nombre != "---":
+            s = stats_acop.setdefault(
+                acopiador_nombre, {"lotes": 0, "tms": 0.0, "oz_sum": 0.0, "ley_tms": 0.0}
+            )
+            s["lotes"] += 1
+            if tms:
+                s["tms"] += tms
+            if tms and ley_prom:
+                s["oz_sum"] += (tms * ley_prom) / 31.1035
+                s["ley_tms"] += tms * ley_prom
 
         lotes_resumen.append(
             LoteDashboard(
@@ -284,8 +303,34 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 total=round(sum(meses_dict.values()), 2),
             )
         )
-
-    # Ordenamos de mayor a menor según el tonelaje total traído
     acopiadores_tmh_list.sort(key=lambda x: x.total, reverse=True)
 
-    return DashboardResponse(kpis=kpis, lotes=lotes_resumen, acopiadores_tmh=acopiadores_tmh_list)
+    acopiadores_stats_list: list[AcopiadorStats] = []
+    for name, s in stats_acop.items():
+        ley_p = round(s["ley_tms"] / s["tms"], 3) if s["tms"] > 0 else None
+        acopiadores_stats_list.append(
+            AcopiadorStats(
+                acopiador=name,
+                lotes=s["lotes"],
+                tms=round(s["tms"], 2),
+                oz=round(s["oz_sum"], 3),
+                ley_prom=ley_p,
+            )
+        )
+    acopiadores_stats_list.sort(key=lambda x: x.oz, reverse=True)
+
+    conteo = AnalisisConteo(
+        listo=analisis_counts.get("LISTO", 0),
+        falta_rec=analisis_counts.get("FALTA_REC", 0),
+        falta_ley=analisis_counts.get("FALTA_LEY", 0),
+        falta_muestreo=analisis_counts.get("FALTA_MUESTREO", 0),
+        sin_datos=analisis_counts.get("SIN_DATOS", 0),
+    )
+
+    return DashboardResponse(
+        kpis=kpis,
+        lotes=lotes_resumen,
+        acopiadores_tmh=acopiadores_tmh_list,
+        analisis_conteo=conteo,
+        acopiadores_stats=acopiadores_stats_list,
+    )

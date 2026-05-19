@@ -316,7 +316,7 @@
                   <span class="ag-badge">Ag</span>
                   Plata — Condiciones contractuales
                   <span class="params-grupo-hint">
-                    Dejar en blanco si el contrato no incluye pago de plata.
+                  <br>Dejar en blanco si el contrato no incluye pago de plata.
                   </span>
                 </p>
                 <div class="form-grid">
@@ -1166,27 +1166,29 @@ font-size: var(--text-sm);
 }
 
 .params-grupo--ag {
-  border: 1px solid #e0d7fa;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 12px 14px;
-  background: #faf8ff;
 }
 
+
+/* Plata */
 .ag-badge {
-  background: #6366f1;
-  color: #fff;
+  background: #9696a5;
   border-radius: 4px;
   padding: 1px 7px;
   font-size: 0.78rem;
   font-weight: 700;
   margin-right: 6px;
+  color: #232325;
 }
 
 .params-grupo-hint {
   font-size: 0.75rem;
-  font-weight: 400;
+  font-weight: var(--text-xs);
   color: var(--color-text-3);
   margin-left: 8px;
+  margin-top: 12px;
 }
 
 .field-tooltip {
@@ -1207,7 +1209,6 @@ font-size: var(--text-sm);
 .ag-formula-preview {
   margin-top: 10px;
   padding: 8px 12px;
-  background: #ede9fe;
   border-radius: 6px;
   font-size: 0.8rem;
   display: flex;

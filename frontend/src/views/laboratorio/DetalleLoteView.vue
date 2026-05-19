@@ -101,6 +101,26 @@
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                     @change="adjuntarCertLey($event, a.id)" />
                 </label>
+                <!-- Botón Ag: solo en análisis Au, sin Ag vigente ya registrada -->
+                <button
+                  v-if="a.material !== 'Ag' && !lote.ley_ag_gr_tm"
+                  class="btn-ag-sm"
+                  @click="abrirModalAg(a.id, a.laboratorio)"
+                  title="Registrar ley de plata vinculada a este análisis"
+                >
+                  <span class="ag-dot">Ag</span> + Ley Ag
+                </button>
+                <!-- Si ya existe Ag, mostrar valor + editar -->
+                <span
+                  v-else-if="a.material !== 'Ag' && lote.ley_ag_gr_tm"
+                  class="ag-registered"
+                  title="Ley Ag registrada"
+                >
+                  <span class="ag-dot">Ag</span>
+                  {{ Number(lote.ley_ag_gr_tm).toFixed(3) }} g/TM
+                  <button class="ag-edit-btn" @click="abrirModalAg(a.id, a.laboratorio)"
+                    title="Actualizar ley Ag">✎</button>
+                </span>
               </template>
               <button
                 v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
@@ -679,6 +699,81 @@
       </div>
     </div>
 
+    <!-- Modal: registrar ley Ag -->
+    <div v-if="modalAgAnalisisId !== null" class="modal-overlay" @click.self="modalAgAnalisisId = null">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2 style="display:flex;align-items:center;gap:0.5rem">
+            <span class="ag-badge-modal">Ag</span> Registrar Ley de Plata
+          </h2>
+          <button class="btn-cerrar" @click="modalAgAnalisisId = null"><X :size="18" /></button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:0.78rem;color:var(--color-text-muted);margin-bottom:1rem">
+            Corrección en blanco: <code style="font-family:var(--font-mono)">0.1444 mg</code> (fija) ·
+            Fórmula: <code style="font-family:var(--font-mono)">((Au+Ag − Au − 0.1444) × 1000) / Peso</code>
+          </p>
+
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:1rem">
+            <div class="field">
+              <label class="field-label">SEÑAL Au+Ag (mg) *</label>
+              <input type="number" step="0.0001" min="0" class="field-input"
+                v-model.number="formAg.au_ag_mg" placeholder="Ej: 2.3450" />
+            </div>
+            <div class="field">
+              <label class="field-label">SEÑAL Au PURA (mg) *</label>
+              <input type="number" step="0.0001" min="0" class="field-input"
+                v-model.number="formAg.au_mg" placeholder="Ej: 0.1230" />
+            </div>
+            <div class="field">
+              <label class="field-label">PESO MUESTRA (g) *</label>
+              <input type="number" step="0.01" min="0.01" class="field-input"
+                v-model.number="formAg.peso_muestra" placeholder="Ej: 29.16" />
+            </div>
+            <div class="field">
+              <label class="field-label">LABORATORIO *</label>
+              <input class="field-input" v-model="formAg.laboratorio" placeholder="Laboratorio" />
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label class="field-label">FECHA ANÁLISIS</label>
+              <input type="date" class="field-input" v-model="formAg.fecha_analisis" />
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div v-if="previewAg" class="ag-preview-inline">
+            <div class="ag-preview-row">
+              <span class="ag-preview-label">Neto (mg)</span>
+              <span class="ag-preview-val">{{ previewAg.neto.toFixed(4) }}</span>
+            </div>
+            <div class="ag-preview-row">
+              <span class="ag-preview-label">Ley Ag (g/TM)</span>
+              <span class="ag-preview-val" style="color:var(--color-gold);font-size:var(--text-lg)">
+                {{ previewAg.ley_gr_tm.toFixed(3) }}
+              </span>
+            </div>
+            <div class="ag-preview-row">
+              <span class="ag-preview-label">Ley Ag (Oz/TC)</span>
+              <span class="ag-preview-val">{{ previewAg.ley_oz_tc.toFixed(4) }}</span>
+            </div>
+          </div>
+
+          <p v-if="agErr" class="error-msg" style="margin-top:0.75rem">{{ agErr }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalAgAnalisisId = null">Cancelar</button>
+          <button
+            class="btn-primary"
+            :disabled="!previewAg || !formAg.laboratorio.trim() || agGuardando"
+            @click="guardarAg"
+          >
+            <span v-if="agGuardando" class="spinner" style="margin-right:0.4rem"></span>
+            Guardar Ley Ag
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal: descartar análisis de recuperación -->
     <div v-if="modalDescartarRec !== null" class="modal-overlay" @click.self="modalDescartarRec = null">
       <div class="modal modal-sm">
@@ -807,6 +902,18 @@ const certLeyGuardado       = ref<string | null>(null)
 
 const ley_cabeza = ref<number | null>(null)
 
+// ── Ag: modal inline ──────────────────────────────────────────────────────────
+const modalAgAnalisisId = ref<number | null>(null)  // analisis Au sobre el que se registra Ag
+const agGuardando       = ref(false)
+const agErr             = ref('')
+const formAg = ref({
+  au_ag_mg:       null as number | null,
+  au_mg:          null as number | null,
+  peso_muestra:   null as number | null,
+  laboratorio:    '',
+  fecha_analisis: new Date().toISOString().split('T')[0],
+})
+
 function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)
   s.has(id) ? s.delete(id) : s.add(id)
@@ -842,8 +949,20 @@ const leyPlantaSimulada = computed<number | null>(() => {
 })
 
 const analisisADescartar = computed(() =>
-  lote.value?.analisis_ley.filter(a => excluidos.value.has(a.id)) ?? [],
+lote.value?.analisis_ley.filter(a => excluidos.value.has(a.id)) ?? [],
 )
+
+// leyPromedio: (planta + minero) / 2, o ley dirimencia si tiene dirimencia
+const leyPromedio = computed<number | null>(() => {
+if (!lote.value) return null
+if (lote.value.tiene_dirimencia && leyComercialCalc.value) {
+  return leyComercialCalc.value.ley_comercial   // dirimencia prevalece
+}
+const planta = leyPlantaSimulada.value
+const minero = lote.value.ley_minero != null ? Number(lote.value.ley_minero) : null
+if (planta == null || minero == null) return null
+return parseFloat(((planta + minero) / 2).toFixed(4))
+})
 
 function abrirConfirmarGenerar() {
   justificacionGenerar.value = ''
@@ -885,6 +1004,49 @@ async function confirmarYGuardar() {
     ui.toast('Error al guardar certificado PDF', 'error')
   } finally {
     generando.value = false
+  }
+}
+
+// Plata
+const BLANK_AG = 0.1444
+const previewAg = computed(() => {
+  const { au_ag_mg, au_mg, peso_muestra } = formAg.value
+  if (au_ag_mg == null || au_mg == null || !peso_muestra || peso_muestra <= 0) return null
+  const neto      = Math.max(0, au_ag_mg - au_mg - BLANK_AG)
+  const ley_gr_tm = parseFloat(((neto * 1000) / peso_muestra).toFixed(3))
+  const ley_oz_tc = parseFloat((ley_gr_tm / 34.2857).toFixed(4))
+  return { neto, ley_gr_tm, ley_oz_tc }
+})
+
+function abrirModalAg(analisisAuId: number, labDefault: string) {
+  formAg.value = {
+    au_ag_mg: null, au_mg: null, peso_muestra: null,
+    laboratorio: labDefault,
+    fecha_analisis: new Date().toISOString().split('T')[0],
+  }
+  agErr.value = ''
+  modalAgAnalisisId.value = analisisAuId
+}
+
+async function guardarAg() {
+  if (!modalAgAnalisisId.value || !previewAg.value) return
+  const { au_ag_mg, au_mg, peso_muestra, laboratorio, fecha_analisis } = formAg.value
+  if (!au_ag_mg || !au_mg || !peso_muestra || !laboratorio.trim()) {
+    agErr.value = 'Complete todos los campos requeridos'; return
+  }
+  agGuardando.value = true
+  agErr.value = ''
+  try {
+    await laboratorioApi.registrarLeyAg(modalAgAnalisisId.value, {
+      au_ag_mg, au_mg, peso_muestra, laboratorio, fecha_analisis: fecha_analisis || null,
+    })
+    ui.toast(`Ley Ag registrada: ${previewAg.value.ley_gr_tm.toFixed(3)} g/TM`, 'success')
+    modalAgAnalisisId.value = null
+    lote.value = await store.cargarDetalleLote(ipActual)
+  } catch (e: any) {
+    agErr.value = e?.response?.data?.detail ?? 'Error al guardar'
+  } finally {
+    agGuardando.value = false
   }
 }
 
@@ -1469,4 +1631,48 @@ onMounted(async () => {
   background: rgba(234,179,8,0.15); color: #fbbf24;
   border: 1px solid rgba(234,179,8,0.4); border-radius: 4px; cursor: pointer;
 }
+
+/* Ag */
+.btn-ag-sm {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  font-size: 0.72rem; padding: 0.25rem 0.65rem;
+  background: rgba(99,102,241,0.12); color: #a5b4fc;
+  border: 1px solid rgba(99,102,241,0.35); border-radius: 4px; cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-ag-sm:hover { background: rgba(99,102,241,0.22); }
+.ag-dot {
+  background: #6366f1; color: #fff;
+  border-radius: 3px; padding: 0px 4px;
+  font-size: 0.62rem; font-weight: 700;
+}
+.ag-registered {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.72rem; color: #a5b4fc;
+  font-family: var(--font-mono); padding: 0.25rem 0.5rem;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.2); border-radius: 4px;
+}
+.ag-edit-btn {
+  background: none; border: none; cursor: pointer;
+  color: #818cf8; font-size: 0.8rem; padding: 0 0 0 2px;
+}
+.ag-badge-modal {
+  background: #6366f1; color: #fff;
+  border-radius: 4px; padding: 1px 8px;
+  font-size: 0.8rem; font-weight: 700;
+}
+.ag-preview-inline {
+  background: rgba(99,102,241,0.07);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: flex; gap: 1.5rem; flex-wrap: wrap;
+}
+.ag-preview-row { display: flex; flex-direction: column; gap: 0.15rem; }
+.ag-preview-label {
+  font-size: 0.65rem; font-family: var(--font-mono);
+  color: var(--color-text-faint); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.ag-preview-val { font-family: var(--font-mono); font-size: var(--text-md); }
 </style>

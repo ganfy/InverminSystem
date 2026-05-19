@@ -321,12 +321,11 @@ async function extraer() {
 }
 
 function saltarOcr() {
-  form.value.origen_datos = 'manual'
-  form.value.laboratorio = laboratorio.value
-  archivo.value = null
-  // Precarga el CIP esperado si no está ya
-  cipExtraido.value = cipActual
-  fase.value = 'form'
+  form.value.origen_datos  = 'manual'
+  form.value.laboratorio   = laboratorio.value   // propagar el lab del paso 1
+  archivo.value            = null
+  cipExtraido.value        = cipActual
+  fase.value               = 'form'
 }
 
 async function guardar() {

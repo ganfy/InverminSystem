@@ -49,6 +49,20 @@ export interface DashboardResponse {
     kpis: DashboardKPIs
     lotes: LoteDashboard[]
     acopiadores_tmh: AcopiadorTMH[]
+    analisis_conteo: {
+        listo: number
+        falta_rec: number
+        falta_ley: number
+        falta_muestreo: number
+        sin_datos: number
+    }
+    acopiadores_stats: Array<{
+        acopiador: string
+        lotes: number
+        tms: number
+        oz: number
+        ley_prom: number | null
+    }>
 }
 
 export const dashboardApi = {

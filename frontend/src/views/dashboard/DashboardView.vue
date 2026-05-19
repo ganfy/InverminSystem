@@ -112,6 +112,12 @@
             />
           </div>
         </div>
+
+        <div style="display:flex;align-items:flex-end;gap:0.5rem">
+          <button class="btn-export" @click="exportarLotesCSV">
+            <Download :size="14" /> Excel
+          </button>
+        </div>
       </div>
       <div class="table-wrapper">
         <table class="data-table">
@@ -189,6 +195,12 @@
       <div class="section-header">
         <h2>Análisis de Toneladas Húmedas (TMH) por Acopiador</h2>
         <span class="badge-info">Resumen Mensualizado</span>
+      </div>
+
+      <div class="export-bar">
+        <button class="btn-export" @click="exportarAcopiadoresCSV">
+          <Download :size="14" /> Excel
+        </button>
       </div>
 
       <div class="table-wrapper">
@@ -335,35 +347,42 @@
     </template>
 
     <template v-else>
-      <div class="charts-grid">
+      <!-- Botones de exportación -->
+      <div class="export-bar">
+        <button class="btn-export" @click="exportarResumenCSV" title="Exportar resumen KPIs">
+          <Download :size="14" /> KPIs
+        </button>
+        <button class="btn-export" @click="imprimirVista" title="Imprimir / Guardar PDF">
+          <Printer :size="14" /> PDF
+        </button>
+      </div>
 
+      <div class="charts-grid">
+        <!-- Distribución de estados -->
         <div class="analytics-card">
           <div class="card-header-mini">
-            <h3>Distribución de Lotes por Estado Operativo</h3>
-            <span class="text-muted font-mono" style="font-size: var(--text-xs)">Total: {{ totalLotes }}</span>
+            <h3>Estados de Lotes</h3>
+            <span class="text-muted font-mono" style="font-size:var(--text-xs)">Total: {{ totalLotes }}</span>
           </div>
           <div class="chart-container-bars">
             <div v-for="(item, estado) in distribucionEstados" :key="estado" class="chart-row">
               <div class="row-info">
                 <span class="badge-estado" :class="badgeLote(estado.toString())">{{ estado }}</span>
-                <span class="row-count font-mono">{{ item.count }} lotes</span>
+                <span class="row-count font-mono">{{ item.count }}</span>
               </div>
               <div class="progress-bar-bg">
-                <div
-                  class="progress-bar-fill transition-all"
-                  :class="badgeLote(estado.toString())"
-                  :style="{ width: `${item.porcentaje}%` }"
-                ></div>
+                <div class="progress-bar-fill transition-all" :class="badgeLote(estado.toString())" :style="{ width: `${item.porcentaje}%` }"></div>
               </div>
               <span class="row-pct font-mono">{{ item.porcentaje }}%</span>
             </div>
           </div>
         </div>
 
+        <!-- Pipeline de análisis -->
         <div class="analytics-card">
           <div class="card-header-mini">
-            <h3>Estado del Pipeline de Análisis (Laboratorio)</h3>
-            <span class="text-muted font-mono" style="font-size: var(--text-xs)">Muestras activas</span>
+            <h3>Pipeline de Análisis</h3>
+            <span class="text-muted font-mono" style="font-size:var(--text-xs)">Muestras activas</span>
           </div>
           <div class="chart-container-bars">
             <div v-for="(item, estAnalisis) in distribucionAnalisis" :key="estAnalisis" class="chart-row">
@@ -371,20 +390,45 @@
                 <span class="badge-analisis" :class="badgeAnalisis(estAnalisis.toString())">
                   {{ labelAnalisis(estAnalisis.toString()) }}
                 </span>
-                <span class="row-count font-mono">{{ item.count }} muestras</span>
+                <span class="row-count font-mono">{{ item.count }}</span>
               </div>
               <div class="progress-bar-bg">
-                <div
-                  class="progress-bar-fill transition-all"
-                  :class="badgeAnalisis(estAnalisis.toString())"
-                  :style="{ width: `${item.porcentaje}%` }"
-                ></div>
+                <div class="progress-bar-fill transition-all" :class="badgeAnalisis(estAnalisis.toString())" :style="{ width: `${item.porcentaje}%` }"></div>
               </div>
               <span class="row-pct font-mono">{{ item.porcentaje }}%</span>
             </div>
           </div>
         </div>
 
+        <!-- Resumen por acopiador -->
+        <div class="analytics-card analytics-card--wide" v-if="data?.acopiadores_stats?.length">
+          <div class="card-header-mini">
+            <h3>Resumen por Acopiador</h3>
+            <span class="text-muted font-mono" style="font-size:var(--text-xs)">Acumulado campaña</span>
+          </div>
+          <div class="table-wrapper" style="margin-top:0.5rem">
+            <table class="data-table" style="font-size:var(--text-sm)">
+              <thead>
+                <tr>
+                  <th>ACOPIADOR</th>
+                  <th class="align-right">LOTES</th>
+                  <th class="align-right">TMS</th>
+                  <th class="align-right">OZ EN STOCK</th>
+                  <th class="align-right">LEY PROM (gr/TM)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in data.acopiadores_stats" :key="s.acopiador" class="tabla-row">
+                  <td class="font-bold">{{ s.acopiador }}</td>
+                  <td class="align-right td-mono">{{ s.lotes }}</td>
+                  <td class="align-right td-mono">{{ s.tms.toFixed(2) }}</td>
+                  <td class="align-right td-mono" style="color:var(--color-gold)">{{ s.oz.toFixed(3) }}</td>
+                  <td class="align-right td-mono">{{ s.ley_prom?.toFixed(3) ?? '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -397,7 +441,7 @@ import { useRouter } from 'vue-router'
 import {
   Zap, TrendingUp, Scale, Database, Coins, Search,
   RefreshCw, Layers, FileText, PlusCircle, Download, LayoutDashboard,
-  Hourglass,
+  Hourglass, Printer,
 } from 'lucide-vue-next'
 import { dashboardApi, type DashboardResponse } from '@/api/dashboard'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
@@ -546,6 +590,81 @@ function fmtDate(s: string) {
   if (!s) return '-'
   return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+
+// ── Export helpers ────────────────────────────────────────────────────
+function fechaHoy() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function descargarCSV(rows: Record<string, unknown>[], nombre: string) {
+  if (!rows.length) return
+  const headers = Object.keys(rows[0] ?? {})
+  const sep = ';' // Excel es-PE usa punto y coma
+  const csv = [
+    headers.join(sep),
+    ...rows.map(r =>
+      headers.map(h => {
+        const v = r[h] ?? ''
+        return typeof v === 'string' && v.includes(sep) ? `"${v}"` : String(v)
+      }).join(sep)
+    ),
+  ].join('\r\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `${nombre}.csv`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportarLotesCSV() {
+  const rows = lotesFiltrados.value.map(l => ({
+    'Lote (IP)': l.ip,
+    'TMH': l.tmh,
+    'TMS': l.tms ?? '',
+    '%H2O': l.h2o_porc ?? '',
+    'Proveedor': l.proveedor,
+    'RUC': l.ruc ?? '',
+    'Ley Prom gr/TM': l.ley_avg ?? '',
+    '% Rec': l.rec_porc ?? '',
+    'Acopiador': l.acopiador ?? '',
+    'Estado': l.estado,
+    'Analisis': labelAnalisis(l.estado_analisis),
+    'Dias Almacen': l.dias_almacen,
+    'Habilitado Ruma': l.habilitado_ruma ? 'Si' : 'No',
+    'Volado': l.volado ? 'Si' : 'No',
+    'Dirimencia': l.dirimencia ? 'Si' : 'No',
+  }))
+  descargarCSV(rows, `lotes_paititi_${fechaHoy()}`)
+}
+
+function exportarAcopiadoresCSV() {
+  const rows = (data.value?.acopiadores_tmh ?? []).map(a => ({
+    'Acopiador': a.acopiador,
+    'Ene': a.enero, 'Feb': a.febrero, 'Mar': a.marzo, 'Abr': a.abril,
+    'May': a.mayo, 'Jun': a.junio, 'Jul': a.julio, 'Ago': a.agosto,
+    'Set': a.septiembre, 'Oct': a.octubre, 'Nov': a.noviembre, 'Dic': a.diciembre,
+    'Total TMH': a.total,
+  }))
+  descargarCSV(rows, `acopiadores_tmh_${fechaHoy()}`)
+}
+
+function exportarResumenCSV() {
+  const k = data.value?.kpis
+  if (!k) return
+  const kpiRows = [
+    { Indicador: 'Au Real 100%', Valor: k.au_real_100, Unidad: 'gr' },
+    { Indicador: 'Au Real con Recuperacion', Valor: k.au_real_rec, Unidad: 'gr' },
+    { Indicador: 'TMH en Stock', Valor: k.tmh_stock, Unidad: 'TM' },
+    { Indicador: 'TMS en Stock', Valor: k.tms_stock, Unidad: 'TM' },
+    { Indicador: 'Oz en Stock', Valor: k.oz_stock, Unidad: 'oz' },
+    { Indicador: 'Oz Disponibles para Ruma', Valor: k.oz_habilitados, Unidad: 'oz' },
+  ]
+  descargarCSV(kpiRows, `resumen_gerencia_${fechaHoy()}`)
+}
+
+function imprimirVista() {
+  window.print()
+}
+
 function badgeLote(estado: string) {
   const m: Record<string, string> = {
     RECEPCIONADO: 'en-proceso', ASIGNADO_RUMA: 'parcial',
@@ -852,4 +971,26 @@ onMounted(() => {
 
 .spinner { animation: spin 0.8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Export bar */
+.export-bar { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.btn-export {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.8rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border); background: transparent;
+  color: var(--color-text-muted); font-size: var(--text-xs);
+  font-family: var(--font-mono); cursor: pointer; transition: all 0.15s;
+}
+.btn-export:hover { border-color: var(--color-gold); color: var(--color-gold); }
+
+/* Wide card (acopiadores) */
+.analytics-card--wide { grid-column: 1 / -1; }
+
+/* Print */
+@media print {
+  .tabs-bar, .filtros-bar, .export-bar, .btn-refresh, .page-header button { display: none !important; }
+  .dashboard-page { padding: 0; }
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .analytics-card, .table-wrapper { break-inside: avoid; }
+}
 </style>

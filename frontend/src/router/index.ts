@@ -22,7 +22,8 @@ import LiquidacionesView from '@/views/liquidaciones/LiquidacionesView.vue'
 import CrearLiquidacionView from '@/views/liquidaciones/CrearLiquidacionView.vue'
 import DetalleLiquidacionView from '@/views/liquidaciones/DetalleLiquidacionView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
-import UsuariosView from '@/views/admin/UsuariosView.vue'  // ← AÑADIDO
+import UsuariosView from '@/views/admin/UsuariosView.vue'
+import RegistrarLeyAgView from '@/views/laboratorio/RegistrarLeyAgView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -55,6 +56,7 @@ const router = createRouter({
         // Laboratorio
         { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView },
         { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView },
+        { path: 'laboratorio/ley-ag/:cip', name: 'RegistrarLeyAg', component: RegistrarLeyAgView },
         { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView },
         { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
         { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView },
