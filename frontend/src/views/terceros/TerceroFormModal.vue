@@ -348,7 +348,7 @@
                   </div>
                   <div class="field">
                     <label class="field-label">
-                      Descuento al spot Ag (USD/Oz)
+                      Descuento (USD/Oz)
                       <span class="field-tooltip" title="Castigo sobre el spot: valor_ag = oz × (spot − z). (z del contrato)">?</span>
                     </label>
                     <input

@@ -1,30 +1,36 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, timedelta
 
-from app.models.enums import EstadoLote, TipoAnalisis
+from app.models.enums import EstadoLote, EstadoRecuperacion, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
     AnalisisRecuperacion,
+    Configuracion,
     Lote,
     MapeoCIP,
     Muestreo,
     Pesaje,
+    PruebaMetalurgica,
     SesionDescarga,
 )
 from app.schemas.dashboard import (
     AcopiadorStats,
     AcopiadorTMH,
+    AlertaItem,
+    AlertasConfig,
+    AlertasResponse,
     AnalisisConteo,
     DashboardKPIs,
     DashboardResponse,
     LoteDashboard,
 )
+from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
 
-_DIAS_HABILITADO = 30  # días de almacén para considerar lote "habilitado"
+dias_habilitado = 30  # días de almacén para considerar lote "habilitado"
 
 
-def _calcular_estado_analisis(
+def _calcular_estadoanalisis(
     tiene_cip: bool,
     tiene_ley: bool,
     tiene_rec_completa: bool,
@@ -48,9 +54,77 @@ def _calcular_estado_lote(lote: Lote, dias: int, tiene_recuperacion: bool) -> st
         return "DIRIMENCIA"
     if tiene_recuperacion:
         return "COMPLETO"
-    if lote.habilitado_ruma or dias >= _DIAS_HABILITADO:
+    if lote.habilitado_ruma or dias >= dias_habilitado:
         return "HABILITADO"
     return "EN_PROCESO"
+
+
+alert_defaults: dict[str, str] = {
+    "alerta_horas_pesado_muestreo": "24",
+    "alerta_horas_muestreo_ley": "24",
+    "alerta_horas_ley_recuperacion": "72",
+    "alerta_dias_volado_stock": "30",
+}
+
+alert_desc: dict[str, str] = {
+    "alerta_horas_pesado_muestreo": "Horas máx. entre pesaje y primer muestreo",
+    "alerta_horas_muestreo_ley": "Horas máx. entre muestreo y análisis de ley",
+    "alerta_horas_ley_recuperacion": "Horas máx. entre inicio de pruebas y recuperación",
+    "alerta_dias_volado_stock": "Días máx. que un lote volado puede estar sin ruma",
+}
+
+
+def _dt(val) -> datetime:
+    """Normaliza date/datetime a datetime."""
+    if isinstance(val, datetime):
+        return val
+    return datetime.combine(val, datetime.min.time())
+
+
+def _severidad(delta: timedelta, umbral: timedelta) -> str:
+    ratio = delta.total_seconds() / max(umbral.total_seconds(), 1)
+    if ratio >= 2.0:
+        return "CRITICA"
+    if ratio >= 1.5:
+        return "ALTA"
+    return "MEDIA"
+
+
+def _make_alerta(
+    tipo: str,
+    delta: timedelta,
+    umbral: timedelta,
+    desc: str,
+    fecha: datetime,
+    ip: str,
+    proveedor: str,
+    acopiador: str,
+) -> AlertaItem:
+    return AlertaItem(
+        tipo=tipo,
+        severidad=_severidad(delta, umbral),
+        ip=ip,
+        proveedor=proveedor,
+        acopiador=acopiador,
+        horas_retraso=round(delta.total_seconds() / 3600, 1),
+        descripcion=desc,
+        fecha_ref=fecha,
+    )
+
+
+def _cargar_config_alertas(db: Session) -> AlertasConfig:
+    rows = (
+        db.query(Configuracion.clave, Configuracion.valor)
+        .filter(Configuracion.clave.in_(alert_defaults.keys()))
+        .all()
+    )
+    vals = {k: v for k, v in rows}
+    return AlertasConfig(
+        horas_pesado_muestreo=float(vals.get("alerta_horas_pesado_muestreo", 24)),
+        horas_muestreo_ley=float(vals.get("alerta_horas_muestreo_ley", 24)),
+        horas_ley_recuperacion=float(vals.get("alerta_horas_ley_recuperacion", 72)),
+        dias_volado_stock=float(vals.get("alerta_dias_volado_stock", 30)),
+    )
 
 
 def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
@@ -160,7 +234,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
             fecha_rec = dt.date() if hasattr(dt, "date") else dt
         dias = (date.today() - fecha_rec).days if fecha_rec else 0
 
-        is_volado_30d = bool(lote.volado) and dias >= _DIAS_HABILITADO
+        is_volado_30d = bool(lote.volado) and dias >= dias_habilitado
         is_facturado_o_pagado = lote.estado in (EstadoLote.FACTURADO, EstadoLote.PAGADO)
         habilitado_ruma = bool(lote.habilitado_ruma) or is_volado_30d or is_facturado_o_pagado
 
@@ -169,13 +243,13 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
             mes_num = fecha_rec.month
             tmh_por_acopiador_mes[acopiador_nombre][mes_num] += tmh
 
-        estado_analisis = _calcular_estado_analisis(
+        estadoanalisis = _calcular_estadoanalisis(
             tiene_cip=lote.id in ids_con_cip,
             tiene_ley=lote.id in ids_con_ley,
             tiene_rec_completa=lote.id in ids_rec_completa,
             tiene_humedad=tiene_humedad,
         )
-        analisis_counts[estado_analisis] = analisis_counts.get(estado_analisis, 0) + 1
+        analisis_counts[estadoanalisis] = analisis_counts.get(estadoanalisis, 0) + 1
 
         # --- CÁLCULO DE LEY PROMEDIO O COMERCIAL ---
         ley_prom = None
@@ -265,7 +339,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 rec_porc=rec_prom,
                 acopiador=acopiador_nombre,
                 estado=lote.estado if lote.estado else "RECEPCIONADO",
-                estado_analisis=estado_analisis,
+                estadoanalisis=estadoanalisis,
                 habilitado_ruma=habilitado_ruma,
                 volado=bool(lote.volado),
                 dirimencia=bool(lote.dirimencia),
@@ -334,3 +408,319 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         analisis_conteo=conteo,
         acopiadores_stats=acopiadores_stats_list,
     )
+
+
+def generar_excel_dashboard(data: DashboardResponse, tipo: str, clave: str):
+    import io
+
+    import msoffcrypto
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    gold_fill = PatternFill("solid", fgColor="1C1A09")
+    gold_font = Font(bold=True, color="C9A227")
+    center = Alignment(horizontal="center")
+
+    def _autowidth(ws):
+        for col in ws.columns:
+            mx = max((len(str(c.value or "")) for c in col), default=0)
+            ws.column_dimensions[get_column_letter(col[0].column)].width = min(mx + 3, 45)
+
+    def _header_row(ws, headers):
+        for i, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=i, value=h)
+            c.fill = gold_fill
+            c.font = gold_font
+            c.alignment = center
+
+    analisis = {
+        "SIN_DATOS": "Sin datos",
+        "FALTA_MUESTREO": "Falta humedad",
+        "FALTA_LEY": "Falta ley",
+        "FALTA_REC": "Falta rec.",
+        "LISTO": "Listo",
+    }
+
+    wb = Workbook()
+
+    if tipo == "lotes":
+        ws = wb.active
+        ws.title = "Lotes"
+        _header_row(
+            ws,
+            [
+                "IP",
+                "TMH",
+                "TMS",
+                "%H2O",
+                "Proveedor",
+                "RUC",
+                "Ley gr/TM",
+                "% Rec",
+                "Acopiador",
+                "Estado",
+                "Análisis",
+                "Días Almacén",
+                "Habilitado Ruma",
+                "Volado",
+            ],
+        )
+        for lt in data.lotes:
+            ws.append(
+                [
+                    lt.ip,
+                    lt.tmh,
+                    lt.tms,
+                    lt.h2o_porc,
+                    lt.proveedor,
+                    lt.ruc,
+                    lt.ley_avg,
+                    lt.rec_porc,
+                    lt.acopiador,
+                    lt.estado,
+                    analisis.get(lt.estadoanalisis, lt.estadoanalisis),
+                    lt.dias_almacen,
+                    "Sí" if lt.habilitado_ruma else "No",
+                    "Sí" if lt.volado else "No",
+                ]
+            )
+    else:
+        ws = wb.active
+        ws.title = "Acopiadores TMH"
+        _header_row(
+            ws,
+            [
+                "Acopiador",
+                "Ene",
+                "Feb",
+                "Mar",
+                "Abr",
+                "May",
+                "Jun",
+                "Jul",
+                "Ago",
+                "Set",
+                "Oct",
+                "Nov",
+                "Dic",
+                "Total",
+            ],
+        )
+        for a in data.acopiadores_tmh:
+            ws.append(
+                [
+                    a.acopiador,
+                    a.enero,
+                    a.febrero,
+                    a.marzo,
+                    a.abril,
+                    a.mayo,
+                    a.junio,
+                    a.julio,
+                    a.agosto,
+                    a.septiembre,
+                    a.octubre,
+                    a.noviembre,
+                    a.diciembre,
+                    a.total,
+                ]
+            )
+        ws2 = wb.create_sheet("Stats por Acopiador")
+        _header_row(ws2, ["Acopiador", "Lotes", "TMS", "Oz en Stock", "Ley Prom gr/TM"])
+        for s in data.acopiadores_stats:
+            ws2.append([s.acopiador, s.lotes, s.tms, s.oz, s.ley_prom])
+
+    _autowidth(wb.active)
+
+    raw = io.BytesIO()
+    wb.save(raw)
+    raw.seek(0)
+
+    encrypted = io.BytesIO()
+    msoffcrypto.OfficeFile(raw).encrypt(clave, encrypted)
+    encrypted.seek(0)
+    return encrypted
+
+
+# Alertas:
+def obtener_alertas(db: Session) -> AlertasResponse:
+    cfg = _cargar_config_alertas(db)
+    now = datetime.utcnow()
+    alertas: list[AlertaItem] = []
+
+    # ── Lotes activos ────────────────────────────────────────────────
+    lotes = db.query(Lote).filter(~Lote.eliminado, Lote.estado != EstadoLote.PAGADO).all()
+    ids = [lt.id for lt in lotes]
+    if not ids:
+        return AlertasResponse(alertas=[], config=cfg)
+
+    # ── Pre-cargas en queries únicas (sin N+1) ───────────────────────
+    pesaje_fecha: dict[int, datetime] = {
+        r.lote_id: _dt(r.fecha)
+        for r in db.query(Pesaje.lote_id, sqlfunc.max(Pesaje.fecha_fin).label("fecha"))
+        .filter(Pesaje.lote_id.in_(ids))
+        .group_by(Pesaje.lote_id)
+        .all()
+        if r.fecha
+    }
+
+    muestreo_fecha: dict[int, datetime] = {
+        r.lote_id: _dt(r.fecha)
+        for r in db.query(Muestreo.lote_id, sqlfunc.max(Muestreo.creado_en).label("fecha"))
+        .filter(Muestreo.lote_id.in_(ids))
+        .group_by(Muestreo.lote_id)
+        .all()
+        if r.fecha
+    }
+
+    ley_fecha: dict[int, datetime] = {
+        r.lote_id: _dt(r.fecha)
+        for r in db.query(AnalisisLey.lote_id, sqlfunc.max(AnalisisLey.creado_en).label("fecha"))
+        .filter(
+            AnalisisLey.lote_id.in_(ids),
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipoanalisis != TipoAnalisis.MINERO,
+        )
+        .group_by(AnalisisLey.lote_id)
+        .all()
+        if r.fecha
+    }
+
+    ids_con_rec: set[int] = {
+        r.lote_id
+        for r in db.query(AnalisisRecuperacion.lote_id)
+        .filter(
+            AnalisisRecuperacion.lote_id.in_(ids),
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.estado.in_(
+                [EstadoRecuperacion.COMPLETADO, EstadoRecuperacion.CERT_COMERCIAL]
+            ),
+        )
+        .distinct()
+        .all()
+    }
+
+    prueba_fecha: dict[int, datetime] = {
+        r.lote_id: _dt(r.fecha)
+        for r in db.query(
+            PruebaMetalurgica.lote_id,
+            sqlfunc.max(PruebaMetalurgica.fecha_ingreso).label("fecha"),
+        )
+        .filter(PruebaMetalurgica.lote_id.in_(ids))
+        .group_by(PruebaMetalurgica.lote_id)
+        .all()
+        if r.fecha
+    }
+
+    # Nombres proveedor/acopiador
+    sesiones = {
+        s.id: s
+        for s in db.query(SesionDescarga)
+        .filter(SesionDescarga.id.in_({lt.sesion_id for lt in lotes}))
+        .all()
+    }
+
+    def _nombres(lote: Lote) -> tuple[str, str]:
+        s = sesiones.get(lote.sesion_id)
+        prov = acop = "---"
+        if s and getattr(s, "provacop", None):
+            if getattr(s.provacop, "proveedor", None):
+                prov = s.provacop.proveedor.razon_social
+            if getattr(s.provacop, "acopiador", None):
+                acop = s.provacop.acopiador.razon_social
+        return prov, acop
+
+    # ── Evaluación de alertas por lote ──────────────────────────────
+    umb_muestreo = timedelta(hours=cfg.horas_pesado_muestreo)
+    umb_ley = timedelta(hours=cfg.horas_muestreo_ley)
+    umb_rec = timedelta(hours=cfg.horas_ley_recuperacion)
+    umb_volado = timedelta(days=cfg.dias_volado_stock)
+
+    for lote in lotes:
+        ip, prov, acop = lote.ip, *_nombres(lote)
+
+        fp = pesaje_fecha.get(lote.id)
+        fm = muestreo_fecha.get(lote.id)
+        fl = ley_fecha.get(lote.id)
+        fr = prueba_fecha.get(lote.id) or fl
+
+        if lote.volado and lote.ruma_id is None and fp:
+            delta = now - fp
+            if delta >= umb_volado:
+                dias_v = int(delta.days)
+                alertas.append(
+                    _make_alerta(
+                        "VOLADO_STOCK",
+                        delta,
+                        umb_volado,
+                        f"Lote volado sin asignar a ruma hace {dias_v} día{'s' if dias_v != 1 else ''}",
+                        fp,
+                        ip,
+                        prov,
+                        acop,
+                    )
+                )
+
+        if fp and lote.id not in muestreo_fecha:
+            delta = now - fp
+            if delta >= umb_muestreo:
+                alertas.append(
+                    _make_alerta(
+                        "RETRASO_MUESTREO",
+                        delta,
+                        umb_muestreo,
+                        f"Sin muestreo {delta.total_seconds()/3600:.1f}h después del pesaje",
+                        fp,
+                        ip,
+                        prov,
+                        acop,
+                    )
+                )
+        elif fm and lote.id not in ley_fecha:
+            delta = now - fm
+            if delta >= umb_ley:
+                alertas.append(
+                    _make_alerta(
+                        "RETRASO_LEY",
+                        delta,
+                        umb_ley,
+                        f"Sin análisis de ley {delta.total_seconds()/3600:.1f}h después del muestreo",
+                        fm,
+                        ip,
+                        prov,
+                        acop,
+                    )
+                )
+        elif fl and lote.id not in ids_con_rec and fr:
+            delta = now - fr
+            if delta >= umb_rec:
+                origen = "inicio de pruebas" if lote.id in prueba_fecha else "análisis de ley"
+                alertas.append(
+                    _make_alerta(
+                        "RETRASO_RECUPERACION",
+                        delta,
+                        umb_rec,
+                        f"Sin recuperación {delta.total_seconds()/3600:.1f}h después del {origen}",
+                        fr,
+                        ip,
+                        prov,
+                        acop,
+                    )
+                )
+
+
+def actualizar_config_alertas(db: Session, config: AlertasConfig) -> None:
+    updates = {
+        "alerta_horas_pesado_muestreo": str(config.horas_pesado_muestreo),
+        "alerta_horas_muestreo_ley": str(config.horas_muestreo_ley),
+        "alerta_horas_ley_recuperacion": str(config.horas_ley_recuperacion),
+        "alerta_dias_volado_stock": str(config.dias_volado_stock),
+    }
+    for clave, valor in updates.items():
+        row = db.query(Configuracion).filter(Configuracion.clave == clave).first()
+        if row:
+            row.valor = valor
+        else:
+            db.add(Configuracion(clave=clave, valor=valor, descripcion=alert_desc.get(clave, "")))
+    db.commit()

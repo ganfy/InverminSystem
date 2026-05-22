@@ -202,7 +202,6 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import type { TipoAnalisis } from '@/types/laboratorio'
 import { AlertTriangle } from 'lucide-vue-next'
-import { f } from 'vue-router/dist/router-CWoNjPRp.mjs'
 import type { OrigenDatos } from '@/types/laboratorio'
 const router    = useRouter()
 const route     = useRoute()

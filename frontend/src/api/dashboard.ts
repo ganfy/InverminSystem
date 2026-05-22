@@ -1,4 +1,6 @@
+import type { StringMappingType } from 'typescript'
 import api from './axios'
+import { Zap } from 'lucide-vue-next'
 
 export interface DashboardKPIs {
     au_real_100: number
@@ -45,26 +47,69 @@ export interface LoteDashboard {
     tiene_rec_pendiente: boolean
 }
 
+export interface AnalisisConteo {
+    listo: number; falta_rec: number; falta_ley: number; falta_muestreo: number; sin_datos: number
+}
+
+export interface AcopiadorStats {
+    acopiador: string; lotes: number; tms: number; oz: number; ley_prom: number | null
+}
+
 export interface DashboardResponse {
     kpis: DashboardKPIs
     lotes: LoteDashboard[]
     acopiadores_tmh: AcopiadorTMH[]
-    analisis_conteo: {
-        listo: number
-        falta_rec: number
-        falta_ley: number
-        falta_muestreo: number
-        sin_datos: number
-    }
-    acopiadores_stats: Array<{
-        acopiador: string
-        lotes: number
-        tms: number
-        oz: number
-        ley_prom: number | null
-    }>
+    analisis_conteo: AnalisisConteo
+    acopiadores_stats: AcopiadorStats[]
+}
+
+//Alertas
+export interface AlertaItem {
+    tipo: 'VOLADO_STOCK' | 'RETRASO_MUESTREO' | ' RETRASO_LEY' | 'RETRASO_RECUPERACIÓN'
+    severidad: 'CRITICA' | 'ALTA' | 'MEDIA'
+    ip: string
+    proveedor: string
+    acopiador: string | null
+    horas_retraso: number
+    descripcion: string
+    fecha_ref: string
+}
+
+export interface AlertasConfig {
+    horas_pesado_muestreo: number
+    horas_muestreo_ley: number
+    horas_ley_recuperacion: number
+    dias_volado_stock: number
+}
+
+export interface AlertasResponse {
+    alertas: AlertaItem[]
+    config: AlertasConfig
+    total_criticas: number
+    total_altas: number
+    total_medias: number
 }
 
 export const dashboardApi = {
-    getResumen: () => api.get<DashboardResponse>('/dashboard/resumen').then(r => r.data)
-}
+    getResumen: () => api.get<DashboardResponse>('/dashboard/resumen').then(r => r.data),
+
+    async exportar(tipo: 'lotes' | 'acopiadores'): Promise<void> {
+        const res = await api.post(
+            '/dashboard/exportar',
+            null,
+            { params: { tipo }, responseType: 'blob' },
+        )
+        const url = URL.createObjectURL(res.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${tipo}_paititi_${new Date().toISOString().slice(0, 10)}.xlsx`
+        a.click()
+        URL.revokeObjectURL(url)
+      },
+
+      getAlertas: () =>
+        api.get<AlertasResponse>('/dashboard/alertas').then(r => r.data),
+
+      updateAlertasConfig: (config: AlertasConfig) =>
+        api.put<AlertasConfig>('/dashboard/alertas/config', config).then(r => r.data)
+  }

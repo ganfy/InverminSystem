@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -68,3 +70,29 @@ class DashboardResponse(BaseModel):
     acopiadores_tmh: list[AcopiadorTMH]
     analisis_conteo: AnalisisConteo = AnalisisConteo()
     acopiadores_stats: list[AcopiadorStats] = []
+
+
+class AlertaItem(BaseModel):
+    tipo: str  # VOLADO_STOCK | RETRASO_MUESTREO | RETRASO_LEY | RETRASO_RECUPERACION
+    severidad: str  # CRITICA | ALTA | MEDIA
+    ip: str
+    proveedor: str
+    acopiador: str | None
+    horas_retraso: float
+    descripcion: str
+    fecha_ref: datetime
+
+
+class AlertasConfig(BaseModel):
+    horas_pesado_muestreo: float = 24.0
+    horas_muestreo_ley: float = 24.0
+    horas_ley_recuperacion: float = 72.0
+    dias_volado_stock: float = 30.0
+
+
+class AlertasResponse(BaseModel):
+    alertas: list[AlertaItem]
+    config: AlertasConfig
+    total_criticas: int = 0
+    total_altas: int = 0
+    total_medias: int = 0

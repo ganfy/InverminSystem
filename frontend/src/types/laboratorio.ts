@@ -71,6 +71,8 @@ export interface AnalisisRecuperacionOut {
     ley_cabeza: number
     ley_cola: number | null
     ley_liquido?: number | null
+    ley_cola_ag_gr_tm?: number | null
+    solucion_ag_g_m3?: number | null
     recuperacion?: number | null
     estado: EstadoRecuperacion
     vigente: boolean

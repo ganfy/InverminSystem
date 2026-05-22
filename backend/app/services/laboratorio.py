@@ -15,6 +15,7 @@ from pathlib import Path
 
 from app.models.enums import EstadoRecuperacion, OrigenDatos, TipoAnalisis, TipoMuestra
 from app.models.models import (
+    AnalisisDetalle,
     AnalisisLey,
     AnalisisRecuperacion,
     Lote,
@@ -181,6 +182,8 @@ def _rec_out(
         ley_cabeza=a.ley_cabeza if a.ley_cabeza is not None else Decimal("0"),
         ley_cola=a.ley_cola,
         ley_liquido=a.ley_liquido,
+        ley_cola_ag_gr_tm=a.ley_cola_ag_gr_tm,
+        solucion_ag_g_m3=a.solucion_ag_g_m3,
         recuperacion=a.recuperacion,
         estado=a.estado,
         vigente=a.vigente,
@@ -485,6 +488,7 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
+    _crear_detalles_newmont(db, nuevo.id, datos)
     return nuevo
 
 
@@ -679,15 +683,144 @@ def enviar_recuperacion_interna(
     return nuevo
 
 
-def completar_recuperacion(
-    db: Session,
-    analisis_id: int,
-    datos: CompletarRecuperacionRequest,
+def _calcular_ley_reco_gr_tm(mineral_mg: Decimal, peso_g: Decimal) -> Decimal:
+    """ley (Gr/TM) = mineral_mg / peso_g * 1000"""
+    if peso_g == 0:
+        raise ValueError("El peso de la muestra no puede ser 0")
+    return (Decimal(str(mineral_mg)) / Decimal(str(peso_g)) * 1000).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
+
+
+def _promedio_decimal(*values) -> Decimal | None:
+    vals = [Decimal(str(v)) for v in values if v is not None]
+    if not vals:
+        return None
+    return (sum(vals) / len(vals)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _procesar_muestras_reconocimiento(
+    db: "Session",
+    recuperacion_id: int,
+    muestras,  # list[MuestraReconocimientoIn]
     usuario_id: int,
-) -> AnalisisRecuperacion:
+) -> "tuple[Decimal | None, Decimal | None]":
+    """
+    Crea 3 filas en analisis_detalle por cada muestra física:
+      AU1  : mineral_mg=au1_mg, ley=ley_au1 (Gr/TM)
+      AU2  : mineral_mg=au2_mg, ley=ley_au2 (Gr/TM)
+      AU_AG: mineral_mg=au_ag_mg, ley=ley_ag (Gr/TM)
+    Retorna (ley_cola_oz_tc, ley_cola_ag_gr_tm).
+    ley_cola_oz_tc = promedio de avg(Au1,Au2) por muestra / 34.2857
+    """
+    leyes_au_gr_tm: list[Decimal] = []
+    leyes_ag_gr_tm: list[Decimal] = []
+
+    for m in muestras:
+        peso = Decimal(str(m.peso_g))
+
+        ley_au1 = _calcular_ley_reco_gr_tm(m.au1_mg, peso)
+        ley_au2 = _calcular_ley_reco_gr_tm(m.au2_mg, peso)
+        ley_au_avg = _promedio_decimal(ley_au1, ley_au2)
+
+        # Ag = señal neta: (Au+Ag_mg - avg(Au1,Au2)_mg) / peso * 1000
+        au_avg_mg = (Decimal(str(m.au1_mg)) + Decimal(str(m.au2_mg))) / 2
+        ag_mg = max(Decimal("0"), Decimal(str(m.au_ag_mg)) - au_avg_mg - BLANK_CORRECTION_AG)
+        ley_ag = _calcular_ley_reco_gr_tm(ag_mg, peso) if ag_mg > 0 else Decimal("0")
+
+        leyes_au_gr_tm.append(ley_au_avg)
+        leyes_ag_gr_tm.append(ley_ag)
+
+        db.add(
+            AnalisisDetalle(
+                recuperacion_id=recuperacion_id,
+                origen="AU1",
+                peso=peso,
+                mineral_mg=Decimal(str(m.au1_mg)),
+                ley=ley_au1,
+                numero_ensayo=m.numero_ensayo,
+            )
+        )
+        db.add(
+            AnalisisDetalle(
+                recuperacion_id=recuperacion_id,
+                origen="AU2",
+                peso=peso,
+                mineral_mg=Decimal(str(m.au2_mg)),
+                ley=ley_au2,
+                numero_ensayo=m.numero_ensayo,
+            )
+        )
+        db.add(
+            AnalisisDetalle(
+                recuperacion_id=recuperacion_id,
+                origen="AU_AG",
+                peso=peso,
+                mineral_mg=Decimal(str(m.au_ag_mg)),
+                ley=ley_ag,
+                numero_ensayo=m.numero_ensayo,
+            )
+        )
+
+    db.flush()
+
+    ley_cola_gr_tm = _promedio_decimal(*leyes_au_gr_tm)
+    ley_cola_oz_tc = (
+        (ley_cola_gr_tm / FACTOR_OZ_TC).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        if ley_cola_gr_tm
+        else None
+    )
+    ley_cola_ag = _promedio_decimal(*leyes_ag_gr_tm)
+    return ley_cola_oz_tc, ley_cola_ag
+
+
+def _crear_detalles_newmont(
+    db: "Session",
+    analisis_id: int,
+    datos,  # AnalisisLeyCreate — necesita campo opcional muestras_detalle
+) -> None:
+    """
+    Crea hasta 3 filas en analisis_detalle con los datos crudos del triple sampling.
+    Solo si el payload incluye muestras_detalle (campo opcional, no breaking change).
+    Orden esperado: [FINO1, GRUESO, FINO2]
+    """
+    muestras = getattr(datos, "muestras_detalle", None)
+    if not muestras:
+        return
+
+    mapa_origen = {0: "FINO1", 1: "GRUESO", 2: "FINO2"}
+    for i, m in enumerate(muestras):
+        db.add(
+            AnalisisDetalle(
+                analisis_id=analisis_id,
+                origen=mapa_origen.get(i, f"MUESTRA_{i+1}"),
+                peso=Decimal(str(m.peso_g)),
+                mineral_mg=Decimal(str(m.au_mg)),
+                ley=Decimal(str(m.ley_oz_tc)),
+                numero_ensayo=1,
+            )
+        )
+    db.flush()
+
+
+def completar_recuperacion(
+    db: "Session",
+    analisis_id: int,
+    datos: "CompletarRecuperacionRequest",
+    usuario_id: int,
+) -> "AnalisisRecuperacion":
     """
     Laboratorista completa un análisis de recuperación PENDIENTE.
-    Ingresa ley_cola y ley_liquido; el sistema calcula recuperacion automáticamente.
+
+    Flujo A — con muestras crudas (reconocimiento de planta):
+      Requiere datos.muestras (list[MuestraReconocimientoIn]).
+      Crea filas en analisis_detalle (AU1, AU2, AU_AG) y calcula:
+        ley_cola        = promedio leyes Au (convertido a Oz/TC)
+        ley_cola_ag_gr_tm = promedio leyes Ag (Gr/TM)
+
+    Flujo B — fallback (certificado externo / sin muestras):
+      Requiere datos.ley_cola directo.
+      No crea filas de detalle.
     """
     a = (
         db.query(AnalisisRecuperacion)
@@ -702,11 +835,23 @@ def completar_recuperacion(
     if not a.vigente:
         raise ValueError("No se puede completar un análisis descartado")
 
-    if datos.ley_cola >= a.ley_cabeza:
+    # ── Determinar ley_cola ───────────────────────────────────────────────────
+    muestras = getattr(datos, "muestras", None)
+    if muestras:
+        ley_cola, ley_cola_ag = _procesar_muestras_reconocimiento(db, a.id, muestras, usuario_id)
+    else:
+        if datos.ley_cola is None:
+            raise ValueError("Debe ingresar muestras o ley_cola directamente")
+        ley_cola = Decimal(str(datos.ley_cola))
+        ley_cola_ag = None
+
+    if ley_cola >= a.ley_cabeza:
         raise ValueError("La ley cola debe ser estrictamente menor a la ley cabeza")
 
-    a.ley_cola = datos.ley_cola
+    a.ley_cola = ley_cola
     a.ley_liquido = datos.ley_liquido
+    a.ley_cola_ag_gr_tm = ley_cola_ag
+    a.solucion_ag_g_m3 = getattr(datos, "solucion_ag_g_m3", None)
     a.estado = EstadoRecuperacion.COMPLETADO
     a.fecha_analisis = datos.fecha_analisis
     a.modificado_por = usuario_id

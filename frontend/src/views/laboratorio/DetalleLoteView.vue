@@ -103,7 +103,7 @@
                 </label>
                 <!-- Botón Ag: solo en análisis Au, sin Ag vigente ya registrada -->
                 <button
-                  v-if="a.material !== 'Ag' && !lote.ley_ag_gr_tm"
+                  v-if="a.material !== 'Ag' && !lote.ley_ag_gr_tm && !leyAgDesdeRecuperacion"
                   class="btn-ag-sm"
                   @click="abrirModalAg(a.id, a.laboratorio)"
                   title="Registrar ley de plata vinculada a este análisis"
@@ -111,6 +111,15 @@
                   <span class="ag-dot">Ag</span> + Ley Ag
                 </button>
                 <!-- Si ya existe Ag, mostrar valor + editar -->
+                <span
+                  v-else-if="a.material !== 'Ag' && leyAgDesdeRecuperacion"
+                  class="ag-registered"
+                  title="Ley Ag calculada desde reconocimiento de pulpa"
+                >
+                  <span class="ag-dot">Ag</span>
+                  {{ Number(leyAgDesdeRecuperacion).toFixed(3) }} Gr/TM
+                  <span style="font-size:0.65rem;color:var(--color-text-faint);margin-left:0.25rem">(reconocimiento)</span>
+                </span>
                 <span
                   v-else-if="a.material !== 'Ag' && lote.ley_ag_gr_tm"
                   class="ag-registered"
@@ -498,6 +507,18 @@
             <div class="lab-field">
               <span class="lf-label">% RECUPERACIÓN:</span>
               <span class="lf-value highlight">{{ a.recuperacion != null ? a.recuperacion + '%' : '-' }}</span>
+            </div>
+            <div class="lab-field" v-if="a.ley_cola_ag_gr_tm != null">
+              <span class="lf-label">LEY COLA Ag:</span>
+              <span class="lf-value" style="color:#60a5fa">
+                {{ Number(a.ley_cola_ag_gr_tm).toFixed(4) }} Gr/TM
+              </span>
+            </div>
+            <div class="lab-field" v-if="a.solucion_ag_g_m3 != null">
+              <span class="lf-label">Ag SOLUCIÓN:</span>
+              <span class="lf-value" style="color:#60a5fa">
+                {{ Number(a.solucion_ag_g_m3).toFixed(4) }} g/m³
+              </span>
             </div>
 
             <div v-if="a.certificado_url" class="lab-field">
@@ -913,6 +934,14 @@ const formAg = ref({
   laboratorio:    '',
   fecha_analisis: new Date().toISOString().split('T')[0],
 })
+
+const leyAgDesdeRecuperacion = computed(() => {
+      if (!lote.value) return null
+      const rec = lote.value.analisis_recuperacion.find(
+        a => a.vigente && a.ley_cola_ag_gr_tm != null
+      )
+      return rec?.ley_cola_ag_gr_tm ?? null
+    })
 
 function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)

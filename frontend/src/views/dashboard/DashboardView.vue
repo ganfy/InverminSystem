@@ -113,9 +113,9 @@
           </div>
         </div>
 
-        <div style="display:flex;align-items:flex-end;gap:0.5rem">
-          <button class="btn-export" @click="exportarLotesCSV">
-            <Download :size="14" /> Excel
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn-export" @click="exportarExcel('lotes')">
+            <Download :size="13" /> Excel
           </button>
         </div>
       </div>
@@ -140,7 +140,11 @@
             <tr v-if="lotesFiltrados.length === 0">
               <td colspan="11" class="empty-state">Sin lotes para los filtros seleccionados.</td>
             </tr>
-            <tr v-for="lote in lotesFiltrados" :key="lote.ip" class="tabla-row">
+            <tr
+              v-for="lote in lotesFiltrados" :key="lote.ip"
+              class="tabla-row"
+              :class="urgenciaFila(lote)"
+            >
               <td class="td-mono gold">{{ lote.ip }}</td>
               <td class="align-right td-mono">{{ lote.tmh.toFixed(3) }}</td>
               <td class="align-right td-mono">{{ lote.tms?.toFixed(3) ?? '—' }}</td>
@@ -197,9 +201,9 @@
         <span class="badge-info">Resumen Mensualizado</span>
       </div>
 
-      <div class="export-bar">
-        <button class="btn-export" @click="exportarAcopiadoresCSV">
-          <Download :size="14" /> Excel
+      <div class="export-bar" style="margin-bottom:0.5rem">
+        <button class="btn-export" @click="exportarExcel('acopiadores')">
+          <Download :size="13" /> Excel
         </button>
       </div>
 
@@ -346,89 +350,243 @@
       </div>
     </template>
 
+    <template v-else-if="tabActual === 'alertas'">
+      <div v-if="alertasLoading" class="estado-carga">
+        <RefreshCw class="spin" :size="20" /> Evaluando alertas…
+      </div>
+
+      <template v-else-if="alertasData">
+
+        <!-- Resumen de severidades -->
+        <div class="alertas-header">
+          <div class="sev-pill pill-critica">
+            <span class="pill-num">{{ alertasData.total_criticas }}</span>
+            <span class="pill-lbl">Críticas</span>
+          </div>
+          <div class="sev-pill pill-alta">
+            <span class="pill-num">{{ alertasData.total_altas }}</span>
+            <span class="pill-lbl">Altas</span>
+          </div>
+          <div class="sev-pill pill-media">
+            <span class="pill-num">{{ alertasData.total_medias }}</span>
+            <span class="pill-lbl">Medias</span>
+          </div>
+          <div style="flex:1"/>
+          <button class="btn-export" @click="cargarAlertas">
+            <RefreshCw :size="13" /> Actualizar
+          </button>
+        </div>
+
+        <!-- Filtros -->
+        <div class="filtros-bar">
+          <div class="field" style="width:160px">
+            <label class="field-label">TIPO</label>
+            <select v-model="filtroTipo" class="field-input field-select">
+              <option value="TODOS">Todos</option>
+              <option v-for="(lbl, key) in TIPO_LABELS" :key="key" :value="key">{{ lbl }}</option>
+            </select>
+          </div>
+          <div class="field" style="width:160px">
+            <label class="field-label">SEVERIDAD</label>
+            <select v-model="filtroSev" class="field-input field-select">
+              <option value="TODOS">Todas</option>
+              <option value="CRITICA">Crítica</option>
+              <option value="ALTA">Alta</option>
+              <option value="MEDIA">Media</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Sin alertas -->
+        <div v-if="!alertasFiltradas.length" class="empty-state" style="margin-top:2rem">
+          <span style="font-size:2rem">✅</span>
+          <p>Sin alertas para los filtros seleccionados</p>
+        </div>
+
+        <!-- Lista de alertas -->
+        <div v-else class="alertas-list">
+          <div
+            v-for="a in alertasFiltradas" :key="`${a.ip}-${a.tipo}`"
+            class="alerta-card"
+            :class="`alerta-${a.severidad.toLowerCase()}`"
+          >
+            <div class="alerta-top">
+              <component
+                :is="TIPO_ICONOS[a.tipo] ?? ICONO_FALLBACK"
+                :size="17"
+                class="alerta-icono-svg"
+              />
+              <div class="alerta-meta">
+                <span class="alerta-tipo">{{ TIPO_LABELS[a.tipo] }}</span>
+                <span class="badge-sev" :class="`sev-${a.severidad.toLowerCase()}`">
+                  {{ a.severidad }}
+                </span>
+              </div>
+              <span class="alerta-ip font-mono">{{ a.ip }}</span>
+            </div>
+            <p class="alerta-desc">{{ a.descripcion }}</p>
+            <div class="alerta-footer">
+              <span class="text-muted" style="font-size:var(--text-xs)">
+                {{ a.proveedor }}
+                <template v-if="a.acopiador && a.acopiador !== a.proveedor">
+                  · {{ a.acopiador }}
+                </template>
+              </span>
+              <span class="alerta-horas font-mono">
+                {{ a.horas_retraso >= 48
+                    ? `${(a.horas_retraso/24).toFixed(1)} días`
+                    : `${a.horas_retraso}h` }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editor de umbrales (solo Admin/Gerencia) -->
+        <details class="umbrales-panel" v-if="umbralEdit">
+          <summary class="umbrales-summary">
+            <Settings :size="13" />
+            Configurar umbrales de alerta
+          </summary>
+          <div class="umbrales-grid">
+            <div class="umbral-row">
+              <label>Pesaje → Muestreo (horas)</label>
+              <input type="number" min="1" v-model.number="umbralEdit.horas_pesado_muestreo" class="umbral-input"/>
+            </div>
+            <div class="umbral-row">
+              <label>Muestreo → Ley (horas)</label>
+              <input type="number" min="1" v-model.number="umbralEdit.horas_muestreo_ley" class="umbral-input"/>
+            </div>
+            <div class="umbral-row">
+              <label>Ley → Recuperación (horas)</label>
+              <input type="number" min="1" v-model.number="umbralEdit.horas_ley_recuperacion" class="umbral-input"/>
+            </div>
+            <div class="umbral-row">
+              <label>Volado sin ruma (días)</label>
+              <input type="number" min="1" v-model.number="umbralEdit.dias_volado_stock" class="umbral-input"/>
+            </div>
+          </div>
+          <button class="btn-export" :disabled="guardandoCfg" @click="guardarConfig"
+            style="margin-top:0.75rem; border-color: var(--color-gold); color: var(--color-gold)">
+            {{ guardandoCfg ? 'Guardando…' : 'Guardar umbrales' }}
+          </button>
+        </details>
+
+      </template>
+    </template>
+
     <template v-else>
-      <!-- Botones de exportación -->
       <div class="export-bar">
-        <button class="btn-export" @click="exportarResumenCSV" title="Exportar resumen KPIs">
-          <Download :size="14" /> KPIs
+        <button class="btn-export" @click="exportarExcel('lotes')">
+          <Download :size="13" /> Lotes .xlsx
         </button>
-        <button class="btn-export" @click="imprimirVista" title="Imprimir / Guardar PDF">
-          <Printer :size="14" /> PDF
+        <button class="btn-export" @click="exportarExcel('acopiadores')">
+          <Download :size="13" /> Acopiadores .xlsx
+        </button>
+        <button class="btn-export" @click="imprimirVista">
+          <Printer :size="13" /> PDF
         </button>
       </div>
 
       <div class="charts-grid">
-        <!-- Distribución de estados -->
-        <div class="analytics-card">
-          <div class="card-header-mini">
-            <h3>Estados de Lotes</h3>
-            <span class="text-muted font-mono" style="font-size:var(--text-xs)">Total: {{ totalLotes }}</span>
-          </div>
-          <div class="chart-container-bars">
-            <div v-for="(item, estado) in distribucionEstados" :key="estado" class="chart-row">
-              <div class="row-info">
-                <span class="badge-estado" :class="badgeLote(estado.toString())">{{ estado }}</span>
-                <span class="row-count font-mono">{{ item.count }}</span>
-              </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill transition-all" :class="badgeLote(estado.toString())" :style="{ width: `${item.porcentaje}%` }"></div>
-              </div>
-              <span class="row-pct font-mono">{{ item.porcentaje }}%</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- Pipeline de análisis -->
+        <!-- Donut: Pipeline de Análisis -->
         <div class="analytics-card">
           <div class="card-header-mini">
             <h3>Pipeline de Análisis</h3>
-            <span class="text-muted font-mono" style="font-size:var(--text-xs)">Muestras activas</span>
+            <span class="font-mono text-muted" style="font-size:var(--text-xs)">{{ totalLotes }} lotes totales</span>
           </div>
-          <div class="chart-container-bars">
-            <div v-for="(item, estAnalisis) in distribucionAnalisis" :key="estAnalisis" class="chart-row">
-              <div class="row-info">
-                <span class="badge-analisis" :class="badgeAnalisis(estAnalisis.toString())">
-                  {{ labelAnalisis(estAnalisis.toString()) }}
-                </span>
-                <span class="row-count font-mono">{{ item.count }}</span>
+          <div class="donut-layout">
+            <!-- SVG Donut -->
+            <div class="donut-wrap">
+              <svg :viewBox="`0 0 100 100`" width="150" height="150">
+                <g transform="rotate(-90 50 50)">
+                  <circle cx="50" cy="50" :r="DONUT_R" fill="none"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="13"/>
+                  <circle
+                    v-for="seg in donutSegments" :key="seg.label"
+                    cx="50" cy="50" :r="DONUT_R" fill="none"
+                    :stroke="seg.color" stroke-width="13"
+                    :stroke-dasharray="`${seg.dash} ${DONUT_CIRC}`"
+                    :stroke-dashoffset="`-${seg.offset}`"
+                    style="transition: stroke-dashoffset 0.5s"
+                  />
+                </g>
+              </svg>
+              <div class="donut-center">
+                <span class="donut-val">{{ totalLotes }}</span>
+                <span class="donut-lbl">lotes</span>
               </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill transition-all" :class="badgeAnalisis(estAnalisis.toString())" :style="{ width: `${item.porcentaje}%` }"></div>
+            </div>
+            <!-- Legend -->
+            <div class="donut-legend">
+              <div v-for="seg in donutSegments" :key="seg.label" class="legend-row">
+                <span class="legend-dot" :style="{ background: seg.color }"></span>
+                <span class="legend-label">{{ seg.label }}</span>
+                <span class="legend-count font-mono">{{ seg.value }}</span>
+                <span class="legend-pct font-mono">{{ seg.pct }}%</span>
               </div>
-              <span class="row-pct font-mono">{{ item.porcentaje }}%</span>
             </div>
           </div>
         </div>
 
-        <!-- Resumen por acopiador -->
+        <!-- Barras: Estados de Lotes -->
+        <div class="analytics-card">
+          <div class="card-header-mini">
+            <h3>Estados de Lotes</h3>
+          </div>
+          <div class="bars-list">
+            <div v-for="(item, estado) in distribucionEstados" :key="estado" class="bar-row">
+              <div class="bar-label">
+                <span class="badge-estado" :class="badgeLote(estado.toString())">{{ estado }}</span>
+              </div>
+              <div class="bar-track">
+                <div
+                  class="bar-fill"
+                  :class="badgeLote(estado.toString())"
+                  :style="{ width: `${item.porcentaje}%` }"
+                ></div>
+              </div>
+              <span class="bar-count font-mono">{{ item.count }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla: Resumen por Acopiador -->
         <div class="analytics-card analytics-card--wide" v-if="data?.acopiadores_stats?.length">
           <div class="card-header-mini">
             <h3>Resumen por Acopiador</h3>
-            <span class="text-muted font-mono" style="font-size:var(--text-xs)">Acumulado campaña</span>
+            <span class="font-mono text-muted" style="font-size:var(--text-xs)">acumulado campaña</span>
           </div>
-          <div class="table-wrapper" style="margin-top:0.5rem">
-            <table class="data-table" style="font-size:var(--text-sm)">
-              <thead>
-                <tr>
-                  <th>ACOPIADOR</th>
-                  <th class="align-right">LOTES</th>
-                  <th class="align-right">TMS</th>
-                  <th class="align-right">OZ EN STOCK</th>
-                  <th class="align-right">LEY PROM (gr/TM)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="s in data.acopiadores_stats" :key="s.acopiador" class="tabla-row">
-                  <td class="font-bold">{{ s.acopiador }}</td>
-                  <td class="align-right td-mono">{{ s.lotes }}</td>
-                  <td class="align-right td-mono">{{ s.tms.toFixed(2) }}</td>
-                  <td class="align-right td-mono" style="color:var(--color-gold)">{{ s.oz.toFixed(3) }}</td>
-                  <td class="align-right td-mono">{{ s.ley_prom?.toFixed(3) ?? '—' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <table class="data-table" style="margin-top:0.75rem">
+            <thead>
+              <tr>
+                <th>ACOPIADOR</th>
+                <th class="align-right">LOTES</th>
+                <th>TMS</th>
+                <th class="align-right">OZ EN STOCK</th>
+                <th class="align-right">LEY PROM gr/TM</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in data.acopiadores_stats" :key="s.acopiador" class="tabla-row">
+                <td class="font-bold">{{ s.acopiador }}</td>
+                <td class="align-right td-mono">{{ s.lotes }}</td>
+                <td>
+                  <div class="mini-bar-wrap">
+                    <div class="mini-bar-track">
+                      <div class="mini-bar-fill"
+                        :style="{ width: `${(s.tms / maxAcopiadorTms) * 100}%` }"></div>
+                    </div>
+                    <span class="mini-bar-val font-mono">{{ s.tms.toFixed(1) }}</span>
+                  </div>
+                </td>
+                <td class="align-right td-mono" style="color:var(--color-gold)">{{ s.oz.toFixed(3) }}</td>
+                <td class="align-right td-mono">{{ s.ley_prom?.toFixed(3) ?? '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+
       </div>
     </template>
 
@@ -436,17 +594,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, markRaw } from 'vue'
+import { ref, computed, onMounted, markRaw, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Zap, TrendingUp, Scale, Database, Coins, Search,
   RefreshCw, Layers, FileText, PlusCircle, Download, LayoutDashboard,
-  Hourglass, Printer,
+  Hourglass, Printer, Package, Droplets, FlaskConical, Timer,
+  Settings, AlertTriangle,
 } from 'lucide-vue-next'
-import { dashboardApi, type DashboardResponse } from '@/api/dashboard'
+import { dashboardApi, type DashboardResponse,
+  type LoteDashboard,
+ } from '@/api/dashboard'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
 import { useUiStore } from '@/stores/ui'
 import { descargarPDF } from '@/api/liquidaciones'
+import type { AlertaItem, AlertasConfig, AlertasResponse} from '@/api/dashboard'
 
 const router   = useRouter()
 const liqStore = useLiquidacionesStore()
@@ -458,7 +620,7 @@ const cargando   = ref(true)
 const lastUpdate = ref<string | null>(null)
 
 // ── Tabs ──────────────────────────────────────────────────────────────
-type TabKey = 'resumen' | 'lotes' | 'liquidaciones' | 'acopiadores'
+type TabKey = 'resumen' | 'lotes' | 'liquidaciones' | 'acopiadores' | 'alertas'
 const tabActual = ref<TabKey>('resumen')
 
 const tabs = computed(() => [
@@ -466,6 +628,7 @@ const tabs = computed(() => [
   { key: 'lotes'          as TabKey, label: 'Lotes',         icon: markRaw(Layers),           count: lotesFiltrados.value.length || null },
   { key: 'liquidaciones'  as TabKey, label: 'Liquidaciones', icon: markRaw(FileText),          count: liqStore.lista.length || null },
   { key: 'acopiadores'    as TabKey, label: 'Acopiadores',   icon: markRaw(Scale),            count: data.value?.acopiadores_tmh?.length || null },
+  { key: 'alertas'        as TabKey, label: 'Alertas',       icon: markRaw(FileText),         count: totalAlertas.value || null },
 ])
 
 // Mapeo ordenado de meses de claves de la estructura de datos
@@ -473,6 +636,14 @@ const mesesClaves = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
 ] as const;
+
+// Estado
+const alertasData = ref<AlertasResponse | null>(null)
+const alertasLoading = ref(false)
+const filtroTipo = ref<string>('TODOS')
+const filtroSev = ref<string>('TODOS')
+const umbralEdit = ref<AlertasConfig | null>(null)
+const guardandoCfg = ref(false)
 
 const formatVolume = (val: number) => {
   if (!val || val === 0) return '-';
@@ -665,6 +836,115 @@ function imprimirVista() {
   window.print()
 }
 
+// ── Donut Chart (análisis pipeline) ─────────────────────────────────
+const DONUT_R    = 40
+const DONUT_CIRC = +(2 * Math.PI * DONUT_R).toFixed(4)  // 251.3274
+
+interface DonutSeg { label: string; value: number; color: string; pct: number; dash: number; offset: number }
+
+const donutSegments = computed((): DonutSeg[] => {
+  const c = data.value?.analisis_conteo
+  if (!c) return []
+  const items = [
+    { label: 'Listo',         value: c.listo,          color: '#22c55e' },
+    { label: 'Falta Rec.',    value: c.falta_rec,       color: '#f59e0b' },
+    { label: 'Falta Ley',     value: c.falta_ley,       color: '#60a5fa' },
+    { label: 'Falta Muestreo',value: c.falta_muestreo,  color: '#c084fc' },
+    { label: 'Sin datos',     value: c.sin_datos,       color: '#475569' },
+  ].filter(i => i.value > 0)
+  const total = items.reduce((s, i) => s + i.value, 0)
+  if (!total) return []
+  let acc = 0
+  return items.map(i => {
+    const dash = (i.value / total) * DONUT_CIRC
+    const seg: DonutSeg = { ...i, pct: +(i.value / total * 100).toFixed(1), dash, offset: acc }
+    acc += dash
+    return seg
+  })
+})
+
+// Max TMS para normalizar mini-bars de acopiadores
+const maxAcopiadorTms = computed(() =>
+  Math.max(...(data.value?.acopiadores_stats.map(a => a.tms) ?? [1]), 1)
+)
+
+function urgenciaFila(l: LoteDashboard): string {
+  if (l.estado_analisis === 'LISTO') return 'row-listo'
+  if (l.dias_almacen >= 30 && l.estado_analisis !== 'LISTO') return 'row-urgente'
+  if (l.estado_analisis === 'SIN_DATOS') return 'row-sin-datos'
+  return ''
+}
+
+// ── Export ───────────────────────────────────────────────────────────
+async function exportarExcel(tipo: 'lotes' | 'acopiadores') {
+  try {
+    await dashboardApi.exportar(tipo)
+    ui.toast('Excel generado', 'success')
+  } catch {
+    ui.toast('Error al generar el Excel', 'error')
+  }
+}
+
+// Alertas
+
+async function cargarAlertas() {
+  alertasLoading.value = true
+  try {
+    alertasData.value = await dashboardApi.getAlertas()
+    umbralEdit.value = { ...alertasData.value.config }
+  } finally {
+    alertasLoading.value = false
+  }
+}
+
+async function guardarConfig() {
+  if (!umbralEdit.value) return
+  guardandoCfg.value = true
+  try {
+    await dashboardApi.updateAlertasConfig(umbralEdit.value)
+    ui.toast('Umbrales actualizados', 'success')
+    await cargarAlertas()
+  } catch {
+    ui.toast('Error al guardar umbrales', 'error')
+  } finally {
+    guardandoCfg.value = false
+  }
+}
+
+const alertasFiltradas = computed(() => {
+  if (!alertasData.value) return []
+  return alertasData.value.alertas.filter(a =>
+    (filtroTipo.value === 'TODOS' || a.tipo === filtroTipo.value) &&
+    (filtroSev.value  === 'TODOS' || a.severidad === filtroSev.value)
+  )
+})
+
+const totalAlertas = computed(() =>
+  (alertasData.value?.total_criticas ?? 0) +
+  (alertasData.value?.total_altas    ?? 0) +
+  (alertasData.value?.total_medias   ?? 0)
+)
+
+const TIPO_LABELS: Record<string, string> = {
+  VOLADO_STOCK:         'Volado en stock',
+  RETRASO_MUESTREO:     'Sin muestreo',
+  RETRASO_LEY:          'Sin ley',
+  RETRASO_RECUPERACION: 'Sin recuperación',
+}
+
+const TIPO_ICONOS: Record<string, object> = {
+  VOLADO_STOCK: markRaw(Package),
+  RETRASO_MUESTREO: markRaw(Droplets),
+  RETRASO_LEY: markRaw(FlaskConical),
+  RETRASO_RECUPERACION: markRaw(Timer),
+}
+const ICONO_FALLBACK = markRaw(AlertTriangle)
+
+// Cargar alertas cuando se activa el tab
+watch(tabActual, (tab) => {
+  if (tab === 'alertas' && !alertasData.value) cargarAlertas()
+})
+
 function badgeLote(estado: string) {
   const m: Record<string, string> = {
     RECEPCIONADO: 'en-proceso', ASIGNADO_RUMA: 'parcial',
@@ -696,7 +976,7 @@ function labelAnalisis(estado: string): string {
     FALTA_MUESTREO: 'Falta humedad',
     FALTA_LEY: 'Falta ley',
     FALTA_REC: 'Falta rec.',
-    LISTO:     'Listo',
+    LISTO:     'Listo para liquidar',
   }[estado] ?? estado
 }
 
@@ -986,11 +1266,169 @@ onMounted(() => {
 /* Wide card (acopiadores) */
 .analytics-card--wide { grid-column: 1 / -1; }
 
+/* Donut */
+.donut-layout { display: flex; align-items: center; gap: 1.5rem; padding-top: 0.5rem; flex-wrap: wrap; }
+.donut-wrap   { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
+.donut-center {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none;
+}
+.donut-val { display: block; font-size: 1.6rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-text); }
+.donut-lbl { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-top: -2px; }
+
+.donut-legend { display: flex; flex-direction: column; gap: 0.55rem; flex: 1; min-width: 160px; }
+.legend-row { display: flex; align-items: center; gap: 0.5rem; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-label { flex: 1; font-size: var(--text-sm); color: var(--color-text); }
+.legend-count { font-size: var(--text-sm); color: var(--color-text); min-width: 28px; text-align: right; }
+.legend-pct { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 40px; text-align: right; }
+
+/* Barras estados (reemplaza progress-bar-*) */
+.bars-list { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 0.5rem; }
+.bar-row { display: flex; align-items: center; gap: 0.75rem; }
+.bar-label { width: 130px; min-width: 130px; }
+.bar-track {
+  flex: 1; height: 14px; background: rgba(255,255,255,0.06);
+  border: 1px solid var(--color-border); border-radius: 3px; overflow: hidden;
+}
+.bar-fill {
+  height: 100%; border-radius: 3px; width: 0;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.bar-fill.en-proceso  { background: var(--color-warning); }
+.bar-fill.parcial     { background: var(--color-gold); }
+.bar-fill.completado  { background: #4ade80; }
+.bar-fill.pagado      { background: #22c55e; }
+.bar-fill.pendiente   { background: var(--color-error); }
+.bar-count { width: 32px; text-align: right; font-size: var(--text-sm); color: var(--color-text); font-weight: 700; }
+
+/* Mini-bars tabla acopiadores */
+.mini-bar-wrap { display: flex; align-items: center; gap: 0.5rem; }
+.mini-bar-track {
+  width: 90px; height: 8px; background: rgba(255,255,255,0.06);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--color-border);
+}
+.mini-bar-fill { height: 100%; background: var(--color-gold); border-radius: 2px; transition: width 0.5s; }
+.mini-bar-val { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 36px; }
+
+/* Urgencia filas lotes */
+.row-listo    { background: rgba(34, 197, 94,  0.03) !important; }
+.row-urgente  { background: rgba(245, 158, 11, 0.05) !important; border-left: 2px solid var(--color-warning); }
+.row-sin-datos{ background: rgba(148, 163, 184, 0.03) !important; }
+.row-urgente td:first-child { padding-left: calc(1rem - 2px); }
+
+/* Export bar (ya definido, asegurar que exista) */
+.export-bar { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.btn-export {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.8rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border); background: transparent;
+  color: var(--color-text-muted); font-size: var(--text-xs);
+  font-family: var(--font-mono); cursor: pointer; transition: all 0.15s;
+}
+.btn-export:hover { border-color: var(--color-gold); color: var(--color-gold); }
+
 /* Print */
 @media print {
-  .tabs-bar, .filtros-bar, .export-bar, .btn-refresh, .page-header button { display: none !important; }
+  .tabs-bar, .filtros-bar, .export-bar, .btn-refresh { display: none !important; }
   .dashboard-page { padding: 0; }
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .analytics-card, .table-wrapper { break-inside: avoid; }
 }
+
+/* Tab badge */
+.tab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; border-radius: 9px;
+  font-size: 10px; font-weight: 700; padding: 0 4px; margin-left: 5px;
+}
+.badge-critica { background: #ef4444; color: #fff; }
+.badge-alta    { background: #f59e0b; color: #000; }
+
+/* Severity pills */
+.alertas-header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.sev-pill {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0.5rem 1.25rem; border-radius: var(--radius-sm);
+  border: 1px solid; min-width: 80px;
+}
+.sev-pill .pill-num { font-size: 1.5rem; font-weight: 700; font-family: var(--font-mono); line-height: 1; }
+.sev-pill .pill-lbl { font-size: var(--text-xs); margin-top: 2px; }
+.pill-critica { border-color: #ef4444; color: #ef4444; }
+.pill-alta    { border-color: #f59e0b; color: #f59e0b; }
+.pill-media   { border-color: #facc15; color: #facc15; }
+
+/* Alert cards */
+.alertas-list { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.75rem; }
+.alerta-card {
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem; border-left-width: 3px;
+  background: rgba(255,255,255,0.02);
+}
+.alerta-critica { border-left-color: #ef4444; }
+.alerta-alta    { border-left-color: #f59e0b; }
+.alerta-media   { border-left-color: #facc15; }
+
+.alerta-top { display: flex; align-items: center; gap: 0.6rem; }
+.alerta-icono { font-size: 1.1rem; }
+.alerta-meta  { display: flex; align-items: center; gap: 0.5rem; flex: 1; }
+.alerta-tipo  { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+.alerta-ip    { font-size: var(--text-sm); color: var(--color-gold); }
+
+.badge-sev { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+.sev-critica { background: rgba(239,68,68,.15);  color: #ef4444; }
+.sev-alta    { background: rgba(245,158,11,.15); color: #f59e0b; }
+.sev-media   { background: rgba(250,204,21,.12); color: #facc15; }
+
+.alerta-desc {
+  margin: 0.35rem 0 0.5rem 1.7rem;
+  font-size: var(--text-sm); color: var(--color-text-muted);
+}
+.alerta-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-left: 1.7rem;
+}
+.alerta-horas { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* Umbrales panel */
+.umbrales-panel {
+  margin-top: 2rem; border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: 0.75rem 1rem;
+}
+.umbrales-panel summary {
+  cursor: pointer; font-size: var(--text-sm);
+  color: var(--color-text-muted); user-select: none;
+}
+.umbrales-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem; }
+.umbral-row { display: flex; flex-direction: column; gap: 0.25rem; }
+.umbral-row label { font-size: var(--text-xs); color: var(--color-text-muted); }
+.umbral-input {
+  padding: 0.3rem 0.5rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border); background: transparent;
+  color: var(--color-text); font-family: var(--font-mono); font-size: var(--text-sm);
+  width: 100%;
+}
+.umbral-input:focus { outline: none; border-color: var(--color-gold); }
+
+.alerta-icono-svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  margin-top: 1px;          /* alineación vertical con el texto */
+}
+
+.alerta-critica .alerta-icono-svg { color: #ef4444; }
+.alerta-alta    .alerta-icono-svg { color: #f59e0b; }
+.alerta-media   .alerta-icono-svg { color: #facc15; }
+
+.umbrales-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  user-select: none;
+  list-style: none;       /* quita el triángulo nativo en algunos browsers */
+}
+.umbrales-summary::-webkit-details-marker { display: none; }
 </style>

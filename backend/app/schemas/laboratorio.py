@@ -9,6 +9,28 @@ from pydantic import BaseModel, Field
 model_config = {"from_attributes": True, "json_encoders": {Decimal: float}}
 
 
+class NewmontMuestraIn(BaseModel):
+    """
+    Datos crudos de una muestra del triple sampling Newmont.
+    Campo opcional en AnalisisLeyCreate para poblar analisis_detalle.
+    """
+
+    peso_g: Decimal = Field(..., gt=0)
+    au_mg: Decimal = Field(..., ge=0)
+    ley_oz_tc: Decimal = Field(..., ge=0, description="Ley calculada en frontend (Oz/TC)")
+
+
+class AnalisisDetalleOut(BaseModel):
+    id: int
+    origen: str  # FINO1 | FINO2 | GRUESO | AU1 | AU2 | AU_AG
+    peso: Decimal | None
+    mineral_mg: Decimal | None
+    ley: Decimal | None
+    numero_ensayo: int
+
+    model_config = {"from_attributes": True}
+
+
 class AnalisisLeyCreate(BaseModel):
     cip: str = Field(..., description="Código CIP de la muestra")
     laboratorio: str = Field(..., description="Nombre del laboratorio")
@@ -17,6 +39,7 @@ class AnalisisLeyCreate(BaseModel):
     ley_fino: float = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
     ley_grueso: float = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
     origen_datos: str = OrigenDatos.MANUAL
+    muestras_detalle: list[NewmontMuestraIn] | None = None
     fecha_analisis: date | None = None
 
 
@@ -109,14 +132,6 @@ class AnalisisRecuperacionCreate(BaseModel):
     fecha_analisis: date | None = None
 
 
-class CompletarRecuperacionRequest(BaseModel):
-    """Para que laboratorista complete un pending (ley_cola + ley_liquido)."""
-
-    ley_cola: Decimal | None = None
-    ley_liquido: Decimal | None = None
-    fecha_analisis: date | None = None
-
-
 class EnviarRecuperacionInternaRequest(BaseModel):
     """
     Comercial crea un registro pendiente de recuperación para el laboratorio interno.
@@ -137,13 +152,18 @@ class AnalisisRecuperacionOut(BaseModel):
     laboratorio: str
     ley_cabeza: Decimal
     ley_cola: Decimal | None = None
-    ley_liquido: Decimal | None = None
+    ley_liquido: Decimal | None = None  # solución Au
     recuperacion: Decimal | None = None
+    ley_cola_ag_gr_tm: Decimal | None = None  # ley Ag de cola (Gr/TM)
+    solucion_ag_g_m3: Decimal | None = None  # Ag en solución (g/m³)
+    # ── Detalles por muestra (solo se incluyen cuando se piden explícitamente) ─
+    detalles: list[AnalisisDetalleOut] = []
+    # ── Estado y trazabilidad ─────────────────────────────────────────────────
     estado: str
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
-    creado_por_nombre: str | None = None  # nombre del laboratorista que registró
+    creado_por_nombre: str | None = None
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     eliminado: bool = False
@@ -151,6 +171,50 @@ class AnalisisRecuperacionOut(BaseModel):
     eliminado_por: int | None = None
 
     model_config = {"from_attributes": True}
+
+
+class MuestraReconocimientoIn(BaseModel):
+    """
+    Una muestra física del reconocimiento de pulpa (sala de metalurgia).
+    Cada lote produce 3 filas en analisis_detalle:
+      - origen AU1  : peso + mineral_mg=Au1_mg → ley Au1 (Gr/TM)
+      - origen AU2  : peso + mineral_mg=Au2_mg → ley Au2 (Gr/TM)
+      - origen AU_AG: peso + mineral_mg=AuAg_mg → ley Ag (Gr/TM)
+    La ley Au final de esta muestra = avg(ley_au1, ley_au2).
+    numero_ensayo: 1 normal, 2 = remuestreo.
+    """
+
+    peso_g: Decimal = Field(..., gt=0, description="Peso de muestra sólida (g)")
+    au1_mg: Decimal = Field(..., ge=0, description="Señal Au primera lectura (mg)")
+    au2_mg: Decimal = Field(..., ge=0, description="Señal Au segunda lectura (mg)")
+    au_ag_mg: Decimal = Field(..., ge=0, description="Señal Au+Ag combinada (mg)")
+    numero_ensayo: int = Field(default=1, ge=1, le=10)
+
+
+class CompletarRecuperacionRequest(BaseModel):
+    """
+    Para que laboratorista complete un PENDIENTE.
+
+    Flujo A (reconocimiento de planta): proveer muestras[].
+    El service calcula ley_cola y ley_cola_ag automáticamente.
+    Flujo B (fallback / certificado externo): proveer ley_cola directo.
+    """
+
+    # Flujo A — muestras crudas
+    muestras: list[MuestraReconocimientoIn] | None = Field(
+        default=None,
+        description="Muestras de reconocimiento. Si se proveen, ley_cola se calcula automáticamente.",
+    )
+    # Flujo B — fallback
+    ley_cola: Decimal | None = Field(
+        default=None, description="Ley cola directa (Oz/TC). Solo si no hay muestras."
+    )
+    # Solución (líquido)
+    ley_liquido: Decimal | None = Field(default=None, description="Ley líquido Au (Oz/TC).")
+    solucion_ag_g_m3: Decimal | None = Field(
+        default=None, description="Concentración Ag en solución (g/m³)."
+    )
+    fecha_analisis: date | None = None
 
 
 # ── Acciones de Comercial ─────────────────────────────────────────────────────

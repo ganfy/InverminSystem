@@ -243,6 +243,27 @@ CONFIGURACIONES = [
         "valor": "72",
         "descripcion": "Tiempo máximo en horas para completar una prueba metalúrgica antes de alertar de incumplimiento",
     },
+    # Alertas Dashboard
+    {
+        "clave": "alerta_horas_pesado_muestreo",
+        "valor": "24",
+        "descripcion": "Horas máximas entre pesado y muestreo antes de generar alerta de retraso",
+    },
+    {
+        "clave": "alerta_horas_muestreo_ley",
+        "valor": "24",
+        "descripcion": "Horas máximas entre muestreo y resultado de ley antes de generar alerta de retraso",
+    },
+    {
+        "clave": "alerta_horas_ley_recuperacion",
+        "valor": "72",
+        "descripcion": "Horas máximas entre resultado de ley y recuperación antes de generar alerta de retraso",
+    },
+    {
+        "clave": "alerta_dias_volado_stock",
+        "valor": "30",
+        "descripcion": "Días máximos de volado en stock antes de generar alerta",
+    },
 ]
 # ── Runner ────────────────────────────────────────────────────────────────────
 

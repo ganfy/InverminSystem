@@ -625,6 +625,7 @@ class AnalisisDetalle(Base):
     peso = Column(Numeric(10, 4))
     ley = Column(Numeric(10, 4))
     numero_ensayo = Column(Integer, default=1)
+    mineral_mg = Column(Numeric(10, 4), nullable=True)  # Señal cruda en mg
 
     analisis_ley = relationship(
         "AnalisisLey",
@@ -653,6 +654,8 @@ class AnalisisRecuperacion(AuditMixin, Base):
     laboratorio = Column(String(50), nullable=False)
     ley_cabeza = Column(Numeric(10, 4))
     ley_cola = Column(Numeric(10, 4))
+    ley_cola_ag_gr_tm = Column(Numeric(10, 4), nullable=True)
+    solucion_ag_g_m3 = Column(Numeric(10, 4), nullable=True)
     ley_liquido = Column(Numeric(10, 4))
     recuperacion = Column(
         Numeric(5, 2),
