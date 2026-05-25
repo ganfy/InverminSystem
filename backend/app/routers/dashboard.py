@@ -1,4 +1,3 @@
-from app.core.config import get_settings
 from app.core.deps import get_db
 from app.schemas.dashboard import AlertasConfig, AlertasResponse, DashboardResponse
 from app.services.dashboard import (
@@ -7,7 +6,7 @@ from app.services.dashboard import (
     obtener_alertas,
     obtener_resumen_dashboard,
 )
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -31,13 +30,12 @@ def get_dashboard_resumen(db: Session = Depends(get_db)):
 
 @router.post("/exportar")
 def exportar_excel(
-    tipo: str = Query("lotes", pattern="^(lotes|acopiadores)$"),
+    payload: ExportarPayload,
     db: Session = Depends(get_db),
 ):
-    settings = get_settings()
     data = obtener_resumen_dashboard(db)
-    buf = generar_excel_dashboard(data, tipo=tipo, clave=settings.excel_export_password)
-    nombre = f"{'lotes' if tipo == 'lotes' else 'acopiadores'}_paititi.xlsx"
+    buf = generar_excel_dashboard(data, tipo=payload.tipo, clave=payload.clave)
+    nombre = f"{'lotes' if payload.tipo == 'lotes' else 'acopiadores'}_paititi.xlsx"
     return Response(
         content=buf.read(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

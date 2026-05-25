@@ -478,7 +478,7 @@ def generar_excel_dashboard(data: DashboardResponse, tipo: str, clave: str):
                     lt.rec_porc,
                     lt.acopiador,
                     lt.estado,
-                    analisis.get(lt.estadoanalisis, lt.estadoanalisis),
+                    analisis.get(lt.estado_analisis, lt.estado_analisis),
                     lt.dias_almacen,
                     "Sí" if lt.habilitado_ruma else "No",
                     "Sí" if lt.volado else "No",

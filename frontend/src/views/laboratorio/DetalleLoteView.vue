@@ -988,7 +988,7 @@ const leyPlantaSoloSimulada = computed<number | null>(() => {
     return leyComercialCalc.value?.ley_planta_solo ?? null
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && a.tipo_analisis === 'planta' && a.material === 'Ag',
+      && a.tipo_analisis === 'planta' && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -1003,7 +1003,7 @@ const leyPlantaSimulada = computed<number | null>(() => {
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
       && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
-      && a.material === 'Ag',
+      && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length

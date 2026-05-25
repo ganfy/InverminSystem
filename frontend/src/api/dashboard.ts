@@ -1,6 +1,4 @@
-import type { StringMappingType } from 'typescript'
 import api from './axios'
-import { Zap } from 'lucide-vue-next'
 
 export interface DashboardKPIs {
     au_real_100: number
@@ -26,7 +24,7 @@ interface AcopiadorTMH {
     noviembre: number;
     diciembre: number;
     total: number;
-  }
+}
 
 export interface LoteDashboard {
     ip: string
@@ -93,11 +91,11 @@ export interface AlertasResponse {
 export const dashboardApi = {
     getResumen: () => api.get<DashboardResponse>('/dashboard/resumen').then(r => r.data),
 
-    async exportar(tipo: 'lotes' | 'acopiadores'): Promise<void> {
+    async exportar(tipo: 'lotes' | 'acopiadores', clave: string): Promise<void> {
         const res = await api.post(
             '/dashboard/exportar',
-            null,
-            { params: { tipo }, responseType: 'blob' },
+            { tipo, clave },
+            { responseType: 'blob' },
         )
         const url = URL.createObjectURL(res.data)
         const a = document.createElement('a')
@@ -105,11 +103,11 @@ export const dashboardApi = {
         a.download = `${tipo}_paititi_${new Date().toISOString().slice(0, 10)}.xlsx`
         a.click()
         URL.revokeObjectURL(url)
-      },
+    },
 
-      getAlertas: () =>
+    getAlertas: () =>
         api.get<AlertasResponse>('/dashboard/alertas').then(r => r.data),
 
-      updateAlertasConfig: (config: AlertasConfig) =>
+    updateAlertasConfig: (config: AlertasConfig) =>
         api.put<AlertasConfig>('/dashboard/alertas/config', config).then(r => r.data)
-  }
+}

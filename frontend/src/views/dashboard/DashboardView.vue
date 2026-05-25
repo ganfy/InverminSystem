@@ -877,9 +877,17 @@ function urgenciaFila(l: LoteDashboard): string {
 
 // ── Export ───────────────────────────────────────────────────────────
 async function exportarExcel(tipo: 'lotes' | 'acopiadores') {
+  const clave = await ui.showPrompt({
+    title: 'Proteger Excel',
+    message: 'Ingresa tu contraseña para cifrar el archivo:',
+    inputType: 'password',
+    placeholder: '••••••••',
+    confirmLabel: 'Descargar',
+  })
+  if (!clave) return
   try {
-    await dashboardApi.exportar(tipo)
-    ui.toast('Excel generado', 'success')
+    await dashboardApi.exportar(tipo, clave)
+    ui.toast('Excel generado y protegido', 'success')
   } catch {
     ui.toast('Error al generar el Excel', 'error')
   }
@@ -939,6 +947,11 @@ const TIPO_ICONOS: Record<string, object> = {
   RETRASO_RECUPERACION: markRaw(Timer),
 }
 const ICONO_FALLBACK = markRaw(AlertTriangle)
+
+// Cargar alertas cuando se activa el tab
+watch(tabActual, (tab) => {
+  if (tab === 'alertas' && !alertasData.value) cargarAlertas()
+})
 
 function badgeLote(estado: string) {
   const m: Record<string, string> = {
