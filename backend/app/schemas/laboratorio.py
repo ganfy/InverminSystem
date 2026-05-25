@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.models.enums import OrigenDatos, TipoAnalisis
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ── Análisis de Ley (Fire Assay triple sampling) ──────────────────────────────
 
@@ -35,27 +35,47 @@ class AnalisisLeyCreate(BaseModel):
     cip: str = Field(..., description="Código CIP de la muestra")
     laboratorio: str = Field(..., description="Nombre del laboratorio")
     tipo_analisis: TipoAnalisis = Field(..., description="planta | externo | minero | dirimencia")
-    material: str = Field("Au", description="Material analizado")
-    ley_fino: float = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
-    ley_grueso: float = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
+    material: str = Field("Au", description="Au | Ag")
+    ley_fino: float = Field(..., ge=0, description="Oz/TC fracción -140 (Au) o ley Ag")
+    ley_grueso: float = Field(0.0, ge=0, description="Oz/TC fracción +140 (Au). 0 para Ag")
+    punto: str | None = Field(None, description="Ag: CABEZA | COLA | LIQUIDO")
     origen_datos: str = OrigenDatos.MANUAL
     muestras_detalle: list[NewmontMuestraIn] | None = None
     fecha_analisis: date | None = None
 
+    @model_validator(mode="after")
+    def validar_segun_material(self) -> "AnalisisLeyCreate":
+        if self.material == "Au":
+            if self.ley_fino <= 0:
+                raise ValueError("ley_fino debe ser > 0 para Au")
+            if self.ley_grueso <= 0:
+                raise ValueError("ley_grueso debe ser > 0 para Au")
+        elif self.material == "Ag":
+            if self.ley_fino <= 0:
+                raise ValueError("ley_fino (ley Ag oz/TC) debe ser > 0")
+            self.ley_grueso = 0.0  # garantizar
+            if not self.punto:
+                raise ValueError("punto (CABEZA/COLA/LIQUIDO) es requerido para Ag")
+        return self
+
 
 class AnalisisLeyPorIPCreate(BaseModel):
-    """
-    Para registrar ley minero o dirimencia directamente por IP del lote,
-    sin requerir CIP (ley minero no pasa por laboratorio de planta).
-    """
-
     tipo_analisis: TipoAnalisis = Field(..., description="minero | dirimencia")
     laboratorio: str = Field(..., description="Nombre del laboratorio o minero")
-    ley_fino: float = Field(..., ge=0, description="Oz/TC malla fina")
-    ley_grueso: float = Field(..., ge=0, description="Oz/TC malla gruesa")
-    material: str = Field("Au")
+    ley_fino: float = Field(..., ge=0, description="Oz/TC malla fina (Au) o ley Ag")
+    ley_grueso: float = Field(0.0, ge=0, description="Oz/TC malla gruesa. 0 para Ag")
+    material: str = Field("Au", description="Au | Ag")
+    punto: str | None = Field(None, description="Ag: CABEZA | COLA | LIQUIDO")
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
+
+    @model_validator(mode="after")
+    def validar_segun_material(self) -> "AnalisisLeyPorIPCreate":
+        if self.material == "Ag":
+            self.ley_grueso = 0.0
+            if not self.punto:
+                raise ValueError("punto es requerido para Ag")
+        return self
 
 
 class AnalisisLeyOut(BaseModel):

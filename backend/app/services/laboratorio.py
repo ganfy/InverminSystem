@@ -69,6 +69,7 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.tipo_analisis == TipoAnalisis.MINERO,
+            AnalisisLey.material == "Au",
             AnalisisLey.vigente == True,  # noqa: E712
         )
         .first()
@@ -84,6 +85,7 @@ def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis == TipoAnalisis.PLANTA,
+            AnalisisLey.material == "Au",
         )
         .all()
     )
@@ -101,6 +103,7 @@ def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis == TipoAnalisis.EXTERNO,
+            AnalisisLey.material == "Au",
         )
         .all()
     )
@@ -118,6 +121,7 @@ def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.tipo_analisis == TipoAnalisis.DIRIMENCIA,
             AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.material == "Au",
         )
         .first()
     )
@@ -467,6 +471,15 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     #     for p in previos:
     #         p.vigente = False
 
+    # Para Ag: garantizar ley_grueso=0, desactivar Ag anterior vigente
+    if datos.material == "Ag":
+        datos.ley_grueso = 0.0
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == mapeo.lote_id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        ).update({"vigente": False}, synchronize_session="fetch")
+
     ley_final = _calcular_ley_final(datos.ley_fino, datos.ley_grueso)
     ley_gr_tm = _calcular_ley_gr_tm(ley_final)
 
@@ -488,7 +501,10 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
-    _crear_detalles_newmont(db, nuevo.id, datos)
+    if datos.material == "Ag":
+        _crear_detalle_ag(db, nuevo.id, datos)
+    else:
+        _crear_detalles_newmont(db, nuevo.id, datos)
     return nuevo
 
 
@@ -526,6 +542,14 @@ def registrar_ley_por_ip(
     #     for p in previos:
     #         p.vigente = False
 
+    if datos.material == "Ag":
+        datos.ley_grueso = 0.0
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == lote.id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        ).update({"vigente": False}, synchronize_session="fetch")
+
     ley_final = _calcular_ley_final(Decimal(str(datos.ley_fino)), Decimal(str(datos.ley_grueso)))
     ley_gr_tm = _calcular_ley_gr_tm(ley_final)
 
@@ -547,6 +571,9 @@ def registrar_ley_por_ip(
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
+    if datos.material == "Ag":
+        _crear_detalle_ag(db, nuevo.id, datos)
+
     return nuevo
 
 
@@ -800,6 +827,32 @@ def _crear_detalles_newmont(
                 numero_ensayo=1,
             )
         )
+    db.flush()
+
+
+def _crear_detalle_ag(
+    db: "Session",
+    analisis_id: int,
+    datos,  # AnalisisLeyCreate | AnalisisLeyPorIPCreate
+) -> None:
+    """
+    Crea 1 fila en analisis_detalle para análisis de Ag.
+    origen = datos.punto (CABEZA | COLA | LIQUIDO).
+    ley almacenada en oz/TC (ley_fino del payload).
+    """
+    if getattr(datos, "material", "Au") != "Ag":
+        return
+    punto = getattr(datos, "punto", None)
+    if not punto:
+        return
+    db.add(
+        AnalisisDetalle(
+            analisis_id=analisis_id,
+            origen=punto,  # CABEZA | COLA | LIQUIDO
+            ley=Decimal(str(datos.ley_fino)),
+            numero_ensayo=1,
+        )
+    )
     db.flush()
 
 

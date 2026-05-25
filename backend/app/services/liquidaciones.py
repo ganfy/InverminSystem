@@ -122,6 +122,7 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.tipo_analisis == TipoAnalisis.MINERO,
+            AnalisisLey.material == "Au",
             AnalisisLey.vigente == True,  # noqa: E712
         )
         .order_by(AnalisisLey.id.desc())
@@ -138,6 +139,7 @@ def _ley_base_planta(db: Session, lote_id: int) -> Decimal | None:
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
+            AnalisisLey.material == "Au",
         )
         .all()
     )
@@ -154,6 +156,7 @@ def _ley_dirimencia_raw(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.tipo_analisis == TipoAnalisis.DIRIMENCIA,
+            AnalisisLey.material == "Au",
             AnalisisLey.vigente == True,  # noqa: E712
         )
         .first()

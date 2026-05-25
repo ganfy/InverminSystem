@@ -57,6 +57,7 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
+            AnalisisLey.material == "Au",
         )
         .all()
     )
