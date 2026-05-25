@@ -57,12 +57,12 @@
           <input type="date" class="field-input" v-model="form.fecha_analisis" />
         </div>
         <div class="field">
-          <label class="field-label">DESCRIPCIÓN:</label>
-          <input class="field-input" v-model="descripcion" placeholder="Polveado" />
+          <label class="field-label">RECEPCIÓN DE MUESTRAS:</label>
+          <input class="field-input" v-model="descripcion" placeholder="0.5kg aprox. de Mineral" />
         </div>
         <div class="field">
-          <label class="field-label">MÉTODO:</label>
-          <input :value="form.material === 'Ag' ? 'Absorción Atómica' : 'Newmont'" readonly class="field-input" disabled />
+          <label class="field-label">DESCRIPCIÓN:</label>
+          <input :value="'PROCESO'" class="field-input" disabled />
         </div>
         <div class="field">
           <label class="field-label">PUNTO:</label>
@@ -79,7 +79,7 @@
         <div class="field">
           <label class="field-label">TIPO DE ANÁLISIS:</label>
           <input class="field-input"
-            :value="form.material === 'Ag' ? 'Absorción Atómica' : 'Fire Assay - Gravimétrico'"
+            :value="'Fire Assay - Gravimétrico'"
             disabled />
         </div>
       </div>
@@ -225,7 +225,7 @@ const errCalc      = ref('')
 const materialInfo = ref('Mineral')
 
 // ── Campos del formulario ─────────────────────────────────────────────────────
-const descripcion = ref('Polveado')
+const descripcion = ref('0.5kg aprox. de Mineral')
 const punto       = ref<'CABEZA' | 'COLA' | 'LIQUIDO'>('CABEZA')
 
 const form = ref({
