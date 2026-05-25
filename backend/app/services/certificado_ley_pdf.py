@@ -313,7 +313,7 @@ _TEMPLATE_ENSAYO = """
     <span class="meta-label">Fecha Entrega:</span><span class="meta-val">{fecha_entrega}</span>
   </div>
   <div class="meta-row">
-    <span class="meta-label">PARA:</span><span class="meta-val">PLANTA</span>
+    <span class="meta-label">PARA:</span><span class="meta-val">COMERCIAL</span>
   </div>
   <div class="meta-row">
     <span class="meta-label">Solicitud de ensayo:</span><span class="meta-val">Análisis de sólidos por Au y Ag</span>

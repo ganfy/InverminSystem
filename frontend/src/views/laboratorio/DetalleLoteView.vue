@@ -76,10 +76,43 @@
               <span class="lf-label">RESPONSABLE:</span>
               <span class="lf-value" style="color:var(--color-text-muted)">{{ a.creado_por_nombre }}</span>
             </div>
-            <div class="lab-field"><span class="lf-label">MALLA +140:</span>  <span class="lf-value">{{ a.ley_grueso }}</span></div>
-            <div class="lab-field"><span class="lf-label">MALLA -140:</span>  <span class="lf-value">{{ a.ley_fino }}</span></div>
-            <div class="lab-field"><span class="lf-label">LEY OZ/TC:</span>   <span class="lf-value highlight">{{ a.ley_final }}</span></div>
-            <div class="lab-field"><span class="lf-label">LEY GR/TM:</span>   <span class="lf-value">{{ a.ley_gr_tm }}</span></div>
+            <!-- Au: triple sampling con ambas unidades -->
+            <template v-if="a.material !== 'Ag'">
+              <div class="lab-field">
+                <span class="lf-label">MALLA +140:</span>
+                <span class="lf-value">
+                  {{ fmtOz(a.ley_grueso) }} oz/TC
+                  <span class="lf-unit-alt">/ {{ ozToGt(a.ley_grueso) }} g/TM</span>
+                </span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">MALLA −140:</span>
+                <span class="lf-value">
+                  {{ fmtOz(a.ley_fino) }} oz/TC
+                  <span class="lf-unit-alt">/ {{ ozToGt(a.ley_fino) }} g/TM</span>
+                </span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">LEY Au (OZ/TC):</span>
+                <span class="lf-value highlight">{{ fmtOz(a.ley_final) }}</span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">LEY Au (GR/TM):</span>
+                <span class="lf-value" style="color:var(--color-gold)">{{ fmtGt(a.ley_gr_tm) }}</span>
+              </div>
+            </template>
+
+            <!-- Ag: ley directa -->
+            <template v-else>
+              <div class="lab-field">
+                <span class="lf-label">LEY Ag (OZ/TC):</span>
+                <span class="lf-value highlight" style="color:#60a5fa">{{ fmtOz(a.ley_final) }}</span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">LEY Ag (G/TM):</span>
+                <span class="lf-value" style="color:#93c5fd">{{ fmtGt(a.ley_gr_tm) }}</span>
+              </div>
+            </template>
 
             <div v-if="a.certificado_url" class="lab-field">
               <span class="lf-label">CERTIFICADO:</span>
@@ -101,34 +134,15 @@
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                     @change="adjuntarCertLey($event, a.id)" />
                 </label>
-                <!-- Botón Ag: solo en análisis Au, sin Ag vigente ya registrada -->
-                <button
-                  v-if="a.material !== 'Ag' && !lote.ley_ag_gr_tm && !leyAgDesdeRecuperacion"
-                  class="btn-ag-sm"
-                  @click="abrirModalAg(a.id, a.laboratorio)"
-                  title="Registrar ley de plata vinculada a este análisis"
-                >
-                  <span class="ag-dot">Ag</span> + Ley Ag
-                </button>
-                <!-- Si ya existe Ag, mostrar valor + editar -->
+                <!-- Ag registrada desde recuperación (solo display, no acción) -->
                 <span
-                  v-else-if="a.material !== 'Ag' && leyAgDesdeRecuperacion"
+                  v-if="a.material !== 'Ag' && leyAgDesdeRecuperacion"
                   class="ag-registered"
                   title="Ley Ag calculada desde reconocimiento de pulpa"
                 >
                   <span class="ag-dot">Ag</span>
                   {{ Number(leyAgDesdeRecuperacion).toFixed(3) }} Gr/TM
                   <span style="font-size:0.65rem;color:var(--color-text-faint);margin-left:0.25rem">(reconocimiento)</span>
-                </span>
-                <span
-                  v-else-if="a.material !== 'Ag' && lote.ley_ag_gr_tm"
-                  class="ag-registered"
-                  title="Ley Ag registrada"
-                >
-                  <span class="ag-dot">Ag</span>
-                  {{ Number(lote.ley_ag_gr_tm).toFixed(3) }} g/TM
-                  <button class="ag-edit-btn" @click="abrirModalAg(a.id, a.laboratorio)"
-                    title="Actualizar ley Ag">✎</button>
                 </span>
               </template>
               <button
@@ -935,6 +949,24 @@ const formAg = ref({
   fecha_analisis: new Date().toISOString().split('T')[0],
 })
 
+// Helpers
+function fmtOz(v: number | string | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toFixed(4)   // oz/TC
+}
+
+// Convierte oz/TC → g/TM (para ley_fino y ley_grueso que vienen en oz/TC)
+function ozToGt(v: number | string | null | undefined): string {
+  if (v == null) return '-'
+  return (Number(v) * 34.2857).toFixed(3)
+}
+
+// Formatea un valor ya en g/TM (ley_gr_tm que viene calculado del backend)
+function fmtGt(v: number | string | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toFixed(3)
+}
+
 const leyAgDesdeRecuperacion = computed(() => {
       if (!lote.value) return null
       const rec = lote.value.analisis_recuperacion.find(
@@ -956,7 +988,7 @@ const leyPlantaSoloSimulada = computed<number | null>(() => {
     return leyComercialCalc.value?.ley_planta_solo ?? null
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && a.tipo_analisis === 'planta',
+      && a.tipo_analisis === 'planta' && a.material === 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -970,7 +1002,8 @@ const leyPlantaSimulada = computed<number | null>(() => {
     return lote.value.ley_planta != null ? Number(lote.value.ley_planta) : null
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo'),
+      && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
+      && a.material === 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -1704,4 +1737,10 @@ onMounted(async () => {
   color: var(--color-text-faint); text-transform: uppercase; letter-spacing: 0.05em;
 }
 .ag-preview-val { font-family: var(--font-mono); font-size: var(--text-md); }
+.lf-unit-alt {
+  font-size: 0.65rem;
+  color: var(--color-text-faint);
+  margin-left: 0.3rem;
+  font-family: var(--font-mono);
+}
 </style>

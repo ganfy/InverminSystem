@@ -104,12 +104,12 @@
     <template v-else>
       <div class="tabs-lab">
         <button class="tab-lab-btn" :class="{ active: tabActual === 'ley' }" @click="tabActual = 'ley'">
-          Análisis de Ley
+          Análisis de Ley Newmont
           <span v-if="pendientesLey > 0" class="badge-count">{{ pendientesLey }}</span>
           <span class="tab-lab-toggle">{{ tabActual === 'ley' ? '︿' : '︾' }}</span>
         </button>
         <button class="tab-lab-btn" :class="{ active: tabActual === 'rec' }" @click="tabActual = 'rec'">
-          Análisis de Recuperación
+          Análisis de Reconocimientos
           <span v-if="pendientesRec > 0" class="badge-count">{{ pendientesRec }}</span>
           <span class="tab-lab-toggle">{{ tabActual === 'rec' ? '︿' : '︾' }}</span>
         </button>

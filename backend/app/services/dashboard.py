@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from app.models.enums import EstadoLote, EstadoRecuperacion, TipoAnalisis
+from app.models.enums import EstadoLote, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
     AnalisisRecuperacion,
@@ -24,7 +24,6 @@ from app.schemas.dashboard import (
     DashboardResponse,
     LoteDashboard,
 )
-from sqlalchemy import func as sqlfunc
 from sqlalchemy.orm import Session
 
 dias_habilitado = 30  # días de almacén para considerar lote "habilitado"
@@ -339,7 +338,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 rec_porc=rec_prom,
                 acopiador=acopiador_nombre,
                 estado=lote.estado if lote.estado else "RECEPCIONADO",
-                estadoanalisis=estadoanalisis,
+                estado_analisis=estadoanalisis,
                 habilitado_ruma=habilitado_ruma,
                 volado=bool(lote.volado),
                 dirimencia=bool(lote.dirimencia),
@@ -555,65 +554,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
     if not ids:
         return AlertasResponse(alertas=[], config=cfg)
 
-    # ── Pre-cargas en queries únicas (sin N+1) ───────────────────────
-    pesaje_fecha: dict[int, datetime] = {
-        r.lote_id: _dt(r.fecha)
-        for r in db.query(Pesaje.lote_id, sqlfunc.max(Pesaje.fecha_fin).label("fecha"))
-        .filter(Pesaje.lote_id.in_(ids))
-        .group_by(Pesaje.lote_id)
-        .all()
-        if r.fecha
-    }
-
-    muestreo_fecha: dict[int, datetime] = {
-        r.lote_id: _dt(r.fecha)
-        for r in db.query(Muestreo.lote_id, sqlfunc.max(Muestreo.creado_en).label("fecha"))
-        .filter(Muestreo.lote_id.in_(ids))
-        .group_by(Muestreo.lote_id)
-        .all()
-        if r.fecha
-    }
-
-    ley_fecha: dict[int, datetime] = {
-        r.lote_id: _dt(r.fecha)
-        for r in db.query(AnalisisLey.lote_id, sqlfunc.max(AnalisisLey.creado_en).label("fecha"))
-        .filter(
-            AnalisisLey.lote_id.in_(ids),
-            AnalisisLey.vigente == True,  # noqa: E712
-            AnalisisLey.tipoanalisis != TipoAnalisis.MINERO,
-        )
-        .group_by(AnalisisLey.lote_id)
-        .all()
-        if r.fecha
-    }
-
-    ids_con_rec: set[int] = {
-        r.lote_id
-        for r in db.query(AnalisisRecuperacion.lote_id)
-        .filter(
-            AnalisisRecuperacion.lote_id.in_(ids),
-            AnalisisRecuperacion.vigente == True,  # noqa: E712
-            AnalisisRecuperacion.estado.in_(
-                [EstadoRecuperacion.COMPLETADO, EstadoRecuperacion.CERT_COMERCIAL]
-            ),
-        )
-        .distinct()
-        .all()
-    }
-
-    prueba_fecha: dict[int, datetime] = {
-        r.lote_id: _dt(r.fecha)
-        for r in db.query(
-            PruebaMetalurgica.lote_id,
-            sqlfunc.max(PruebaMetalurgica.fecha_ingreso).label("fecha"),
-        )
-        .filter(PruebaMetalurgica.lote_id.in_(ids))
-        .group_by(PruebaMetalurgica.lote_id)
-        .all()
-        if r.fecha
-    }
-
-    # Nombres proveedor/acopiador
+    # ── 1. Nombres y Sesiones ──
     sesiones = {
         s.id: s
         for s in db.query(SesionDescarga)
@@ -631,7 +572,90 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                 acop = s.provacop.acopiador.razon_social
         return prov, acop
 
-    # ── Evaluación de alertas por lote ──────────────────────────────
+    # ── 2. Extracción de Fechas (Alineado 100% con el Dashboard) ──
+
+    # Pesaje: Tomamos el PRIMER registro (id.asc) al igual que hace lote.pesajes[0]
+    pesajes = (
+        db.query(Pesaje.lote_id, Pesaje.fecha_fin)
+        .filter(Pesaje.lote_id.in_(ids))
+        .order_by(Pesaje.id.asc())
+        .all()
+    )
+    pesaje_fecha: dict[int, datetime] = {}
+    for pid, pfecha in pesajes:
+        if pfecha and pid not in pesaje_fecha:
+            pesaje_fecha[pid] = _dt(pfecha)
+
+    # Muestreo: Tomamos el ÚLTIMO registro válido
+    muestreos = (
+        db.query(Muestreo)
+        .filter(Muestreo.lote_id.in_(ids))
+        .order_by(Muestreo.creado_en.asc())
+        .all()
+    )
+    muestreo_fecha: dict[int, datetime] = {}
+    tiene_muestreo: dict[int, bool] = {}
+    for m in muestreos:
+        # Regla idéntica al dashboard: debe tener ambos pesos mayores a 0
+        if m.peso_humedo and m.peso_seco and float(m.peso_humedo) > 0:
+            muestreo_fecha[m.lote_id] = _dt(m.creado_en)
+            tiene_muestreo[m.lote_id] = True
+        else:
+            tiene_muestreo[m.lote_id] = False
+
+    # Ley: Tomamos el ÚLTIMO registro válido (Corrección del typo: tipo_analisis)
+    leyes = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id.in_(ids),
+            AnalisisLey.vigente,
+            AnalisisLey.tipo_analisis != TipoAnalisis.MINERO,
+        )
+        .order_by(AnalisisLey.creado_en.asc())
+        .all()
+    )
+
+    ley_fecha: dict[int, datetime] = {}
+    tiene_ley: dict[int, bool] = {}
+    for le in leyes:
+        if le.ley_gr_tm is not None:
+            ley_fecha[le.lote_id] = _dt(le.creado_en)
+            tiene_ley[le.lote_id] = True
+        else:
+            tiene_ley[le.lote_id] = False
+
+    # Recuperación: Completada y sin pendientes
+    recs = (
+        db.query(AnalisisRecuperacion)
+        .filter(AnalisisRecuperacion.lote_id.in_(ids), AnalisisRecuperacion.vigente)
+        .all()
+    )
+
+    recs_dict = defaultdict(list)
+    for r in recs:
+        recs_dict[r.lote_id].append(r.estado)
+
+    ids_con_rec = {
+        lid
+        for lid, estados in recs_dict.items()
+        if any(e in ("COMPLETADO", "CERT_COMERCIAL") for e in estados)
+        and not any(e == "PENDIENTE" for e in estados)
+    }
+
+    # Pruebas Metalúrgicas
+    pruebas = (
+        db.query(PruebaMetalurgica.lote_id, PruebaMetalurgica.fecha_ingreso)
+        .filter(PruebaMetalurgica.lote_id.in_(ids))
+        .all()
+    )
+    prueba_fecha = {}
+    for pid, pfecha in pruebas:
+        if pfecha:
+            dt_p = _dt(pfecha)
+            if pid not in prueba_fecha or dt_p > prueba_fecha[pid]:
+                prueba_fecha[pid] = dt_p
+
+    # ── 3. Evaluación de Alertas (Cascada - Cuello de Botella) ──
     umb_muestreo = timedelta(hours=cfg.horas_pesado_muestreo)
     umb_ley = timedelta(hours=cfg.horas_muestreo_ley)
     umb_rec = timedelta(hours=cfg.horas_ley_recuperacion)
@@ -645,16 +669,16 @@ def obtener_alertas(db: Session) -> AlertasResponse:
         fl = ley_fecha.get(lote.id)
         fr = prueba_fecha.get(lote.id) or fl
 
+        # Alerta aislada: Volado sin ruma
         if lote.volado and lote.ruma_id is None and fp:
             delta = now - fp
             if delta >= umb_volado:
-                dias_v = int(delta.days)
                 alertas.append(
                     _make_alerta(
                         "VOLADO_STOCK",
                         delta,
                         umb_volado,
-                        f"Lote volado sin asignar a ruma hace {dias_v} día{'s' if dias_v != 1 else ''}",
+                        f"Lote volado sin asignar a ruma hace {int(delta.days)} días",
                         fp,
                         ip,
                         prov,
@@ -662,7 +686,8 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                     )
                 )
 
-        if fp and lote.id not in muestreo_fecha:
+        # Alertas en cascada (elif) - Bloquea si la etapa actual no está completada
+        if fp and not tiene_muestreo.get(lote.id, False):
             delta = now - fp
             if delta >= umb_muestreo:
                 alertas.append(
@@ -677,7 +702,8 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         acop,
                     )
                 )
-        elif fm and lote.id not in ley_fecha:
+
+        elif fm and not tiene_ley.get(lote.id, False):
             delta = now - fm
             if delta >= umb_ley:
                 alertas.append(
@@ -692,6 +718,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         acop,
                     )
                 )
+
         elif fl and lote.id not in ids_con_rec and fr:
             delta = now - fr
             if delta >= umb_rec:
@@ -708,6 +735,15 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         acop,
                     )
                 )
+
+    # Retorno de resultados
+    return AlertasResponse(
+        alertas=alertas,
+        config=cfg,
+        total_criticas=sum(1 for a in alertas if a.severidad == "CRITICA"),
+        total_altas=sum(1 for a in alertas if a.severidad == "ALTA"),
+        total_medias=sum(1 for a in alertas if a.severidad == "MEDIA"),
+    )
 
 
 def actualizar_config_alertas(db: Session, config: AlertasConfig) -> None:

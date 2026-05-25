@@ -940,11 +940,6 @@ const TIPO_ICONOS: Record<string, object> = {
 }
 const ICONO_FALLBACK = markRaw(AlertTriangle)
 
-// Cargar alertas cuando se activa el tab
-watch(tabActual, (tab) => {
-  if (tab === 'alertas' && !alertasData.value) cargarAlertas()
-})
-
 function badgeLote(estado: string) {
   const m: Record<string, string> = {
     RECEPCIONADO: 'en-proceso', ASIGNADO_RUMA: 'parcial',
@@ -975,7 +970,7 @@ function labelAnalisis(estado: string): string {
     SIN_DATOS: 'Sin datos',
     FALTA_MUESTREO: 'Falta humedad',
     FALTA_LEY: 'Falta ley',
-    FALTA_REC: 'Falta rec.',
+    FALTA_REC: 'Falta recuperación',
     LISTO:     'Listo para liquidar',
   }[estado] ?? estado
 }
@@ -983,6 +978,7 @@ function labelAnalisis(estado: string): string {
 onMounted(() => {
   cargarDashboard()
   liqStore.cargarLista()
+  cargarAlertas()
 })
 </script>
 

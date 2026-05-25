@@ -784,7 +784,7 @@ def _procesar_muestras_reconocimiento(
                 origen="AU_AG",
                 peso=peso,
                 mineral_mg=Decimal(str(m.au_ag_mg)),
-                ley=ley_ag,
+                ley=None,
                 numero_ensayo=m.numero_ensayo,
             )
         )
@@ -909,6 +909,61 @@ def completar_recuperacion(
     a.fecha_analisis = datos.fecha_analisis
     a.modificado_por = usuario_id
     db.flush()
+
+    # ── Generar Análisis de Ley de Plata (Ag) Automáticamente ──────────
+    if ley_cola_ag is not None:
+        # Obtenemos el análisis Au padre para heredar el tipo de análisis
+        analisis_au = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.lote_id == a.lote_id,
+                AnalisisLey.material == "Au",
+                AnalisisLey.vigente,
+            )
+            .first()
+        )
+
+        tipo_an = analisis_au.tipo_analisis if analisis_au else TipoAnalisis.PLANTA
+
+        # Inactivamos cualquier análisis de Ag previo del lote
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == a.lote_id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        ).update({"vigente": False}, synchronize_session="fetch")
+
+        # Calculamos Ag Oz/TC (ley_fino) a partir de Gr/TM
+        ley_oz_tc = (ley_cola_ag / FACTOR_OZ_TC).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+        nuevo_ag = AnalisisLey(
+            lote_id=a.lote_id,
+            cip=a.cip,
+            laboratorio=a.laboratorio,
+            tipo_analisis=tipo_an,
+            material="Ag",
+            ley_fino=float(ley_oz_tc),
+            ley_grueso=0.0,
+            ley_final=float(ley_oz_tc),
+            ley_gr_tm=float(ley_cola_ag),
+            origen_datos=OrigenDatos.MANUAL,
+            fecha_analisis=datos.fecha_analisis,
+            vigente=True,
+            creado_por=usuario_id,
+        )
+        db.add(nuevo_ag)
+        db.flush()
+
+        # Guardamos el detalle que justifica la ley de Ag creada
+        db.add(
+            AnalisisDetalle(
+                analisis_id=nuevo_ag.id,
+                origen="COLA",
+                ley=ley_oz_tc,
+                numero_ensayo=1,
+            )
+        )
+        db.flush()
+
     db.refresh(a)
     return a
 

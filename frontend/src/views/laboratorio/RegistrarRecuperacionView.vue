@@ -115,12 +115,14 @@
           <!-- Resultados calculados por muestra -->
           <div class="resultados-muestra" v-if="m._leyAu != null || m._leyAg != null">
             <div class="res-item">
-              <span class="res-label">Ley Au (Gr/TM)</span>
-              <span class="res-val gold">{{ fmtD(m._leyAu) }}</span>
+              <span class="res-label">Ley Au</span>
+              <span class="res-val gold">{{ fmtD(m._leyAu) }} <small>g/tm</small></span>
+              <span class="res-val-alt">{{ fmtD(toOzTc(m._leyAu)) }} <small>oz/TC</small></span>
             </div>
             <div class="res-item">
-              <span class="res-label">Ley Ag (Gr/TM)</span>
-              <span class="res-val blue">{{ fmtD(m._leyAg) }}</span>
+              <span class="res-label">Ley Ag</span>
+              <span class="res-val blue">{{ fmtD(m._leyAg) }} <small>g/tm</small></span>
+              <span class="res-val-alt">{{ fmtD(toOzTc(m._leyAg)) }} <small>oz/TC</small></span>
             </div>
           </div>
         </div>
@@ -152,20 +154,24 @@
       </section>
 
       <!-- RESUMEN CALCULADO -->
-      <section class="card card--resultados" v-if="resumen.leyColaAu != null">
+      <section class="card card--resultados" v-if="resumen.leyColaAuOzTc != null">
         <h2 class="card-titulo">RESULTADOS</h2>
         <div class="resumen-grid">
           <div class="res-item">
-            <span class="res-label">Ley cola Au promedio (Oz/TC)</span>
-            <span class="res-val gold">{{ fmtD(resumen.leyColaAu) }}</span>
+            <span class="res-label">Ley cola Au promedio</span>
+            <span class="res-val gold">{{ fmtD(resumen.leyColaAuGrTm) }} <small>g/tm</small></span>
+            <span class="res-val-alt">{{ fmtD(resumen.leyColaAuOzTc) }} <small>oz/TC</small></span>
           </div>
           <div class="res-item">
-            <span class="res-label">Ley cola Ag promedio (Gr/TM)</span>
-            <span class="res-val blue">{{ fmtD(resumen.leyColaAg) }}</span>
+            <span class="res-label">Ley cola Ag promedio</span>
+            <span class="res-val blue">{{ fmtD(resumen.leyColaAgGrTm) }} <small>g/tm</small></span>
+            <span class="res-val-alt">{{ fmtD(resumen.leyColaAgOzTc) }} <small>oz/TC</small></span>
           </div>
           <div class="res-item">
             <span class="res-label">% Recuperación Au</span>
-            <span class="res-val highlight">{{ resumen.recuperacion != null ? resumen.recuperacion.toFixed(2) + '%' : '—' }}</span>
+            <span class="res-val highlight" style="margin-top: 0.2rem;">
+              {{ resumen.recuperacion != null ? resumen.recuperacion.toFixed(2) + '%' : '—' }}
+            </span>
           </div>
         </div>
       </section>
@@ -216,9 +222,16 @@ interface MuestraForm {
   _leyAg:  number | null
 }
 
+// ── Funciones Helper de Conversión ─────────────────────────────────────────────
+function toOzTc(grTm: number | null): number | null {
+  if (grTm == null) return null
+  return parseFloat((grTm / OZ_TC_TO_GR_TM).toFixed(4))
+}
+
 function muestraVacia(): MuestraForm {
   return { peso_g: null, au1_mg: null, au2_mg: null, au_ag_mg: null, numero_ensayo: 1, _leyAu: null, _leyAg: null }
 }
+
 
 const muestras = ref<MuestraForm[]>([muestraVacia()])
 
@@ -258,20 +271,31 @@ const resumen = computed(() => {
   const leyesAu = muestras.value.map(m => m._leyAu).filter(v => v != null) as number[]
   const leyesAg = muestras.value.map(m => m._leyAg).filter(v => v != null) as number[]
 
-  if (!leyesAu.length) return { leyColaAu: null, leyColaAg: null, recuperacion: null }
+  if (!leyesAu.length) {
+    return {
+      leyColaAuOzTc: null, leyColaAuGrTm: null,
+      leyColaAgGrTm: null, leyColaAgOzTc: null,
+      recuperacion: null
+    }
+  }
 
+  // Cálculos para Oro (Au)
   const avgAuGrTm = leyesAu.reduce((a, b) => a + b, 0) / leyesAu.length
-  const leyColaAu = parseFloat((avgAuGrTm / OZ_TC_TO_GR_TM).toFixed(4))
-  const leyColaAg = leyesAg.length
-    ? parseFloat((leyesAg.reduce((a, b) => a + b, 0) / leyesAg.length).toFixed(4))
-    : null
+  const leyColaAuGrTm = parseFloat(avgAuGrTm.toFixed(4))
+  const leyColaAuOzTc = parseFloat((avgAuGrTm / OZ_TC_TO_GR_TM).toFixed(4))
 
+  // Cálculos para Plata (Ag)
+  const avgAgGrTm = leyesAg.length ? leyesAg.reduce((a, b) => a + b, 0) / leyesAg.length : 0
+  const leyColaAgGrTm = leyesAg.length ? parseFloat(avgAgGrTm.toFixed(4)) : null
+  const leyColaAgOzTc = leyesAg.length ? parseFloat((avgAgGrTm / OZ_TC_TO_GR_TM).toFixed(4)) : null
+
+  // Cálculo del % de Recuperación usando Oz/TC contra la ley cabeza
   const cabeza = analisisPendiente.value ? Number(analisisPendiente.value.ley_cabeza) : null
-  const recuperacion = (cabeza && leyColaAu < cabeza)
-    ? parseFloat(((cabeza - leyColaAu) / cabeza * 100).toFixed(2))
+  const recuperacion = (cabeza && leyColaAuOzTc < cabeza)
+    ? parseFloat(((cabeza - leyColaAuOzTc) / cabeza * 100).toFixed(2))
     : null
 
-  return { leyColaAu, leyColaAg, recuperacion }
+  return { leyColaAuOzTc, leyColaAuGrTm, leyColaAgGrTm, leyColaAgOzTc, recuperacion }
 })
 
 function fmtD(v: number | null) {
@@ -316,12 +340,13 @@ async function guardar() {
     return
   }
 
-  if (resumen.value.leyColaAu == null) {
+  if (resumen.value.leyColaAuOzTc == null) {
     errForm.value = 'No se pudo calcular la ley cola. Revise las muestras.'
     return
   }
+
   const cabeza = Number(analisisPendiente.value.ley_cabeza)
-  if (resumen.value.leyColaAu >= cabeza) {
+  if (resumen.value.leyColaAuOzTc >= cabeza) {
     errForm.value = 'La ley cola calculada debe ser menor a la ley cabeza'
     return
   }
@@ -342,7 +367,7 @@ async function guardar() {
       au_ag_mg:      m.au_ag_mg,
       numero_ensayo: m.numero_ensayo,
     })),
-    ley_cola: resumen.value.leyColaAu, // Agregado para cumplir con CompletarRecuperacionRequest
+    ley_cola: resumen.value.leyColaAuOzTc, // Agregado para cumplir con CompletarRecuperacionRequest
     ley_liquido:     leyLiquidoAu.value,
     solucion_ag_g_m3: solucionAg.value,
     fecha_analisis:  fechaAnalisis.value,
