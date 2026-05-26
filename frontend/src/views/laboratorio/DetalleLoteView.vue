@@ -53,9 +53,23 @@
       <!-- ═══════════════════════════════════════ TAB LEY ═══════════════════════════════════════ -->
       <template v-if="tabActual === 'ley'">
 
+        <!-- Toggle Au / Ag -->
+        <div class="material-toggle-bar">
+          <span class="mtog-label">MATERIAL:</span>
+          <div class="mtog-group">
+            <button :class="['mtog-btn', { active: materialFiltro === 'Au' }]" @click="materialFiltro = 'Au'">Au — Oro</button>
+            <button :class="['mtog-btn', 'mtog-btn--ag', { active: materialFiltro === 'Ag' }]" @click="materialFiltro = 'Ag'"><span class="ag-dot" style="margin-right:0.2rem">Ag</span> Plata</button>
+          </div>
+          <span v-if="materialFiltro === 'Ag' && leyAgDesdeRecuperacion" class="ag-registered" title="Ley Ag calculada desde reconocimiento de pulpa (cola)">
+            <span class="ag-dot">Ag</span>
+            {{ Number(leyAgDesdeRecuperacion).toFixed(3) }} Gr/TM
+            <span style="font-size:0.62rem;color:var(--color-text-faint);margin-left:0.25rem">(reconocimiento)</span>
+          </span>
+        </div>
+
         <div class="labs-grid">
           <div
-            v-for="a in lote.analisis_ley"
+            v-for="a in analisisFiltrado"
             :key="a.id"
             class="lab-card"
             :class="{
@@ -134,16 +148,7 @@
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                     @change="adjuntarCertLey($event, a.id)" />
                 </label>
-                <!-- Ag registrada desde recuperación (solo display, no acción) -->
-                <span
-                  v-if="a.material !== 'Ag' && leyAgDesdeRecuperacion"
-                  class="ag-registered"
-                  title="Ley Ag calculada desde reconocimiento de pulpa"
-                >
-                  <span class="ag-dot">Ag</span>
-                  {{ Number(leyAgDesdeRecuperacion).toFixed(3) }} Gr/TM
-                  <span style="font-size:0.65rem;color:var(--color-text-faint);margin-left:0.25rem">(reconocimiento)</span>
-                </span>
+
               </template>
               <button
                 v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
@@ -157,8 +162,8 @@
             </div>
           </div>
 
-          <div v-if="lote.analisis_ley.length === 0" class="estado-tabla sin-datos">
-            Sin análisis de ley registrados
+          <div v-if="analisisFiltrado.length === 0" class="estado-tabla sin-datos">
+            Sin análisis de {{ materialFiltro === 'Au' ? 'oro' : 'plata' }} registrados
           </div>
         </div>
 
@@ -316,8 +321,11 @@
         </div>
 
         <div class="acciones-lote" style="display:flex;gap:0.75rem;flex-wrap:wrap">
-          <button class="btn-primary" @click="abrirModalAgregarLeyNormal">
+          <button v-if="materialFiltro === 'Au'" class="btn-primary" @click="abrirModalAgregarLeyNormal">
             + Registrar nueva ley
+          </button>
+          <button v-if="materialFiltro === 'Ag'" class="btn-primary btn-ag" @click="abrirModalAgregarLeyAg">
+            <span class="ag-dot">Ag</span> Registrar Ley Ag
           </button>
           <button v-if="!lote.ley_minero" class="btn-secondary" @click="modalLeyMinero = true">
             Registrar Ley Minero
@@ -925,7 +933,15 @@ const ipActual  = route.params.ip as string
 const cargando  = ref(false)
 const enviando  = ref(false)
 const lote      = ref<LoteLabOut | null>(null)
-const tabActual = ref<'ley' | 'rec'>('ley')
+const tabActual      = ref<'ley' | 'rec'>('ley')
+const materialFiltro = ref<'Au' | 'Ag'>('Au')
+
+const analisisFiltrado = computed(() => {
+  if (!lote.value) return []
+  return lote.value.analisis_ley.filter(a =>
+    materialFiltro.value === 'Au' ? a.material !== 'Ag' : a.material === 'Ag'
+  )
+})
 
 // ── Flujo ley: exclusión local + guardar ──────────────────────────────────────
 const excluidos             = ref<Set<number>>(new Set())
@@ -988,7 +1004,7 @@ const leyPlantaSoloSimulada = computed<number | null>(() => {
     return leyComercialCalc.value?.ley_planta_solo ?? null
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && a.tipo_analisis === 'planta' && a.material !== 'Ag',
+      && a.tipo_analisis === 'planta' && a.material === 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -1003,7 +1019,7 @@ const leyPlantaSimulada = computed<number | null>(() => {
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
       && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
-      && a.material !== 'Ag',
+      && a.material === 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -1227,6 +1243,13 @@ function abrirModalAgregarLeyNormal() {
   modalAgregarLey.value = true
 }
 
+function abrirModalAgregarLeyAg() {
+  materialFiltro.value = 'Ag'
+  modoModalLey.value = 'normal'
+  cipSeleccionado.value = ''
+  modalAgregarLey.value = true
+}
+
 function abrirModalDirimencia() {
   modoModalLey.value = 'dirimencia'
   cipSeleccionado.value = ''
@@ -1236,10 +1259,11 @@ function abrirModalDirimencia() {
 function confirmarAgregarLey() {
   if (!cipSeleccionado.value) return
   const tipoPorUrl = modoModalLey.value === 'dirimencia' ? 'dirimencia' : 'externo'
-  if (store.puedeImportarCert) {
+  const matQ = materialFiltro.value === 'Ag' ? '&material=Ag' : ''
+  if (store.puedeImportarCert && materialFiltro.value !== 'Ag') {
     router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}?ip=${ipActual}&tipo=${tipoPorUrl}`)
   } else {
-    router.push(`/laboratorio/ley/${cipSeleccionado.value}?tipo=${tipoPorUrl}`)
+    router.push(`/laboratorio/ley/${cipSeleccionado.value}?tipo=${tipoPorUrl}${matQ}`)
   }
 }
 
@@ -1694,15 +1718,17 @@ onMounted(async () => {
   border: 1px solid rgba(234,179,8,0.4); border-radius: 4px; cursor: pointer;
 }
 
-/* Ag */
-.btn-ag-sm {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  font-size: 0.72rem; padding: 0.25rem 0.65rem;
-  background: rgba(99,102,241,0.12); color: #a5b4fc;
-  border: 1px solid rgba(99,102,241,0.35); border-radius: 4px; cursor: pointer;
-  transition: background 0.15s;
+/* Ag button - mismo shape que btn-primary, color índigo */
+:deep(.btn-primary.btn-ag) {
+  background: #4f46e5;
+  color: #fff;
 }
-.btn-ag-sm:hover { background: rgba(99,102,241,0.22); }
+:deep(.btn-primary.btn-ag:not(:disabled)) {
+  background: #4338ca;
+}
+:deep(.btn-primary.btn-ag:hover:not(:disabled)) {
+  background: #6366f1;
+}
 .ag-dot {
   background: #6366f1; color: #fff;
   border-radius: 3px; padding: 0px 4px;
@@ -1743,4 +1769,25 @@ onMounted(async () => {
   margin-left: 0.3rem;
   font-family: var(--font-mono);
 }
+
+/* Material toggle Au/Ag */
+.material-toggle-bar {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-bottom: 0.75rem; padding: 0.4rem 0;
+}
+.mtog-label {
+  font-size: 0.65rem; font-family: var(--font-mono);
+  color: var(--color-text-faint); letter-spacing: 0.08em;
+}
+.mtog-group {
+  display: flex; border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden;
+}
+.mtog-btn {
+  padding: 0.3rem 0.85rem; font-size: 0.75rem; font-family: var(--font-mono);
+  background: transparent; color: var(--color-text-muted);
+  border: none; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.mtog-btn + .mtog-btn { border-left: 1px solid var(--color-border); }
+.mtog-btn.active { background: rgba(184,151,75,0.15); color: var(--color-gold); font-weight: 600; }
+.mtog-btn--ag.active { background: rgba(99,102,241,0.15); color: #a5b4fc; }
 </style>

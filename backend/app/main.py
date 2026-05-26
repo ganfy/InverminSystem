@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal, check_db_connection
 from app.core.security import cleanup_expired_tokens
 from app.routers import (
+    admin,
     auth,
     balanza,
     dashboard,
@@ -76,6 +77,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 PREFIX = "/api/v1"
 
+app.include_router(admin.router, prefix=PREFIX)
 app.include_router(auth.router, prefix=PREFIX)
 app.include_router(dashboard.router, prefix=PREFIX)
 app.include_router(usuarios.router, prefix=PREFIX)

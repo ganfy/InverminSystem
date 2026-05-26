@@ -38,7 +38,7 @@
             <label class="field-label">FECHA ANÁLISIS:</label>
             <input type="date" class="field-input" v-model="fechaAnalisis" />
           </div>
-          <div class="field">
+          <div class="field" v-if="store.puedeVerIP">
             <label class="field-label">LEY CABEZA:</label>
             <div class="ley-cabeza-display">
               <span class="lc-valor">{{ analisisPendiente.ley_cabeza }}</span>
@@ -133,28 +133,55 @@
       <!-- SOLUCIÓN (LÍQUIDO) -->
       <section class="card">
         <h2 class="card-titulo">SOLUCIÓN (LÍQUIDO)</h2>
-        <div class="form-grid">
-          <div class="field">
-            <label class="field-label">Ley líquido Au (Oz/TC)</label>
-            <input
-              type="number" class="field-input"
-              v-model.number="leyLiquidoAu"
-              step="0.0001" placeholder="0.0000"
-            />
+        <div class="liquido-grid">
+
+          <!-- Au líquido -->
+          <div class="liquido-field">
+            <div class="liquido-label">Au en Solución</div>
+            <div class="liquido-input-row">
+              <div class="field" style="flex:1">
+                <label class="field-label">g/m³</label>
+                <input
+                  type="number" class="field-input"
+                  v-model.number="solucionAu"
+                  step="0.0001" placeholder="0.0000"
+                />
+              </div>
+              <div class="liquido-conv">
+                <span class="liquido-conv-label">≡ oz/TC</span>
+                <span class="liquido-conv-val blue">
+                  {{ solucionAu != null ? (solucionAu / OZ_TC_TO_GR_TM).toFixed(4) : '—' }}
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label class="field-label">Ag en solución (g/m³)</label>
-            <input
-              type="number" class="field-input"
-              v-model.number="solucionAg"
-              step="0.0001" placeholder="0.0000"
-            />
+
+          <!-- Ag en solución -->
+          <div class="liquido-field">
+            <div class="liquido-label">Ag EN SOLUCIÓN</div>
+            <div class="liquido-input-row">
+              <div class="field" style="flex:1">
+                <label class="field-label">g/m³</label>
+                <input
+                  type="number" class="field-input"
+                  v-model.number="solucionAg"
+                  step="0.0001" placeholder="0.0000"
+                />
+              </div>
+              <div class="liquido-conv">
+                <span class="liquido-conv-label">≡ oz/TC</span>
+                <span class="liquido-conv-val blue">
+                  {{ solucionAg != null ? (solucionAg / OZ_TC_TO_GR_TM).toFixed(4) : '—' }}
+                </span>
+              </div>
+            </div>
           </div>
+
         </div>
       </section>
 
-      <!-- RESUMEN CALCULADO -->
-      <section class="card card--resultados" v-if="resumen.leyColaAuOzTc != null">
+      <!-- RESUMEN: solo Comercial/Gerencia/Admin -->
+      <section class="card card--resultados" v-if="store.puedeVerIP && resumen.leyColaAuOzTc != null">
         <h2 class="card-titulo">RESULTADOS</h2>
         <div class="resumen-grid">
           <div class="res-item">
@@ -204,7 +231,7 @@ const errMuestras = ref('')
 
 const analisisPendiente = ref<AnalisisRecuperacionOut | null>(null)
 const fechaAnalisis = ref(new Date().toISOString().split('T')[0])
-const leyLiquidoAu  = ref<number | null>(null)
+const solucionAu  = ref<number | null>(null)
 const solucionAg    = ref<number | null>(null)
 
 // ── Constante del lab ─────────────────────────────────────────────────────────
@@ -368,7 +395,7 @@ async function guardar() {
       numero_ensayo: m.numero_ensayo,
     })),
     ley_cola: resumen.value.leyColaAuOzTc, // Agregado para cumplir con CompletarRecuperacionRequest
-    ley_liquido:     leyLiquidoAu.value,
+    ley_liquido:     solucionAu.value != null ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(4)) : null,
     solucion_ag_g_m3: solucionAg.value,
     fecha_analisis:  fechaAnalisis.value,
   }
@@ -477,6 +504,40 @@ async function guardar() {
   border-color: rgba(184,151,75,0.25);
   background: rgba(184,151,75,0.03);
 }
+
+.liquido-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+@media (max-width: 600px) {
+  .liquido-grid { grid-template-columns: 1fr; }
+}
+.liquido-field {
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.liquido-label {
+  font-size: 0.65rem; font-family: var(--font-mono);
+  color: var(--color-text-faint); text-transform: uppercase; letter-spacing: 0.08em;
+}
+.liquido-input-row {
+  display: flex; align-items: flex-end; gap: 0.75rem;
+}
+.liquido-conv {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--color-border);
+  border-radius: 6px; min-width: 90px;
+}
+.liquido-conv-label {
+  font-size: 0.6rem; font-family: var(--font-mono);
+  color: var(--color-text-faint); letter-spacing: 0.06em;
+}
+.liquido-conv-val {
+  font-family: var(--font-mono); font-size: var(--text-md); font-weight: 600;
+}
+.liquido-conv-val.gold { color: var(--color-gold); }
+.liquido-conv-val.blue { color: #60a5fa; }
 
 .ley-cabeza-display {
   display: flex;

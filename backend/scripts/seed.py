@@ -264,6 +264,10 @@ CONFIGURACIONES = [
         "valor": "30",
         "descripcion": "Días máximos de volado en stock antes de generar alerta",
     },
+    # Configs cálculos
+    {"clave": "factor_oz_tc", "valor": "34.2857", "descripcion": "Factor Oz/TC a Gr/TM"},
+    {"clave": "umbral_volado_oz_tc", "valor": "0.100", "descripcion": "Umbral ley volado (Oz/TC)"},
+    {"clave": "blank_correction_ag", "valor": "0.1444", "descripcion": "Corrección en blanco Ag"},
 ]
 # ── Runner ────────────────────────────────────────────────────────────────────
 

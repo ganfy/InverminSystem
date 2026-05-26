@@ -327,6 +327,11 @@ function fmtNum(n: number | null | undefined) {
 onMounted(() => {
   const cip = store.cips.find(c => c.cip === cipActual)
   if (cip?.tipo_muestra) materialInfo.value = cip.tipo_muestra
+  // Pre-select material from query param (e.g. ?material=Ag from DetalleLoteView)
+  if (route.query.material === 'Ag') {
+    form.value.material = 'Ag'
+    leyAgOzTc.value = null
+  }
 })
 
 // ── Guardar ───────────────────────────────────────────────────────────────────

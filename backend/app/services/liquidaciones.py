@@ -48,13 +48,13 @@ from app.schemas.liquidaciones import (
     LiquidacionResumenOut,
     LoteFinancieroOut,
 )
+from app.services.config_calculo import get_constantes
 from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
 from sqlalchemy.orm import Session, joinedload
 
 FACTOR = Decimal("1.1023")
 TROY_OZ = Decimal("31.1035")
 MIN_MAQUILA = Decimal("95")
-UMBRAL_VOLADO = Decimal("0.100")
 
 
 def _nombre_entidad(entidad) -> str:
@@ -339,7 +339,8 @@ def _calcular_lote(
     )
 
     # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
-    if not lote.volado and oz_tc_comercial < UMBRAL_VOLADO:
+    constantes = get_constantes(db)
+    if not lote.volado and oz_tc_comercial < constantes().umbral_volado:
         lote.volado = True  # se persiste al commit de crear_liquidacion
     if lote.volado:
         oz_tc_comercial = Decimal("0")
@@ -919,7 +920,8 @@ def evaluar_volado(db: Session, lote_id: int, ley_planta: Decimal, usuario_id: i
     lote = db.query(Lote).filter(Lote.id == lote_id).first()
     if not lote:
         return False
-    if not lote.volado and ley_planta < UMBRAL_VOLADO:
+    constantes = get_constantes(db)
+    if not lote.volado and ley_planta < constantes.UMBRAL_VOLADO:
         lote.volado = True
         lote.modificado_por = usuario_id
         return True
@@ -970,18 +972,19 @@ def lotes_disponibles_para_liquidar(
         oz_tc_minero = float(oz_tc_minero_val) if oz_tc_minero_val else None
         usa_dir = bool(lote.dirimencia)
 
+        constantes = get_constantes(db)
         params = lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
         ley_comercial = None
         ley_base = ley_paititi_r if ley_paititi_r is not None else ley_dirim_r
 
         if ley_base is not None:
-            lc = calcular_ley_comercial(ley_base, params)
+            lc = calcular_ley_comercial(ley_base, params, constantes.UMBRAL_VOLADO)
             oz_com_paititi = Decimal(
                 str(max(0.0, float(lc["ley_comercial"])) if lc else 0)
             ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
 
             # Auto-set volado basado en ley comercial paititi
-            if not lote.volado and oz_com_paititi < UMBRAL_VOLADO:
+            if not lote.volado and oz_com_paititi < constantes.UMBRAL_VOLADO:
                 lote.volado = True
                 db.flush()
 
@@ -989,7 +992,7 @@ def lotes_disponibles_para_liquidar(
                 ley_comercial = Decimal("0")
             elif ley_dirim_r is not None and oz_tc_minero_val:
                 # Dirimencia: clamp(dir, min(paititi,minero), max(paititi,minero))
-                lc_dir = calcular_ley_comercial(ley_dirim_r, params)
+                lc_dir = calcular_ley_comercial(ley_dirim_r, params, constantes.UMBRAL_VOLADO)
                 oz_dir = Decimal(
                     str(max(0.0, float(lc_dir["ley_comercial"])) if lc_dir else 0)
                 ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)

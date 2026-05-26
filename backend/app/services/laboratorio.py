@@ -40,16 +40,14 @@ from app.schemas.laboratorio import (
     SyncLaboratorioResponse,
     SyncResultado,
 )
+from app.services.config_calculo import get_constantes
 from app.services.pruebas import calcular_ley_planta
 from fastapi import UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-FACTOR_OZ_TC = Decimal("34.2857")
 STORAGE_PATH = Path(os.getenv("STORAGE_PATH", "storage"))
 TIPOS_PERMITIDOS = {"pdf", "jpg", "jpeg", "png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
-UMBRAL_VOLADO = 0.100
-
 
 # ── Helpers de cálculo ────────────────────────────────────────────────────────
 
@@ -58,8 +56,8 @@ def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
     return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.0001"))
 
 
-def _calcular_ley_gr_tm(ley_final: Decimal) -> Decimal:
-    return (Decimal(str(ley_final)) * FACTOR_OZ_TC).quantize(Decimal("0.001"))
+def _calcular_ley_gr_tm(ley_final: Decimal, factor_oz_tc: Decimal) -> Decimal:
+    return (Decimal(str(ley_final)) * factor_oz_tc).quantize(Decimal("0.001"))
 
 
 def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
@@ -481,7 +479,8 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
         ).update({"vigente": False}, synchronize_session="fetch")
 
     ley_final = _calcular_ley_final(datos.ley_fino, datos.ley_grueso)
-    ley_gr_tm = _calcular_ley_gr_tm(ley_final)
+    constantes = get_constantes(db)
+    ley_gr_tm = _calcular_ley_gr_tm(ley_final, constantes.factor_oz_tc)
 
     nuevo = AnalisisLey(
         lote_id=mapeo.lote_id,
@@ -520,7 +519,6 @@ def registrar_ley_por_ip(
     el laboratorio de planta. La dirimencia se registra cuando ya se tiene
     el CIP pero se invoca desde la vista por IP para simplificar el flujo.
     """
-    from app.models.models import Lote
 
     if datos.tipo_analisis not in (TipoAnalisis.MINERO, TipoAnalisis.DIRIMENCIA):
         raise ValueError("Este endpoint solo acepta tipo_analisis 'minero' o 'dirimencia'")
@@ -551,7 +549,8 @@ def registrar_ley_por_ip(
         ).update({"vigente": False}, synchronize_session="fetch")
 
     ley_final = _calcular_ley_final(Decimal(str(datos.ley_fino)), Decimal(str(datos.ley_grueso)))
-    ley_gr_tm = _calcular_ley_gr_tm(ley_final)
+    constantes = get_constantes(db)
+    ley_gr_tm = _calcular_ley_gr_tm(ley_final, constantes.factor_oz_tc)
 
     nuevo = AnalisisLey(
         lote_id=lote.id,
@@ -740,6 +739,7 @@ def _procesar_muestras_reconocimiento(
     Retorna (ley_cola_oz_tc, ley_cola_ag_gr_tm).
     ley_cola_oz_tc = promedio de avg(Au1,Au2) por muestra / 34.2857
     """
+    constantes = get_constantes(db)
     leyes_au_gr_tm: list[Decimal] = []
     leyes_ag_gr_tm: list[Decimal] = []
 
@@ -752,7 +752,9 @@ def _procesar_muestras_reconocimiento(
 
         # Ag = señal neta: (Au+Ag_mg - avg(Au1,Au2)_mg) / peso * 1000
         au_avg_mg = (Decimal(str(m.au1_mg)) + Decimal(str(m.au2_mg))) / 2
-        ag_mg = max(Decimal("0"), Decimal(str(m.au_ag_mg)) - au_avg_mg - BLANK_CORRECTION_AG)
+        ag_mg = max(
+            Decimal("0"), Decimal(str(m.au_ag_mg)) - au_avg_mg - constantes.blank_correction_ag
+        )
         ley_ag = _calcular_ley_reco_gr_tm(ag_mg, peso) if ag_mg > 0 else Decimal("0")
 
         leyes_au_gr_tm.append(ley_au_avg)
@@ -793,7 +795,9 @@ def _procesar_muestras_reconocimiento(
 
     ley_cola_gr_tm = _promedio_decimal(*leyes_au_gr_tm)
     ley_cola_oz_tc = (
-        (ley_cola_gr_tm / FACTOR_OZ_TC).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        (ley_cola_gr_tm / constantes.factor_oz_tc).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
         if ley_cola_gr_tm
         else None
     )
@@ -933,7 +937,10 @@ def completar_recuperacion(
         ).update({"vigente": False}, synchronize_session="fetch")
 
         # Calculamos Ag Oz/TC (ley_fino) a partir de Gr/TM
-        ley_oz_tc = (ley_cola_ag / FACTOR_OZ_TC).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        constantes = get_constantes(db)
+        ley_oz_tc = (ley_cola_ag / constantes.factor_oz_tc).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
 
         nuevo_ag = AnalisisLey(
             lote_id=a.lote_id,
@@ -1031,7 +1038,7 @@ def eliminar_analisis_recuperacion(
     if a.eliminado:
         raise ValueError("El analisis ya esta eliminado")
     a.eliminado = True
-    a.eliminado_en = datetime.utcnow()
+    a.eliminado_en = datetime.now()
     a.eliminado_por = usuario_id
     if a.vigente:
         a.vigente = False
@@ -1453,7 +1460,9 @@ def sincronizar_batch(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
+def calcular_ley_comercial(
+    ley_planta: Decimal, params, umbral_volado: Decimal | None = None
+) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
     params: instancia de ParametrosComerciales (puede ser None → sin reglas).
@@ -1505,9 +1514,10 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
         )
 
     # Check volado:
-    if ley < UMBRAL_VOLADO:
+    _umbral = umbral_volado if umbral_volado is not None else Decimal("0.100")
+    if ley < _umbral:
         detalle_pasos.append(
-            f"Resultado {float(ley):.3f} < umbral volado {float(UMBRAL_VOLADO):.4f}: se marca como volado"
+            f"Resultado {float(ley):.3f} < umbral volado {float(_umbral):.4f}: se marca como volado"
         )
         ley = Decimal("0")
 
@@ -1524,21 +1534,25 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
 
 # ── Análisis de Plata (Ag) ────────────────────────────────────────────────────
 
-BLANK_CORRECTION_AG = Decimal("0.1444")  # corrección en blanco fija
 
-
-def _calcular_ley_ag(au_ag_mg: float, au_mg: float, peso_muestra: float) -> tuple[Decimal, Decimal]:
+def _calcular_ley_ag(
+    au_ag_mg: float,
+    au_mg: float,
+    peso_muestra: float,
+    factor_oz_tc: Decimal,
+    blank_correction: Decimal,
+) -> tuple[Decimal, Decimal]:
     """
     Retorna (ley_ag_gr_tm, ley_ag_oz_tc).
-    Fórmula: ley_ag_gr_tm = ((au_ag_mg - au_mg - 0.1444) * 1000) / peso_muestra
+    Fórmula: ley_ag_gr_tm = ((au_ag_mg - au_mg - blank_correction) * 1000) / peso_muestra
     """
-    neto = Decimal(str(au_ag_mg)) - Decimal(str(au_mg)) - BLANK_CORRECTION_AG
+    neto = Decimal(str(au_ag_mg)) - Decimal(str(au_mg)) - blank_correction
     if neto < 0:
         neto = Decimal("0")
     ley_gr_tm = (neto * 1000 / Decimal(str(peso_muestra))).quantize(
         Decimal("0.001"), rounding=ROUND_HALF_UP
     )
-    ley_oz_tc = (ley_gr_tm / Decimal("34.2857")).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    ley_oz_tc = (ley_gr_tm / factor_oz_tc).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     return ley_gr_tm, ley_oz_tc
 
 
@@ -1570,7 +1584,14 @@ def registrar_analisis_ag(
         AnalisisLey.vigente == True,  # noqa: E712
     ).update({"vigente": False}, synchronize_session="fetch")
 
-    ley_gr_tm, ley_oz_tc = _calcular_ley_ag(datos.au_ag_mg, datos.au_mg, datos.peso_muestra)
+    constantes = get_constantes(db)
+    ley_gr_tm, ley_oz_tc = _calcular_ley_ag(
+        datos.au_ag_mg,
+        datos.au_mg,
+        datos.peso_muestra,
+        constantes.factor_oz_tc,
+        constantes.blank_correction_ag,
+    )
 
     nuevo = AnalisisLey(
         lote_id=lote_id,

@@ -65,6 +65,7 @@
               <th>FECHA RECEPCIÓN</th>
               <th>LEY PLANTA</th>
               <th>LEY MINERO</th>
+              <th>% RECUP</th>
               <th>ESTADO LEYES</th>
               <th>ACCIONES</th>
             </tr>
@@ -77,7 +78,7 @@
             </tr>
             <template v-else>
               <tr v-if="lotesFiltrados.length === 0">
-                <td colspan="8" class="estado-tabla sin-datos">Sin registros</td>
+                <td colspan="9" class="estado-tabla sin-datos">Sin registros</td>
               </tr>
               <tr v-for="lote in lotesFiltrados" :key="lote.ip">
                 <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
@@ -86,6 +87,7 @@
                 <td class="td-fecha">{{ fmt(lote.fecha_recepcion) }}</td>
                 <td class="td-mono">{{ lote.ley_planta ?? '-' }}</td>
                 <td class="td-mono">{{ lote.ley_minero ?? '-' }}</td>
+                <td class="td-mono" style="color:var(--color-gold-light)">{{ getRecuperacion(lote) }}</td>
                 <td>
                   <span class="badge-estado">{{ lote.analisis_ley.length }} análisis</span>
                 </td>
@@ -217,7 +219,7 @@ import { FlaskConical, RefreshCw, WifiOff } from 'lucide-vue-next'
 import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
-import type { CIPAnalisisOut, LoteLabOut } from '@/types/laboratorio'
+import type { CIPAnalisisOut, LoteLabOut, AnalisisRecuperacionOut } from '@/types/laboratorio'
 import { useSync } from '@/composables/useSync'
 import { obtenerAnalisisLeyPendientes, type AnalisisLeyOfflineItem } from '@/composables/useOfflineQueue'
 
@@ -369,6 +371,13 @@ const lotesFiltrados = computed(() => {
   const q = filtroBusquedaLotes.value.toLowerCase()
   return lotes.value.filter(l => l.ip.toLowerCase().includes(q) || (l.proveedor || '').toLowerCase().includes(q))
 })
+
+function getRecuperacion(lote: LoteLabOut): string {
+  const rec = lote.analisis_recuperacion.find(
+    (a: AnalisisRecuperacionOut) => a.vigente && a.recuperacion != null
+  )
+  return rec?.recuperacion != null ? Number(rec.recuperacion).toFixed(1) + '%' : '-'
+}
 
 function fmt(d?: string | null | Date) {
   if (!d) return '-'
