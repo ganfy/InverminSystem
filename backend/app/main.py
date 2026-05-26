@@ -20,6 +20,7 @@ from app.routers import (
     pruebas,
     usuarios,
 )
+from app.services.telegram_alertas import scheduler_loop
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -48,6 +49,12 @@ async def lifespan(app: FastAPI):
                 print(f"{eliminados} tokens expirados eliminados de la blacklist")
         finally:
             db.close()
+
+    # ── Telegram alertas scheduler ───────────────────────────────────────────
+    import asyncio
+
+    # tg_task = asyncio.create_task(scheduler_loop())
+    asyncio.create_task(scheduler_loop())
 
     yield
 
