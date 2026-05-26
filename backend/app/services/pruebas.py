@@ -15,6 +15,7 @@ from app.schemas.pruebas import (
     LotePruebaList,
     PruebaMetalurgicaCreate,
     PruebaRecuperacionItem,
+    ReconocimientoItem,
     SyncPruebasResponse,
     SyncResult,
 )
@@ -365,6 +366,74 @@ def obtener_pruebas_para_recuperacion(db: Session) -> list[PruebaRecuperacionIte
                     tiene_analisis_recuperacion=tiene_rec,
                 )
             )
+
+    return resultado
+
+
+# ── Reconocimientos ────────────────────────────────────────────────────────────
+
+_OZ_TC_TO_GR_TM = Decimal("34.2857")
+
+
+def obtener_reconocimientos(db: Session) -> list[ReconocimientoItem]:
+    """Retorna todos los análisis de recuperación vigentes con leyes de cola y
+    % recuperación. Usado por TecnicoMuestreo en su vista de resultados.
+    """
+    registros = (
+        db.query(AnalisisRecuperacion)
+        .filter(
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.ley_cola != None,  # noqa: E711
+        )
+        .order_by(AnalisisRecuperacion.fecha_analisis.desc())
+        .all()
+    )
+
+    resultado: list[ReconocimientoItem] = []
+    for rec in registros:
+        # Obtener IP y proveedor a través del CIP → lote
+        ip = None
+        proveedor = "-"
+        if rec.cip:
+            mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == rec.cip).first()
+            if mapeo:
+                lote = db.query(Lote).filter(Lote.id == mapeo.lote_id).first()
+                if lote:
+                    ip = lote.ip
+                    try:
+                        proveedor = lote.sesion.provacop.proveedor.razon_social
+                    except AttributeError:
+                        proveedor = "-"
+
+        # Conversiones de unidades
+        cola_oz_tc: Decimal | None = rec.ley_cola
+        cola_gr_tm = (
+            (cola_oz_tc * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"))
+            if cola_oz_tc is not None
+            else None
+        )
+        # ley_liquido en DB está en oz/TC → convertir a g/m³
+        solucion_au = (
+            (rec.ley_liquido * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"))
+            if rec.ley_liquido is not None
+            else None
+        )
+
+        resultado.append(
+            ReconocimientoItem(
+                ip=ip or "-",
+                cip=rec.cip,
+                proveedor=proveedor,
+                fecha_analisis=rec.fecha_analisis,
+                ley_cola_au_oz_tc=cola_oz_tc,
+                ley_cola_au_gr_tm=cola_gr_tm,
+                ley_cola_ag_gr_tm=rec.ley_cola_ag_gr_tm,
+                solucion_au_g_m3=solucion_au,
+                solucion_ag_g_m3=rec.solucion_ag_g_m3,
+                recuperacion=rec.recuperacion,
+                vigente=rec.vigente,
+            )
+        )
 
     return resultado
 
