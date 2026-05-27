@@ -81,10 +81,10 @@ class PruebaRecuperacionItem(BaseModel):
     tiene_analisis_recuperacion: bool = False
 
 
-# ── Reconocimientos (vista Pruebas: leyes de cola + recuperación) ─────────────
+# ── Recuperaciones (vista Pruebas: leyes de cola + recuperación) ─────────────
 
 
-class ReconocimientoItem(BaseModel):
+class RecuperacionItem(BaseModel):
     """Resultado de análisis de recuperación: leyes de cola y % recuperación.
     Expuesto a TecnicoMuestreo sin mostrar ley_cabeza.
     """

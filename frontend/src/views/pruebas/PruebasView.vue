@@ -6,14 +6,23 @@
           <h1 class="page-title">Pruebas Metalúrgicas</h1>
           <p class="page-subtitle">Gestión y registro de análisis de preparación</p>
         </div>
-        <button
-          class="btn-refresh"
-          @click="cargarDatos"
-          :disabled="cargando"
-          title="Actualizar datos"
-        >
-          <RefreshCw :size="20" :class="{ 'spinning': cargando }" />
-        </button>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <button
+            class="btn-secondary"
+            style="font-size:0.78rem;padding:0.4rem 0.9rem"
+            @click="router.push('/pruebas/recuperaciones')"
+          >
+            Ver Recuperaciones →
+          </button>
+          <button
+            class="btn-refresh"
+            @click="cargarDatos"
+            :disabled="cargando"
+            title="Actualizar datos"
+          >
+            <RefreshCw :size="20" :class="{ 'spinning': cargando }" />
+          </button>
+        </div>
       </div>
     </header>
 

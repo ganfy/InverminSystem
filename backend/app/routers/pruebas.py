@@ -11,7 +11,7 @@ from app.schemas.pruebas import (
     PruebaMetalurgicaCreate,
     PruebaMetalurgicaOut,
     PruebaRecuperacionItem,
-    ReconocimientoItem,
+    RecuperacionItem,
     SyncPruebasRequest,
     SyncPruebasResponse,
 )
@@ -57,11 +57,11 @@ def sync_pruebas(
 
 
 @router.get(
-    "/reconocimientos",
-    response_model=list[ReconocimientoItem],
+    "/recuperaciones",
+    response_model=list[RecuperacionItem],
     summary="Leyes de cola y recuperación para Técnico de Pruebas",
 )
-def listar_reconocimientos(
+def listar_recuperaciones(
     current_user=Depends(check_permiso("PRUEBAS_MET", "VIEW")),
     db: Session = Depends(get_db),
 ):
@@ -69,7 +69,7 @@ def listar_reconocimientos(
     Retorna todos los análisis de recuperación vigentes con leyes de cola y
     % de recuperación. Visible para TecnicoMuestreo (no expone ley_cabeza).
     """
-    return pruebas_service.obtener_reconocimientos(db)
+    return pruebas_service.obtener_recuperaciones(db)
 
 
 # ── Rutas con path param ──────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ from app.schemas.pruebas import (
     LotePruebaList,
     PruebaMetalurgicaCreate,
     PruebaRecuperacionItem,
-    ReconocimientoItem,
+    RecuperacionItem,
     SyncPruebasResponse,
     SyncResult,
 )
@@ -370,12 +370,12 @@ def obtener_pruebas_para_recuperacion(db: Session) -> list[PruebaRecuperacionIte
     return resultado
 
 
-# ── Reconocimientos ────────────────────────────────────────────────────────────
+# ── Recuperaciones ────────────────────────────────────────────────────────────
 
 _OZ_TC_TO_GR_TM = Decimal("34.2857")
 
 
-def obtener_reconocimientos(db: Session) -> list[ReconocimientoItem]:
+def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
     """Retorna todos los análisis de recuperación vigentes con leyes de cola y
     % recuperación. Usado por TecnicoMuestreo en su vista de resultados.
     """
@@ -389,7 +389,7 @@ def obtener_reconocimientos(db: Session) -> list[ReconocimientoItem]:
         .all()
     )
 
-    resultado: list[ReconocimientoItem] = []
+    resultado: list[RecuperacionItem] = []
     for rec in registros:
         # Obtener IP y proveedor a través del CIP → lote
         ip = None
@@ -420,7 +420,7 @@ def obtener_reconocimientos(db: Session) -> list[ReconocimientoItem]:
         )
 
         resultado.append(
-            ReconocimientoItem(
+            RecuperacionItem(
                 ip=ip or "-",
                 cip=rec.cip,
                 proveedor=proveedor,

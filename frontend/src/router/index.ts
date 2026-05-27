@@ -8,6 +8,7 @@ import SesionView from '@/views/balanza/SesionView.vue'
 import MuestreoView from '@/views/muestreo/MuestreoView.vue'
 import PruebasView from '@/views/pruebas/PruebasView.vue'
 import RegistrarPruebasView from '@/views/pruebas/RegistrarPruebasView.vue'
+import RecuperacionesPruebasView from '@/views/pruebas/RecuperacionesView.vue'
 import LaboratorioView from '@/views/laboratorio/LaboratorioDashboardView.vue'
 import RegistrarLeyView from '@/views/laboratorio/RegistrarLeyView.vue'
 import RegistrarRecuperacionView from '@/views/laboratorio/RegistrarRecuperacionView.vue'
@@ -50,6 +51,7 @@ const router = createRouter({
 
         // Pruebas
         { path: 'pruebas', name: 'Pruebas', component: PruebasView },
+        { path: 'pruebas/recuperaciones', name: 'Recuperaciones', component: RecuperacionesPruebasView },
         { path: 'pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView },
 
         // Laboratorio
