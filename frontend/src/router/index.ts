@@ -24,6 +24,9 @@ import CrearLiquidacionView from '@/views/liquidaciones/CrearLiquidacionView.vue
 import DetalleLiquidacionView from '@/views/liquidaciones/DetalleLiquidacionView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
 import UsuariosView from '@/views/admin/UsuariosView.vue'
+import RumasView from '@/views/rumas/RumasView.vue'
+import DetalleRumaView from '@/views/rumas/DetalleRumaView.vue'
+import CampanasView from '@/views/rumas/CampanasView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -69,6 +72,11 @@ const router = createRouter({
 
         // Gestión
         { path: 'terceros', name: 'Terceros', component: TercerosView },
+
+        // Rumas
+        { path: 'rumas', name: 'Rumas', component: RumasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'rumas/:id', name: 'DetalleRuma', component: DetalleRumaView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'administracion/campanas', name: 'Campanas', component: CampanasView, meta: { roles: ['Admin', 'Gerencia'] } },
 
         // Administración
         { path: 'administracion', name: 'Administracion', component: UsuariosView, meta: { roles: ['Admin'] } },

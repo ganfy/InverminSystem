@@ -1,6 +1,6 @@
 import type { RolSistema } from '@/types/auth'
 import type { Component } from 'vue'
-import { Scale, FlaskConical, Users, LayoutDashboard, Microscope, Boxes, FileText, Beaker, Settings, Receipt, Weight } from 'lucide-vue-next'
+import { Scale, FlaskConical, Users, LayoutDashboard, Microscope, Boxes, FileText, Beaker, Settings, Receipt, Weight, Flag } from 'lucide-vue-next'
 
 export interface NavItem {
   label: string
@@ -48,6 +48,7 @@ export const NAV_CONFIG: NavSection[] = [
     roles: ['Admin', 'Gerencia', 'Comercial'],
     items: [
       { label: 'Terceros',       path: '/terceros',      icon: Users, roles: ['Admin', 'Gerencia', 'Comercial'] },
+      { label: 'Campañas',       path: '/administracion/campanas', icon: Flag, roles: ['Admin', 'Gerencia'] },
       { label: 'Administración', path: '/administracion',icon: Settings, roles: ['Admin'] },
     ],
   },
