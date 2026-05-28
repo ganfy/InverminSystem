@@ -483,7 +483,7 @@ onMounted(async () => {
   await cargarPrecioOro()
   await Promise.all([
     store.cargarLista(),
-    store.cargarLista().then(() => store.cargarKPIs())
+    store.cargarKPIs(),
   ])
 })
 </script>

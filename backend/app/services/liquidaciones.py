@@ -340,7 +340,7 @@ def _calcular_lote(
 
     # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
     constantes = get_constantes(db)
-    if not lote.volado and oz_tc_comercial < constantes().umbral_volado:
+    if not lote.volado and oz_tc_comercial < constantes().umbral_volado_oz_tc:
         lote.volado = True  # se persiste al commit de crear_liquidacion
     if lote.volado:
         oz_tc_comercial = Decimal("0")
@@ -921,7 +921,7 @@ def evaluar_volado(db: Session, lote_id: int, ley_planta: Decimal, usuario_id: i
     if not lote:
         return False
     constantes = get_constantes(db)
-    if not lote.volado and ley_planta < constantes.UMBRAL_VOLADO:
+    if not lote.volado and ley_planta < constantes.umbral_volado_oz_tc:
         lote.volado = True
         lote.modificado_por = usuario_id
         return True
@@ -978,13 +978,13 @@ def lotes_disponibles_para_liquidar(
         ley_base = ley_paititi_r if ley_paititi_r is not None else ley_dirim_r
 
         if ley_base is not None:
-            lc = calcular_ley_comercial(ley_base, params, constantes.UMBRAL_VOLADO)
+            lc = calcular_ley_comercial(ley_base, params, constantes.umbral_volado_oz_tc)
             oz_com_paititi = Decimal(
                 str(max(0.0, float(lc["ley_comercial"])) if lc else 0)
             ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
 
             # Auto-set volado basado en ley comercial paititi
-            if not lote.volado and oz_com_paititi < constantes.UMBRAL_VOLADO:
+            if not lote.volado and oz_com_paititi < constantes.umbral_volado_oz_tc:
                 lote.volado = True
                 db.flush()
 
@@ -992,7 +992,7 @@ def lotes_disponibles_para_liquidar(
                 ley_comercial = Decimal("0")
             elif ley_dirim_r is not None and oz_tc_minero_val:
                 # Dirimencia: clamp(dir, min(paititi,minero), max(paititi,minero))
-                lc_dir = calcular_ley_comercial(ley_dirim_r, params, constantes.UMBRAL_VOLADO)
+                lc_dir = calcular_ley_comercial(ley_dirim_r, params, constantes.umbral_volado_oz_tc)
                 oz_dir = Decimal(
                     str(max(0.0, float(lc_dir["ley_comercial"])) if lc_dir else 0)
                 ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)

@@ -34,7 +34,7 @@ _ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
 
 
 def _require(user: Usuario, roles: set[RolSistema]) -> None:
-    if user.rol not in {r.value for r in roles}:
+    if user.rol.codigo not in {r.value for r in roles}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Sin permisos para esta acción"
         )

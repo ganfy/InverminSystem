@@ -23,7 +23,7 @@ router = APIRouter(prefix="/admin", tags=["Administración"])
 
 
 def _require_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
-    if current_user.rol not in ("Admin",):
+    if current_user.rol.codigo not in ("Admin",):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo Admin puede modificar esta configuración",
@@ -32,7 +32,7 @@ def _require_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario
 
 
 def _require_admin_o_gerencia(current_user: Usuario = Depends(get_current_user)) -> Usuario:
-    if current_user.rol not in ("Admin", "Gerencia"):
+    if current_user.rol.codigo not in ("Admin", "Gerencia"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
     return current_user
 
