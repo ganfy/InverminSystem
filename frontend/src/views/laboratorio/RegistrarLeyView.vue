@@ -4,7 +4,7 @@
     <header class="page-header">
       <div>
         <h1 class="page-title">
-          {{ form.material === 'Ag' ? 'Registro Análisis Ag' : 'Registro Análisis Newmont' }}
+          Análisis Newmont
         </h1>
       </div>
       <div style="display:flex;gap:0.75rem">
