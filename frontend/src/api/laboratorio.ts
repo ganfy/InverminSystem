@@ -111,8 +111,10 @@ export const laboratorioApi = {
         return data
     },
 
-    async detalleLote(ip: string): Promise<LoteLabOut> {
-        const { data } = await api.get(`/laboratorio/lotes/${ip}`)
+    async detalleLote(ip: string, material?:string): Promise<LoteLabOut> {
+        const { data } = await api.get(`/laboratorio/lotes/${ip}`, {
+            params: material ? { material } : undefined,
+        })
         return data
     },
 

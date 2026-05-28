@@ -74,9 +74,9 @@ const router = createRouter({
         { path: 'terceros', name: 'Terceros', component: TercerosView },
 
         // Rumas
-        { path: 'rumas', name: 'Rumas', component: RumasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
-        { path: 'rumas/:id', name: 'DetalleRuma', component: DetalleRumaView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
-        { path: 'administracion/campanas', name: 'Campanas', component: CampanasView, meta: { roles: ['Admin', 'Gerencia'] } },
+        { path: 'rumas', name: 'Rumas', component: RumasView} ,
+        { path: 'rumas/:id', name: 'DetalleRuma', component: DetalleRumaView },
+        { path: 'administracion/campanas', name: 'Campanas', component: CampanasView },
 
         // Administración
         { path: 'administracion', name: 'Administracion', component: UsuariosView, meta: { roles: ['Admin'] } },

@@ -160,7 +160,9 @@ def _ley_out(
         material=a.material or "Au",
         ley_fino=a.ley_fino or Decimal("0"),
         ley_grueso=a.ley_grueso or Decimal("0"),
-        ley_final=a.ley_final or Decimal("0"),
+        ley_final=(a.ley_fino or Decimal("0"))
+        if (a.material == "Ag" and not a.ley_final)
+        else (a.ley_final or Decimal("0")),
         ley_gr_tm=a.ley_gr_tm or Decimal("0"),
         vigente=a.vigente,
         fecha_analisis=a.fecha_analisis,
@@ -295,7 +297,7 @@ def obtener_cips_laboratorio(
 # ── Vista Comercial: lista por Lote/IP ────────────────────────────────────────
 
 
-def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
+def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) -> LoteLabOut:
     try:
         proveedor = lote.sesion.provacop.proveedor.razon_social
     except AttributeError:
@@ -321,7 +323,10 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     )
     # Separar: registros de cert interno vs análisis reales
     analisis_ley = [
-        a for a in todos_analisis_ley if a.tipo_analisis not in (TipoAnalisis.COMERCIAL,)
+        a
+        for a in todos_analisis_ley
+        if a.tipo_analisis not in (TipoAnalisis.COMERCIAL,)
+        and (material is None or a.material == material)
     ]
     cert_ley_rec = next(
         (a for a in todos_analisis_ley if a.tipo_analisis == TipoAnalisis.COMERCIAL and a.vigente),
@@ -422,7 +427,7 @@ def obtener_lotes_laboratorio(db: Session) -> list[LoteLabOut]:
     return [_build_lote_lab_out(db, lote) for lote in lotes]
 
 
-def obtener_detalle_lote(db: Session, ip: str) -> LoteLabOut | None:
+def obtener_detalle_lote(db: Session, ip: str, material: str | None = None) -> LoteLabOut | None:
     lote = (
         db.query(Lote)
         .options(
@@ -436,7 +441,7 @@ def obtener_detalle_lote(db: Session, ip: str) -> LoteLabOut | None:
     )
     if not lote:
         return None
-    return _build_lote_lab_out(db, lote)
+    return _build_lote_lab_out(db, lote, material=material)
 
 
 # ── Registro de análisis ──────────────────────────────────────────────────────
@@ -1599,8 +1604,9 @@ def registrar_analisis_ag(
         laboratorio=datos.laboratorio,
         tipo_analisis=analisis_au.tipo_analisis,  # hereda tipo del Au padre
         material="Ag",
-        ley_fino=float(ley_oz_tc),  # reutilizamos ley_fino para Oz/TC de Ag
+        ley_fino=0.0,
         ley_grueso=0.0,
+        ley_final=float(ley_oz_tc),  # reutilizamos ley_final para Oz/TC de Ag
         ley_gr_tm=float(ley_gr_tm),
         origen_datos="manual",
         fecha_analisis=datos.fecha_analisis,

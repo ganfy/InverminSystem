@@ -43,7 +43,7 @@ from app.schemas.laboratorio import (
 from app.services import certificado_ley_pdf as cert_svc
 from app.services import laboratorio as svc
 from app.services.pruebas import calcular_ley_planta
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi import UploadFile as FastAPIFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
@@ -756,6 +756,7 @@ def listar_lotes(
 @router.get("/lotes/{ip}", response_model=LoteLabOut)
 def detalle_lote(
     ip: str,
+    material: str | None = Query(None, description="Filtrar análisis por material (Au, Ag)"),
     current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
@@ -765,7 +766,7 @@ def detalle_lote(
             status_code=403,
             detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
         )
-    result = svc.obtener_detalle_lote(db, ip)
+    result = svc.obtener_detalle_lote(db, ip, material=material)
     if not result:
         raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
     return result

@@ -935,12 +935,28 @@ const enviando  = ref(false)
 const lote      = ref<LoteLabOut | null>(null)
 const tabActual      = ref<'ley' | 'rec'>('ley')
 const materialFiltro = ref<'Au' | 'Ag'>('Au')
+const analisisAgCache = ref<import('@/types/laboratorio').AnalisisLeyOut[]>([])
+const cargandoAg      = ref(false)
 
 const analisisFiltrado = computed(() => {
   if (!lote.value) return []
+  if (materialFiltro.value === 'Ag') return analisisAgCache.value
   return lote.value.analisis_ley.filter(a =>
-    materialFiltro.value === 'Au' ? a.material !== 'Ag' : a.material === 'Ag'
-  )
+    a.material !== 'Ag')
+})
+
+watch(materialFiltro, async (mat) => {
+  if (mat === 'Ag' && analisisAgCache.value.length === 0) {
+    cargandoAg.value = true
+    try {
+      const res = await laboratorioApi.detalleLote(ipActual, 'Ag')
+      analisisAgCache.value = res.analisis_ley
+    } catch {
+      ui.toast('Error al cargar análisis Ag', 'error')
+    } finally {
+      cargandoAg.value = false
+    }
+  }
 })
 
 // ── Flujo ley: exclusión local + guardar ──────────────────────────────────────
@@ -1004,7 +1020,7 @@ const leyPlantaSoloSimulada = computed<number | null>(() => {
     return leyComercialCalc.value?.ley_planta_solo ?? null
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && a.tipo_analisis === 'planta' && a.material === 'Ag',
+      && a.tipo_analisis === 'planta' && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -1019,7 +1035,7 @@ const leyPlantaSimulada = computed<number | null>(() => {
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
       && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
-      && a.material === 'Ag',
+      && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -1057,7 +1073,6 @@ async function previsualizarCertLey() {
     previsualizandoLey.value = false
   }
 }
-
 async function confirmarYGuardar() {
   for (const id of excluidos.value) {
     const ok = await store.descartarLey(id, justificacionGenerar.value)
@@ -1071,6 +1086,15 @@ async function confirmarYGuardar() {
 
   lote.value = await store.cargarDetalleLote(ipActual)
   leyComercialCalc.value = null
+
+  // Limpiar cache de Ag si se descartó alguno
+  const hayAgDescartado = (lote.value?.analisis_ley ?? []).some(
+    a => a.material === 'Ag' && a.eliminado
+  )
+  if (hayAgDescartado) {
+    analisisAgCache.value = []
+  }
+
   await recargarLeyComercial()
 
   generando.value = true
@@ -1121,6 +1145,13 @@ async function guardarAg() {
     ui.toast(`Ley Ag registrada: ${previewAg.value.ley_gr_tm.toFixed(3)} g/TM`, 'success')
     modalAgAnalisisId.value = null
     lote.value = await store.cargarDetalleLote(ipActual)
+
+    analisisAgCache.value = []  // forzar recarga en próxima visita al tab Ag
+    // disparar recarga inmediata si seguimos en tab Ag
+    if (materialFiltro.value === 'Ag') {
+      const res = await laboratorioApi.detalleLote(ipActual, 'Ag')
+      analisisAgCache.value = res.analisis_ley
+    }
   } catch (e: any) {
     agErr.value = e?.response?.data?.detail ?? 'Error al guardar'
   } finally {
@@ -1231,10 +1262,17 @@ const modoModalLey    = ref<'normal' | 'dirimencia'>('normal')
 
 const cipsDisponiblesLey = computed(() => {
   if (!lote.value) return []
-  return lote.value.cips_detalle.filter(
-    c => c.tipo_muestra === 'Laboratorio'
-      && !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip),
-  )
+  return lote.value.cips_detalle.filter(c => {
+    if (c.tipo_muestra !== 'Laboratorio') return false
+    if (materialFiltro.value === 'Ag') {
+      // Para Ag: bloquear solo si ya existe Ag vigente en este CIP
+      return !lote.value!.analisis_ley.some(
+        a => a.cip === c.codigo_cip && a.material === 'Ag' && a.vigente,
+      )
+    }
+    // Para Au: bloquear si ya existe cualquier análisis en este CIP (comportamiento original)
+    return !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip && a.material !== 'Ag')
+  })
 })
 
 function abrirModalAgregarLeyNormal() {
