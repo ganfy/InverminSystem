@@ -63,6 +63,12 @@
             </div>
           </div>
 
+          <RecomendadorRuma
+            v-if="puedeEditar && store.rumaDetalle?.estado === 'ABIERTA'"
+            :lotes="store.lotesDisponibles"
+            @aplicar="aplicarCombo"
+          />
+
           <!-- Acciones de guardado -->
           <div v-if="hayPendientes && puedeEditar && store.rumaDetalle.estado === 'ABIERTA'" class="totales-acciones">
             <span class="pendientes-aviso">
@@ -204,6 +210,7 @@
   import { useRumasStore } from '@/stores/rumas'
   import { useAuthStore } from '@/stores/auth'
   import { useUiStore } from '@/stores/ui'
+  import RecomendadorRuma from '@/components/rumas/RecomendadorRuma.vue'
 
   const route  = useRoute()
   const router = useRouter()
@@ -288,6 +295,14 @@
       return true
     })
   })
+
+  //Recomendaciones
+  function aplicarCombo(ips: string[]) {
+    // Agrega al set actual (no reemplaza — permite complementar manualmente)
+    const s = new Set(ipsSeleccionadas.value)
+    for (const ip of ips) s.add(ip)
+    ipsSeleccionadas.value = s
+  }
 
   function toggleLote(ip: string) {
     const s = new Set(ipsSeleccionadas.value)
