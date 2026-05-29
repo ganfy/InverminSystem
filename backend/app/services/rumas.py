@@ -91,8 +91,8 @@ def _calcular_tms_lote(lote: Lote, db: Session) -> float | None:
     Usa el último muestreo vigente.
     """
     pesaje = db.query(Pesaje).filter(Pesaje.lote_id == lote.id).first()
-    if not pesaje or not pesaje.peso_inicial or not pesaje.peso_final:
-        return None
+    if not pesaje or pesaje.peso_inicial is None or pesaje.peso_final is None:
+        return 0.0
     tmh = float(abs(pesaje.peso_final - pesaje.peso_inicial))
     muestreo = (
         db.query(Muestreo)

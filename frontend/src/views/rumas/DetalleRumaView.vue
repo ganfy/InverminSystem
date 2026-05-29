@@ -92,40 +92,38 @@
 
           <!-- Izquierda: lotes en la ruma -->
           <div class="split-col">
-            <div class="split-header">
-              <span class="split-titulo">EN LA RUMA</span>
-              <span class="split-count">{{ ipsEnRuma.size }} lote{{ ipsEnRuma.size !== 1 ? 's' : '' }}</span>
-            </div>
-
-            <div v-if="!lotesMostradosEnRuma.length" class="col-vacio">
-              Sin lotes asignados aún
-            </div>
-
-            <div
-              v-for="lote in lotesMostradosEnRuma"
-              :key="lote.ip"
-              class="lote-card lote-en-ruma"
-              :class="{ 'lote-quitado': !ipsSeleccionadas.has(lote.ip) }"
-            >
-              <div class="lote-ip">{{ lote.ip }}</div>
-              <div class="lote-meta">
-                <span class="lote-prov">{{ lote.proveedor }}</span>
-                <span class="lote-stats">
-                  {{ fmtNum(lote.tms, 3) }} TMS
-                  <span v-if="lote.ley_avg != null"> · Ley {{ fmtNum(lote.ley_avg, 4) }}</span>
-                  <span v-if="lote.rec_porc != null"> · {{ fmtNum(lote.rec_porc, 1) }}% rec</span>
-                </span>
-                <span v-if="lote.volado" class="badge-volado">VOLADO</span>
-                <span v-if="lote.tipo_material" class="badge-material">{{ lote.tipo_material }}</span>
-              </div>
-              <button
-                v-if="puedeEditar && store.rumaDetalle?.estado === 'ABIERTA'"
-                class="btn-icon danger lote-quitar"
-                title="Quitar de ruma"
-                @click="quitarLote(lote.ip)"
-              >
-                <Minus :size="13" />
-              </button>
+            <div class="lote-lista">
+              <div v-if="!lotesMostradosEnRuma.length" class="col-vacio">Sin lotes asignados aún</div>
+                <div class="split-header">
+                  <span class="split-titulo">EN LA RUMA</span>
+                  <span class="split-count">{{ ipsEnRuma.size }} lote{{ ipsEnRuma.size !== 1 ? 's' : '' }}</span>
+                </div>
+                <div
+                  v-for="lote in lotesMostradosEnRuma"
+                  :key="lote.ip"
+                  class="lote-card lote-en-ruma"
+                  :class="{ 'lote-quitado': !ipsSeleccionadas.has(lote.ip) }"
+                >
+                  <div class="lote-ip">{{ lote.ip }}</div>
+                  <div class="lote-meta">
+                    <span class="lote-prov">{{ lote.proveedor }}</span>
+                    <span class="lote-stats">
+                      {{ fmtNum(lote.tms, 3) }} TMS
+                      <span v-if="lote.ley_avg != null"> · Ley {{ fmtNum(lote.ley_avg, 4) }}</span>
+                      <span v-if="lote.rec_porc != null"> · {{ fmtNum(lote.rec_porc, 1) }}% rec</span>
+                    </span>
+                    <span v-if="lote.volado" class="badge-volado">VOLADO</span>
+                    <span v-if="lote.tipo_material" class="badge-material">{{ lote.tipo_material }}</span>
+                  </div>
+                  <button
+                    v-if="puedeEditar && store.rumaDetalle?.estado === 'ABIERTA'"
+                    class="btn-icon danger lote-quitar"
+                    title="Quitar de ruma"
+                    @click="quitarLote(lote.ip)"
+                  >
+                    <Minus :size="13" />
+                  </button>
+                </div>
             </div>
           </div>
 
@@ -147,6 +145,7 @@
                 <option value="">Todo</option>
                 <option value="mineral">Mineral</option>
                 <option value="llampo">Llampo</option>
+                <option value="mllampo">M. Llampo</option>
               </select>
             </div>
 
@@ -160,40 +159,51 @@
               Sin lotes disponibles
             </div>
 
-            <div
-              v-for="lote in lotesFiltrados"
-              :key="lote.ip"
-              class="lote-card lote-disponible"
-              :class="{
-                'lote-agregado': ipsSeleccionadas.has(lote.ip),
-                'lote-disabled': store.rumaDetalle?.estado === 'CERRADA',
-              }"
-            >
-              <div class="lote-ip">{{ lote.ip }}</div>
-              <div class="lote-meta">
-                <span class="lote-prov">{{ lote.proveedor }}</span>
-                <span v-if="lote.acopiador" class="lote-acop">{{ lote.acopiador }}</span>
-                <span class="lote-stats">
-                  {{ fmtNum(lote.tms, 3) }} TMS
-                  <span v-if="lote.ley_avg != null"> · Ley {{ fmtNum(lote.ley_avg, 4) }}</span>
-                  <span v-if="lote.rec_porc != null"> · {{ fmtNum(lote.rec_porc, 1) }}% rec</span>
-                  · {{ lote.dias_almacen }}d almacén
-                </span>
-                <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.2rem">
-                  <span v-if="lote.volado" class="badge-volado">VOLADO</span>
-                  <span v-if="lote.tipo_material" class="badge-material">{{ lote.tipo_material }}</span>
-                </div>
-              </div>
-              <button
-                v-if="puedeEditar && store.rumaDetalle?.estado === 'ABIERTA'"
-                class="btn-icon success lote-agregar"
-                :class="{ 'lote-check': ipsSeleccionadas.has(lote.ip) }"
-                :title="ipsSeleccionadas.has(lote.ip) ? 'Ya agregado' : 'Agregar a ruma'"
-                @click="toggleLote(lote.ip)"
+            <div class="lote-lista">
+              <div
+                v-if="store.cargandoDetalle && !store.lotesDisponibles.length"
+                class="col-vacio"
               >
-                <Check v-if="ipsSeleccionadas.has(lote.ip)" :size="13" />
-                <Plus v-else :size="13" />
-              </button>
+                <span class="spinner-sm" /> Cargando…
+              </div>
+              <div v-else-if="!lotesFiltrados.length" class="col-vacio">
+                Sin lotes disponibles
+              </div>
+              <div
+                v-for="lote in lotesFiltrados"
+                :key="lote.ip"
+                class="lote-card lote-disponible"
+                :class="{
+                  'lote-agregado': ipsSeleccionadas.has(lote.ip),
+                  'lote-disabled': store.rumaDetalle?.estado === 'CERRADA',
+                }"
+              >
+                <div class="lote-ip">{{ lote.ip }}</div>
+                <div class="lote-meta">
+                  <span class="lote-prov">{{ lote.proveedor }}</span>
+                  <span v-if="lote.acopiador" class="lote-acop">{{ lote.acopiador }}</span>
+                  <span class="lote-stats">
+                    {{ fmtNum(lote.tms, 3) }} TMS
+                    <span v-if="lote.ley_avg != null"> · Ley {{ fmtNum(lote.ley_avg, 4) }}</span>
+                    <span v-if="lote.rec_porc != null"> · {{ fmtNum(lote.rec_porc, 1) }}% rec</span>
+                    · {{ lote.dias_almacen }}d almacén
+                  </span>
+                  <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.2rem">
+                    <span v-if="lote.volado" class="badge-volado">VOLADO</span>
+                    <span v-if="lote.tipo_material" class="badge-material">{{ lote.tipo_material }}</span>
+                  </div>
+                </div>
+                <button
+                  v-if="puedeEditar && store.rumaDetalle?.estado === 'ABIERTA'"
+                  class="btn-icon success lote-agregar"
+                  :class="{ 'lote-check': ipsSeleccionadas.has(lote.ip) }"
+                  :title="ipsSeleccionadas.has(lote.ip) ? 'Ya agregado' : 'Agregar a ruma'"
+                  @click="toggleLote(lote.ip)"
+                >
+                  <Check v-if="ipsSeleccionadas.has(lote.ip)" :size="13" />
+                  <Plus v-else :size="13" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -291,7 +301,7 @@
       if (ipsEnRuma.value.has(l.ip)) return false
       const txt = filtroTexto.value.toLowerCase()
       if (txt && !l.ip.toLowerCase().includes(txt) && !l.proveedor.toLowerCase().includes(txt)) return false
-      if (filtroMaterial.value && !l.tipo_material?.toLowerCase().includes(filtroMaterial.value)) return false
+      if (filtroMaterial.value && l.tipo_material?.toLowerCase() !== filtroMaterial.value) return false
       return true
     })
   })
@@ -498,10 +508,11 @@
   .split-col > .lote-card:last-child { border-bottom: none; }
   .split-col > .col-vacio ~ .lote-card { overflow-y: auto; }
 
-  /* Scroll dentro del col */
-  .split-col > :not(.split-header):not(.pool-filtros) {
-    overflow-y: auto;
-  }
+.lote-lista {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;   /* crítico en flexbox para que el scroll funcione */
+}
 
   .lote-en-ruma  { background: rgba(81,161,85,0.04); }
   .lote-quitado  { background: rgba(165,71,61,0.07); opacity: 0.6; }
