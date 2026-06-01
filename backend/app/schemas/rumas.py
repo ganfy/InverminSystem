@@ -98,6 +98,7 @@ class RumaLista(BaseModel):
     total_tms: float = 0.0
     ley_ponderada: float | None = None
     rec_promedio: float | None = None
+    asignada: bool = False  # si tiene campaña asignada o es independiente
 
     model_config = {"from_attributes": True}
 

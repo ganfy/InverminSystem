@@ -182,6 +182,18 @@ export const useRumasStore = defineStore('rumas', () => {
         } finally { cargandoDetalle.value = false }
     }
 
+    async function asignarRuma(campanaId: number, rumaId: number): Promise<boolean> {
+        cargando.value = true; error.value = null
+        try {
+            const r = await api.asignarRumaACampana(campanaId, rumaId)
+            campanaActiva.value = r.data
+            return true
+        } catch (e: any) {
+            error.value = e?.response?.data?.detail ?? 'Error al asignar ruma a campaña'
+            return false
+        } finally { cargando.value = false }
+    }
+
     async function cerrarRuma(id: number): Promise<boolean> {
         cargando.value = true; error.value = null
         try {
@@ -207,5 +219,6 @@ export const useRumasStore = defineStore('rumas', () => {
         calcularPreviewRuma,
         cargarCampanaActiva, cargarHistorial, cerrarCampana, editarMeta,
         cargarRumas, crearRuma, cargarDetalleRuma, guardarAsignacion, cerrarRuma, limpiarDetalle,
+        asignarRuma,
     }
 })

@@ -132,6 +132,29 @@
         </div>
       </template>
 
+      <div class="asignacion-rumas-section" style="margin-top: 2rem; border-top: 1px solid var(--color-border); padding-top: 1.5rem;">
+        <div class="hist-titulo">Asignación de Rumas</div>
+        <p class="text-sm text-muted mb-4">Selecciona rumas independientes para procesarlas en esta campaña.</p>
+        
+        <div class="rumas-grid">
+          <div v-for="ruma in rumasDisponibles" :key="ruma.id" class="hist-card" style="display: flex; justify-content: space-between;">
+            <div>
+              <strong>{{ ruma.codigo }}</strong>
+              <span class="text-xs text-muted" style="margin-left: 1rem;">
+                {{ ruma.total_lotes }} lotes | {{ fmtNum(ruma.total_tms, 2) }} TM
+              </span>
+            </div>
+            <button class="btn-primary btn-sm" @click="vincularRuma(ruma.id)">
+              <Plus :size="14" style="margin-right:0.3rem"/> Añadir a Campaña
+            </button>
+          </div>
+          
+          <div v-if="rumasDisponibles.length === 0" class="text-muted text-sm">
+            No hay rumas huérfanas disponibles para asignar.
+          </div>
+        </div>
+      </div>
+
       <!-- Modal: Editar meta -->
       <Transition name="modal">
         <div v-if="modalMeta" class="modal-overlay" @click.self="modalMeta = false">
@@ -304,6 +327,19 @@
     modalNueva.value = true
   }
 
+ const rumasDisponibles = computed(() => {
+  return store.rumas.filter(r => !r.asignada) 
+})
+
+async function vincularRuma(rumaId: number) {
+  if (!store.campanaActiva) return
+  const ok = await store.asignarRuma(store.campanaActiva.id, rumaId)
+  if (ok) {
+    ui.toast('Ruma añadida a la campaña exitosamente', 'success')
+    await store.cargarCampanaActiva() // Refresca KPIs
+  }
+}
+
   async function guardarMeta() {
     if (!store.campanaActiva) return
     const ok = await store.editarMeta(store.campanaActiva.id, metaInput.value)
@@ -334,6 +370,7 @@
   onMounted(async () => {
     await store.cargarCampanaActiva()
     await store.cargarHistorial()
+    await store.cargarRumas()
   })
   </script>
 

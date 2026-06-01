@@ -186,7 +186,6 @@ def _rec_out(
         ley_cabeza=a.ley_cabeza if a.ley_cabeza is not None else Decimal("0"),
         ley_cola=a.ley_cola,
         ley_liquido=a.ley_liquido,
-        ley_cola_ag_gr_tm=a.ley_cola_ag_gr_tm,
         solucion_ag_g_m3=a.solucion_ag_g_m3,
         recuperacion=a.recuperacion,
         estado=a.estado,
@@ -878,7 +877,6 @@ def completar_recuperacion(
       Requiere datos.muestras (list[MuestraReconocimientoIn]).
       Crea filas en analisis_detalle (AU1, AU2, AU_AG) y calcula:
         ley_cola        = promedio leyes Au (convertido a Oz/TC)
-        ley_cola_ag_gr_tm = promedio leyes Ag (Gr/TM)
 
     Flujo B — fallback (certificado externo / sin muestras):
       Requiere datos.ley_cola directo.
@@ -912,7 +910,6 @@ def completar_recuperacion(
 
     a.ley_cola = ley_cola
     a.ley_liquido = datos.ley_liquido
-    a.ley_cola_ag_gr_tm = ley_cola_ag
     a.solucion_ag_g_m3 = getattr(datos, "solucion_ag_g_m3", None)
     a.estado = EstadoRecuperacion.COMPLETADO
     a.fecha_analisis = datos.fecha_analisis

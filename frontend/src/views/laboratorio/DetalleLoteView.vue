@@ -1262,17 +1262,20 @@ const modoModalLey    = ref<'normal' | 'dirimencia'>('normal')
 
 const cipsDisponiblesLey = computed(() => {
   if (!lote.value) return []
-  return lote.value.cips_detalle.filter(c => {
-    if (c.tipo_muestra !== 'Laboratorio') return false
-    if (materialFiltro.value === 'Ag') {
-      // Para Ag: bloquear solo si ya existe Ag vigente en este CIP
-      return !lote.value!.analisis_ley.some(
+  if (materialFiltro.value === 'Ag') {
+    // Ag reutiliza CIPs de recuperación. Bloquear solo si ya hay Ag vigente en ese CIP.
+    return lote.value.cips_detalle.filter(c =>
+      c.tipo_muestra === 'RecuperacionInterno'
+      && !lote.value!.analisis_ley.some(
         a => a.cip === c.codigo_cip && a.material === 'Ag' && a.vigente,
-      )
-    }
-    // Para Au: bloquear si ya existe cualquier análisis en este CIP (comportamiento original)
-    return !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip && a.material !== 'Ag')
-  })
+      ),
+    )
+  }
+  // Au: CIPs Laboratorio sin análisis Au previo
+  return lote.value.cips_detalle.filter(c =>
+    c.tipo_muestra === 'Laboratorio'
+    && !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip && a.material !== 'Ag'),
+  )
 })
 
 function abrirModalAgregarLeyNormal() {

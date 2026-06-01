@@ -145,10 +145,8 @@
                 <th>AU GR/TM</th>
               </template>
               <template v-else>
-                <th>LEY CABEZA</th>
                 <th>LEY COLA</th>
                 <th>LEY LÍQUIDO</th>
-                <th>% RECUPERACIÓN</th>
               </template>
               <th>ESTADO</th>
               <th></th>
@@ -156,13 +154,13 @@
           </thead>
           <tbody>
             <tr v-if="store.cargando">
-              <td :colspan="tabActual === 'ley' ? 8 : 8" class="estado-tabla">
+              <td :colspan="tabActual === 'ley' ? 8 : 6" class="estado-tabla">
                 <span class="spinner" style="margin-right:0.5rem"></span> Cargando...
               </td>
             </tr>
             <template v-else>
               <tr v-if="filasMostrar.length === 0">
-                <td :colspan="tabActual === 'ley' ? 8 : 8" class="estado-tabla sin-datos">Sin registros</td>
+                <td :colspan="tabActual === 'ley' ? 8 : 6" class="estado-tabla sin-datos">Sin registros</td>
               </tr>
 
               <template v-if="tabActual === 'ley'">
@@ -188,12 +186,8 @@
                 <tr v-for="fila in filasMostrar" :key="fila.cip">
                   <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                   <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
-                  <td>{{ fila.leyCabeza ?? '-' }}</td>
                   <td>{{ fila.leyCola ?? '-' }}</td>
                   <td>{{ fila.leyLiquido ?? '-' }}</td>
-                  <td class="td-mono" style="color:var(--color-gold-light)">
-                    {{ fila.recuperacion != null ? fila.recuperacion + '%' : '-' }}
-                  </td>
                   <td>
                     <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                   </td>
@@ -335,10 +329,8 @@ function mapearCIP(c: CIPAnalisisOut) {
       cip: c.cip,
       fecha_envio: c.fecha_envio,
       estado: c.estado_recuperacion,
-      leyCabeza:   vigente ? (vigente.ley_cabeza   ?? null) : null,
       leyCola:     vigente ? (vigente.ley_cola     ?? null) : null,
       leyLiquido:  vigente ? (vigente.ley_liquido  ?? null) : null,
-      recuperacion: vigente ? (vigente.recuperacion ?? null) : null,
       certificadoUrl: a?.certificado_url ?? null,
     }
   }

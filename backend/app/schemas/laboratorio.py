@@ -174,7 +174,6 @@ class AnalisisRecuperacionOut(BaseModel):
     ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None  # solución Au
     recuperacion: Decimal | None = None
-    ley_cola_ag_gr_tm: Decimal | None = None  # ley Ag de cola (Gr/TM)
     solucion_ag_g_m3: Decimal | None = None  # Ag en solución (g/m³)
     # ── Detalles por muestra (solo se incluyen cuando se piden explícitamente) ─
     detalles: list[AnalisisDetalleOut] = []

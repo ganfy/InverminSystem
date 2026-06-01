@@ -654,7 +654,6 @@ class AnalisisRecuperacion(AuditMixin, Base):
     laboratorio = Column(String(50), nullable=False)
     ley_cabeza = Column(Numeric(10, 4))
     ley_cola = Column(Numeric(10, 4))
-    ley_cola_ag_gr_tm = Column(Numeric(10, 4), nullable=True)
     solucion_ag_g_m3 = Column(Numeric(10, 4), nullable=True)
     ley_liquido = Column(Numeric(10, 4))
     recuperacion = Column(

@@ -586,10 +586,9 @@
             </tbody>
           </table>
         </div>
-
       </div>
     </template>
-
+    <span class="last-sync"> *Cifras reiniciadas desde el último cierre de campaña</span>
   </div>
 </template>
 
@@ -1304,7 +1303,7 @@ onMounted(() => {
   height: 100%; border-radius: 3px; width: 0;
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.bar-fill.en-proceso  { background: var(--color-warning); }
+
 .bar-fill.parcial     { background: var(--color-gold); }
 .bar-fill.completado  { background: #4ade80; }
 .bar-fill.pagado      { background: #22c55e; }

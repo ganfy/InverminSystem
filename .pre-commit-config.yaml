@@ -9,10 +9,8 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
-      - id: trailing-whitespace     # elimina espacios al final de línea
       - id: end-of-file-fixer       # asegura newline al final del archivo
       # - id: check-merge-conflict    # detecta marcadores de conflicto git
-      - id: check-yaml              # valida sintaxis YAML
       - id: debug-statements        # detecta print() / breakpoint() olvidados
 
   - repo: local

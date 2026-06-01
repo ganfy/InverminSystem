@@ -27,6 +27,7 @@ export interface RumaLista {
     total_tms: number
     ley_ponderada: number | null
     rec_promedio: number | null
+    asignada: boolean
 }
 
 export interface LoteRumaItem {
@@ -98,3 +99,7 @@ export const cerrarRuma = (id: number) =>
 
 export const habilitarLote = (ip: string, motivo?: string) =>
     api.patch(`/lotes/${ip}/habilitar-ruma`, { motivo: motivo ?? null })
+
+export function asignarRumaACampana(campanaId: number, rumaId: number) {
+    return api.post(`/campanas/${campanaId}/rumas/${rumaId}`)
+  }

@@ -65,13 +65,18 @@ def _siguiente_codigo_campana(db: Session) -> str:
     return f"{prefijo}{num:02d}"
 
 
-def _siguiente_numero_ruma(db: Session, campana: Campana) -> int:
-    """Máximo numero_ruma en rumas de la campaña + 1."""
-    ids_ruma = [rc.id_ruma for rc in campana.rumas_campana]
-    if not ids_ruma:
-        return 1
-    nums = db.query(Ruma.numero_ruma).filter(Ruma.id.in_(ids_ruma)).all()
-    return max(n for (n,) in nums) + 1 if nums else 1
+def _siguiente_numero_ruma_independiente(db: Session, campana: Campana) -> int:
+    """Obtiene el secuencial máximo de rumas del año actual."""
+    anio = date.today().year
+    ultima = (
+        db.query(Ruma).filter(Ruma.codigo.like(f"RMA{anio}-%")).order_by(Ruma.id.desc()).first()
+    )
+    if ultima:
+        try:
+            return int(ultima.codigo.split("-")[-1]) + 1
+        except (ValueError, IndexError):
+            return 1
+    return 1
 
 
 def _codigo_ruma(campana: Campana, numero: int) -> str:
@@ -120,7 +125,7 @@ def _ley_vigente(lote: Lote, db: Session) -> float | None:
     from app.models.enums import TipoAnalisis
 
     leyes = (
-        db.query(AnalisisLey.tipo_analisis, AnalisisLey.ley_gr_tm)
+        db.query(AnalisisLey.tipo_analisis, AnalisisLey.ley_final)
         .filter(
             AnalisisLey.lote_id == lote.id,
             AnalisisLey.vigente == True,  # noqa: E712
@@ -263,17 +268,88 @@ def _build_ruma_out(ruma: Ruma, db: Session, incluir_lotes: bool = True) -> Ruma
     )
 
 
+def _actualizar_totales_campana(db: Session, campana_id: int):
+    """
+    Recalcula dinámicamente el progreso de la campaña.
+    - Rumas creadas: Cronológico (desde fecha inicio hasta fecha cierre).
+    - Lotes, TMS y Oro: Solo de las rumas ASIGNADAS.
+    """
+    campana = db.query(Campana).filter(Campana.id == campana_id).first()
+    if not campana:
+        return
+
+    # 1. Total de Rumas Creadas en el periodo de la campaña
+    query_rumas = db.query(Ruma).filter(Ruma.fecha_creacion >= campana.fecha_inicio)
+    if campana.fecha_cierre:
+        query_rumas = query_rumas.filter(Ruma.fecha_creacion <= campana.fecha_cierre)
+
+    campana.total_rumas = query_rumas.count()
+
+    # 2. Totales de procesamiento (Solo de las rumas asignadas)
+    ids_ruma = [rc.id_ruma for rc in campana.rumas_campana]
+    if not ids_ruma:
+        campana.total_lotes = 0
+        campana.total_toneladas = Decimal("0")
+        campana.oro_fino_acumulado = Decimal("0")
+        db.flush()
+        return
+
+    lotes = db.query(Lote).filter(Lote.ruma_id.in_(ids_ruma), ~Lote.eliminado).all()
+
+    total_lotes = len(lotes)
+    total_tms = 0.0
+    oro_acumulado = 0.0
+
+    for lote in lotes:
+        tms = _calcular_tms_lote(lote, db) or 0.0
+        total_tms += tms
+
+        ley_oz = _ley_vigente(lote, db)
+        rec_pct = _rec_vigente(lote, db)
+
+        if tms > 0 and ley_oz is not None and rec_pct is not None:
+            oro_lote = tms * (ley_oz * 34.2857) * (rec_pct / 100.0)
+            oro_acumulado += oro_lote
+
+    campana.total_lotes = total_lotes
+    campana.total_toneladas = Decimal(str(round(total_tms, 3)))
+    campana.oro_fino_acumulado = Decimal(str(round(oro_acumulado, 2)))
+
+    db.flush()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # CAMPAÑAS
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+# ── CAMPAÑAS ──────────────────────────────────────────────────────────────────
+
+
 def obtener_campana_activa(db: Session) -> CampanaOut:
-    return _build_campana_out(_get_campana_activa(db))
+    """Retorna la campaña activa recalculando sus métricas en tiempo real."""
+    campana = db.query(Campana).filter(Campana.estado == EstadoCampana.ACTIVA).first()
+    if not campana:
+        raise HTTPException(status_code=404, detail="No hay campaña activa")
+
+    # 1. Forzamos el recálculo para que lea directamente de la BD los datos frescos
+    _actualizar_totales_campana(db, campana.id)
+
+    # 2. Re-refrescamos el objeto por si hubo cambios persistidos en el helper
+    db.refresh(campana)
+
+    return _build_campana_out(campana)
 
 
 def listar_campanas(db: Session) -> list[CampanaOut]:
+    """Lista todas las campañas asegurando que la activa esté actualizada."""
     camps = db.query(Campana).order_by(Campana.id.desc()).all()
+
+    for c in camps:
+        if c.estado == EstadoCampana.ACTIVA:
+            _actualizar_totales_campana(db, c.id)
+            db.refresh(c)
+
     return [_build_campana_out(c) for c in camps]
 
 
@@ -301,6 +377,43 @@ def crear_campana(db: Session, datos: CampanaCreate, usuario: Usuario) -> Campan
     db.commit()
     db.refresh(nueva)
     return _build_campana_out(nueva)
+
+
+def asignar_ruma_a_campana(
+    db: Session, campana_id: int, ruma_id: int, usuario: Usuario
+) -> CampanaOut:
+    campana = db.query(Campana).filter(Campana.id == campana_id).first()
+    if not campana:
+        raise HTTPException(status_code=404, detail="Campaña no encontrada")
+    if campana.estado != EstadoCampana.ACTIVA:
+        raise HTTPException(
+            status_code=400, detail="Solo se pueden asignar rumas a campañas activas"
+        )
+
+    ruma = _get_ruma_o_404(db, ruma_id)
+
+    # Validar que no esté ya asignada
+    asignacion_existente = db.query(RumaCampana).filter(RumaCampana.id_ruma == ruma.id).first()
+    if asignacion_existente:
+        raise HTTPException(status_code=400, detail="Esta ruma ya pertenece a una campaña")
+
+    # Calcular toneladas actuales de la ruma
+    todos_lotes = db.query(Lote).filter(Lote.ruma_id == ruma.id, ~Lote.eliminado).all()
+    total_tms = sum(_calcular_tms_lote(tl, db) or 0.0 for tl in todos_lotes)
+
+    # Crear asociación
+    rel = RumaCampana(
+        id_ruma=ruma.id, id_campana=campana.id, tonelaje=Decimal(str(round(total_tms, 3)))
+    )
+    db.add(rel)
+    db.flush()
+
+    # Actualizar datos de la campaña
+    _actualizar_totales_campana(db, campana.id)
+
+    db.commit()
+    db.refresh(campana)
+    return _build_campana_out(campana)
 
 
 def cerrar_campana(
@@ -362,16 +475,12 @@ def editar_meta_campana(
 
 
 def listar_rumas(db: Session) -> list[RumaLista]:
-    """Rumas de la campaña activa, ordenadas por número."""
-    campana = _get_campana_activa(db)
-    ids_ruma = [rc.id_ruma for rc in campana.rumas_campana]
-    if not ids_ruma:
-        return []
-
-    rumas = db.query(Ruma).filter(Ruma.id.in_(ids_ruma)).order_by(Ruma.numero_ruma.asc()).all()
+    """Lista todas las rumas (puedes agregar filtros por estado o asignación)"""
+    rumas = db.query(Ruma).order_by(Ruma.id.desc()).all()
     resultado = []
     for ruma in rumas:
         totales = _calcular_totales_ruma(ruma.lotes, db)
+        esta_asignada = len(ruma.rumas_campana) > 0
         resultado.append(
             RumaLista(
                 id=ruma.id,
@@ -379,6 +488,7 @@ def listar_rumas(db: Session) -> list[RumaLista]:
                 numero_ruma=ruma.numero_ruma,
                 fecha_creacion=ruma.fecha_creacion or date.today(),
                 estado=ruma.estado,
+                asignada=esta_asignada,
                 **totales,
             )
         )
@@ -386,9 +496,9 @@ def listar_rumas(db: Session) -> list[RumaLista]:
 
 
 def crear_ruma(db: Session, usuario: Usuario) -> RumaOut:
-    campana = _get_campana_activa(db)
-    numero = _siguiente_numero_ruma(db, campana)
-    codigo = _codigo_ruma(campana, numero)
+    anio = date.today().year
+    numero = _siguiente_numero_ruma_independiente(db, anio)
+    codigo = f"RMA{anio}-{numero:03d}"
 
     ruma = Ruma(
         numero_ruma=numero,
@@ -399,12 +509,10 @@ def crear_ruma(db: Session, usuario: Usuario) -> RumaOut:
     db.add(ruma)
     db.flush()
 
-    # Vincular con campaña (tonelaje inicial = 0, se actualiza al asignar lotes)
-    rel = RumaCampana(id_ruma=ruma.id, id_campana=campana.id, tonelaje=Decimal("0"))
-    db.add(rel)
+    campana_activa = db.query(Campana).filter(Campana.estado == EstadoCampana.ACTIVA).first()
+    if campana_activa:
+        _actualizar_totales_campana(db, campana_activa.id)
 
-    # Incrementar contador en campaña
-    campana.total_rumas = (campana.total_rumas or 0) + 1
     db.commit()
     db.refresh(ruma)
     return _build_ruma_out(ruma, db)
@@ -462,6 +570,9 @@ def asignar_lotes(
     rel = db.query(RumaCampana).filter(RumaCampana.id_ruma == ruma_id).first()
     if rel:
         rel.tonelaje = Decimal(str(round(total_tms, 3)))
+        db.flush()
+        # Actualizar datos de la campaña
+        _actualizar_totales_campana(db, rel.id_campana)
 
     db.commit()
     db.refresh(ruma)

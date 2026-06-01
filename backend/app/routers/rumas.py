@@ -101,6 +101,18 @@ def editar_meta(
     return ruma_service.editar_meta_campana(db, campana_id, datos, current_user)
 
 
+@router.post("/campanas/{campana_id}/rumas/{ruma_id}", response_model=CampanaOut)
+def asignar_ruma_campana(
+    campana_id: int,
+    ruma_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Asigna una ruma independiente a una campaña."""
+    _require(current_user, _ROLES_GERENCIA)  # O el rol que prefieras
+    return ruma_service.asignar_ruma_a_campana(db, campana_id, ruma_id, current_user)
+
+
 # ── RUMAS ─────────────────────────────────────────────────────────────────────
 
 

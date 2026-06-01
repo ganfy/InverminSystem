@@ -26,10 +26,10 @@ class ProvAcopCache(BaseModel):
     provacop_id: int
     proveedor_id: int
     proveedor_razon_social: str
-    proveedor_ruc: str
+    proveedor_ruc: str | None = None
     acopiador_id: int
     acopiador_razon_social: str
-    acopiador_ruc: str
+    acopiador_ruc: str | None = None
     es_propio: bool
 
     model_config = {"from_attributes": True}
