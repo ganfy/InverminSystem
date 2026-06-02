@@ -56,6 +56,17 @@
               />
             </div>
             <div class="field">
+              <label class="field-label">SPOT PLATA Ag (USD/Oz) <span style="color:var(--color-text-faint);font-size:var(--text-xs);font-weight:400;text-transform:none">(opcional)</span></label>
+              <input
+                type="number"
+                class="field-input"
+                v-model.number="spotAgUsd"
+                min="0"
+                step="0.01"
+                placeholder="ej: 32.00"
+              />
+            </div>
+            <div class="field">
               <label class="field-label">FECHA LIQUIDACIÓN</label>
               <input type="date" class="field-input" v-model="fechaLiq" />
             </div>
@@ -194,8 +205,12 @@
             <span class="resumen-val">{{ fmtNum(store.preview.total_tms, 3) }} TMS</span>
           </div>
           <div class="resumen-col resumen-total">
-            <span class="resumen-lbl">TOTAL USD</span>
+            <span class="resumen-lbl">TOTAL USD (Au)</span>
             <span class="resumen-val-big">${{ fmtNum(store.preview.total_usd, 2) }}</span>
+          </div>
+          <div v-if="hayAg" class="resumen-col resumen-total-ag">
+            <span class="resumen-lbl">TOTAL AG (Plata)</span>
+            <span class="resumen-val-ag">${{ fmtNum(store.preview.total_ag_usd, 2) }}</span>
           </div>
         </div>
 
@@ -217,6 +232,10 @@
                 <th>MAQUILA</th>
                 <th>INSUMOS</th>
                 <th>PRECIO/TMS</th>
+                <!-- Columnas Ag (opcionales) -->
+                <th v-if="hayAg" class="col-ag">Ag Gr/TM</th>
+                <th v-if="hayAg" class="col-ag">Ag Oz/TC</th>
+                <th v-if="hayAg" class="col-ag">VALOR Ag</th>
                 <th>TOTAL USD</th>
               </tr>
             </thead>
@@ -239,9 +258,13 @@
                 <td class="td-mono td-right">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
                 <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtNum(lote.oz_tc_promedio, 4) }}</td>
                 <td class="td-mono td-right">{{ fmtNum(lote.pct_rec_liq, 1) }}%</td>
-                <td class="td-mono td-right">${{ fmtNum(lote.maquila, 2) }}</td>
+                <td class="td-mono td-right">{{ fmtNum(lote.maquila, 2) }}</td>
                 <td class="td-mono td-right">${{ fmtNum(lote.insumos_total, 2) }}</td>
                 <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 4) }}</td>
+                <!-- Ag (opcionales) -->
+                <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_gr_tm, 2) }}</td>
+                <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_oz_tc, 4) }}</td>
+                <td v-if="hayAg" class="td-mono td-right col-ag total-ag-cel">${{ fmtNum(lote.valor_ag_usd, 2) }}</td>
                 <td class="td-mono td-right total-cel">${{ fmtNum(lote.total_usd, 2) }}</td>
               </tr>
               <!-- Fila total -->
@@ -249,6 +272,9 @@
                 <td colspan="4" style="text-align:right">TOTALES</td>
                 <td class="td-mono td-right">{{ fmtNum(store.preview.total_tms, 3) }}</td>
                 <td colspan="8" />
+                <!-- celdas vacías para columnas Ag -->
+                <td v-if="hayAg" colspan="2" />
+                <td v-if="hayAg" class="td-mono td-right total-ag-cel">${{ fmtNum(store.preview.total_ag_usd, 2) }}</td>
                 <td class="td-mono td-right total-cel">${{ fmtNum(store.preview.total_usd, 2) }}</td>
               </tr>
             </tbody>
@@ -381,6 +407,7 @@
   const paso             = ref(1)
   const provacopId       = ref<number | ''>('')
   const spotUsd          = ref<number | null>(null)
+  const spotAgUsd        = ref<number | null>(null)
   const fechaLiq         = ref(new Date().toISOString().slice(0, 10))
   const lotesSeleccionados = ref<string[]>([])
   const errorPaso1       = ref('')
@@ -413,6 +440,8 @@
     [...(store.preview?.alertas_globales ?? [])]
       .filter(a => !a.critico)
   )
+
+  const hayAg = computed(() => store.preview?.hay_ag ?? false)
 
   const cargarPrecio = async () => {
     try {
@@ -497,6 +526,7 @@ async function recalcularConOverrides() {
       provacop_id: provacopId.value as number,
       lotes: lotesSeleccionados.value.map(ip => ({ ip })),
       spot_usd: spotUsd.value,
+      spot_ag_usd: spotAgUsd.value ?? null,
       fecha_liquidacion: fechaLiq.value || null,
     })
     initEditOverrides()
@@ -518,6 +548,7 @@ async function recalcularConOverrides() {
       provacop_id: provacopId.value as number,
       lotes: lotesSeleccionados.value.map(ip => ({ ip })),
       spot_usd: spotUsd.value!,
+      spot_ag_usd: spotAgUsd.value ?? null,
       fecha_liquidacion: fechaLiq.value || null,
     })
 
@@ -542,6 +573,7 @@ async function recalcularConOverrides() {
         gasto_consumo_override: editOv.value.gasto_consumo,
       })),
       spot_usd: spotUsd.value,
+      spot_ag_usd: spotAgUsd.value ?? null,
       fecha_liquidacion: fechaLiq.value || null,
       como_borrador: true,
     })
@@ -724,5 +756,14 @@ async function recalcularConOverrides() {
   @keyframes spin { to { transform:rotate(360deg); } }
 
   .col-r { text-align: right; }
-.alerta-dirim { background: rgba(179,144,40,0.12); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
+  .alerta-dirim { background: rgba(179,144,40,0.12); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
+
+  /* Columnas Ag (Plata) */
+  .col-ag { color: var(--color-text-muted); }
+  .total-ag-cel { color: #94a3b8 !important; font-weight: 700; }
+  .resumen-total-ag { margin-left: 1.5rem; }
+  .resumen-val-ag {
+    font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 700;
+    color: #94a3b8;
+  }
   </style>

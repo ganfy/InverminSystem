@@ -143,6 +143,8 @@ export interface LiquidacionDetalleOut extends LiquidacionResumenOut {
     lotes: LiquidacionLoteOut[]
     pdf_url: string | null
     fecha_cierre: string | null
+    hay_ag?: boolean
+    total_ag_usd?: number | null
 }
 
 export interface LiquidacionLoteParamsUpdate {

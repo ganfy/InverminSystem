@@ -72,7 +72,7 @@ const SEV_ORDER: Record<string, number> = { CRITICA: 3, ALTA: 2, MEDIA: 1 }
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const todasAlertas   = ref<any[]>([])
-const expandido      = ref(true)
+const expandido      = ref(false)
 const observaciones  = ref<Record<string, string>>({})
 const guardados      = ref<Record<string, boolean>>({})
 

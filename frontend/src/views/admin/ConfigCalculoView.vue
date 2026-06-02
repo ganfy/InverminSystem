@@ -77,7 +77,7 @@
         </div>
 
         <div class="tg-fields">
-          <div class="field-row">
+          <div v-if="!telegramCfg.desde_env" class="field-row">
             <label class="field-label">Token del Bot</label>
             <input
               v-model="editsTelegram.bot_token"
@@ -88,6 +88,12 @@
             />
             <p class="field-hint">
               Obtén uno en <a href="https://t.me/BotFather" target="_blank">@BotFather</a>
+            </p>
+          </div>
+          <div v-else class="field-row">
+            <p class="field-hint" style="margin-top: 0; margin-bottom: 0.75rem; font-size: 0.9rem; line-height: 1.4;">
+              El token del bot está configurado en el servidor. 
+              Si necesitas crear o administrar el bot, visita <a href="https://t.me/BotFather" target="_blank">@BotFather</a>.
             </p>
           </div>
 
@@ -106,16 +112,17 @@
           </div>
 
           <div class="field-row field-row-inline">
-            <label class="field-label">Revisar cada</label>
+            <label class="field-label">Hora del resumen diario</label>
             <input
-              v-model.number="editsTelegram.intervalo_min"
-              type="number"
+              v-model="editsTelegram.hora_resumen"
+              type="time"
               class="field-input input-inline"
-              min="5"
-              max="1440"
             />
-            <span class="field-label">minutos</span>
+            <span class="field-label">hs</span>
           </div>
+          <p class="field-hint" style="margin-top:-0.5rem">
+            Se enviará un resumen con todas las alertas activas a esta hora cada día.
+          </p>
         </div>
 
         <div class="tg-actions">
@@ -192,9 +199,9 @@ const cargandoTelegram  = ref(true)
 const guardandoTelegram = ref(false)
 const probandoTelegram  = ref(false)
 
-interface TelegramCfg { bot_token: string; chat_id: string; intervalo_min: number; configurado: boolean }
-const telegramCfg  = ref<TelegramCfg>({ bot_token: '', chat_id: '', intervalo_min: 30, configurado: false })
-const editsTelegram = reactive({ bot_token: '', chat_id: '', intervalo_min: 30 })
+interface TelegramCfg { bot_token: string; chat_id: string; hora_resumen: string; configurado: boolean; desde_env?: boolean }
+const telegramCfg   = ref<TelegramCfg>({ bot_token: '', chat_id: '', hora_resumen: '07:00', configurado: false, desde_env: false })
+const editsTelegram = reactive({ bot_token: '', chat_id: '', hora_resumen: '07:00' })
 
 async function cargarTelegram() {
   cargandoTelegram.value = true
@@ -203,7 +210,7 @@ async function cargarTelegram() {
     telegramCfg.value = cfg
     // No pre-llenamos el token (viene enmascarado)
     editsTelegram.chat_id      = cfg.chat_id
-    editsTelegram.intervalo_min = cfg.intervalo_min
+    editsTelegram.hora_resumen = cfg.hora_resumen || '07:00'
     editsTelegram.bot_token    = ''
   } catch {
     ui.toast('Error al cargar config Telegram', 'error')
@@ -213,17 +220,16 @@ async function cargarTelegram() {
 }
 
 async function guardarTelegram() {
-  if (!editsTelegram.bot_token && !telegramCfg.value.configurado) {
+  if (!telegramCfg.value.desde_env && !editsTelegram.bot_token && !telegramCfg.value.configurado) {
     ui.toast('Ingresa el token del bot', 'warning')
     return
   }
   guardandoTelegram.value = true
   try {
-    // Si el token está vacío, reusar el existente (no lo tenemos, el backend lo mantendrá)
     const payload = {
-      bot_token:     editsTelegram.bot_token || '(mantener)',
-      chat_id:       editsTelegram.chat_id,
-      intervalo_min: editsTelegram.intervalo_min,
+      bot_token:    editsTelegram.bot_token || '(mantener)',
+      chat_id:      editsTelegram.chat_id,
+      hora_resumen: editsTelegram.hora_resumen,
     }
     await adminApi.updateTelegramConfig(payload)
     ui.toast('Configuración de Telegram guardada', 'success')
@@ -363,7 +369,7 @@ onMounted(async () => {
 }
 .field-hint a { color: var(--color-gold); }
 
-.input-inline { width: 80px; }
+.input-inline { width: 120px; }
 
 .tg-actions {
   display: flex;

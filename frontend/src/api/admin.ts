@@ -9,16 +9,17 @@ export interface ConstanteCalculo {
 }
 
 export interface TelegramConfig {
-    bot_token: string
-    chat_id: string
-    intervalo_min: number
-    configurado: boolean
+    bot_token:    string
+    chat_id:      string
+    hora_resumen: string
+    configurado:  boolean
+    desde_env?:   boolean
 }
 
 export interface TelegramConfigUpdate {
-    bot_token: string
-    chat_id: string
-    intervalo_min: number
+    bot_token:    string
+    chat_id:      string
+    hora_resumen: string
 }
 
 export const adminApi = {

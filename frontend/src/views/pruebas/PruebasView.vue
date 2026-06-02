@@ -26,6 +26,8 @@
       </div>
     </header>
 
+    <AlertasBanner modulo="PRUEBAS" con-observaciones />
+
     <!-- Offline queue -->
     <div v-if="pruebasOffline.length > 0" class="offline-section">
       <div class="offline-section-header">
@@ -190,6 +192,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
+import AlertasBanner from '@/components/AlertasBanner.vue'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
 import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'

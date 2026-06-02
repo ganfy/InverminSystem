@@ -19,6 +19,8 @@
       </div>
     </header>
 
+    <AlertasBanner modulo="LABORATORIO" con-observaciones />
+
     <!-- ── [OFFLINE] Análisis pendientes de sincronizar (solo Laboratorista) ── -->
     <div
       v-if="!store.puedeVerIP && analisisOfflinePendientes.length > 0"
@@ -210,6 +212,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { FlaskConical, RefreshCw, WifiOff } from 'lucide-vue-next'
+import AlertasBanner from '@/components/AlertasBanner.vue'
 import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'

@@ -7,6 +7,8 @@
       </button>
     </div>
 
+    <AlertasBanner modulo="BALANZA" con-observaciones />
+
     <!-- ── [OFFLINE] Sesiones pendientes de sincronizar ──── -->
     <div v-if="sesionesOffline.length > 0 || sesionesHybrid.length > 0" class="offline-section">
       <div class="offline-section-header">
@@ -140,6 +142,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBalanzaStore } from '@/stores/balanza'
+import AlertasBanner from '@/components/AlertasBanner.vue'
 import { obtenerSesionesPendientes,
   obtenerProvacops,
   obtenerFinalizacionesPendientes,

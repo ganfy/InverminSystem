@@ -71,9 +71,11 @@ def put_config_calculo(
 
 
 class TelegramConfig(BaseModel):
-    bot_token: str = Field(..., min_length=10, description="Token del bot de Telegram")
+    bot_token: str | None = Field(None, description="Token del bot de Telegram")
     chat_id: str = Field(..., min_length=1, description="ID del chat o usuario destino")
-    intervalo_min: int = Field(30, ge=5, le=1440, description="Minutos entre revisiones (5-1440)")
+    hora_resumen: str = Field(
+        "07:00", pattern=r"^\d{2}:\d{2}$", description="Hora del resumen diario en formato HH:MM"
+    )
 
 
 @router.get("/telegram")
@@ -97,8 +99,10 @@ def put_telegram(
     _: Usuario = Depends(_require_admin),
 ):
     """Guarda la configuración del bot de Telegram. Solo Admin."""
-    cfg = set_telegram_config(db, body.bot_token, body.chat_id, body.intervalo_min)
-    cfg["bot_token"] = body.bot_token[:8] + "..."
+    cfg = set_telegram_config(db, body.bot_token or "", body.chat_id, body.hora_resumen)
+    if cfg["bot_token"]:
+        tok = cfg["bot_token"]
+        cfg["bot_token"] = tok[:8] + "..." if len(tok) > 8 else "***"
     return cfg
 
 

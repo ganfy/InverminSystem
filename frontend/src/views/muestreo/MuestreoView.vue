@@ -4,6 +4,8 @@
         <h1 class="page-title">Muestreo</h1>
       </div>
 
+      <AlertasBanner modulo="MUESTREO" con-observaciones />
+
       <div class="tabs-container">
         <button class="tab-btn" :class="{ active: tabActual === 'PENDIENTES' }" @click="tabActual = 'PENDIENTES'">
           Pendientes <span class="tab-badge">{{ store.lotesPendientes.length }}</span>
@@ -96,6 +98,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMuestreoStore } from '@/stores/muestreo'
+import AlertasBanner from '@/components/AlertasBanner.vue'
 import ModalDetallesMuestreo from './ModalDetallesMuestreo.vue'
 import ModalEtiquetas from './ModalEtiquetas.vue'
 import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'

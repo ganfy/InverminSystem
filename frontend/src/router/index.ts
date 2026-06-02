@@ -24,6 +24,7 @@ import CrearLiquidacionView from '@/views/liquidaciones/CrearLiquidacionView.vue
 import DetalleLiquidacionView from '@/views/liquidaciones/DetalleLiquidacionView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
 import UsuariosView from '@/views/admin/UsuariosView.vue'
+import ConfigCalculoView from '@/views/admin/ConfigCalculoView.vue'
 import RumasView from '@/views/rumas/RumasView.vue'
 import DetalleRumaView from '@/views/rumas/DetalleRumaView.vue'
 import CampanasView from '@/views/rumas/CampanasView.vue'
@@ -80,6 +81,7 @@ const router = createRouter({
 
         // Administración
         { path: 'administracion', name: 'Administracion', component: UsuariosView, meta: { roles: ['Admin'] } },
+        { path: 'administracion/config', name: 'ConfigSistema', component: ConfigCalculoView, meta: { roles: ['Admin'] } },
 
         // Error
         { path: 'unauthorized', name: 'Unauthorized', component: UnauthorizedView },

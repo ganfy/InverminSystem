@@ -88,8 +88,12 @@
               <span class="dato-val mono">{{ fmtNum(totalTms, 3) }} TMS</span>
             </div>
             <div class="dato-col dato-total">
-              <span class="dato-lbl">TOTAL USD</span>
+              <span class="dato-lbl">TOTAL USD (Au)</span>
               <span class="dato-val-big">${{ fmtNum(store.detalle.total_usd, 2) }}</span>
+            </div>
+            <div v-if="hayAg" class="dato-col dato-total-ag">
+              <span class="dato-lbl">TOTAL AG (Plata)</span>
+              <span class="dato-val-ag">${{ fmtNum(totalAgUsd, 2) }}</span>
             </div>
           </div>
         </div>
@@ -121,6 +125,10 @@
                   <th>FACTOR</th>
                   <th>PRECIO/TMS</th>
                   <th>FINO OZ</th>
+                  <!-- Columnas Ag (opcionales) -->
+                  <th v-if="hayAg" class="col-ag">Ag Gr/TM</th>
+                  <th v-if="hayAg" class="col-ag">Ag Oz/TC</th>
+                  <th v-if="hayAg" class="col-ag">VALOR Ag</th>
                   <th>TOTAL USD</th>
                   <th v-if="puedeEditarParams">ACCIONES</th>
                 </tr>
@@ -148,6 +156,10 @@
                   <td class="td-mono td-right td-muted">{{ fmtNum(lote.factor, 4) }}</td>
                   <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 4) }}</td>
                   <td class="td-mono td-right td-muted">{{ fmtNum(lote.fino_recuperable, 4) }}</td>
+                  <!-- Ag (opcionales) -->
+                  <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_gr_tm, 2) }}</td>
+                  <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_oz_tc, 4) }}</td>
+                  <td v-if="hayAg" class="td-mono td-right col-ag total-ag-cel">${{ fmtNum(lote.valor_ag_usd, 2) }}</td>
                   <td class="td-mono td-right total-cel">${{ fmtNum(lote.total_usd, 2) }}</td>
                   <td v-if="puedeEditarParams">
                     <button
@@ -164,7 +176,10 @@
                 <tr class="fila-total">
                   <td colspan="4" style="text-align:right;padding-right:1rem">TOTALES</td>
                   <td class="td-mono td-right">{{ fmtNum(totalTms, 3) }}</td>
-                  <td colspan="12" />
+                  <td :colspan="hayAg ? 12 : 12" />
+                  <!-- celdas vacías para columnas Ag -->
+                  <td v-if="hayAg" colspan="2" />
+                  <td v-if="hayAg" class="td-mono td-right total-ag-cel">${{ fmtNum(totalAgUsd, 2) }}</td>
                   <td class="td-mono td-right total-cel">${{ fmtNum(store.detalle.total_usd, 2) }}</td>
                 </tr>
               </tbody>
@@ -344,6 +359,16 @@
 
   const totalTms = computed(() =>
     (store.detalle?.lotes ?? []).reduce((acc, l) => acc + Number(l.tms), 0)
+  )
+
+  const hayAg = computed(() =>
+    store.detalle?.hay_ag ??
+    (store.detalle?.lotes?.some(l => l.aplica_ag) ?? false)
+  )
+
+  const totalAgUsd = computed(() =>
+    (store.detalle?.total_ag_usd) ??
+    (store.detalle?.lotes ?? []).reduce((acc, l) => acc + (l.aplica_ag ? Number(l.valor_ag_usd ?? 0) : 0), 0)
   )
 
   const estadosSiguientes = computed(() => {
@@ -589,4 +614,15 @@ border: 1px solid rgba(60, 180, 80, 0.3);
 
 .spinner { animation:spin 0.8s linear infinite; display:inline-block; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* Columnas Ag (Plata) */
+.col-ag { color: var(--color-text-dim); }
+.total-ag-cel { color: #94a3b8 !important; font-weight: 700; }
+.dato-total-ag { margin-left: 1rem; }
+.dato-val-ag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: #94a3b8;
+}
 </style>
