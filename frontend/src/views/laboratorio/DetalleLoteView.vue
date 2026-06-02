@@ -60,10 +60,9 @@
             <button :class="['mtog-btn', { active: materialFiltro === 'Au' }]" @click="materialFiltro = 'Au'">Au — Oro</button>
             <button :class="['mtog-btn', 'mtog-btn--ag', { active: materialFiltro === 'Ag' }]" @click="materialFiltro = 'Ag'"><span class="ag-dot" style="margin-right:0.2rem">Ag</span> Plata</button>
           </div>
-          <span v-if="materialFiltro === 'Ag' && leyAgDesdeRecuperacion" class="ag-registered" title="Ley Ag calculada desde reconocimiento de pulpa (cola)">
+          <span v-if="materialFiltro === 'Ag' && leyAgDesdeRecuperacion" class="ag-registered">
             <span class="ag-dot">Ag</span>
             {{ Number(leyAgDesdeRecuperacion).toFixed(3) }} Gr/TM
-            <span style="font-size:0.62rem;color:var(--color-text-faint);margin-left:0.25rem">(reconocimiento)</span>
           </span>
         </div>
 
@@ -530,12 +529,6 @@
               <span class="lf-label">% RECUPERACIÓN:</span>
               <span class="lf-value highlight">{{ a.recuperacion != null ? a.recuperacion + '%' : '-' }}</span>
             </div>
-            <div class="lab-field" v-if="a.ley_cola_ag_gr_tm != null">
-              <span class="lf-label">LEY COLA Ag:</span>
-              <span class="lf-value" style="color:#60a5fa">
-                {{ Number(a.ley_cola_ag_gr_tm).toFixed(4) }} Gr/TM
-              </span>
-            </div>
             <div class="lab-field" v-if="a.solucion_ag_g_m3 != null">
               <span class="lf-label">Ag SOLUCIÓN:</span>
               <span class="lf-value" style="color:#60a5fa">
@@ -612,45 +605,36 @@
         <!-- Sección: certificado de recuperación comercial -->
         <section class="card" v-if="tieneRecuperacionVigente">
           <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
-            <span>CERTIFICADO DE RECUPERACIÓN</span>
+            <span>CERTIFICADO DE RECONOCIMIENTO</span>
             <div style="display:flex;gap:0.5rem;align-items:center">
               <button
+                v-if="certReconocimientoGuardado"
                 class="btn-secondary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="previsualizarCertRec"
-                :disabled="previsualizandoRec"
-                title="Abrir previsualización del certificado de recuperación"
-              >
-                <span v-if="previsualizandoRec" class="spinner" style="margin-right:0.4rem"></span>
-                <span v-else><Eye /> Previsualizar</span>
-              </button>
-              <button
-                v-if="certRecGuardado"
-                class="btn-secondary"
-                style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="verCertificado(certRecGuardado)"
+                @click="verCertificado(certReconocimientoGuardado)"
                 title="Ver el último PDF generado"
               >
                 <File /> Ver último PDF
               </button>
               <button
-                v-if="!certRecGuardado || puedeRegenerarCerts"
+                v-if="!certReconocimientoGuardado || puedeRegenerarCerts"
                 class="btn-primary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="guardarCertRecuperacion"
-                :disabled="guardandoRec"
-                :title="certRecGuardado ? 'Regenerar certificado (sobreescribe el anterior)' : 'Guardar certificado PDF definitivo'"
+                @click="guardarCertReconocimientoFn"
+                :disabled="guardandoReconocimiento"
+                :title="certReconocimientoGuardado ? 'Regenerar certificado' : 'Guardar certificado PDF definitivo'"
               >
-                <span v-if="guardandoRec" class="spinner" style="margin-right:0.4rem"></span>
-                {{ certRecGuardado ? 'Regenerar PDF' : 'Guardar PDF definitivo' }}
+                <span v-if="guardandoReconocimiento" class="spinner" style="margin-right:0.4rem"></span>
+                {{ certReconocimientoGuardado ? 'Regenerar PDF' : 'Guardar PDF' }}
               </button>
             </div>
           </h2>
           <p style="font-size:0.8rem;color:var(--color-text-muted)">
-            Genera el informe de recuperación (formato Paititi) para entregar al proveedor.
+            Certificado de reconocimiento de pulpa — ley cola Au, ley líquido Au y solución Ag.
+            El certificado de recuperación (%) se genera desde el módulo de Pruebas Metalúrgicas.
           </p>
-          <div v-if="certRecGuardado" class="cert-guardado-info">
-            ✓ Certificado de recuperación generado
+          <div v-if="certReconocimientoGuardado" class="cert-guardado-info">
+            ✓ Certificado de reconocimiento generado
             <span v-if="!puedeRegenerarCerts" style="font-size:0.72rem;color:var(--color-text-faint);margin-left:0.4rem">
               — solo Admin y Gerencia pueden regenerarlo
             </span>
@@ -999,13 +983,7 @@ function fmtGt(v: number | string | null | undefined): string {
   return Number(v).toFixed(3)
 }
 
-const leyAgDesdeRecuperacion = computed(() => {
-      if (!lote.value) return null
-      const rec = lote.value.analisis_recuperacion.find(
-        a => a.vigente && a.ley_cola_ag_gr_tm != null
-      )
-      return rec?.ley_cola_ag_gr_tm ?? null
-    })
+const leyAgDesdeRecuperacion = computed(() => lote.value?.ley_ag_gr_tm ?? null)
 
 function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)
@@ -1162,35 +1140,23 @@ async function guardarAg() {
 // ── Flujo rec: descartar + certificado ───────────────────────────────────────
 const modalDescartarRec  = ref<number | null>(null)
 const justificacionRec   = ref('')
-const previsualizandoRec = ref(false)
-const guardandoRec       = ref(false)
-const certRecGuardado    = ref<string | null>(null)
+const guardandoReconocimiento  = ref(false)
+const certReconocimientoGuardado = ref<string | null>(null)
 
 const tieneRecuperacionVigente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.vigente && a.estado === 'COMPLETADO') ?? false
 )
 
-async function previsualizarCertRec() {
-  previsualizandoRec.value = true
+async function guardarCertReconocimientoFn() {
+  guardandoReconocimiento.value = true
   try {
-    await laboratorioApi.previewCertificadoRecPdf(ipActual)
-  } catch (e: any) {
-    ui.toast(e?.response?.data?.detail ?? 'Error al generar previsualización', 'error')
-  } finally {
-    previsualizandoRec.value = false
-  }
-}
-
-async function guardarCertRecuperacion() {
-  guardandoRec.value = true
-  try {
-    const res = await laboratorioApi.guardarCertificadoRec(ipActual)
-    certRecGuardado.value = res.ruta
-    ui.toast('Certificado de recuperación guardado', 'success')
+    const res = await laboratorioApi.guardarCertReconocimiento(ipActual)
+    certReconocimientoGuardado.value = res.ruta
+    ui.toast('Certificado de reconocimiento guardado', 'success')
   } catch (e: any) {
     ui.toast(e?.response?.data?.detail ?? 'Error al guardar certificado', 'error')
   } finally {
-    guardandoRec.value = false
+    guardandoReconocimiento.value = false
   }
 }
 
@@ -1249,11 +1215,9 @@ const puedeRegenerarCerts = computed(() => {
 
 //watch para certificados
 watch(lote, (l) => {
-  // Siempre sincronizar desde el lote al cargar/recargar
-  // Solo sobreescribir si el lote trae valor (para no borrar lo que se acaba de guardar en sesión)
-  if (l?.cert_ley_url) certLeyGuardado.value = l.cert_ley_url
-  if (l?.cert_rec_url) certRecGuardado.value = l.cert_rec_url
-}, { immediate: true })
+  if (l?.cert_ley_url)             certLeyGuardado.value = l.cert_ley_url
+  if (l?.cert_reconocimiento_url)  certReconocimientoGuardado.value = l.cert_reconocimiento_url
+  }, { immediate: true })
 
 // ── Agregar nueva ley ─────────────────────────────────────────────────────────
 const modalAgregarLey = ref(false)

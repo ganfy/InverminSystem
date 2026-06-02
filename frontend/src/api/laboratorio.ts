@@ -287,6 +287,21 @@ export const laboratorioApi = {
         return data
     },
 
+    async previewCertReconocimientoPdf(ip: string): Promise<void> {
+        const response = await api.get(
+            `/laboratorio/lotes/${ip}/guardar-certificado-reconocimiento?inline=true`,
+            { responseType: 'blob' },
+        )
+        const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    },
+
+    async guardarCertReconocimiento(ip: string): Promise<GuardarCertResult> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-reconocimiento`)
+        return data
+    },
+
     async descargarCertificadoEnsayo(cip: string): Promise<void> {
         const response = await api.get(`/laboratorio/cips/${encodeURIComponent(cip)}/certificado-ensayo`, {
             responseType: 'blob',

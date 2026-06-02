@@ -286,6 +286,7 @@ class LoteLabOut(BaseModel):
     tiene_prueba_pendiente: bool = False
     cert_ley_url: str | None = None
     cert_rec_url: str | None = None
+    cert_reconocimiento_url: str | None = None
     ley_ag_gr_tm: float | None = None  # ley de plata vigente (g/TM), None si no hay
     ley_ag_oz_tc: float | None = None
 

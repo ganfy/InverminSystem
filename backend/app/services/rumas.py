@@ -7,7 +7,7 @@ Lógica de negocio separada del router.
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.models.enums import EstadoCampana, EstadoRuma
+from app.models.enums import EstadoCampana, EstadoRuma, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
     AnalisisRecuperacion,
@@ -122,14 +122,13 @@ def _calcular_tmh_lote(lote: Lote, db: Session) -> float:
 
 
 def _ley_vigente(lote: Lote, db: Session) -> float | None:
-    from app.models.enums import TipoAnalisis
-
     leyes = (
         db.query(AnalisisLey.tipo_analisis, AnalisisLey.ley_final)
         .filter(
             AnalisisLey.lote_id == lote.id,
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis != TipoAnalisis.MINERO,
+            AnalisisLey.material == "Au",
         )
         .all()
     )

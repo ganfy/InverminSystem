@@ -123,6 +123,7 @@ export interface LoteLabOut {
     tiene_cip_listo_sin_enviar: boolean
     cert_ley_url?: string | null
     cert_rec_url?: string | null
+    cert_reconocimiento_url?: string | null
     // Plata
     ley_ag_gr_tm?: number | null
     ley_ag_oz_tc?: number | null

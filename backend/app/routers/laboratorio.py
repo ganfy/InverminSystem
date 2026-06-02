@@ -640,6 +640,50 @@ def guardar_certificado_recuperacion(
     return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
 
 
+@router.post("/lotes/{ip}/guardar-certificado-reconocimiento")
+def guardar_certificado_reconocimiento(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Genera y persiste el certificado de reconocimiento en storage."""
+    try:
+        pdf_bytes = cert_svc.generar_cert_reconocimiento_pdf(db, ip)
+        ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "reconocimiento")
+
+        lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
+        if lote_obj:
+            cert_record = (
+                db.query(AnalisisRecuperacion)
+                .filter(
+                    AnalisisRecuperacion.lote_id == lote_obj.id,
+                    AnalisisRecuperacion.estado == EstadoRecuperacion.CERT_RECONOCIMIENTO,
+                )
+                .first()
+            )
+            if cert_record:
+                cert_record.certificado_url = ruta
+            else:
+                db.add(
+                    AnalisisRecuperacion(
+                        lote_id=lote_obj.id,
+                        cip=None,
+                        laboratorio="Paititi",
+                        estado=EstadoRecuperacion.CERT_RECONOCIMIENTO,
+                        certificado_url=ruta,
+                        vigente=True,
+                        creado_por=current_user.id,
+                    )
+                )
+            db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
+
+
 @router.get("/cips/{cip}/certificado-ensayo")
 def generar_certificado_ensayo(
     cip: str,

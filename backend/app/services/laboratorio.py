@@ -348,6 +348,14 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         ),
         None,
     )
+    cert_reconocimiento_record = next(
+        (
+            a
+            for a in todos_analisis_rec
+            if a.estado == EstadoRecuperacion.CERT_RECONOCIMIENTO and a.vigente
+        ),
+        None,
+    )
 
     ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
     nombres = _nombres_usuarios(db, ids)
@@ -370,17 +378,6 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         c.codigo_cip not in cips_con_rec_vigente for c in cips_recuperacion
     )
 
-    # Debug
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.info(
-        "cert_ley_url=%s | cert_rec_url=%s | lote=%s",
-        cert_ley_rec.certificado_url if cert_ley_rec else None,
-        cert_rec_record.certificado_url if cert_rec_record else None,
-        lote.ip,
-    )
-
     return LoteLabOut(
         ip=lote.ip,
         lote_id=lote.id,
@@ -401,6 +398,9 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         tiene_cip_listo_sin_enviar=tiene_cip_listo_sin_enviar,
         cert_ley_url=cert_ley_rec.certificado_url if cert_ley_rec else None,
         cert_rec_url=cert_rec_record.certificado_url if cert_rec_record else None,
+        cert_reconocimiento_url=cert_reconocimiento_record.certificado_url
+        if cert_reconocimiento_record
+        else None,
     )
 
 

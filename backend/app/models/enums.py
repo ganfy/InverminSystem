@@ -94,6 +94,7 @@ class EstadoRecuperacion(str, Enum):
     PENDIENTE = "PENDIENTE"
     COMPLETADO = "COMPLETADO"
     CERT_COMERCIAL = "CERT_COMERCIAL"  # PDF Paititi generado por Comercial; no es análisis de lab
+    CERT_RECONOCIMIENTO = "CERT_RECONOCIMIENTO"  # PDF de reconocimiento
 
 
 class EstadoComprobante(str, Enum):

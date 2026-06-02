@@ -134,19 +134,30 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
 
     # Pre-cargar todas las Leyes vigentes (excluyendo minero)
     leyes_db = (
-        db.query(AnalisisLey.lote_id, AnalisisLey.tipo_analisis, AnalisisLey.ley_gr_tm)
+        db.query(
+            AnalisisLey.lote_id,
+            AnalisisLey.tipo_analisis,
+            AnalisisLey.ley_final,
+            AnalisisLey.ley_gr_tm,
+        )
         .filter(
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis != TipoAnalisis.MINERO,
+            AnalisisLey.material == "Au",
         )
         .all()
     )
 
     leyes_por_lote = defaultdict(list)
     ids_con_ley = set()
-    for lote_id, tipo, valor in leyes_db:
-        ids_con_ley.add(lote_id)
-        leyes_por_lote[lote_id].append({"tipo": tipo, "valor": valor})
+    for lote_id, tipo, ley_final, ley_gr_tm in leyes_db:
+        leyes_por_lote[lote_id].append(
+            {
+                "tipo": tipo,
+                "valor": float(ley_final) if ley_final is not None else None,  # oz/TC → ley_avg
+                "valor_gr_tm": float(ley_gr_tm) if ley_gr_tm is not None else None,  # gr/TM → KPIs
+            }
+        )
 
     # Pre-cargar todas las Recuperaciones vigentes
     recs_db = (
@@ -250,31 +261,6 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         )
         analisis_counts[estadoanalisis] = analisis_counts.get(estadoanalisis, 0) + 1
 
-        # --- CÁLCULO DE LEY PROMEDIO O COMERCIAL ---
-        ley_prom = None
-        leyes_del_lote = leyes_por_lote.get(lote.id, [])
-        if leyes_del_lote:
-            # Buscar primero si tiene ley comercial con valor registrado
-            ley_comercial = next(
-                (
-                    ley["valor"]
-                    for ley in leyes_del_lote
-                    if ley["tipo"] in (TipoAnalisis.COMERCIAL, "ley_comercial")
-                    and ley["valor"] is not None
-                ),
-                None,
-            )
-
-            if ley_comercial is not None:
-                ley_prom = float(ley_comercial)
-            else:
-                # Si no hay comercial, se promedian las demás leyes válidas registradas
-                valores_ley = [
-                    float(ley["valor"]) for ley in leyes_del_lote if ley["valor"] is not None
-                ]
-                if valores_ley:
-                    ley_prom = round(sum(valores_ley) / len(valores_ley), 3)
-
         # --- CÁLCULO DE RECUPERACIÓN PROMEDIO O COMERCIAL ---
         rec_prom = None
         recs_del_lote = recs_por_lote.get(lote.id, [])
@@ -301,8 +287,44 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 if valores_rec:
                     rec_prom = round(sum(valores_rec) / len(valores_rec), 2)
 
-        if tms is not None and ley_prom is not None:
-            au_lote = tms * ley_prom
+        # --- CÁLCULO DE LEY PROMEDIO O COMERCIAL ---
+        ley_prom = None  # oz/TC → va a ley_avg en LoteDashboard
+        ley_gr_tm_prom = None  # gr/TM → se usa para acumular KPI de oro
+        leyes_del_lote = leyes_por_lote.get(lote.id, [])
+        if leyes_del_lote:
+            # Preferir ley comercial
+            comercial = next(
+                (
+                    ley
+                    for ley in leyes_del_lote
+                    if ley["tipo"] in (TipoAnalisis.COMERCIAL, "ley_comercial")
+                    and ley["valor"] is not None
+                ),
+                None,
+            )
+            if comercial is not None:
+                ley_prom = float(comercial["valor"])  # oz/TC
+                ley_gr_tm_prom = float(comercial["valor_gr_tm"] or 0) or ley_prom * 34.2857
+            else:
+                # Promedio de todas las leyes válidas
+                valores_oz = [
+                    float(ley["valor"]) for ley in leyes_del_lote if ley["valor"] is not None
+                ]
+                valores_gr = [
+                    float(ley["valor_gr_tm"])
+                    for ley in leyes_del_lote
+                    if ley.get("valor_gr_tm") is not None
+                ]
+                if valores_oz:
+                    ley_prom = round(sum(valores_oz) / len(valores_oz), 4)  # oz/TC
+                if valores_gr:
+                    ley_gr_tm_prom = round(sum(valores_gr) / len(valores_gr), 3)  # gr/TM
+                elif ley_prom is not None:
+                    ley_gr_tm_prom = ley_prom * 34.2857  # conversión de respaldo
+
+        # KPI oro: usa gr/TM (TMS × ley_gr_tm = gramos)
+        if tms is not None and ley_gr_tm_prom is not None:
+            au_lote = tms * ley_gr_tm_prom
             kpis.au_real_100 += au_lote
             if rec_prom is not None:
                 kpis.au_real_rec += au_lote * rec_prom / 100
@@ -322,9 +344,9 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
             s["lotes"] += 1
             if tms:
                 s["tms"] += tms
-            if tms and ley_prom:
-                s["oz_sum"] += (tms * ley_prom) / 31.1035
-                s["ley_tms"] += tms * ley_prom
+            if tms and ley_gr_tm_prom:
+                s["oz_sum"] += (tms * ley_gr_tm_prom) / 31.1035
+                s["ley_tms"] += tms * ley_gr_tm_prom
 
         lotes_resumen.append(
             LoteDashboard(
