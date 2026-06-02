@@ -24,6 +24,7 @@ from datetime import date, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any
 
+# pyrefly: ignore [missing-import]
 from app.models.enums import EstadoLiquidacion, EstadoLote, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
@@ -340,7 +341,7 @@ def _calcular_lote(
 
     # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
     constantes = get_constantes(db)
-    if not lote.volado and oz_tc_comercial < constantes().umbral_volado_oz_tc:
+    if not lote.volado and oz_tc_comercial < constantes.umbral_volado_oz_tc:
         lote.volado = True  # se persiste al commit de crear_liquidacion
     if lote.volado:
         oz_tc_comercial = Decimal("0")
