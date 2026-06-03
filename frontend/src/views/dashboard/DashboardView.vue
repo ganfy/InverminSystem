@@ -196,22 +196,25 @@
     </template>
 
     <template v-else-if="tabActual === 'acopiadores'">
-      <div class="section-header">
-        <h2>Análisis de Toneladas Húmedas (TMH) por Acopiador</h2>
-        <span class="badge-info">Resumen Mensualizado</span>
-      </div>
-
-      <div class="export-bar" style="margin-bottom:0.5rem">
-        <button class="btn-export" @click="exportarExcel('acopiadores')">
-          <Download :size="13" /> Excel
+      <div class="matrix-section-header">
+        <div class="title-group">
+          <Scale class="section-icon" :size="22" />
+          <div>
+            <h2>Análisis de Toneladas Húmedas (TMH) por Acopiador</h2>
+            <p class="section-subtitle">Volumen mensualizado acumulado de la campaña actual</p>
+          </div>
+        </div>
+        <button class="btn-export-premium" @click="exportarExcel('acopiadores')">
+          <Download :size="14" />
+          <span>Exportar Matriz (.xlsx)</span>
         </button>
       </div>
 
-      <div class="table-wrapper">
-        <table class="matrix-table data-table">
+      <div class="matrix-table-scroll-container">
+        <table class="matrix-table-premium">
           <thead>
             <tr>
-              <th class="text-left">Acopiador</th>
+              <th class="sticky-column text-left">Acopiador</th>
               <th class="align-right">Ene</th>
               <th class="align-right">Feb</th>
               <th class="align-right">Mar</th>
@@ -224,32 +227,35 @@
               <th class="align-right">Oct</th>
               <th class="align-right">Nov</th>
               <th class="align-right">Dic</th>
-              <th class="total-cell align-right">Total General</th>
+              <th class="total-column-header align-right">Total General</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in data?.acopiadores_tmh" :key="item.acopiador" class="tabla-row">
-              <td class="font-bold text-left" style="min-width: 200px;">{{ item.acopiador || 'SIN ACOPIADOR' }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.enero) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.febrero) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.marzo) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.abril) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.mayo) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.junio) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.julio) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.agosto) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.septiembre) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.octubre) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.noviembre) }}</td>
-              <td class="align-right td-mono">{{ formatVolume(item.diciembre) }}</td>
-              <td class="total-cell font-bold align-right td-mono">{{ formatVolume(item.total) }}</td>
+            <tr v-for="item in data?.acopiadores_tmh" :key="item.acopiador" class="matrix-row">
+              <td class="sticky-column font-bold text-left acopiador-cell">
+                <span class="acopiador-avatar-sm">{{ (item.acopiador || 'S').charAt(0) }}</span>
+                <span class="acopiador-text">{{ item.acopiador || 'SIN ACOPIADOR' }}</span>
+              </td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.enero > 0 }">{{ formatVolume(item.enero) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.febrero > 0 }">{{ formatVolume(item.febrero) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.marzo > 0 }">{{ formatVolume(item.marzo) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.abril > 0 }">{{ formatVolume(item.abril) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.mayo > 0 }">{{ formatVolume(item.mayo) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.junio > 0 }">{{ formatVolume(item.junio) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.julio > 0 }">{{ formatVolume(item.julio) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.agosto > 0 }">{{ formatVolume(item.agosto) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.septiembre > 0 }">{{ formatVolume(item.septiembre) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.octubre > 0 }">{{ formatVolume(item.octubre) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.noviembre > 0 }">{{ formatVolume(item.noviembre) }}</td>
+              <td class="align-right td-mono volume-cell" :class="{ 'has-value': item.diciembre > 0 }">{{ formatVolume(item.diciembre) }}</td>
+              <td class="total-column font-bold align-right td-mono highlight-gold-cell">{{ formatVolume(item.total) }}</td>
             </tr>
-            <tr class="totals-row">
-              <td class="text-left font-bold">TOTAL GENERAL</td>
-              <td v-for="mes in mesesClaves" :key="mes" class="align-right td-mono">
+            <tr class="totals-row-premium">
+              <td class="sticky-column text-left font-bold totals-title-cell">TOTAL GENERAL</td>
+              <td v-for="mes in mesesClaves" :key="mes" class="align-right td-mono totals-month-cell">
                 {{ formatVolume(calcularTotalMes(mes)) }}
               </td>
-              <td class="total-cell font-bold align-right td-mono">{{ formatVolume(totalGeneralMatriz) }}</td>
+              <td class="total-column font-bold align-right td-mono highlight-gold-cell-total">{{ formatVolume(totalGeneralMatriz) }}</td>
             </tr>
           </tbody>
         </table>
@@ -475,16 +481,22 @@
     </template>
 
     <template v-else>
-      <div class="export-bar">
-        <button class="btn-export" @click="exportarExcel('lotes')">
-          <Download :size="13" /> Lotes .xlsx
-        </button>
-        <button class="btn-export" @click="exportarExcel('acopiadores')">
-          <Download :size="13" /> Acopiadores .xlsx
-        </button>
-        <button class="btn-export" @click="imprimirVista">
-          <Printer :size="13" /> PDF
-        </button>
+      <div class="actions-header-bar">
+        <span class="actions-label">EXPORTAR REPORTES</span>
+        <div class="actions-group">
+          <button class="btn-export-premium" @click="exportarExcel('lotes')">
+            <Download :size="14" />
+            <span>Lotes (.xlsx)</span>
+          </button>
+          <button class="btn-export-premium" @click="exportarExcel('acopiadores')">
+            <Download :size="14" />
+            <span>Acopiadores (.xlsx)</span>
+          </button>
+          <button class="btn-export-premium btn-print" @click="imprimirVista">
+            <Printer :size="14" />
+            <span>Imprimir PDF</span>
+          </button>
+        </div>
       </div>
 
       <div class="charts-grid">
@@ -493,7 +505,7 @@
         <div class="analytics-card">
           <div class="card-header-mini">
             <h3>Pipeline de Análisis</h3>
-            <span class="font-mono text-muted" style="font-size:var(--text-xs)">{{ totalLotes }} lotes totales</span>
+            <span class="font-mono text-muted-badge">{{ totalLotes }} lotes totales</span>
           </div>
           <div class="donut-layout">
             <!-- SVG Donut -->
@@ -501,14 +513,14 @@
               <svg :viewBox="`0 0 100 100`" width="150" height="150">
                 <g transform="rotate(-90 50 50)">
                   <circle cx="50" cy="50" :r="DONUT_R" fill="none"
-                    stroke="rgba(255,255,255,0.05)" stroke-width="13"/>
+                    stroke="rgba(255,255,255,0.03)" stroke-width="12"/>
                   <circle
                     v-for="seg in donutSegments" :key="seg.label"
                     cx="50" cy="50" :r="DONUT_R" fill="none"
-                    :stroke="seg.color" stroke-width="13"
+                    :stroke="seg.color" stroke-width="12"
                     :stroke-dasharray="`${seg.dash} ${DONUT_CIRC}`"
                     :stroke-dashoffset="`-${seg.offset}`"
-                    style="transition: stroke-dashoffset 0.5s"
+                    class="donut-segment-transition"
                   />
                 </g>
               </svg>
@@ -533,6 +545,7 @@
         <div class="analytics-card">
           <div class="card-header-mini">
             <h3>Estados de Lotes</h3>
+            <span class="font-mono text-muted-badge">Distribución operativa</span>
           </div>
           <div class="bars-list">
             <div v-for="(item, estado) in distribucionEstados" :key="estado" class="bar-row">
@@ -546,7 +559,10 @@
                   :style="{ width: `${item.porcentaje}%` }"
                 ></div>
               </div>
-              <span class="bar-count font-mono">{{ item.count }}</span>
+              <div class="bar-stats font-mono">
+                <span class="bar-count-val">{{ item.count }}</span>
+                <span class="bar-pct-val">{{ item.porcentaje }}%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -554,37 +570,43 @@
         <!-- Tabla: Resumen por Acopiador -->
         <div class="analytics-card analytics-card--wide" v-if="data?.acopiadores_stats?.length">
           <div class="card-header-mini">
-            <h3>Resumen por Acopiador</h3>
-            <span class="font-mono text-muted" style="font-size:var(--text-xs)">acumulado campaña</span>
+            <h3>Desempeño por Acopiador</h3>
+            <span class="font-mono text-muted-badge">Acumulado Campaña</span>
           </div>
-          <table class="data-table" style="margin-top:0.75rem">
-            <thead>
-              <tr>
-                <th>ACOPIADOR</th>
-                <th class="align-right">LOTES</th>
-                <th>TMS</th>
-                <th class="align-right">OZ EN STOCK</th>
-                <th class="align-right">LEY PROM gr/TM</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="s in data.acopiadores_stats" :key="s.acopiador" class="tabla-row">
-                <td class="font-bold">{{ s.acopiador }}</td>
-                <td class="align-right td-mono">{{ s.lotes }}</td>
-                <td>
-                  <div class="mini-bar-wrap">
-                    <div class="mini-bar-track">
-                      <div class="mini-bar-fill"
-                        :style="{ width: `${(s.tms / maxAcopiadorTms) * 100}%` }"></div>
+          <div class="table-premium-wrapper">
+            <table class="data-table-premium">
+              <thead>
+                <tr>
+                  <th>ACOPIADOR</th>
+                  <th class="align-center">LOTES</th>
+                  <th>TONELADAS SECAS (TMS)</th>
+                  <th class="align-right">OZ EN STOCK</th>
+                  <th class="align-right">LEY PROMEDIO</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in data.acopiadores_stats" :key="s.acopiador" class="tabla-row-premium">
+                  <td class="td-acopiador">
+                    <span class="acopiador-avatar">{{ s.acopiador.charAt(0) }}</span>
+                    <span class="acopiador-name">{{ s.acopiador }}</span>
+                  </td>
+                  <td class="align-center">
+                    <span class="badge-lotes-count font-mono">{{ s.lotes }}</span>
+                  </td>
+                  <td>
+                    <div class="premium-bar-wrap">
+                      <div class="premium-bar-track">
+                        <div class="premium-bar-fill" :style="{ width: `${(s.tms / maxAcopiadorTms) * 100}%` }"></div>
+                      </div>
+                      <span class="premium-bar-val font-mono">{{ s.tms.toFixed(2) }} <span class="unit-label">TM</span></span>
                     </div>
-                    <span class="mini-bar-val font-mono">{{ s.tms.toFixed(1) }}</span>
-                  </div>
-                </td>
-                <td class="align-right td-mono" style="color:var(--color-gold)">{{ s.oz.toFixed(3) }}</td>
-                <td class="align-right td-mono">{{ s.ley_prom?.toFixed(3) ?? '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
+                  </td>
+                  <td class="align-right td-mono highlight-gold">{{ s.oz.toFixed(3) }} <span class="unit-label-dim">oz</span></td>
+                  <td class="align-right td-mono font-bold">{{ s.ley_prom?.toFixed(3) ?? '—' }} <span class="unit-label-dim">g/T</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </template>
@@ -1023,9 +1045,13 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.kpi-card:hover { 
+  transform: translateY(-3px); 
+  border-color: var(--color-border-focus);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); 
+}
 .gold-accent { border-left: 3px solid var(--color-gold); }
 .kpi-info { display: flex; flex-direction: column; gap: 0.25rem; }
 .kpi-label {
@@ -1034,7 +1060,8 @@ onMounted(() => {
 }
 .kpi-value { font-family: var(--font-mono); font-size: var(--text-xl); font-weight: 700; color: var(--color-text); }
 .kpi-value.highlight { color: var(--color-gold); }
-.kpi-icon { color: var(--color-text-muted); opacity: 0.3; }
+.kpi-icon { color: var(--color-text-muted); opacity: 0.3; transition: opacity 0.2s, color 0.2s; }
+.kpi-card:hover .kpi-icon { opacity: 0.7; color: var(--color-gold); }
 
 /* Tabs */
 .tabs-bar {
@@ -1057,9 +1084,9 @@ onMounted(() => {
 .tab-btn:hover:not(.active) { color: var(--color-text); }
 .tab-count {
   margin-left: 0.4rem;
-  background: rgba(179,144,40,0.15); border: 1px solid rgba(179,144,40,0.3);
+  background: rgba(179,144,40,0.12); border: 1px solid rgba(179,144,40,0.25);
   color: var(--color-gold); font-size: var(--text-xs);
-  padding: 0.05rem 0.45rem; border-radius: 999px; font-family: var(--font-mono);
+  padding: 0.05rem 0.45rem; border-radius: 99px; font-family: var(--font-mono);
 }
 
 /* Filtros */
@@ -1078,9 +1105,9 @@ onMounted(() => {
   font-family: var(--font-mono); font-size: var(--text-xs);
   letter-spacing: 0.12em; color: var(--color-text-muted); text-transform: uppercase; white-space: nowrap;
 }
-.data-table td { padding: 0.7rem 1rem; border-bottom: 1px solid rgba(58,58,40,0.4); color: var(--color-text); }
+.data-table td { padding: 0.7rem 1rem; border-bottom: 1px solid rgba(58,58,40,0.3); color: var(--color-text); }
 .tabla-row { transition: background 0.1s; }
-.tabla-row:hover { background: rgba(179,144,40,0.04); }
+.tabla-row:hover { background: rgba(179,144,40,0.03); }
 .tabla-row.clickable { cursor: pointer; }
 
 .td-mono   { font-family: var(--font-mono); }
@@ -1115,14 +1142,19 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.2s ease;
+}
+
+.analytics-card:hover {
+  border-color: rgba(179, 144, 40, 0.3);
 }
 
 .card-header-mini {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(179,144,40,0.15);
+  border-bottom: 1px solid rgba(179,144,40,0.12);
   padding-bottom: 0.75rem;
 }
 
@@ -1130,6 +1162,9 @@ onMounted(() => {
   font-size: var(--text-md);
   font-weight: 700;
   color: var(--color-text);
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .chart-container-bars {
@@ -1182,7 +1217,6 @@ onMounted(() => {
 }
 
 /* Soporte de compatibilidad de colores para los fondos de las barras */
-.progress-bar-fill.en-proceso   { background: var(--color-warning) !important; }
 .progress-bar-fill.parcial      { background: var(--color-gold) !important; }
 .progress-bar-fill.completado   { background: #4ade80 !important; }
 .progress-bar-fill.pagado       { background: #22c55e !important; }
@@ -1204,11 +1238,11 @@ onMounted(() => {
   font-size: var(--text-xs); font-weight: 700; font-family: var(--font-mono);
   letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
 }
-.en-proceso  { background: var(--color-warning-bg);  color: var(--color-warning);  border: 1px solid rgba(207,151,61,0.3); }
-.parcial     { background: var(--color-gold-bg);      color: var(--color-gold);     border: 1px solid rgba(179,144,40,0.3); }
-.completado  { background: var(--color-success-bg);   color: #4ade80;               border: 1px solid rgba(81,161,85,0.3); }
-.pagado      { background: var(--color-success-bg);   color: #4ade80;               border: 1px solid rgba(81,161,85,0.3); }
-.pendiente   { background: var(--color-error-bg);     color: var(--color-error);    border: 1px solid rgba(165,71,61,0.3); }
+.en-proceso  { background: rgba(14, 165, 233, 0.15);  color: #38bdf8;  border: 1px solid rgba(14, 165, 233, 0.25); }
+.parcial     { background: var(--color-gold-bg);      color: var(--color-gold);     border: 1px solid rgba(179,144,40,0.25); }
+.completado  { background: var(--color-success-bg);   color: #4ade80;               border: 1px solid rgba(81,161,85,0.25); }
+.pagado      { background: var(--color-success-bg);   color: #4ade80;               border: 1px solid rgba(81,161,85,0.25); }
+.pendiente   { background: var(--color-error-bg);     color: var(--color-error);    border: 1px solid rgba(165,71,61,0.25); }
 
 .badge-count-sm {
   display: inline-block; padding: 0.1rem 0.5rem;
@@ -1224,10 +1258,10 @@ onMounted(() => {
   letter-spacing: 0.06em; white-space: nowrap;
 }
 .analisis-sin-datos { background: rgba(148,163,184,0.1);  color: var(--color-text-muted); }
-.analisis-falta-ley    { background: rgba(59,130,246,0.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
-.analisis-falta-rec { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
-.analisis-listo     { background: rgba(34,197,94,0.15);   color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
-.analisis-falta-muestreo { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+.analisis-falta-ley    { background: rgba(59,130,246,0.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
+.analisis-falta-rec { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+.analisis-listo     { background: rgba(34,197,94,0.15);   color: #22c55e; border: 1px solid rgba(34,197,94,0.25); }
+.analisis-falta-muestreo { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
 
 /* Tags secundarios */
 .tags-secundarios { display: flex; gap: 0.25rem; flex-wrap: wrap; justify-content: center; }
@@ -1236,10 +1270,10 @@ onMounted(() => {
   font-size: 0.62rem; font-family: var(--font-mono); font-weight: 600;
   letter-spacing: 0.04em; cursor: default; white-space: nowrap;
 }
-.tag-volado     { background: var(--color-volado-bg);  color: var(--color-volado); border: 1px solid rgba(68, 122, 239, 0.25); }
-.tag-dirimencia { background: var(--color-dirimencia-bg);  color: var(--color-dirimencia); border: 1px solid rgba(168, 85, 247, 0.25); }
-.tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
-.tag-remu { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.tag-volado     { background: var(--color-volado-bg);  color: var(--color-volado); border: 1px solid rgba(68, 122, 239, 0.2); }
+.tag-dirimencia { background: var(--color-dirimencia-bg);  color: var(--color-dirimencia); border: 1px solid rgba(168, 85, 247, 0.2); }
+.tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.15); }
+.tag-remu { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
 
 .btn-accion {
   background: transparent; border: 1px solid var(--color-border);
@@ -1275,73 +1309,84 @@ onMounted(() => {
 .analytics-card--wide { grid-column: 1 / -1; }
 
 /* Donut */
-.donut-layout { display: flex; align-items: center; gap: 1.5rem; padding-top: 0.5rem; flex-wrap: wrap; }
+.donut-layout { display: flex; align-items: center; gap: 2rem; padding-top: 0.5rem; flex-wrap: wrap; }
 .donut-wrap   { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
 .donut-center {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   text-align: center; pointer-events: none;
 }
-.donut-val { display: block; font-size: 1.6rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-text); }
-.donut-lbl { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-top: -2px; }
+.donut-val { display: block; font-size: 1.8rem; font-weight: 700; font-family: var(--font-mono); color: var(--color-gold); }
+.donut-lbl { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-top: -4px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-.donut-legend { display: flex; flex-direction: column; gap: 0.55rem; flex: 1; min-width: 160px; }
-.legend-row { display: flex; align-items: center; gap: 0.5rem; }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.legend-label { flex: 1; font-size: var(--text-sm); color: var(--color-text); }
-.legend-count { font-size: var(--text-sm); color: var(--color-text); min-width: 28px; text-align: right; }
-.legend-pct { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 40px; text-align: right; }
+.donut-legend { display: flex; flex-direction: column; gap: 0.6rem; flex: 1; min-width: 180px; }
+.legend-row { 
+  display: flex; align-items: center; gap: 0.6rem; 
+  padding: 0.25rem 0.5rem; border-radius: 4px;
+  background: rgba(255,255,255,0.01);
+  border: 1px solid rgba(255,255,255,0.02);
+  transition: transform 0.15s, background-color 0.15s;
+}
+.legend-row:hover {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.03);
+}
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.legend-label { flex: 1; font-size: var(--text-sm); color: var(--color-text-muted); }
+.legend-count { font-size: var(--text-sm); color: var(--color-text); min-width: 28px; text-align: right; font-weight: 700; }
+.legend-pct { font-size: var(--text-xs); color: var(--color-gold-light); min-width: 40px; text-align: right; }
+
+.donut-segment-transition {
+  transition: stroke-dashoffset 0.6s ease-in-out, stroke 0.3s;
+}
 
 /* Barras estados (reemplaza progress-bar-*) */
-.bars-list { display: flex; flex-direction: column; gap: 0.9rem; padding-top: 0.5rem; }
+.bars-list { display: flex; flex-direction: column; gap: 1rem; padding-top: 0.5rem; }
 .bar-row { display: flex; align-items: center; gap: 0.75rem; }
-.bar-label { width: 130px; min-width: 130px; }
+.bar-label { width: 120px; min-width: 120px; }
 .bar-track {
-  flex: 1; height: 14px; background: rgba(255,255,255,0.06);
-  border: 1px solid var(--color-border); border-radius: 3px; overflow: hidden;
+  flex: 1; height: 12px; background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden;
 }
 .bar-fill {
-  height: 100%; border-radius: 3px; width: 0;
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%; border-radius: 6px; width: 0;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.bar-fill.parcial     { background: var(--color-gold); }
-.bar-fill.completado  { background: #4ade80; }
-.bar-fill.pagado      { background: #22c55e; }
-.bar-fill.pendiente   { background: var(--color-error); }
-.bar-count { width: 32px; text-align: right; font-size: var(--text-sm); color: var(--color-text); font-weight: 700; }
+.bar-fill.parcial     { background: linear-gradient(90deg, var(--color-gold), var(--color-gold-light)); }
+.bar-fill.completado  { background: linear-gradient(90deg, #51a155, #4ade80); }
+.bar-fill.pagado      { background: linear-gradient(90deg, #22c55e, #10b981); }
+.bar-fill.pendiente   { background: linear-gradient(90deg, var(--color-error), #ef4444); }
 
-/* Mini-bars tabla acopiadores */
-.mini-bar-wrap { display: flex; align-items: center; gap: 0.5rem; }
-.mini-bar-track {
-  width: 90px; height: 8px; background: rgba(255,255,255,0.06);
-  border-radius: 2px; overflow: hidden; border: 1px solid var(--color-border);
+.bar-stats {
+  display: flex;
+  justify-content: space-between;
+  width: 70px;
+  min-width: 70px;
+  font-size: var(--text-sm);
 }
-.mini-bar-fill { height: 100%; background: var(--color-gold); border-radius: 2px; transition: width 0.5s; }
-.mini-bar-val { font-size: var(--text-xs); color: var(--color-text-muted); min-width: 36px; }
+.bar-count-val {
+  color: var(--color-text);
+  font-weight: 700;
+}
+.bar-pct-val {
+  color: var(--color-gold);
+  font-weight: 600;
+  text-align: right;
+  flex: 1;
+}
 
 /* Urgencia filas lotes */
-.row-listo    { background: rgba(34, 197, 94,  0.03) !important; }
-.row-urgente  { background: rgba(245, 158, 11, 0.05) !important; border-left: 2px solid var(--color-warning); }
-.row-sin-datos{ background: rgba(148, 163, 184, 0.03) !important; }
+.row-listo    { background: rgba(34, 197, 94,  0.02) !important; }
+.row-urgente  { background: rgba(245, 158, 11, 0.04) !important; border-left: 2px solid var(--color-warning); }
+.row-sin-datos{ background: rgba(148, 163, 184, 0.02) !important; }
 .row-urgente td:first-child { padding-left: calc(1rem - 2px); }
-
-/* Export bar (ya definido, asegurar que exista) */
-.export-bar { display: flex; gap: 0.5rem; justify-content: flex-end; }
-.btn-export {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.35rem 0.8rem; border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border); background: transparent;
-  color: var(--color-text-muted); font-size: var(--text-xs);
-  font-family: var(--font-mono); cursor: pointer; transition: all 0.15s;
-}
-.btn-export:hover { border-color: var(--color-gold); color: var(--color-gold); }
 
 /* Print */
 @media print {
-  .tabs-bar, .filtros-bar, .export-bar, .btn-refresh { display: none !important; }
+  .tabs-bar, .filtros-bar, .export-bar, .btn-refresh, .actions-header-bar, .matrix-section-header button { display: none !important; }
   .dashboard-page { padding: 0; }
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
-  .analytics-card, .table-wrapper { break-inside: avoid; }
+  .analytics-card, .table-wrapper, .matrix-table-scroll-container { break-inside: avoid; }
 }
 
 /* Tab badge */
@@ -1439,4 +1484,338 @@ onMounted(() => {
   list-style: none;       /* quita el triángulo nativo en algunos browsers */
 }
 .umbrales-summary::-webkit-details-marker { display: none; }
+
+/* ── ESTILOS PREMIUM PARA LA PESTAÑA DE RESUMEN Y ACOPIADORES ── */
+.actions-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(179, 144, 40, 0.02);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.actions-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.actions-group {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.btn-export-premium {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-focus);
+  background: transparent;
+  color: var(--color-gold);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 34px;
+}
+.btn-export-premium:hover {
+  background: var(--color-gold-bg);
+  border-color: var(--color-gold);
+  transform: translateY(-1px);
+}
+.btn-export-premium.btn-print {
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+.btn-export-premium.btn-print:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+  background: rgba(179, 144, 40, 0.04);
+}
+
+.text-muted-badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: rgba(138, 135, 98, 0.08);
+  color: var(--color-text-muted);
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  border: 1px solid rgba(58, 58, 40, 0.3);
+}
+
+/* Tabla Desempeño Acopiadores Premium */
+.table-premium-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+.data-table-premium {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.data-table-premium th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--color-border);
+}
+.data-table-premium td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(58, 58, 40, 0.35);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+.tabla-row-premium {
+  transition: background 0.15s;
+}
+.tabla-row-premium:hover {
+  background: rgba(179, 144, 40, 0.03);
+}
+.td-acopiador {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.acopiador-avatar {
+  width: 26px;
+  height: 26px;
+  background: rgba(179, 144, 40, 0.08);
+  color: var(--color-gold);
+  border: 1px solid rgba(179, 144, 40, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+.badge-lotes-count {
+  background: rgba(179, 144, 40, 0.06);
+  border: 1px solid rgba(179, 144, 40, 0.2);
+  color: var(--color-gold);
+  padding: 0.15rem 0.55rem;
+  border-radius: 3px;
+  font-size: var(--text-xs);
+  display: inline-block;
+}
+
+.premium-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.premium-bar-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 140px;
+}
+.premium-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-gold), var(--color-gold-light));
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.premium-bar-val {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  min-width: 75px;
+  font-weight: 600;
+}
+.unit-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin-left: 0.1rem;
+}
+.unit-label-dim {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-weight: normal;
+}
+.highlight-gold {
+  color: var(--color-gold);
+  font-weight: 700;
+}
+
+/* Matriz de Volumen Acopiadores Scrollable con Sticky */
+.matrix-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.matrix-section-header .title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.matrix-section-header h2 {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.matrix-table-scroll-container {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-focus) var(--color-bg-card);
+}
+
+.matrix-table-scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+.matrix-table-scroll-container::-webkit-scrollbar-track {
+  background: var(--color-bg-card);
+}
+.matrix-table-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+.matrix-table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-focus);
+}
+
+.matrix-table-premium {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+}
+
+.matrix-table-premium th {
+  padding: 0.85rem 1rem;
+  background: rgba(179, 144, 40, 0.05);
+  color: var(--color-gold);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.matrix-table-premium td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(58, 58, 40, 0.35);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.sticky-column {
+  position: sticky;
+  left: 0;
+  background: var(--color-bg-card) !important;
+  z-index: 5;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
+  border-right: 1px solid var(--color-border) !important;
+}
+
+.matrix-row {
+  transition: background 0.15s;
+}
+.matrix-row:hover {
+  background: rgba(179, 144, 40, 0.02);
+}
+.matrix-row:hover .sticky-column {
+  background: #28281e !important; /* Ligeramente destacado en hover */
+}
+
+.acopiador-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 200px;
+}
+
+.acopiador-avatar-sm {
+  width: 20px;
+  height: 20px;
+  background: rgba(179, 144, 40, 0.08);
+  color: var(--color-gold);
+  border: 1px solid rgba(179, 144, 40, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.volume-cell {
+  color: var(--color-text-dim);
+  opacity: 0.45;
+  transition: opacity 0.15s, color 0.15s;
+}
+.volume-cell.has-value {
+  color: var(--color-text) !important;
+  opacity: 1 !important;
+}
+
+.total-column-header {
+  border-left: 1px solid var(--color-border) !important;
+  background: rgba(179, 144, 40, 0.08) !important;
+}
+
+.total-column {
+  border-left: 1px solid var(--color-border) !important;
+  background: rgba(179, 144, 40, 0.02) !important;
+}
+
+.highlight-gold-cell {
+  color: var(--color-gold) !important;
+  font-weight: 700 !important;
+}
+
+.totals-row-premium {
+  background: rgba(179, 144, 40, 0.06);
+  font-weight: 700;
+  border-top: 2px solid var(--color-gold);
+}
+.totals-row-premium td {
+  border-bottom: none;
+  color: var(--color-text) !important;
+}
+.totals-row-premium:hover .sticky-column {
+  background: rgba(179, 144, 40, 0.06) !important;
+}
+
+.totals-title-cell {
+  font-family: var(--font-mono);
+  color: var(--color-gold) !important;
+  letter-spacing: 0.05em;
+}
+
+.highlight-gold-cell-total {
+  color: var(--color-gold) !important;
+  font-weight: 800 !important;
+  font-size: 0.95rem !important;
+  background: rgba(179, 144, 40, 0.15) !important;
+  border-left: 1px solid var(--color-border) !important;
+  box-shadow: inset 0 0 10px rgba(179, 144, 40, 0.1);
+}
 </style>

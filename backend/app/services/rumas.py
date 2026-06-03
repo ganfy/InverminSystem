@@ -65,8 +65,8 @@ def _siguiente_codigo_campana(db: Session) -> str:
     return f"{prefijo}{num:02d}"
 
 
-def _siguiente_numero_ruma_independiente(db: Session, campana: Campana) -> int:
-    """Obtiene el secuencial máximo de rumas del año actual."""
+def _siguiente_numero_ruma_independiente(db: Session) -> int:
+    """Obtiene el siguiente número de ruma para el año actual (global, no por campaña)"""
     anio = date.today().year
     ultima = (
         db.query(Ruma).filter(Ruma.codigo.like(f"RMA{anio}-%")).order_by(Ruma.id.desc()).first()
@@ -496,7 +496,7 @@ def listar_rumas(db: Session) -> list[RumaLista]:
 
 def crear_ruma(db: Session, usuario: Usuario) -> RumaOut:
     anio = date.today().year
-    numero = _siguiente_numero_ruma_independiente(db, anio)
+    numero = _siguiente_numero_ruma_independiente(db)
     codigo = f"RMA{anio}-{numero:03d}"
 
     ruma = Ruma(

@@ -1634,8 +1634,6 @@ def obtener_ley_ag_vigente(db: Session, lote_id: int) -> tuple[Decimal, Decimal]
     o None si no existe.
     Usada por el servicio de liquidaciones.
     """
-    from app.models.models import AnalisisLey
-
     a = (
         db.query(AnalisisLey)
         .filter(
@@ -1649,5 +1647,5 @@ def obtener_ley_ag_vigente(db: Session, lote_id: int) -> tuple[Decimal, Decimal]
     if not a:
         return None
     gr_tm = Decimal(str(a.ley_gr_tm)) if a.ley_gr_tm else Decimal("0")
-    oz_tc = Decimal(str(a.ley_fino)) if a.ley_fino else Decimal("0")
+    oz_tc = Decimal(str(a.ley_final)) if a.ley_final else Decimal("0")
     return gr_tm, oz_tc
