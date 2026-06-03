@@ -109,17 +109,11 @@ async function guardarObservacion(alerta: any) {
   if (!texto) return
 
   try {
-    // Guarda como configuración con clave obs:{tipo}:{ip}
-    // El backend puede ignorarla o persistirla según se implemente
-    await fetch(`/api/alertas/observacion`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-      body: JSON.stringify({ tipo: alerta.tipo, ip: alerta.ip, observacion: texto }),
-    })
+    await dashboardApi.guardarObservacion(alerta.tipo, alerta.ip, texto)
     guardados.value[key] = true
     setTimeout(() => { guardados.value[key] = false }, 3000)
   } catch {
-    ui.toast('No se pudo guardar la observación')
+    ui.toast('No se pudo guardar la observación', 'error')
   }
 }
 </script>

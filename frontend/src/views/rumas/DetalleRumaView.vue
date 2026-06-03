@@ -96,7 +96,7 @@
               <div v-if="!lotesMostradosEnRuma.length" class="col-vacio">Sin lotes asignados aún</div>
                 <div class="split-header">
                   <span class="split-titulo">EN LA RUMA</span>
-                  <span class="split-count">{{ ipsEnRuma.size }} lote{{ ipsEnRuma.size !== 1 ? 's' : '' }}</span>
+                  <span class="split-count">{{ lotesMostradosEnRuma.filter(l => ipsSeleccionadas.has(l.ip)).length }} lote{{ lotesMostradosEnRuma.filter(l => ipsSeleccionadas.has(l.ip)).length !== 1 ? 's' : '' }}</span>
                 </div>
                 <div
                   v-for="lote in lotesMostradosEnRuma"
@@ -308,9 +308,9 @@
 
   //Recomendaciones
   function aplicarCombo(ips: string[]) {
-    // Agrega al set actual (no reemplaza — permite complementar manualmente)
-    const s = new Set(ipsSeleccionadas.value)
-    for (const ip of ips) s.add(ip)
+    // Reemplaza la selección actual con los lotes de la combinación recomendada
+    // (vacía primero para no acumular selecciones anteriores)
+    const s = new Set<string>(ips)
     ipsSeleccionadas.value = s
   }
 

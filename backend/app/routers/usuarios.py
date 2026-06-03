@@ -33,6 +33,7 @@ def _serializar(usuario) -> dict:
         "rol": _rol_str(usuario),
         "email": usuario.email,
         "activo": usuario.activo,
+        "creado_en": usuario.creado_en,
     }
 
 

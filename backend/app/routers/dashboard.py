@@ -6,6 +6,7 @@ from app.services.dashboard import (
     obtener_alertas,
     obtener_resumen_dashboard,
 )
+from app.services.telegram_alertas import guardar_observacion_alerta
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -54,3 +55,19 @@ def update_alertas_config(config: AlertasConfig, db: Session = Depends(get_db)):
     """Actualiza la configuración de alertas."""
     actualizar_config_alertas(db, config)
     return config
+
+
+class ObservacionAlertaPayload(BaseModel):
+    tipo: str = Field(..., description="Tipo de alerta (ej. RETRASO_MUESTREO)")
+    ip: str = Field(..., description="IP del lote al que aplica la alerta")
+    observacion: str = Field(..., min_length=1, description="Texto de la justificación")
+
+
+@router.post("/alertas/observacion")
+def guardar_observacion(
+    payload: ObservacionAlertaPayload,
+    db: Session = Depends(get_db),
+):
+    """Guarda la observación/justificación del operador para una alerta."""
+    guardar_observacion_alerta(db, payload.tipo, payload.ip, payload.observacion)
+    return {"ok": True}

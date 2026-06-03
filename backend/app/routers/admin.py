@@ -6,7 +6,11 @@ Router de administración del sistema.
 
 from app.core.deps import get_current_user, get_db
 from app.models.models import Usuario
-from app.services.config_calculo import actualizar_constante, listar_constantes
+from app.services.config_calculo import (
+    actualizar_constante,
+    get_config_public_dict,
+    listar_constantes,
+)
 from app.services.telegram_alertas import (
     enviar_test,
     get_telegram_config,
@@ -42,6 +46,18 @@ def _require_admin_o_gerencia(current_user: Usuario = Depends(get_current_user))
 
 class ConstanteUpdate(BaseModel):
     valor: str
+
+
+@router.get("/config-public")
+def get_config_public(
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    """
+    Retorna las configuraciones públicas del sistema (unidades, datos de empresa, etc.).
+    Accesible por cualquier usuario autenticado.
+    """
+    return get_config_public_dict(db)
 
 
 @router.get("/config-calculo")

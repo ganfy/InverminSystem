@@ -109,5 +109,8 @@ export const dashboardApi = {
         api.get<AlertasResponse>('/dashboard/alertas').then(r => r.data),
 
     updateAlertasConfig: (config: AlertasConfig) =>
-        api.put<AlertasConfig>('/dashboard/alertas/config', config).then(r => r.data)
+        api.put<AlertasConfig>('/dashboard/alertas/config', config).then(r => r.data),
+
+    guardarObservacion: (tipo: string, ip: string, observacion: string) =>
+        api.post('/dashboard/alertas/observacion', { tipo, ip, observacion }).then(r => r.data),
 }

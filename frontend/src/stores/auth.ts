@@ -109,6 +109,14 @@ export const useAuthStore = defineStore('auth', () => {
         const cachedUsers = JSON.parse(localStorage.getItem('offline_users_dict') || '{}')
         if (cachedUsers[lastUser]) {
           user.value = cachedUsers[lastUser].perfil
+          // Cargar config guardada si existe en offline
+          try {
+            const cached = localStorage.getItem('public_config_cache')
+            if (cached) {
+              const { updateUnidadesModulos } = await import('@/utils/units')
+              updateUnidadesModulos(JSON.parse(cached))
+            }
+          } catch {}
           return
         }
       }
@@ -116,6 +124,24 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Flujo normal online
     user.value = await authApi.me()
+
+    // Intentamos cargar la configuración pública (unidades, etc.)
+    try {
+      const { adminApi } = await import('@/api/admin')
+      const { updateUnidadesModulos } = await import('@/utils/units')
+      const publicConfig = await adminApi.getPublicConfig()
+      updateUnidadesModulos(publicConfig)
+      localStorage.setItem('public_config_cache', JSON.stringify(publicConfig))
+    } catch (err) {
+      console.warn('No se pudo cargar la configuración pública desde el servidor:', err)
+      try {
+        const cached = localStorage.getItem('public_config_cache')
+        if (cached) {
+          const { updateUnidadesModulos } = await import('@/utils/units')
+          updateUnidadesModulos(JSON.parse(cached))
+        }
+      } catch {}
+    }
   }
 
   async function refresh() {

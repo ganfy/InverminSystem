@@ -112,6 +112,13 @@
               {{ res.preview.ley_ponderada != null ? fmtNum(res.preview.ley_ponderada, 4) : '—' }}
             </span>
             <span class="rec-stat-unit">oz/tc</span>
+            <span
+              v-if="params.leyMin && res.preview.ley_ponderada != null"
+              class="rec-stat-delta"
+              :class="res.preview.ley_ponderada >= params.leyMin ? 'delta-ok' : 'delta-bad'"
+            >
+              {{ deltaLeyLabel(res.preview.ley_ponderada, params.leyMin) }}
+            </span>
           </div>
 
           <!-- Recuperación -->
@@ -121,6 +128,13 @@
                   :class="params.recMin && res.preview.rec_promedio != null && res.preview.rec_promedio < params.recMin ? 'rec-val-warn' : ''">
               {{ res.preview.rec_promedio != null ? fmtNum(res.preview.rec_promedio, 1) + '%' : '—' }}
             </span>
+            <span
+              v-if="params.recMin && res.preview.rec_promedio != null"
+              class="rec-stat-delta"
+              :class="res.preview.rec_promedio >= params.recMin ? 'delta-ok' : 'delta-bad'"
+            >
+              {{ deltaRecLabel(res.preview.rec_promedio, params.recMin) }}
+            </span>
           </div>
 
           <!-- % Llampo -->
@@ -129,6 +143,13 @@
             <span class="rec-stat-val"
                   :class="params.llampoMax && res.preview.pct_llampo != null && res.preview.pct_llampo > params.llampoMax ? 'rec-val-warn' : ''">
               {{ res.preview.pct_llampo != null ? fmtNum(res.preview.pct_llampo, 1) + '%' : '0%' }}
+            </span>
+            <span
+              v-if="params.llampoMax && res.preview.pct_llampo != null"
+              class="rec-stat-delta"
+              :class="res.preview.pct_llampo <= params.llampoMax ? 'delta-ok' : 'delta-bad'"
+            >
+              {{ deltaLlampoLabel(res.preview.pct_llampo, params.llampoMax) }}
             </span>
           </div>
 
@@ -284,47 +305,83 @@ function calcScore(preview: Preview): { score: number; matchPct: number } {
   return { score: finalScore, matchPct }
 }
 
-/** Rellena codiciosamente hasta alcanzar tmsObj (o toma todos si no hay objetivo). */
-function greedyFill(sorted: LoteDisponibleOut[]): LoteDisponibleOut[] {
+/**
+ * Rellena codiciosamente hasta alcanzar tmsObj±tolerancia.
+ * Si hay objetivo, para cuando alcanza el objetivo o cuando agregar el siguiente
+ * lote haría que se pase demasiado.
+ */
+function greedyFill(sorted: LoteDisponibleOut[], toleranciaArriba = 1.10): LoteDisponibleOut[] {
   const tmsObj = params.tmsObj
   const combo: LoteDisponibleOut[] = []
   let acc = 0
   for (const l of sorted) {
+    const nextAcc = acc + (l.tms ?? 0)
+    // Si hay objetivo y ya alcanzamos el mínimo, ver si vale la pena agregar más
+    if (tmsObj != null && acc >= tmsObj * 0.90) {
+      // Solo agregar si no nos pasamos de la tolerancia
+      if (nextAcc > tmsObj * toleranciaArriba) break
+    }
     combo.push(l)
-    acc += l.tms ?? 0
-    if (tmsObj != null && acc >= tmsObj * 1.05) break
+    acc = nextAcc
+    if (tmsObj != null && acc >= tmsObj * toleranciaArriba) break
   }
   return combo
 }
 
-/** Genera hasta 5 combinaciones con distintas estrategias. Sin filtros duros. */
+/**
+ * Genera hasta 6 combinaciones con distintas estrategias deterministas.
+ * Incluye ventanas de búsqueda para mayor diversidad.
+ */
 function generarCombinaciones(candidatos: LoteDisponibleOut[]): Resultado[] {
   if (!candidatos.length) return []
 
-  const estrategias: Array<(a: LoteDisponibleOut, b: LoteDisponibleOut) => number> = [
-    (a, b) => (b.ley_avg ?? 0) - (a.ley_avg ?? 0),                                       // mejor ley primero
-    (a, b) => (b.rec_porc ?? 0) - (a.rec_porc ?? 0),                                     // mejor rec primero
-    (a, b) => ((b.ley_avg ?? 0) * (b.rec_porc ?? 0)) - ((a.ley_avg ?? 0) * (a.rec_porc ?? 0)), // mejor calidad combinada
-    (a, b) => (b.tms ?? 0) - (a.tms ?? 0),                                               // lotes grandes primero
-    (a, b) => (a.tms ?? 0) - (b.tms ?? 0),                                               // lotes chicos primero
-    (a, b) => (b.dias_almacen ?? 0) - (a.dias_almacen ?? 0),                             // más antiguos primero
-    () => Math.random() - 0.5,
-    () => Math.random() - 0.5,
+  // Filtrar llampo si hay límite (preferir candidatos dentro del límite pero sin excluir)
+  const sinExcesoDeLlampo = params.llampoMax != null
+    ? candidatos.filter(l => !l.tipo_material?.toUpperCase().includes('LLAMPO'))
+    : []
+
+  type SortFn = (a: LoteDisponibleOut, b: LoteDisponibleOut) => number
+
+  // Estrategias deterministas con diversidad real
+  const estrategias: Array<{ fn: SortFn; pool?: LoteDisponibleOut[]; tolerancia?: number }> = [
+    // 1. Mejor ley ponderada primero
+    { fn: (a, b) => (b.ley_avg ?? 0) - (a.ley_avg ?? 0) },
+    // 2. Mejor recuperación primero
+    { fn: (a, b) => (b.rec_porc ?? 0) - (a.rec_porc ?? 0) },
+    // 3. Mejor calidad combinada (ley × rec)
+    { fn: (a, b) => ((b.ley_avg ?? 0) * (b.rec_porc ?? 0)) - ((a.ley_avg ?? 0) * (a.rec_porc ?? 0)) },
+    // 4. Lotes grandes primero (minimiza cantidad de lotes)
+    { fn: (a, b) => (b.tms ?? 0) - (a.tms ?? 0) },
+    // 5. Lotes más antiguos primero (gestión de inventario)
+    { fn: (a, b) => (b.dias_almacen ?? 0) - (a.dias_almacen ?? 0) },
+    // 6. Ley alta + tolerancia más ajustada (para evitar pasarse del TMS)
+    { fn: (a, b) => (b.ley_avg ?? 0) - (a.ley_avg ?? 0), tolerancia: 1.03 },
+    // 7. Sin llampo + mejor ley (si hay límite de llampo)
+    ...(sinExcesoDeLlampo.length > 0
+      ? [{ fn: (a: LoteDisponibleOut, b: LoteDisponibleOut) => (b.ley_avg ?? 0) - (a.ley_avg ?? 0), pool: sinExcesoDeLlampo }]
+      : []
+    ),
+    // 8. Sin llampo + mejor recuperación
+    ...(sinExcesoDeLlampo.length > 0
+      ? [{ fn: (a: LoteDisponibleOut, b: LoteDisponibleOut) => (b.rec_porc ?? 0) - (a.rec_porc ?? 0), pool: sinExcesoDeLlampo }]
+      : []
+    ),
   ]
 
   const vistas = new Set<string>()
   const todos: Resultado[] = []
 
-  for (const estrategia of estrategias) {
-    const sorted = [...candidatos].sort(estrategia)
-    const combo  = greedyFill(sorted)
+  for (const { fn, pool, tolerancia } of estrategias) {
+    const fuente = pool ?? candidatos
+    const sorted = [...fuente].sort(fn)
+    const combo  = greedyFill(sorted, tolerancia ?? 1.10)
     if (!combo.length) continue
 
     const key = combo.map(l => l.ip).sort().join(',')
     if (vistas.has(key)) continue
     vistas.add(key)
 
-    const preview          = calcPreview(combo)
+    const preview             = calcPreview(combo)
     const { score, matchPct } = calcScore(preview)
     todos.push({ lotes: combo, preview, score, matchPct })
   }
@@ -372,6 +429,24 @@ function deltaClass(actual: number, objetivo: number): string {
   if (pct <= 0.05) return 'delta-ok'
   if (pct <= 0.12) return 'delta-warn'
   return 'delta-bad'
+}
+
+/** Diferencia de ley vs mínimo requerido (oz/tc) */
+function deltaLeyLabel(actual: number, minimo: number): string {
+  const diff = actual - minimo
+  return `${diff >= 0 ? '+' : ''}${diff.toFixed(4)} oz/tc`
+}
+
+/** Diferencia de recuperación vs mínimo requerido (puntos porcentuales) */
+function deltaRecLabel(actual: number, minimo: number): string {
+  const diff = actual - minimo
+  return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp`
+}
+
+/** Diferencia de % llampo vs máximo permitido */
+function deltaLlampoLabel(actual: number, maximo: number): string {
+  const diff = actual - maximo
+  return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp`
 }
 
 function matchClass(pct: number): string {

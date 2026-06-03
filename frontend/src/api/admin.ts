@@ -24,6 +24,9 @@ export interface TelegramConfigUpdate {
 
 export const adminApi = {
     // ── Constantes de cálculo ──────────────────────────────────────────────
+    getPublicConfig: (): Promise<Record<string, string>> =>
+        api.get<Record<string, string>>('/admin/config-public').then(r => r.data),
+
     getConstantesCalculo: (): Promise<ConstanteCalculo[]> =>
         api.get<ConstanteCalculo[]>('/admin/config-calculo').then(r => r.data),
 

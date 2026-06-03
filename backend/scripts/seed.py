@@ -232,14 +232,19 @@ CONFIGURACIONES = [
         "descripcion": "Nombre de la planta/sede",
     },
     {"clave": "empresa_ruc", "valor": "20601910587", "descripcion": "RUC de la empresa"},
-    # Pruebas Metalúrgicas
     {
-        "clave": "Tiempo_espera_prueba_metalurgica_horas",
+        "clave": "empresa_direccion",
+        "valor": "Av. Principal 123, Lima",
+        "descripcion": "Dirección fiscal o física de la empresa",
+    },
+    # Pruebas Metalúrgicas / SLA
+    {
+        "clave": "sla_metalurgia_horas",
         "valor": "48",
         "descripcion": "Tiempo de espera en horas para considerar una prueba metalúrgica como retrasada",
     },
     {
-        "clave": "Prueba_metalurgica_máximo_plazo_horas",
+        "clave": "sla_limite_plazo_horas",
         "valor": "72",
         "descripcion": "Tiempo máximo en horas para completar una prueba metalúrgica antes de alertar de incumplimiento",
     },
@@ -268,6 +273,32 @@ CONFIGURACIONES = [
     {"clave": "factor_oz_tc", "valor": "34.2857", "descripcion": "Factor Oz/TC a Gr/TM"},
     {"clave": "umbral_volado_oz_tc", "valor": "0.100", "descripcion": "Umbral ley volado (Oz/TC)"},
     {"clave": "blank_correction_ag", "valor": "0.1444", "descripcion": "Corrección en blanco Ag"},
+    # Unidades por módulo
+    {
+        "clave": "unidad_balanza",
+        "valor": "TM",
+        "descripcion": "Unidad de peso para el módulo de Balanza (TM, TMC, KG)",
+    },
+    {
+        "clave": "unidad_muestreo",
+        "valor": "TM",
+        "descripcion": "Unidad de peso para el módulo de Muestreo (TM, TMC, KG)",
+    },
+    {
+        "clave": "unidad_laboratorio",
+        "valor": "KG",
+        "descripcion": "Unidad de peso para el módulo de Laboratorio (TM, TMC, KG)",
+    },
+    {
+        "clave": "unidad_liquidaciones",
+        "valor": "TMC",
+        "descripcion": "Unidad de peso para el módulo de Liquidaciones (TM, TMC, KG)",
+    },
+    {
+        "clave": "unidad_default",
+        "valor": "TM",
+        "descripcion": "Unidad de peso por defecto en el sistema (TM, TMC, KG)",
+    },
 ]
 # ── Runner ────────────────────────────────────────────────────────────────────
 

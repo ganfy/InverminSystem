@@ -166,7 +166,7 @@
           </div>
         </div>
 
-        <section class="card" v-if="lote.ley_planta != null">
+        <section class="card" v-if="tieneAnalisisLeyVigente">
           <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
             <span>
               LEY PLANTA
@@ -1005,11 +1005,22 @@ const leyPlantaSoloSimulada = computed<number | null>(() => {
   return parseFloat(prom.toFixed(4))
 })
 
-// Base para deshabilitar botones: average(planta+externo)
+// ¿Tiene algún análisis Au vigente (cualquier tipo)? Controla visibilidad del card
+const tieneAnalisisLeyVigente = computed(() => {
+  if (!lote.value) return false
+  return lote.value.analisis_ley.some(
+    a => a.vigente && !a.eliminado && a.material !== 'Ag',
+  )
+})
+
+// Base para deshabilitar botones: average(planta+externo), o dirimencia como fallback
 const leyPlantaSimulada = computed<number | null>(() => {
   if (!lote.value) return null
-  if (excluidos.value.size === 0)
-    return lote.value.ley_planta != null ? Number(lote.value.ley_planta) : null
+  if (excluidos.value.size === 0) {
+    if (lote.value.ley_planta != null) return Number(lote.value.ley_planta)
+    // Fallback para casos con solo dirimencia (legacy): usar ley_planta del endpoint
+    return leyComercialCalc.value?.ley_planta ?? null
+  }
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
       && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
@@ -1181,7 +1192,7 @@ const cargandoLeyComercial = ref(false)
 const leyComercialCalc     = ref<LeyComercialCalc | null>(null)
 
 watch(lote, async (l: LoteLabOut | null) => {
-  if (l?.ley_planta != null && !leyComercialCalc.value) {
+  if (l != null && tieneAnalisisLeyVigente.value && !leyComercialCalc.value) {
     cargandoLeyComercial.value = true
     try {
       leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
@@ -1192,7 +1203,7 @@ watch(lote, async (l: LoteLabOut | null) => {
 }, { immediate: true })
 
 async function recargarLeyComercial() {
-  if (!lote.value?.ley_planta) return
+  if (!tieneAnalisisLeyVigente.value) return
   cargandoLeyComercial.value = true
   try {
     leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)

@@ -145,6 +145,13 @@ def _obtener_observacion(db, tipo: str, ip: str) -> str | None:
     return lineas[-1] if lineas else None
 
 
+def guardar_observacion_alerta(db, tipo: str, ip: str, observacion: str) -> None:
+    """Guarda (o reemplaza) la observación de operador para una alerta en la BD."""
+    clave = f"obs_alerta:{tipo}:{ip}"
+    descripcion = f"Observación de operador para alerta {tipo} — lote {ip}"
+    _set_cfg(db, clave, observacion.strip(), descripcion)
+
+
 def _formatear_resumen(db, alertas: list) -> str:
     """Construye el mensaje de resumen agrupado por severidad."""
     ahora = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -236,6 +243,8 @@ def _revisar_y_enviar_si_corresponde() -> None:
                 "Resumen diario enviado: %d alertas activas",
                 len(respuesta.alertas),
             )
+            # Limpiar observaciones de alertas que ya se resolvieron
+            _limpiar_observaciones_resueltas(db, respuesta.alertas)
         else:
             logger.warning("No se pudo enviar el resumen diario por Telegram")
 
@@ -243,3 +252,26 @@ def _revisar_y_enviar_si_corresponde() -> None:
         logger.error("Error en _revisar_y_enviar_si_corresponde: %s", e)
     finally:
         db.close()
+
+
+def _limpiar_observaciones_resueltas(db, alertas_activas: list) -> None:
+    """
+    Elimina de la BD las observaciones cuya alerta ya no esta activa.
+    Las observaciones de alertas que siguen activas se conservan intactas
+    para que aparezcan en el proximo resumen si el jefe no lo leyo hoy.
+    """
+    # Conjunto de claves que SI tienen alerta activa hoy
+    activas = {f"obs_alerta:{a.tipo}:{a.ip}" for a in alertas_activas}
+
+    # Buscar todas las claves de observacion guardadas en BD
+    filas = db.query(Configuracion).filter(Configuracion.clave.like("obs_alerta:%")).all()
+
+    eliminadas = 0
+    for fila in filas:
+        if fila.clave not in activas:
+            db.delete(fila)
+            eliminadas += 1
+
+    if eliminadas:
+        db.commit()
+        logger.info("Observaciones de alertas resueltas eliminadas: %d", eliminadas)

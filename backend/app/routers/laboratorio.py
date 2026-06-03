@@ -394,6 +394,9 @@ def preview_ley_comercial(
 
     ley_base = calcular_ley_planta(db, lote.id)
     if ley_base is None:
+        # Fallback: si no hay análisis planta/externo vigentes, usar dirimencia (flujo legacy)
+        ley_base = svc._ley_dirimencia(db, lote.id)
+    if ley_base is None:
         raise HTTPException(
             status_code=422, detail="Sin análisis de ley vigentes para calcular ley planta"
         )
