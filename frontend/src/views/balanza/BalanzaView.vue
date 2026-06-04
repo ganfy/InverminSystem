@@ -1,11 +1,17 @@
 <template>
   <div class="balanza-page">
-    <div class="page-header">
-      <h1 class="page-title">Balanza</h1>
-      <button class="btn-primary ready" @click="router.push({ name: 'RegistrarCamion' })">
-        + Nuevo pesaje
+    <header class="page-header">
+      <div class="header-title-row">
+        <Weight class="header-icon" :size="26" />
+        <div>
+          <h1 class="page-title">Balanza</h1>
+        </div>
+      </div>
+      <button class="btn-primary ready btn-con-icono" @click="router.push({ name: 'RegistrarCamion' })">
+        <Plus :size="16" />
+        <span>Nuevo pesaje</span>
       </button>
-    </div>
+    </header>
 
     <AlertasBanner modulo="BALANZA" con-observaciones />
 
@@ -155,7 +161,7 @@ import type { SesionOfflineData } from '@/composables/useOfflineQueue'
 import { watch } from 'vue'
 import { useSync } from '@/composables/useSync'
 import {
-  WifiOff, Edit3,
+  WifiOff, Edit3, Weight, Plus,
 } from 'lucide-vue-next'
 
 const router = useRouter()

@@ -1,14 +1,13 @@
 <template>
     <div class="page-container">
 
-      <!-- Header -->
       <header class="page-header">
-        <div>
-          <h1 class="page-title">
-            <Target class="lucide" :size="22" style="margin-right:0.5rem" />
-            Gestión de Campañas
-          </h1>
-          <p class="page-subtitle">Seguimiento de metas de oro fino por campaña</p>
+        <div class="header-title-row">
+          <Target class="header-icon" :size="26" />
+          <div>
+            <h1 class="page-title">Gestión de Campañas</h1>
+            <p class="page-subtitle">Seguimiento de metas de oro fino por campaña</p>
+          </div>
         </div>
       </header>
 
@@ -72,7 +71,8 @@
               <span class="barra-pct">{{ store.campanaActiva.progreso_pct.toFixed(1) }}%</span>
             </div>
             <div v-if="store.campanaActiva.progreso_pct >= 95 && store.campanaActiva.progreso_pct < 100" class="alerta-meta">
-              ⚠ Cerca del 95% — considera cerrar la campaña próximamente
+              <AlertTriangle :size="13" style="vertical-align:middle;margin-right:4px" />
+              Cerca del 95% — considera cerrar la campaña próximamente
             </div>
           </div>
 
@@ -280,7 +280,7 @@
 
   <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue'
-  import { Calendar, Clock, Layers, Plus, Pencil, FlagOff, X, Target } from 'lucide-vue-next'
+  import { Calendar, Clock, Layers, Plus, Pencil, FlagOff, X, Target, AlertTriangle } from 'lucide-vue-next'
   import { useRumasStore } from '@/stores/rumas'
   import { useAuthStore } from '@/stores/auth'
   import { useUiStore } from '@/stores/ui'

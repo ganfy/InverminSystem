@@ -35,11 +35,11 @@
       <div class="section-toolbar">
         <!-- Filtros -->
         <div class="filtros">
-          <select class="field-input filtro-select" v-model="filtroRol">
+          <select class="field-input field-select filtro-select" v-model="filtroRol">
             <option value="">Todos los roles</option>
             <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
           </select>
-          <select class="field-input filtro-select" v-model="filtroEstado">
+          <select class="field-input field-select filtro-select" v-model="filtroEstado">
             <option value="">Todos los estados</option>
             <option value="activo">Activos</option>
             <option value="inactivo">Inactivos</option>
@@ -50,7 +50,10 @@
             placeholder="Buscar nombre, usuario..."
           />
         </div>
-        <button class="btn-primary" @click="abrirCrear">+ Nuevo usuario</button>
+        <button class="btn-primary ready btn-con-icono" @click="abrirCrear">
+          <UserPlus :size="16" />
+          Nuevo usuario
+        </button>
       </div>
 
       <!-- Tabla -->
@@ -92,7 +95,10 @@
                   class="btn-icon"
                   :title="u.activo ? 'Desactivar' : 'Activar'"
                   @click="toggleEstado(u)"
-                >{{ u.activo ? '⊘' : '⊕' }}</button>
+                >
+                  <UserRoundMinus v-if="u.activo" :size="15" />
+                  <UserRoundPlus v-else :size="15" />
+                </button>
                 <button class="btn-icon" title="Reset contraseña" @click="abrirReset(u)">
                   <KeyRound :size="16" />
                 </button>
@@ -169,7 +175,7 @@
                       <select
                         v-if="c.clave.startsWith('unidad_')"
                         v-model="editsCalculo[c.clave]"
-                        class="field-input select-valor"
+                        class="field-input field-select select-valor"
                         :class="{ modified: editsCalculo[c.clave] !== c.valor }"
                       >
                         <option value="TM">TM (Tonelada Métrica)</option>
@@ -216,7 +222,6 @@
         </p>
       </div>
     </div>
-    ════════════════════════════════════════════════════════════ -->
     <div v-show="tabActivo === 'notificaciones'" class="tab-content">
       <div v-if="cargandoTelegram" class="estado-tabla">
         <span class="spinner" style="margin-right:0.5rem" /> Cargando configuración…
@@ -367,7 +372,7 @@
             </div>
             <div class="field">
               <label class="field-label">Rol *</label>
-              <select class="field-input" v-model="form.rol">
+              <select class="field-input field-select" v-model="form.rol">
                 <option value="" disabled>Seleccionar rol</option>
                 <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
               </select>
@@ -430,6 +435,7 @@ import {
   Database, Info, AlertTriangle, Save,
   Bot, MessageSquare, Clock, Send, Mail,
   Scale, FlaskConical, Microscope, Beaker,
+  UserPlus, UserRoundMinus, UserRoundPlus,
 } from 'lucide-vue-next'
 
 const ui = useUiStore()
@@ -754,7 +760,7 @@ const guardandoCalculo = reactive<Record<string, boolean>>({})
 const currentParamCategory = ref('empresa')
 
 const activeCategoryDetails = computed(() => {
-  return PARAM_CATEGORIES.find(cat => cat.id === currentParamCategory.value) || PARAM_CATEGORIES[0]
+  return PARAM_CATEGORIES.find(cat => cat.id === currentParamCategory.value) ?? PARAM_CATEGORIES[0]!
 })
 
 const filteredConstantes = computed(() => {

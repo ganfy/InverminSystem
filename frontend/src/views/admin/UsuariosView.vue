@@ -1,17 +1,24 @@
 <template>
   <div class="usuarios-page">
     <div class="page-header">
-      <h1 class="page-title">Gestión de Usuarios</h1>
-      <button class="btn-primary" @click="abrirCrear">+ Nuevo usuario</button>
+      <div class="header-title-row">
+        <Users class="header-icon" :size="26" />
+        <div>
+          <h1 class="page-title">Gestión de Usuarios</h1>
+        </div>
+      </div>
+      <button class="btn-primary ready btn-con-icono" @click="abrirCrear">
+        <UserPlus :size="16" /> Nuevo usuario
+      </button>
     </div>
 
     <!-- Filtros -->
     <div class="filtros">
-      <select class="field-input filtro-select" v-model="filtroRol">
+      <select class="field-input field-select filtro-select" v-model="filtroRol">
         <option value="">Todos los roles</option>
         <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
       </select>
-      <select class="field-input filtro-select" v-model="filtroEstado">
+      <select class="field-input field-select filtro-select" v-model="filtroEstado">
         <option value="">Todos los estados</option>
         <option value="activo">Activos</option>
         <option value="inactivo">Inactivos</option>
@@ -53,12 +60,15 @@
             </td>
             <td class="td-fecha">{{ formatFecha(u.creado_en) }}</td>
             <td class="td-acciones">
-              <button class="btn-icon" title="Editar" @click="abrirEditar(u)"><Pencil :size="16" />Pencil :size="16" /></button>
+              <button class="btn-icon" title="Editar" @click="abrirEditar(u)"><Pencil :size="16" /></button>
               <button
                 class="btn-icon"
                 :title="u.activo ? 'Desactivar' : 'Activar'"
                 @click="toggleEstado(u)"
-              >{{ u.activo ? '⊘' : '⊕' }}</button>
+              >
+                <UserRoundMinus v-if="u.activo" :size="15" />
+                <UserRoundPlus v-else :size="15" />
+              </button>
               <button class="btn-icon" title="Reset password" @click="abrirReset(u)"><KeyRound :size="16" /></button>
             </td>
           </tr>
@@ -92,7 +102,7 @@
             </div>
             <div class="field">
               <label class="field-label">Rol *</label>
-              <select class="field-input" v-model="form.rol">
+              <select class="field-input field-select" v-model="form.rol">
                 <option value="" disabled>Seleccionar rol</option>
                 <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
               </select>
@@ -149,7 +159,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usuariosApi, type UsuarioListItem } from '@/api/usuarios'
 import { useUiStore } from '@/stores/ui'
-import { X, Pencil, KeyRound } from 'lucide-vue-next'
+import { X, Pencil, KeyRound, Users, UserPlus, UserRoundMinus, UserRoundPlus } from 'lucide-vue-next'
 const ui = useUiStore()
 
 const ROLES = [

@@ -234,7 +234,7 @@ CONFIGURACIONES = [
     {"clave": "empresa_ruc", "valor": "20601910587", "descripcion": "RUC de la empresa"},
     {
         "clave": "empresa_direccion",
-        "valor": "Av. Principal 123, Lima",
+        "valor": "Calle Santo Domingo 123, Arequipa",
         "descripcion": "Dirección fiscal o física de la empresa",
     },
     # Pruebas Metalúrgicas / SLA

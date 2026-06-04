@@ -1,8 +1,13 @@
 <template>
     <div class="muestreo-page">
-      <div class="page-header">
-        <h1 class="page-title">Muestreo</h1>
-      </div>
+      <header class="page-header">
+        <div class="header-title-row">
+          <FlaskConical class="header-icon" :size="26" />
+          <div>
+            <h1 class="page-title">Muestreo</h1>
+          </div>
+        </div>
+      </header>
 
       <AlertasBanner modulo="MUESTREO" con-observaciones />
 
@@ -104,8 +109,9 @@ import ModalEtiquetas from './ModalEtiquetas.vue'
 import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'
 import {
   WifiOff,
-    AlertTriangle,
-    Plus,
+  AlertTriangle,
+  Plus,
+  FlaskConical,
 } from 'lucide-vue-next'
 
 

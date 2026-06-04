@@ -61,7 +61,7 @@
           <p class="sidebar-user-rol">{{ authStore.user?.rol }}</p>
         </div>
         <button class="btn-logout" @click="handleLogout" title="Cerrar sesión">
-          ⏻
+          <LogOut :size="16" />
         </button>
       </div>
     </aside>
@@ -84,7 +84,7 @@
       <!-- Topbar mobile -->
       <header class="topbar">
         <button class="hamburger" @click="sidebarOpen = !sidebarOpen">
-          <span :class="['hamburger-icon', { 'hamburger-icon--open': sidebarOpen }]">☰</span>
+          <Menu :size="20" :class="['hamburger-icon', { 'hamburger-icon--open': sidebarOpen }]" />
         </button>
         <p class="topbar-title">{{ currentTitle }}</p>
       </header>
@@ -105,6 +105,7 @@ import { useSync } from '@/composables/useSync'
 import SyncIndicator from '@/components/balanza/SyncIndicator.vue'
 import { NAV_CONFIG } from '@/router/nav'
 import type { NavSection } from '@/router/nav'
+import { LogOut, Menu } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const router    = useRouter()

@@ -2,9 +2,12 @@
   <div class="dashboard-page">
 
     <header class="page-header">
-      <div>
-        <h1 class="page-title">Dashboard</h1>
-        <span class="last-sync" v-if="lastUpdate">Actualizado {{ lastUpdate }}</span>
+      <div class="header-title-row">
+        <LayoutDashboard class="header-icon" :size="26" />
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <span class="last-sync" v-if="lastUpdate">Actualizado {{ lastUpdate }}</span>
+        </div>
       </div>
       <button class="btn-secondary btn-refresh" @click="recargar" :disabled="cargando">
         <RefreshCw :size="16" :class="{ spinner: cargando }" style="margin-right:0.4rem" />
@@ -132,7 +135,19 @@
               <th class="align-right">LEY PROM.</th>
               <th class="align-right">% REC.</th>
               <th>ACOPIADOR</th>
-              <th class="align-center">ANÁLISIS</th>
+              <th class="align-center th-analisis">
+                ANÁLISIS
+                <span class="th-help-wrap">
+                  <HelpCircle :size="12" class="th-help-icon" />
+                  <div class="th-tooltip">
+                    <div class="tooltip-row"><span class="t-badge t-listo">LISTO</span><span>Datos completos para liquidar</span></div>
+                    <div class="tooltip-row"><span class="t-badge t-humedad">FALTA HUMEDAD</span><span>Sin resultado de muestreo</span></div>
+                    <div class="tooltip-row"><span class="t-badge t-ley">FALTA LEY</span><span>Sin análisis de ley</span></div>
+                    <div class="tooltip-row"><span class="t-badge t-rec">FALTA REC.</span><span>Sin análisis de recuperación</span></div>
+                    <div class="tooltip-row"><span class="t-badge t-sin">SIN DATOS</span><span>Sin ningún dato registrado</span></div>
+                  </div>
+                </span>
+              </th>
               <th class="align-center">ESTADO</th>
             </tr>
           </thead>
@@ -405,7 +420,7 @@
 
         <!-- Sin alertas -->
         <div v-if="!alertasFiltradas.length" class="empty-state" style="margin-top:2rem">
-          <span style="font-size:2rem">✅</span>
+          <CheckCircle2 :size="36" class="icon-sin-alertas" />
           <p>Sin alertas para los filtros seleccionados</p>
         </div>
 
@@ -621,7 +636,7 @@ import {
   Zap, TrendingUp, Scale, Database, Coins, Search,
   RefreshCw, Layers, FileText, PlusCircle, Download, LayoutDashboard,
   Hourglass, Printer, Package, Droplets, FlaskConical, Timer,
-  Settings, AlertTriangle,
+  Settings, AlertTriangle, HelpCircle, CheckCircle2,
 } from 'lucide-vue-next'
 import { dashboardApi, type DashboardResponse,
   type LoteDashboard,
@@ -1290,6 +1305,44 @@ onMounted(() => {
 /* Empty / loading */
 .estado-tabla { text-align: center; padding: 3rem; font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text-muted); display: flex; align-items: center; justify-content: center; }
 .empty-state  { text-align: center; padding: 2.5rem; color: var(--color-text-faint); font-family: var(--font-mono); font-size: var(--text-md); font-style: italic; }
+.icon-sin-alertas { color: #4ade80; margin-bottom: 0.75rem; }
+
+/* ── Tooltip leyenda de análisis ──────────────────────────── */
+.th-analisis { position: relative; }
+.th-help-wrap {
+  display: inline-flex; align-items: center; position: relative; margin-left: 4px; cursor: default;
+}
+.th-help-icon { color: var(--color-text-muted); vertical-align: middle; }
+.th-tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  min-width: 240px;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.th-help-wrap:hover .th-tooltip { display: flex; flex-direction: column; gap: 0.35rem; }
+.tooltip-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.t-badge {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 2px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap;
+}
+.t-listo   { background: rgba(34,197,94,0.15);   color: #4ade80;  border: 1px solid rgba(34,197,94,0.25); }
+.t-humedad { background: rgba(168,85,247,0.12);  color: #c084fc;  border: 1px solid rgba(168,85,247,0.25); }
+.t-ley     { background: rgba(59,130,246,0.15);  color: #60a5fa;  border: 1px solid rgba(59,130,246,0.25); }
+.t-rec     { background: rgba(245,158,11,0.15);  color: #f59e0b;  border: 1px solid rgba(245,158,11,0.25); }
+.t-sin     { background: rgba(148,163,184,0.1);  color: var(--color-text-muted); }
+
 
 .spinner { animation: spin 0.8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }

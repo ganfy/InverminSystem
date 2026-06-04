@@ -43,7 +43,10 @@
         >
           <span class="pendiente-cip">{{ item.datos.cip }}</span>
           <span class="pendiente-tipo">Análisis de ley · {{ item.datos.tipo_analisis }}</span>
-          <span v-if="item.error" class="pendiente-error" :title="item.error">⚠ Error sync</span>
+          <span v-if="item.error" class="pendiente-error" :title="item.error">
+            <AlertTriangle :size="12" style="vertical-align:middle;margin-right:2px" />
+            Error sync
+          </span>
           <span v-else class="badge-local">LOCAL</span>
         </div>
       </div>
@@ -110,12 +113,14 @@
         <button class="tab-lab-btn" :class="{ active: tabActual === 'ley' }" @click="tabActual = 'ley'">
           Análisis de Ley Newmont
           <span v-if="pendientesLey > 0" class="badge-count">{{ pendientesLey }}</span>
-          <span class="tab-lab-toggle">{{ tabActual === 'ley' ? '︿' : '︾' }}</span>
+          <ChevronUp v-if="tabActual === 'ley'" :size="14" class="tab-chevron" />
+          <ChevronDown v-else :size="14" class="tab-chevron" />
         </button>
         <button class="tab-lab-btn" :class="{ active: tabActual === 'rec' }" @click="tabActual = 'rec'">
           Análisis de Reconocimientos
           <span v-if="pendientesRec > 0" class="badge-count">{{ pendientesRec }}</span>
-          <span class="tab-lab-toggle">{{ tabActual === 'rec' ? '︿' : '︾' }}</span>
+          <ChevronUp v-if="tabActual === 'rec'" :size="14" class="tab-chevron" />
+          <ChevronDown v-else :size="14" class="tab-chevron" />
         </button>
       </div>
 
@@ -211,7 +216,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FlaskConical, RefreshCw, WifiOff } from 'lucide-vue-next'
+import { FlaskConical, RefreshCw, WifiOff, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-vue-next'
 import AlertasBanner from '@/components/AlertasBanner.vue'
 import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
@@ -424,7 +429,7 @@ async function generarCertRec(fila: any) {
 .tabs-lab { display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border); }
 .tab-lab-btn { background: transparent; border: none; color: var(--color-text-muted); padding: 0.6rem 1.25rem; font-size: var(--text-md); font-family: var(--font-mono); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; display: flex; align-items: center; gap: 0.5rem; }
 .tab-lab-btn.active { color: var(--color-gold); border-bottom-color: var(--color-gold); }
-.badge-count { background: var(--color-error, #ef4444); color: #fff; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 999px; min-width: 1.2rem; text-align: center; }
+.tab-chevron { flex-shrink: 0; opacity: 0.6; }
 .filtros-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 
 /* ── Sección offline pendientes ──────────────────────────── */

@@ -41,7 +41,8 @@
           <span class="preview-val">{{ preview.ley_oz_tc.toFixed(4) }}</span>
         </div>
         <p v-if="preview.ley_gr_tm < umbralAg" class="ag-form__warn">
-          ⚠ Ley Ag menor al umbral de inclusión ({{ umbralAg }} g/TM) — no se incluirá en liquidación.
+          <AlertTriangle :size="13" style="vertical-align:middle;margin-right:4px" />
+          Ley Ag menor al umbral de inclusión ({{ umbralAg }} g/TM) — no se incluirá en liquidación.
         </p>
       </div>
 
@@ -56,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { AlertTriangle } from 'lucide-vue-next'
 import { laboratorioApi, type AnalisisAgOut } from '@/api/laboratorio'
 import { useUiStore } from '@/stores/ui'
 

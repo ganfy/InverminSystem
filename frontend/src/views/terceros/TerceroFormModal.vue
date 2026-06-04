@@ -374,7 +374,8 @@
                 </div>
 
                 <p v-if="agParamsIncompletos" class="ag-params-warn">
-                  ⚠ Para activar el pago de Ag debes completar los 3 campos. Con campos parciales no se calculará Ag.
+                  <AlertTriangle :size="13" style="vertical-align:middle;margin-right:4px" />
+                  Para activar el pago de Ag debes completar los 3 campos. Con campos parciales no se calculará Ag.
                 </p>
               </div>
 

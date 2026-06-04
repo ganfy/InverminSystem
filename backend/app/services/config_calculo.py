@@ -38,7 +38,7 @@ DEFAULTS: dict[str, str] = {
     "empresa_nombre": "INVERMIN PAITITI S.A.C.",
     "empresa_planta": "Planta El Dorado",
     "empresa_ruc": "20601910587",
-    "empresa_direccion": "Av. Principal 123, Lima",
+    "empresa_direccion": "Calle Santo Domingo 123, Arequipa",
     "CAMPANA_META_ORO_FINO_DEFAULT": "5000",
     # Pruebas Metalúrgicas / SLA
     "sla_metalurgia_horas": "48",

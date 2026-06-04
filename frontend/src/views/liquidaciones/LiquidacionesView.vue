@@ -3,14 +3,14 @@
 
     <!-- ── Header ─────────────────────────────────────────────── -->
     <header class="page-header">
-      <div>
-        <h1 class="page-title">
-          <FileText class="lucide" :size="24" style="margin-right:0.5rem" />
-          Liquidaciones
-        </h1>
-        <p class="page-subtitle">
-          Gestión comercial de lotes
-        </p>
+      <div class="header-title-row">
+        <FileText class="header-icon" :size="26" />
+        <div>
+          <h1 class="page-title">Liquidaciones</h1>
+          <p class="page-subtitle">
+            Gestión comercial de lotes
+          </p>
+        </div>
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
         <button class="btn-secondary btn-con-icono" @click="router.push('/reportes')">

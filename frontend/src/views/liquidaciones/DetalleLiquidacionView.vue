@@ -227,7 +227,10 @@
               <span v-if="guardandoParams" class="spinner" style="margin-right:0.4rem"/>
               {{ guardandoParams ? 'Guardando…' : 'Guardar y Recalcular' }}
             </button>
-            <span v-if="pendienteGuardar" class="warn-recalc">⚠ Cambios sin guardar</span>
+            <span v-if="pendienteGuardar" class="warn-recalc">
+              <AlertTriangle :size="13" style="vertical-align:middle;margin-right:4px" />
+              Cambios sin guardar
+            </span>
           </div>
         </div>
 
