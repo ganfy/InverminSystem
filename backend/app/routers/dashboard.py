@@ -1,10 +1,17 @@
-from app.core.deps import get_db
-from app.schemas.dashboard import AlertasConfig, AlertasResponse, DashboardResponse
+from app.core.deps import get_db, require_roles
+from app.models.models import Usuario
+from app.schemas.dashboard import (
+    AlertasConfig,
+    AlertasResponse,
+    DashboardResponse,
+    TrazabilidadLoteResponse,
+)
 from app.services.dashboard import (
     actualizar_config_alertas,
     generar_excel_dashboard,
     obtener_alertas,
     obtener_resumen_dashboard,
+    obtener_trazabilidad_lote,
 )
 from app.services.telegram_alertas import guardar_observacion_alerta
 from fastapi import APIRouter, Depends
@@ -71,3 +78,13 @@ def guardar_observacion(
     """Guarda la observación/justificación del operador para una alerta."""
     guardar_observacion_alerta(db, payload.tipo, payload.ip, payload.observacion)
     return {"ok": True}
+
+
+@router.get("/lotes/{ip}/trazabilidad", response_model=TrazabilidadLoteResponse)
+def get_trazabilidad(
+    ip: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("Admin", "Gerencia", "Comercial")),
+):
+    """Retorna el cuadro de trazabilidad administrativa completo de un lote."""
+    return obtener_trazabilidad_lote(db, ip)

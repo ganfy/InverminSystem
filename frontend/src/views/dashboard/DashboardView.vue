@@ -158,7 +158,9 @@
             <tr
               v-for="lote in lotesFiltrados" :key="lote.ip"
               class="tabla-row"
-              :class="urgenciaFila(lote)"
+              :class="[urgenciaFila(lote), canViewTrazabilidad ? 'clickable' : '']"
+              :style="canViewTrazabilidad ? 'cursor:pointer' : ''"
+              @click="canViewTrazabilidad && abrirTrazabilidad(lote.ip)"
             >
               <td class="td-mono gold">{{ lote.ip }}</td>
               <td class="align-right td-mono">{{ lote.tmh.toFixed(3) }}</td>
@@ -626,6 +628,13 @@
       </div>
     </template>
     <span class="last-sync"> *Cifras reiniciadas desde el último cierre de campaña</span>
+
+    <!-- Drawer de trazabilidad -->
+    <TrazabilidadLoteDrawer
+      :ip="ipTrazabilidad"
+      :open="drawerOpen"
+      @close="drawerOpen = false"
+    />
   </div>
 </template>
 
@@ -643,12 +652,25 @@ import { dashboardApi, type DashboardResponse,
  } from '@/api/dashboard'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { descargarPDF } from '@/api/liquidaciones'
 import type { AlertaItem, AlertasConfig, AlertasResponse} from '@/api/dashboard'
+import TrazabilidadLoteDrawer from '@/components/dashboard/TrazabilidadLoteDrawer.vue'
 
 const router   = useRouter()
 const liqStore = useLiquidacionesStore()
 const ui       = useUiStore()
+const auth     = useAuthStore()
+
+// ── Trazabilidad drawer ───────────────────────────────────────────────
+const drawerOpen       = ref(false)
+const ipTrazabilidad   = ref<string | null>(null)
+const ROLES_TRAZABILIDAD = ['Admin', 'Gerencia', 'Comercial']
+const canViewTrazabilidad = computed(() => ROLES_TRAZABILIDAD.includes(auth.rol ?? ''))
+function abrirTrazabilidad(ip: string) {
+  ipTrazabilidad.value = ip
+  drawerOpen.value = true
+}
 
 // ── Data ─────────────────────────────────────────────────────────────
 const data       = ref<DashboardResponse | null>(null)

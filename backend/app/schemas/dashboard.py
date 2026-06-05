@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -96,3 +96,150 @@ class AlertasResponse(BaseModel):
     total_criticas: int = 0
     total_altas: int = 0
     total_medias: int = 0
+
+
+# =============================================================================
+# TRAZABILIDAD POR LOTE
+# =============================================================================
+
+
+class UsuarioResumen(BaseModel):
+    id: int
+    nombre_completo: str
+    rol: str  # código del rol
+
+
+class AccionRegistro(BaseModel):
+    por: UsuarioResumen | None = None
+    fecha: datetime | None = None
+
+
+class TrazabilidadSesion(BaseModel):
+    id: int
+    placa: str | None
+    carreta: str | None
+    conductor: str | None
+    transportista: str | None
+    guia_remision: str | None
+    guia_transporte: str | None
+    registro: AccionRegistro
+
+
+class TrazabilidadPesaje(BaseModel):
+    numero_ticket: str | None
+    sacos: int | None
+    granel: bool
+    peso_inicial: float
+    peso_final: float
+    peso_neto: float
+    fecha_inicio: datetime | None
+    fecha_fin: datetime | None
+    es_manual: bool
+    justificacion_manual: str | None
+    registro: AccionRegistro
+
+
+class TrazabilidadMuestreo(BaseModel):
+    intento: int
+    peso_humedo: float
+    peso_seco: float
+    porcentaje_humedad: float | None
+    tms_calculado: float | None
+    observaciones: str | None
+    registro: AccionRegistro
+
+
+class TrazabilidadPrueba(BaseModel):
+    cip: str | None
+    fecha_ingreso: datetime | None
+    fecha_salida: datetime | None  # fecha_ingreso + 48h
+    malla_porcentaje: float | None
+    porcentaje_nacn: float | None
+    ph_inicial: float | None
+    ph_final: float | None
+    adicion_nacn: float | None
+    adicion_naoh: float | None
+    gasto_agno3: float | None
+    registro: AccionRegistro
+
+
+class TrazabilidadAnalisisLey(BaseModel):
+    id: int
+    cip: str | None
+    laboratorio: str
+    tipo_analisis: str
+    material: str
+    ley_final: float | None
+    ley_gr_tm: float | None
+    origen_datos: str
+    fecha_analisis: date | None
+    certificado_url: str | None
+    vigente: bool
+    descarte: AccionRegistro | None = None
+    justificacion_descarte: str | None
+    registro: AccionRegistro
+
+
+class TrazabilidadAnalisisRec(BaseModel):
+    id: int
+    cip: str | None
+    laboratorio: str
+    ley_cabeza: float | None
+    ley_cola: float | None
+    ley_liquido: float | None
+    recuperacion: float | None
+    estado: str
+    origen_datos: str
+    fecha_analisis: date | None
+    certificado_url: str | None
+    vigente: bool
+    descarte: AccionRegistro | None = None
+    justificacion_descarte: str | None
+    registro: AccionRegistro
+
+
+class TrazabilidadRuma(BaseModel):
+    codigo: str
+    estado: str
+    fecha_creacion: date | None
+    campana: str | None  # código de campaña
+
+
+class TrazabilidadLiquidacion(BaseModel):
+    id: int
+    numero_liquidacion: str | None
+    estado: str
+    precio_oro_usd: float | None
+    valor_total_usd: float | None
+    fino_recuperable: float | None
+    ley_comercial: float | None
+    usa_dirimencia: bool
+    generacion: AccionRegistro
+    cierre: AccionRegistro | None = None
+
+
+class TrazabilidadAuditoria(BaseModel):
+    registro_lote: AccionRegistro
+    habilitacion_ruma: AccionRegistro
+    cambio_estado: AccionRegistro
+
+
+class TrazabilidadLoteResponse(BaseModel):
+    ip: str
+    estado: str
+    tipo_material: str | None
+    volado: bool
+    dirimencia: bool
+    habilitado_ruma: bool
+    proveedor: str
+    ruc_proveedor: str | None
+    acopiador: str | None
+    sesion: TrazabilidadSesion
+    pesajes: list[TrazabilidadPesaje]
+    muestreos: list[TrazabilidadMuestreo]
+    prueba_metalurgica: TrazabilidadPrueba | None
+    analisis_ley: list[TrazabilidadAnalisisLey]
+    analisis_recuperacion: list[TrazabilidadAnalisisRec]
+    ruma: TrazabilidadRuma | None
+    liquidacion: TrazabilidadLiquidacion | None
+    auditoria: TrazabilidadAuditoria

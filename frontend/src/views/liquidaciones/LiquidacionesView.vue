@@ -99,7 +99,7 @@
             placeholder="Buscar N° liq, proveedor…"
             v-model="filtroTexto"
           />
-          <select class="filtro-select" v-model="filtroEstado">
+          <select class="field-select filtro-select" v-model="filtroEstado">
             <option value="">Todos los estados</option>
             <option value="BORRADOR">Borrador</option>
             <option value="GENERADA">Generada</option>

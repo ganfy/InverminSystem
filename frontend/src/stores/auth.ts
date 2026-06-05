@@ -98,7 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.warn('Error al hacer logout en el servidor. Limpiando sesión local...', error)
     } finally {
       clearTokens()
-      router.push({name: 'Login'})
+      window.location.href = '/login'
     }
   }
 

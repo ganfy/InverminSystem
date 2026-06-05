@@ -158,7 +158,6 @@ const currentTitle = computed(() => {
 
 async function handleLogout() {
   await authStore.logout()
-  router.push('/login')
 }
 
 watch(() => online.value, (isOnline) => {
