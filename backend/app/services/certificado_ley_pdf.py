@@ -15,8 +15,12 @@ import os
 from datetime import datetime
 from pathlib import Path as _Path
 
+from app.models.enums import EstadoRecuperacion
 from app.models.models import (
+    AnalisisRecuperacion,
+    Configuracion,
     Lote,
+    MapeoCIP,
     ParametrosComerciales,
     ProveedorAcopiador,
     SesionDescarga,
@@ -536,8 +540,6 @@ _TEMPLATE_RECUPERACION = """
 
 
 def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> bytes:
-    from app.models.models import AnalisisRecuperacion, Configuracion, MapeoCIP
-
     cip = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_code).first()
     if not cip:
         raise ValueError(f"CIP {cip_code} no encontrado")
@@ -575,13 +577,12 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
     # Para el cert por CIP no tenemos IP/proveedor (confidencialidad)
     filas = ""
     for i, a in enumerate(analisis_list, 1):
-        rec_str = f"{float(a.recuperacion):.2f}%" if a.recuperacion is not None else "-"
+        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
+        liquido = _fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)
+        sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
         filas += (
             f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
-            f"<td>{_fmt_oz(float(a.ley_cabeza) if a.ley_cabeza is not None else None)}</td>"
-            f"<td>{_fmt_oz(float(a.ley_cola)   if a.ley_cola   is not None else None)}</td>"
-            f"<td>{_fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)}</td>"
-            f"<td><strong>{rec_str}</strong></td></tr>"
+            f"<td>{cola}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
         )
 
     fecha_analisis = analisis_list[-1].fecha_analisis
@@ -589,12 +590,11 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
         datetime.combine(fecha_analisis, datetime.min.time()) if fecha_analisis else None
     )
 
-    html = _TEMPLATE_RECUPERACION.format(
+    html = _TEMPLATE_RECONOCIMIENTO.format(
         empresa_nombre=empresa_nombre,
         empresa_sub=empresa_sub,
         empresa_direccion=empresa_dir,
         n_lq=cip_code,
-        cliente="-",
         referencia=cip_code,
         fecha_recepcion=fecha,
         fecha_termino=_fmt_date(datetime.now()),
@@ -734,3 +734,152 @@ def _html_to_pdf(html: str) -> bytes:
         raise RuntimeError("Ejecutar: pip install weasyprint (o instalar GTK en Windows)") from e
 
     return HTML(string=html).write_pdf()
+
+
+_TEMPLATE_RECONOCIMIENTO = """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  @page {{ size: A4; margin: 20mm 18mm; }}
+  body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
+  .watermark-pattern {{
+      position: fixed; top: -50%; left: -50%;
+      width: 200%; height: 200%; z-index: -50;
+      background-image:
+          linear-gradient(rgba(255,255,255,0.50), rgba(255,255,255,0.50)),
+          url('{logo_b64}');
+      background-repeat: repeat; background-size: 100px;
+      background-position: center; transform: rotate(-30deg);
+  }}
+  .logo-header {{ width: 220px; margin-bottom: 10px; }}
+  .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
+  .empresa-sub {{ font-size: 10px; color: #555; font-style: italic; }}
+  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 8px 0; }}
+  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 1px; margin: 10px 0 2px; }}
+  .n-cert {{ text-align: center; color: #c8a84b; font-size: 11px; font-weight: bold; margin-bottom: 12px; }}
+  .kv-row {{ display: table; width: 100%; margin-bottom: 4px; }}
+  .kv-label {{ display: table-cell; width: 160px; color: #555; }}
+  .kv-val {{ display: table-cell; font-weight: bold; }}
+  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+  table.detalle th {{ background: #e8e0cc; font-size: 10px; padding: 6px; border: 1px solid #bbb; }}
+  table.detalle td {{ padding: 8px; border: 1px solid #ccc; text-align: center; font-family: monospace; font-size: 12px; }}
+  .firma-bloque {{ margin-top: 60px; text-align: center; }}
+  .firma-linea {{ display: inline-block; width: 220px; border-top: 1px solid #333; padding-top: 4px; font-weight: bold; font-size: 10px; }}
+  .pie {{ font-size: 9px; color: #555; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 8px; }}
+</style>
+</head>
+<body>
+<div class="watermark-pattern"></div>
+<div><img src="{membrete_b64}" class="logo-header" /></div>
+<hr class="linea-gold"/>
+<div class="titulo-cert">INFORME DE RECONOCIMIENTO DE PULPA</div>
+<div class="n-cert">N&deg; {n_lq}</div>
+<div class="seccion">
+  <div class="kv-row"><span class="kv-label">Referencia</span><span class="kv-val">: {referencia}</span></div>
+  <div class="kv-row"><span class="kv-label">An&aacute;lisis</span><span class="kv-val">: Reconocimiento Au / Ag (CIP)</span></div>
+</div>
+<hr class="linea-gold"/>
+<div class="seccion">
+  <div class="kv-row"><span class="kv-label">Fecha de Recepcion</span><span class="kv-val">: {fecha_recepcion}</span></div>
+  <div class="kv-row"><span class="kv-label">Termino de Analisis</span><span class="kv-val">: {fecha_termino}</span></div>
+  <div class="kv-row"><span class="kv-label">Laboratorio</span><span class="kv-val">: {laboratorio}</span></div>
+</div>
+<table class="detalle">
+  <thead>
+    <tr>
+      <th>N&deg;</th><th>C&Oacute;DIGO</th>
+      <th>Ley Cola Au (Oz/TC)</th>
+      <th>Ley L&iacute;quido Au (Oz/TC)</th>
+      <th>Soluci&oacute;n Ag (g/m&sup3;)</th>
+    </tr>
+  </thead>
+  <tbody>{filas_detalle}</tbody>
+</table>
+{bloque_notas}
+<div class="firma-bloque">
+  <span class="firma-linea">{analista}<br/>Analista Responsable</span>
+</div>
+<div class="pie">
+  Resultados de reconocimiento de pulpa por m&eacute;todo CIP. Documento interno — no incluye datos comerciales.<br/>
+  <strong>{empresa_nombre}</strong> &mdash; {empresa_direccion}
+</div>
+</body>
+</html>
+"""
+
+
+def generar_cert_reconocimiento_cip_pdf(db: Session, ip_lote: str) -> bytes:
+    """
+    Certificado de reconocimineto por IP para comercial/admin.
+    Muestra solo: ley cola Au, ley líquido Au y solución Ag (si hay).
+    """
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise ValueError(f"Lote {ip_lote} no encontrado")
+
+    analisis_list = (
+        db.query(AnalisisRecuperacion)
+        .filter(
+            AnalisisRecuperacion.lote_id == lote.id,
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.estado == EstadoRecuperacion.COMPLETADO,
+        )
+        .order_by(AnalisisRecuperacion.id)
+        .all()
+    )
+    if not analisis_list:
+        raise ValueError(f"Sin análisis de recuperación completados para {ip_lote}")
+
+    cfg_rows = (
+        db.query(Configuracion.clave, Configuracion.valor)
+        .filter(Configuracion.clave.in_(["empresa_nombre", "empresa_planta", "empresa_direccion"]))
+        .all()
+    )
+    cfg = {r.clave: r.valor for r in cfg_rows}
+    empresa_nombre = cfg.get("empresa_nombre", "INVERMIN PAITITI S.A.C.")
+    empresa_dir = cfg.get(
+        "empresa_direccion", "Otr.Las Terrazas KM.2 - Chala - Caraveli - Arequipa"
+    )
+
+    analista_nombre = "DEPARTAMENTO TÉCNICO"
+    if analisis_list[0].creado_por:
+        u = db.query(Usuario).filter(Usuario.id == analisis_list[0].creado_por).first()
+        if u:
+            analista_nombre = u.nombre_completo
+
+    logo_b64 = _get_image_b64("logo invermin.png")
+    membrete_b64 = _get_image_b64("membrete invermin.png")
+
+    filas = ""
+    for i, a in enumerate(analisis_list, 1):
+        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
+        liquido = _fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)
+        sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
+        filas += (
+            f"<tr><td>{i}</td><td style='color:#b8860b'>{a.cip or '-'}</td>"
+            f"<td>{cola}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
+        )
+
+    fecha_analisis = analisis_list[-1].fecha_analisis
+    fecha = _fmt_date(
+        datetime.combine(fecha_analisis, datetime.min.time()) if fecha_analisis else None
+    )
+
+    html = _TEMPLATE_RECONOCIMIENTO.format(
+        empresa_nombre=empresa_nombre,
+        empresa_sub=cfg.get("empresa_planta", ""),
+        empresa_direccion=empresa_dir,
+        n_lq=ip_lote,
+        referencia=ip_lote,
+        fecha_recepcion=fecha,
+        fecha_termino=_fmt_date(datetime.now()),
+        laboratorio=analisis_list[0].laboratorio or "-",
+        filas_detalle=filas,
+        bloque_notas="",
+        logo_b64=logo_b64,
+        membrete_b64=membrete_b64,
+        analista=analista_nombre,
+    )
+    return _html_to_pdf(html)

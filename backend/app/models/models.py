@@ -262,6 +262,10 @@ class ParametrosComerciales(AuditMixin, Base):
     gasto_consumo = Column(Numeric(10, 2))  # USD
     maquila = Column(Numeric(5, 2))  # %
     comision = Column(Numeric(5, 2))  # %
+    # Plata (Ag) — parámetros contractuales, todos nullable
+    umbral_ag_oz_tc = Column(Numeric(8, 4), nullable=True)  # x: piso Oz/TC para pagar Ag
+    rec_ag_pct = Column(Numeric(5, 2), nullable=True)  # y: % recuperación aplicada
+    descuento_ag_usd = Column(Numeric(8, 2), nullable=True)  # z: castigo al spot (USD/Oz)
 
     provacop = relationship("ProveedorAcopiador", back_populates="parametros")
 
@@ -621,6 +625,7 @@ class AnalisisDetalle(Base):
     peso = Column(Numeric(10, 4))
     ley = Column(Numeric(10, 4))
     numero_ensayo = Column(Integer, default=1)
+    mineral_mg = Column(Numeric(10, 4), nullable=True)  # Señal cruda en mg
 
     analisis_ley = relationship(
         "AnalisisLey",
@@ -649,6 +654,7 @@ class AnalisisRecuperacion(AuditMixin, Base):
     laboratorio = Column(String(50), nullable=False)
     ley_cabeza = Column(Numeric(10, 4))
     ley_cola = Column(Numeric(10, 4))
+    solucion_ag_g_m3 = Column(Numeric(10, 4), nullable=True)
     ley_liquido = Column(Numeric(10, 4))
     recuperacion = Column(
         Numeric(5, 2),
@@ -879,6 +885,10 @@ class LiquidacionLote(AuditMixin, Base):
     spot_usd_snapshot = Column(Numeric(10, 2))
     precio_x_tms = Column(Numeric(10, 4))
     total_usd = Column(Numeric(12, 2))
+    # Plata (Ag) — nullable, solo presente si aplica
+    ley_ag_gr_tm_snapshot = Column(Numeric(10, 3), nullable=True)
+    spot_ag_snapshot = Column(Numeric(10, 2), nullable=True)
+    valor_ag_usd = Column(Numeric(12, 2), nullable=True)
 
     liquidacion = relationship("Liquidacion", back_populates="liquidacion_lotes")
     lote = relationship("Lote", back_populates="liquidaciones_lotes")

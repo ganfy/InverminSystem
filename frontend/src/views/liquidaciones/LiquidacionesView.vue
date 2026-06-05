@@ -3,14 +3,14 @@
 
     <!-- ── Header ─────────────────────────────────────────────── -->
     <header class="page-header">
-      <div>
-        <h1 class="page-title">
-          <FileText class="lucide" :size="24" style="margin-right:0.5rem" />
-          Liquidaciones
-        </h1>
-        <p class="page-subtitle">
-          Gestión comercial de lotes
-        </p>
+      <div class="header-title-row">
+        <FileText class="header-icon" :size="26" />
+        <div>
+          <h1 class="page-title">Liquidaciones</h1>
+          <p class="page-subtitle">
+            Gestión comercial de lotes
+          </p>
+        </div>
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
         <button class="btn-secondary btn-con-icono" @click="router.push('/reportes')">
@@ -99,7 +99,7 @@
             placeholder="Buscar N° liq, proveedor…"
             v-model="filtroTexto"
           />
-          <select class="filtro-select" v-model="filtroEstado">
+          <select class="field-select filtro-select" v-model="filtroEstado">
             <option value="">Todos los estados</option>
             <option value="BORRADOR">Borrador</option>
             <option value="GENERADA">Generada</option>
@@ -336,7 +336,8 @@ const listaFiltrada = computed(() => {
 })
 
 const countLotesLiquidables = computed(() => {
-  return yaCargoLotes.value ? lotesLiquidables.value.length : (store.kpis?.lotes_liquidables ?? 0)
+  if (yaCargoLotes.value) return lotesLiquidables.value.length
+  return store.kpis?.lotes_liquidables ?? 0
 })
 
 const lotesAgrupados = computed<GrupoProvacop[]>(() => {
@@ -445,7 +446,15 @@ async function cambiarEstadoRapido(liq: LiquidacionResumenOut, nuevoEstado: stri
   })
   if (!ok) return
   const exito = await store.cambiarEstado(liq.id, nuevoEstado)
-  if (exito) ui.toast(`Estado actualizado a ${nuevoEstado}`, 'success')
+  if (exito) {
+    ui.toast(`Estado actualizado a ${nuevoEstado}`, 'success')
+    await store.cargarKPIs()
+    // Si ya cargamos lotes, refrescar también ese listado
+    if (yaCargoLotes.value) {
+      yaCargoLotes.value = false
+      await cargarLotesLiquidables()
+    }
+  }
   else ui.toast(store.error ?? 'Error al cambiar estado', 'error')
 }
 

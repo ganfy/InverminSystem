@@ -25,6 +25,8 @@ from app.core.deps import check_permiso
 from app.models.enums import EstadoRecuperacion, RolSistema, TipoAnalisis
 from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, ParametrosComerciales
 from app.schemas.laboratorio import (
+    AnalisisAgCreate,
+    AnalisisAgOut,
     AnalisisLeyCreate,
     AnalisisLeyOut,
     AnalisisLeyPorIPCreate,
@@ -41,7 +43,7 @@ from app.schemas.laboratorio import (
 from app.services import certificado_ley_pdf as cert_svc
 from app.services import laboratorio as svc
 from app.services.pruebas import calcular_ley_planta
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi import UploadFile as FastAPIFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
@@ -93,6 +95,27 @@ def registrar_ley(
         lote = db.query(Lote).filter(Lote.id == nuevo.lote_id).first()
         ip = lote.ip if lote else None
         return svc._ley_out(nuevo, ip)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/ley/{analisis_id}/ag", response_model=AnalisisAgOut, status_code=201)
+def registrar_ley_ag(
+    analisis_id: int,
+    datos: AnalisisAgCreate,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Registra un análisis de ley de Plata (Ag) vinculado a un análisis Au existente.
+    Calcula ley_ag_gr_tm = ((au_ag_mg - au_mg - 0.1444) * 1000) / peso_muestra
+    Accesible por Laboratorista, Comercial y Admin.
+    """
+    try:
+        resultado = svc.registrar_analisis_ag(db, analisis_id, datos, usuario_id=current_user.id)
+        db.commit()
+        return resultado
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -357,13 +380,23 @@ def preview_ley_comercial(
     Calcula y devuelve la ley comercial del lote aplicando las reglas
     de parametros_comerciales del proveedor-acopiador.
     Solo visible para Comercial, Gerencia, Admin (pueden ver IP).
+
+    Desglose completo de leyes del lote:
+        ley_planta_solo : solo lab propio (tipo 'planta')
+        ley_externo     : labs externos (tipo 'externo')
+        ley_comercial   : average(planta, externo) → factores aplicados
+        ley_minero      : ley declarada por el minero
+        ley_promedio    : (comercial + minero) / 2, o clamp con dirimencia
     """
     lote = db.query(Lote).filter(Lote.ip == ip, ~Lote.eliminado).first()
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
-    ley_planta = calcular_ley_planta(db, lote.id)
-    if ley_planta is None:
+    ley_base = calcular_ley_planta(db, lote.id)
+    if ley_base is None:
+        # Fallback: si no hay análisis planta/externo vigentes, usar dirimencia (flujo legacy)
+        ley_base = svc._ley_dirimencia(db, lote.id)
+    if ley_base is None:
         raise HTTPException(
             status_code=422, detail="Sin análisis de ley vigentes para calcular ley planta"
         )
@@ -374,7 +407,35 @@ def preview_ley_comercial(
     except AttributeError:
         params = None
 
-    return svc.calcular_ley_comercial(ley_planta, params)
+    result = svc.calcular_ley_comercial(ley_base, params)
+
+    ley_solo_planta = svc._ley_solo_planta(db, lote.id)
+    ley_externo = svc._ley_solo_externo(db, lote.id)
+    ley_minero = svc._ley_minero(db, lote.id)
+    ley_dirimencia = svc._ley_dirimencia(db, lote.id)
+
+    ley_comercial_dec = Decimal(str(result["ley_comercial"])).quantize(Decimal("0.001"))
+    ley_promedio: Decimal | None = None
+
+    if ley_minero is not None:
+        if ley_dirimencia is not None:
+            # Clamping
+            ley_low = min(ley_comercial_dec, Decimal(str(ley_minero)))
+            ley_high = max(ley_comercial_dec, Decimal(str(ley_minero)))
+            ley_promedio = max(min(ley_dirimencia, ley_high), ley_low)
+        else:
+            ley_promedio = (ley_comercial_dec + Decimal(str(ley_minero))) / 2
+
+        if ley_promedio is not None:
+            ley_promedio = ley_promedio.quantize(Decimal("0.001"))
+
+    result["ley_planta_solo"] = float(ley_solo_planta) if ley_solo_planta is not None else None
+    result["ley_externo"] = float(ley_externo) if ley_externo is not None else None
+    result["ley_minero"] = float(ley_minero) if ley_minero is not None else None
+    result["ley_promedio"] = float(ley_promedio) if ley_promedio is not None else None
+    result["tiene_dirimencia"] = ley_dirimencia is not None
+
+    return result
 
 
 @router.post(
@@ -582,6 +643,50 @@ def guardar_certificado_recuperacion(
     return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
 
 
+@router.post("/lotes/{ip}/guardar-certificado-reconocimiento")
+def guardar_certificado_reconocimiento(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Genera y persiste el certificado de reconocimiento en storage."""
+    try:
+        pdf_bytes = cert_svc.generar_cert_reconocimiento_pdf(db, ip)
+        ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "reconocimiento")
+
+        lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
+        if lote_obj:
+            cert_record = (
+                db.query(AnalisisRecuperacion)
+                .filter(
+                    AnalisisRecuperacion.lote_id == lote_obj.id,
+                    AnalisisRecuperacion.estado == EstadoRecuperacion.CERT_RECONOCIMIENTO,
+                )
+                .first()
+            )
+            if cert_record:
+                cert_record.certificado_url = ruta
+            else:
+                db.add(
+                    AnalisisRecuperacion(
+                        lote_id=lote_obj.id,
+                        cip=None,
+                        laboratorio="Paititi",
+                        estado=EstadoRecuperacion.CERT_RECONOCIMIENTO,
+                        certificado_url=ruta,
+                        vigente=True,
+                        creado_por=current_user.id,
+                    )
+                )
+            db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return {"ruta": ruta, "url": f"/laboratorio/archivos/{ruta}"}
+
+
 @router.get("/cips/{cip}/certificado-ensayo")
 def generar_certificado_ensayo(
     cip: str,
@@ -698,6 +803,7 @@ def listar_lotes(
 @router.get("/lotes/{ip}", response_model=LoteLabOut)
 def detalle_lote(
     ip: str,
+    material: str | None = Query(None, description="Filtrar análisis por material (Au, Ag)"),
     current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
@@ -707,7 +813,7 @@ def detalle_lote(
             status_code=403,
             detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
         )
-    result = svc.obtener_detalle_lote(db, ip)
+    result = svc.obtener_detalle_lote(db, ip, material=material)
     if not result:
         raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado o sin CIPs")
     return result

@@ -43,6 +43,11 @@ class Settings(BaseSettings):
 
     tesseract_path: str | None = None
 
+    excel_export_password: str = "INVERMIN"
+
+    # Telegram
+    telegram_bot_token: str = ""
+
     @property
     def database_url(self) -> str:
         if self.db_engine == "postgresql":

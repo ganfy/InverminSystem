@@ -11,6 +11,7 @@ from app.schemas.pruebas import (
     PruebaMetalurgicaCreate,
     PruebaMetalurgicaOut,
     PruebaRecuperacionItem,
+    RecuperacionItem,
     SyncPruebasRequest,
     SyncPruebasResponse,
 )
@@ -53,6 +54,22 @@ def sync_pruebas(
     db: Session = Depends(get_db),
 ):
     return pruebas_service.sync_batch(db, payload.pruebas, current_user.id)
+
+
+@router.get(
+    "/recuperaciones",
+    response_model=list[RecuperacionItem],
+    summary="Leyes de cola y recuperación para Técnico de Pruebas",
+)
+def listar_recuperaciones(
+    current_user=Depends(check_permiso("PRUEBAS_MET", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna todos los análisis de recuperación vigentes con leyes de cola y
+    % de recuperación. Visible para TecnicoMuestreo (no expone ley_cabeza).
+    """
+    return pruebas_service.obtener_recuperaciones(db)
 
 
 # ── Rutas con path param ──────────────────────────────────────────────────────

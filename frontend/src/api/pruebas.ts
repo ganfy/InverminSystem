@@ -47,6 +47,20 @@ export interface PruebaRecuperacionItem {
     tiene_analisis_recuperacion: boolean
 }
 
+export interface RecuperacionItem {
+    ip: string
+    cip: string | null
+    proveedor: string
+    fecha_analisis: string | null
+    ley_cola_au_oz_tc: number | null
+    ley_cola_au_gr_tm: number | null
+    ley_cola_ag_gr_tm: number | null
+    solucion_au_g_m3: number | null
+    solucion_ag_g_m3: number | null
+    recuperacion: number | null
+    vigente: boolean
+}
+
 export interface PruebaOfflineItem {
     offline_id: string
     ip: string
@@ -84,6 +98,12 @@ export const pruebasApi = {
     /** Pruebas COMPLETADO con ley_cabeza disponible para análisis de recuperación */
     async paraRecuperacion(): Promise<PruebaRecuperacionItem[]> {
         const { data } = await api.get('/pruebas/para-recuperacion')
+        return data
+    },
+
+    /** Leyes de cola + % recuperación para vista de Técnico Pruebas */
+    async listarRecuperaciones(): Promise<RecuperacionItem[]> {
+        const { data } = await api.get('/pruebas/recuperaciones')
         return data
     },
 

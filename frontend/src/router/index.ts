@@ -8,6 +8,7 @@ import SesionView from '@/views/balanza/SesionView.vue'
 import MuestreoView from '@/views/muestreo/MuestreoView.vue'
 import PruebasView from '@/views/pruebas/PruebasView.vue'
 import RegistrarPruebasView from '@/views/pruebas/RegistrarPruebasView.vue'
+import RecuperacionesPruebasView from '@/views/pruebas/RecuperacionesView.vue'
 import LaboratorioView from '@/views/laboratorio/LaboratorioDashboardView.vue'
 import RegistrarLeyView from '@/views/laboratorio/RegistrarLeyView.vue'
 import RegistrarRecuperacionView from '@/views/laboratorio/RegistrarRecuperacionView.vue'
@@ -22,7 +23,9 @@ import LiquidacionesView from '@/views/liquidaciones/LiquidacionesView.vue'
 import CrearLiquidacionView from '@/views/liquidaciones/CrearLiquidacionView.vue'
 import DetalleLiquidacionView from '@/views/liquidaciones/DetalleLiquidacionView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
-import UsuariosView from '@/views/admin/UsuariosView.vue'  // ← AÑADIDO
+import RumasView from '@/views/rumas/RumasView.vue'
+import DetalleRumaView from '@/views/rumas/DetalleRumaView.vue'
+import CampanasView from '@/views/rumas/CampanasView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -37,39 +40,46 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         // Dashboard principal
-        { path: 'dashboard', name: 'Dashboard', component: DashboardView },
+        { path: 'dashboard', name: 'Dashboard', component: DashboardView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
 
         // Balanza
-        { path: 'balanza', name: 'Balanza', component: BalanzaView },
-        { path: 'balanza/nueva', name: 'RegistrarCamion', component: RegistrarCamionView },
-        { path: 'balanza/:id', name: 'SesionBalanza', component: SesionView },
+        { path: 'balanza', name: 'Balanza', component: BalanzaView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] } },
+        { path: 'balanza/nueva', name: 'RegistrarCamion', component: RegistrarCamionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] } },
+        { path: 'balanza/:id', name: 'SesionBalanza', component: SesionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] } },
 
         // Muestreo
-        { path: 'muestreo', name: 'Muestreo', component: MuestreoView },
-        { path: 'muestreo/:ip', name: 'RegistrarHumedad', component: RegistrarHumedadView },
+        { path: 'muestreo', name: 'Muestreo', component: MuestreoView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] } },
+        { path: 'muestreo/:ip', name: 'RegistrarHumedad', component: RegistrarHumedadView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] } },
 
         // Pruebas
-        { path: 'pruebas', name: 'Pruebas', component: PruebasView },
-        { path: 'pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView },
+        { path: 'pruebas', name: 'Pruebas', component: PruebasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Metalurgista'] } },
+        { path: 'pruebas/recuperaciones', name: 'Recuperaciones', component: RecuperacionesPruebasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Metalurgista'] } },
+        { path: 'pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Metalurgista'] } },
 
         // Laboratorio
-        { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView },
-        { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView },
-        { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView },
-        { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView },
-        { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView },
-        { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView },
+        { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
+        { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
+        { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
+        { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
+        { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
 
         // Liquidaciones
-        { path: 'liquidaciones', name: 'Liquidaciones', component: LiquidacionesView },
-        { path: 'liquidaciones/nueva', name: 'CrearLiquidacion', component: CrearLiquidacionView },
-        { path: 'liquidaciones/:id', name: 'DetalleLiquidacion', component: DetalleLiquidacionView },
+        { path: 'liquidaciones', name: 'Liquidaciones', component: LiquidacionesView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'liquidaciones/nueva', name: 'CrearLiquidacion', component: CrearLiquidacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'liquidaciones/:id', name: 'DetalleLiquidacion', component: DetalleLiquidacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
 
         // Gestión
-        { path: 'terceros', name: 'Terceros', component: TercerosView },
+        { path: 'terceros', name: 'Terceros', component: TercerosView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
 
-        // Administración
-        { path: 'administracion', name: 'Administracion', component: UsuariosView, meta: { roles: ['Admin'] } },
+        // Rumas
+        { path: 'rumas', name: 'Rumas', component: RumasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'rumas/:id', name: 'DetalleRuma', component: DetalleRumaView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
+        { path: 'administracion/campanas', name: 'Campanas', component: CampanasView, meta: { roles: ['Admin', 'Gerencia'] } },
+
+        // Administración (vista unificada con tabs: Usuarios / Parámetros / Notificaciones)
+        { path: 'administracion', name: 'Administracion', component: () => import('@/views/admin/AdminView.vue'), meta: { roles: ['Admin'] } },
+        { path: 'administracion/config', redirect: { name: 'Administracion' } },
 
         // Error
         { path: 'unauthorized', name: 'Unauthorized', component: UnauthorizedView },
@@ -131,12 +141,7 @@ router.beforeEach(async (to) => {
     if (!(to.meta.roles as string[]).includes(rol)) return { name: 'Unauthorized' }
   }
 
-  // Protección específica de DetalleLote
-  if (to.name === 'DetalleLote') {
-    const rol = auth.user?.rol ?? ''
-    const permitidos = ['Admin', 'Gerencia', 'Comercial']
-    if (!permitidos.includes(rol)) return { name: 'Unauthorized' }
-  }
+
 
   return true
 })

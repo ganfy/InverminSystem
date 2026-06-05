@@ -3,6 +3,8 @@ Schemas de usuarios - gestión administrativa.
 Solo accesible por Admin (RF-SYS-001 módulo ADMINISTRACIÓN).
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, field_validator
 
 
@@ -89,6 +91,7 @@ class UsuarioRespuesta(BaseModel):
     rol: str
     email: str | None = None
     activo: bool
+    creado_en: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -101,5 +104,6 @@ class UsuarioLista(BaseModel):
     nombre_completo: str
     rol: str
     activo: bool
+    creado_en: datetime | None = None
 
     model_config = {"from_attributes": True}

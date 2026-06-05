@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal, check_db_connection
 from app.core.security import cleanup_expired_tokens
 from app.routers import (
+    admin,
     auth,
     balanza,
     dashboard,
@@ -17,8 +18,10 @@ from app.routers import (
     liquidaciones,
     muestreo,
     pruebas,
+    rumas,
     usuarios,
 )
+from app.services.telegram_alertas import scheduler_loop
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -48,6 +51,12 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
+    # ── Telegram alertas scheduler ───────────────────────────────────────────
+    import asyncio
+
+    # tg_task = asyncio.create_task(scheduler_loop())
+    asyncio.create_task(scheduler_loop())
+
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
@@ -76,6 +85,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 PREFIX = "/api/v1"
 
+app.include_router(admin.router, prefix=PREFIX)
 app.include_router(auth.router, prefix=PREFIX)
 app.include_router(dashboard.router, prefix=PREFIX)
 app.include_router(usuarios.router, prefix=PREFIX)
@@ -84,7 +94,8 @@ app.include_router(entidades.router, prefix=PREFIX)
 app.include_router(muestreo.router, prefix=PREFIX)
 app.include_router(pruebas.router, prefix=PREFIX)
 app.include_router(laboratorio.router, prefix=PREFIX)
-app.include_router(liquidaciones.router, prefix="/api/v1")
+app.include_router(liquidaciones.router, prefix=PREFIX)
+app.include_router(rumas.router, prefix=PREFIX)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.models.enums import TipoMuestra
 from app.models.models import (
+    AnalisisLey,
     AnalisisRecuperacion,
     Lote,
     MapeoCIP,
@@ -14,6 +15,7 @@ from app.schemas.pruebas import (
     LotePruebaList,
     PruebaMetalurgicaCreate,
     PruebaRecuperacionItem,
+    RecuperacionItem,
     SyncPruebasResponse,
     SyncResult,
 )
@@ -47,29 +49,16 @@ def _get_cips_recuperacion(db: Session, lote_id: int) -> list[MapeoCIP]:
 def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
     """
     Calcula ley planta = promedio de análisis de ley VIGENTES del lote.
-    Excluye tipo 'minero'. Si hay dirimencia, usa solo ese.
+    Excluye tipo 'minero'.
     Función compartida usada por pruebas y laboratorio.
     """
-    from app.models.models import AnalisisLey
-
-    dirimencia = (
-        db.query(AnalisisLey)
-        .filter(
-            AnalisisLey.lote_id == lote_id,
-            AnalisisLey.tipo_analisis == "dirimencia",
-            AnalisisLey.vigente == True,  # noqa: E712
-        )
-        .first()
-    )
-    if dirimencia:
-        return dirimencia.ley_final
-
     analisis = (
         db.query(AnalisisLey)
         .filter(
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.vigente == True,  # noqa: E712
             AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
+            AnalisisLey.material == "Au",
         )
         .all()
     )
@@ -77,7 +66,7 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
         return None
 
     total = sum(a.ley_final for a in analisis if a.ley_final is not None)
-    return (total / len(analisis)).quantize(Decimal("0.0001"))
+    return (total / len(analisis)).quantize(Decimal("0.001"))
 
 
 # ── Lista principal ───────────────────────────────────────────────────────────
@@ -172,6 +161,8 @@ def registrar_prueba(
             warning_msg = (
                 f"Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
             )
+
+    datos.fecha_ingreso = datetime.now()
 
     prueba_existente = (
         db.query(PruebaMetalurgica)
@@ -375,6 +366,74 @@ def obtener_pruebas_para_recuperacion(db: Session) -> list[PruebaRecuperacionIte
                     tiene_analisis_recuperacion=tiene_rec,
                 )
             )
+
+    return resultado
+
+
+# ── Recuperaciones ────────────────────────────────────────────────────────────
+
+_OZ_TC_TO_GR_TM = Decimal("34.2857")
+
+
+def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
+    """Retorna todos los análisis de recuperación vigentes con leyes de cola y
+    % recuperación. Usado por TecnicoMuestreo en su vista de resultados.
+    """
+    registros = (
+        db.query(AnalisisRecuperacion)
+        .filter(
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.ley_cola != None,  # noqa: E711
+        )
+        .order_by(AnalisisRecuperacion.fecha_analisis.desc())
+        .all()
+    )
+
+    resultado: list[RecuperacionItem] = []
+    for rec in registros:
+        # Obtener IP y proveedor a través del CIP → lote
+        ip = None
+        proveedor = "-"
+        if rec.cip:
+            mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == rec.cip).first()
+            if mapeo:
+                lote = db.query(Lote).filter(Lote.id == mapeo.lote_id).first()
+                if lote:
+                    ip = lote.ip
+                    try:
+                        proveedor = lote.sesion.provacop.proveedor.razon_social
+                    except AttributeError:
+                        proveedor = "-"
+
+        # Conversiones de unidades
+        cola_oz_tc: Decimal | None = rec.ley_cola
+        cola_gr_tm = (
+            (cola_oz_tc * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"))
+            if cola_oz_tc is not None
+            else None
+        )
+        # ley_liquido en DB está en oz/TC → convertir a g/m³
+        solucion_au = (
+            (rec.ley_liquido * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"))
+            if rec.ley_liquido is not None
+            else None
+        )
+
+        resultado.append(
+            RecuperacionItem(
+                ip=ip or "-",
+                cip=rec.cip,
+                proveedor=proveedor,
+                fecha_analisis=rec.fecha_analisis,
+                ley_cola_au_oz_tc=cola_oz_tc,
+                ley_cola_au_gr_tm=cola_gr_tm,
+                ley_cola_ag_gr_tm=rec.ley_cola_ag_gr_tm,
+                solucion_au_g_m3=solucion_au,
+                solucion_ag_g_m3=rec.solucion_ag_g_m3,
+                recuperacion=rec.recuperacion,
+                vigente=rec.vigente,
+            )
+        )
 
     return resultado
 

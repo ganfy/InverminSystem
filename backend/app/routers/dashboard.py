@@ -1,15 +1,90 @@
-from app.core.deps import get_db
-from app.schemas.dashboard import DashboardResponse
-from app.services.dashboard import obtener_resumen_dashboard
+from app.core.deps import get_db, require_roles
+from app.models.models import Usuario
+from app.schemas.dashboard import (
+    AlertasConfig,
+    AlertasResponse,
+    DashboardResponse,
+    TrazabilidadLoteResponse,
+)
+from app.services.dashboard import (
+    actualizar_config_alertas,
+    generar_excel_dashboard,
+    obtener_alertas,
+    obtener_resumen_dashboard,
+    obtener_trazabilidad_lote,
+)
+from app.services.telegram_alertas import guardar_observacion_alerta
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
+class ExportarPayload(BaseModel):
+    tipo: str = Field(
+        "lotes",
+        pattern="^(lotes|acopiadores)$",
+        description="Tipo de datos a exportar: 'lotes' o 'acopiadores'",
+    )
+    clave: str = Field(..., min_length=4, description="Contraseña para proteger el archivo Excel")
+
+
 @router.get("/resumen", response_model=DashboardResponse)
 def get_dashboard_resumen(db: Session = Depends(get_db)):
-    """
-    Obtiene las métricas y la lista de lotes recientes para la vista principal del Dashboard.
-    """
     return obtener_resumen_dashboard(db)
+
+
+@router.post("/exportar")
+def exportar_excel(
+    payload: ExportarPayload,
+    db: Session = Depends(get_db),
+):
+    data = obtener_resumen_dashboard(db)
+    buf = generar_excel_dashboard(data, tipo=payload.tipo, clave=payload.clave)
+    nombre = f"{'lotes' if payload.tipo == 'lotes' else 'acopiadores'}_paititi.xlsx"
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={nombre}"},
+    )
+
+
+@router.get("/alertas", response_model=AlertasResponse)
+def get_alertas(db: Session = Depends(get_db)):
+    """Obtiene las alertas activas según la configuración actual."""
+    return obtener_alertas(db)
+
+
+@router.put("/alertas/config", response_model=AlertasConfig)
+def update_alertas_config(config: AlertasConfig, db: Session = Depends(get_db)):
+    """Actualiza la configuración de alertas."""
+    actualizar_config_alertas(db, config)
+    return config
+
+
+class ObservacionAlertaPayload(BaseModel):
+    tipo: str = Field(..., description="Tipo de alerta (ej. RETRASO_MUESTREO)")
+    ip: str = Field(..., description="IP del lote al que aplica la alerta")
+    observacion: str = Field(..., min_length=1, description="Texto de la justificación")
+
+
+@router.post("/alertas/observacion")
+def guardar_observacion(
+    payload: ObservacionAlertaPayload,
+    db: Session = Depends(get_db),
+):
+    """Guarda la observación/justificación del operador para una alerta."""
+    guardar_observacion_alerta(db, payload.tipo, payload.ip, payload.observacion)
+    return {"ok": True}
+
+
+@router.get("/lotes/{ip}/trazabilidad", response_model=TrazabilidadLoteResponse)
+def get_trazabilidad(
+    ip: str,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("Admin", "Gerencia", "Comercial")),
+):
+    """Retorna el cuadro de trazabilidad administrativa completo de un lote."""
+    return obtener_trazabilidad_lote(db, ip)

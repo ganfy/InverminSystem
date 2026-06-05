@@ -19,6 +19,8 @@
       </div>
     </header>
 
+    <AlertasBanner modulo="LABORATORIO" con-observaciones />
+
     <!-- ── [OFFLINE] Análisis pendientes de sincronizar (solo Laboratorista) ── -->
     <div
       v-if="!store.puedeVerIP && analisisOfflinePendientes.length > 0"
@@ -41,7 +43,10 @@
         >
           <span class="pendiente-cip">{{ item.datos.cip }}</span>
           <span class="pendiente-tipo">Análisis de ley · {{ item.datos.tipo_analisis }}</span>
-          <span v-if="item.error" class="pendiente-error" :title="item.error">⚠ Error sync</span>
+          <span v-if="item.error" class="pendiente-error" :title="item.error">
+            <AlertTriangle :size="12" style="vertical-align:middle;margin-right:2px" />
+            Error sync
+          </span>
           <span v-else class="badge-local">LOCAL</span>
         </div>
       </div>
@@ -65,6 +70,7 @@
               <th>FECHA RECEPCIÓN</th>
               <th>LEY PLANTA</th>
               <th>LEY MINERO</th>
+              <th>% RECUP</th>
               <th>ESTADO LEYES</th>
               <th>ACCIONES</th>
             </tr>
@@ -77,7 +83,7 @@
             </tr>
             <template v-else>
               <tr v-if="lotesFiltrados.length === 0">
-                <td colspan="8" class="estado-tabla sin-datos">Sin registros</td>
+                <td colspan="9" class="estado-tabla sin-datos">Sin registros</td>
               </tr>
               <tr v-for="lote in lotesFiltrados" :key="lote.ip">
                 <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
@@ -86,6 +92,7 @@
                 <td class="td-fecha">{{ fmt(lote.fecha_recepcion) }}</td>
                 <td class="td-mono">{{ lote.ley_planta ?? '-' }}</td>
                 <td class="td-mono">{{ lote.ley_minero ?? '-' }}</td>
+                <td class="td-mono" style="color:var(--color-gold-light)">{{ getRecuperacion(lote) }}</td>
                 <td>
                   <span class="badge-estado">{{ lote.analisis_ley.length }} análisis</span>
                 </td>
@@ -104,14 +111,16 @@
     <template v-else>
       <div class="tabs-lab">
         <button class="tab-lab-btn" :class="{ active: tabActual === 'ley' }" @click="tabActual = 'ley'">
-          Análisis de Ley
+          Análisis de Ley Newmont
           <span v-if="pendientesLey > 0" class="badge-count">{{ pendientesLey }}</span>
-          <span class="tab-lab-toggle">{{ tabActual === 'ley' ? '︿' : '︾' }}</span>
+          <ChevronUp v-if="tabActual === 'ley'" :size="14" class="tab-chevron" />
+          <ChevronDown v-else :size="14" class="tab-chevron" />
         </button>
         <button class="tab-lab-btn" :class="{ active: tabActual === 'rec' }" @click="tabActual = 'rec'">
-          Análisis de Recuperación
+          Análisis de Reconocimientos
           <span v-if="pendientesRec > 0" class="badge-count">{{ pendientesRec }}</span>
-          <span class="tab-lab-toggle">{{ tabActual === 'rec' ? '︿' : '︾' }}</span>
+          <ChevronUp v-if="tabActual === 'rec'" :size="14" class="tab-chevron" />
+          <ChevronDown v-else :size="14" class="tab-chevron" />
         </button>
       </div>
 
@@ -143,10 +152,8 @@
                 <th>AU GR/TM</th>
               </template>
               <template v-else>
-                <th>LEY CABEZA</th>
                 <th>LEY COLA</th>
                 <th>LEY LÍQUIDO</th>
-                <th>% RECUPERACIÓN</th>
               </template>
               <th>ESTADO</th>
               <th></th>
@@ -154,13 +161,13 @@
           </thead>
           <tbody>
             <tr v-if="store.cargando">
-              <td :colspan="tabActual === 'ley' ? 8 : 8" class="estado-tabla">
+              <td :colspan="tabActual === 'ley' ? 8 : 6" class="estado-tabla">
                 <span class="spinner" style="margin-right:0.5rem"></span> Cargando...
               </td>
             </tr>
             <template v-else>
               <tr v-if="filasMostrar.length === 0">
-                <td :colspan="tabActual === 'ley' ? 8 : 8" class="estado-tabla sin-datos">Sin registros</td>
+                <td :colspan="tabActual === 'ley' ? 8 : 6" class="estado-tabla sin-datos">Sin registros</td>
               </tr>
 
               <template v-if="tabActual === 'ley'">
@@ -186,12 +193,8 @@
                 <tr v-for="fila in filasMostrar" :key="fila.cip">
                   <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                   <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
-                  <td>{{ fila.leyCabeza ?? '-' }}</td>
                   <td>{{ fila.leyCola ?? '-' }}</td>
                   <td>{{ fila.leyLiquido ?? '-' }}</td>
-                  <td class="td-mono" style="color:var(--color-gold-light)">
-                    {{ fila.recuperacion != null ? fila.recuperacion + '%' : '-' }}
-                  </td>
                   <td>
                     <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                   </td>
@@ -213,11 +216,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FlaskConical, RefreshCw, WifiOff } from 'lucide-vue-next'
+import { FlaskConical, RefreshCw, WifiOff, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-vue-next'
+import AlertasBanner from '@/components/AlertasBanner.vue'
 import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
-import type { CIPAnalisisOut, LoteLabOut } from '@/types/laboratorio'
+import type { CIPAnalisisOut, LoteLabOut, AnalisisRecuperacionOut } from '@/types/laboratorio'
 import { useSync } from '@/composables/useSync'
 import { obtenerAnalisisLeyPendientes, type AnalisisLeyOfflineItem } from '@/composables/useOfflineQueue'
 
@@ -333,10 +337,8 @@ function mapearCIP(c: CIPAnalisisOut) {
       cip: c.cip,
       fecha_envio: c.fecha_envio,
       estado: c.estado_recuperacion,
-      leyCabeza:   vigente ? (vigente.ley_cabeza   ?? null) : null,
       leyCola:     vigente ? (vigente.ley_cola     ?? null) : null,
       leyLiquido:  vigente ? (vigente.ley_liquido  ?? null) : null,
-      recuperacion: vigente ? (vigente.recuperacion ?? null) : null,
       certificadoUrl: a?.certificado_url ?? null,
     }
   }
@@ -369,6 +371,13 @@ const lotesFiltrados = computed(() => {
   const q = filtroBusquedaLotes.value.toLowerCase()
   return lotes.value.filter(l => l.ip.toLowerCase().includes(q) || (l.proveedor || '').toLowerCase().includes(q))
 })
+
+function getRecuperacion(lote: LoteLabOut): string {
+  const rec = lote.analisis_recuperacion.find(
+    (a: AnalisisRecuperacionOut) => a.vigente && a.recuperacion != null
+  )
+  return rec?.recuperacion != null ? Number(rec.recuperacion).toFixed(1) + '%' : '-'
+}
 
 function fmt(d?: string | null | Date) {
   if (!d) return '-'
@@ -420,7 +429,7 @@ async function generarCertRec(fila: any) {
 .tabs-lab { display: flex; gap: 0; margin-bottom: 1.25rem; border-bottom: 1px solid var(--color-border); }
 .tab-lab-btn { background: transparent; border: none; color: var(--color-text-muted); padding: 0.6rem 1.25rem; font-size: var(--text-md); font-family: var(--font-mono); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; display: flex; align-items: center; gap: 0.5rem; }
 .tab-lab-btn.active { color: var(--color-gold); border-bottom-color: var(--color-gold); }
-.badge-count { background: var(--color-error, #ef4444); color: #fff; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 999px; min-width: 1.2rem; text-align: center; }
+.tab-chevron { flex-shrink: 0; opacity: 0.6; }
 .filtros-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 
 /* ── Sección offline pendientes ──────────────────────────── */

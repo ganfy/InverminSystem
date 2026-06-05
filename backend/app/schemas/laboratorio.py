@@ -2,37 +2,80 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.models.enums import OrigenDatos, TipoAnalisis
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ── Análisis de Ley (Fire Assay triple sampling) ──────────────────────────────
 
 model_config = {"from_attributes": True, "json_encoders": {Decimal: float}}
 
 
+class NewmontMuestraIn(BaseModel):
+    """
+    Datos crudos de una muestra del triple sampling Newmont.
+    Campo opcional en AnalisisLeyCreate para poblar analisis_detalle.
+    """
+
+    peso_g: Decimal = Field(..., gt=0)
+    au_mg: Decimal = Field(..., ge=0)
+    ley_oz_tc: Decimal = Field(..., ge=0, description="Ley calculada en frontend (Oz/TC)")
+
+
+class AnalisisDetalleOut(BaseModel):
+    id: int
+    origen: str  # FINO1 | FINO2 | GRUESO | AU1 | AU2 | AU_AG
+    peso: Decimal | None
+    mineral_mg: Decimal | None
+    ley: Decimal | None
+    numero_ensayo: int
+
+    model_config = {"from_attributes": True}
+
+
 class AnalisisLeyCreate(BaseModel):
     cip: str = Field(..., description="Código CIP de la muestra")
     laboratorio: str = Field(..., description="Nombre del laboratorio")
     tipo_analisis: TipoAnalisis = Field(..., description="planta | externo | minero | dirimencia")
-    material: str = Field("Au", description="Material analizado")
-    ley_fino: float = Field(..., gt=0, description="Oz/TC fracción -140 (malla fina)")
-    ley_grueso: float = Field(..., gt=0, description="Oz/TC fracción +140 (malla gruesa)")
+    material: str = Field("Au", description="Au | Ag")
+    ley_fino: float = Field(..., ge=0, description="Oz/TC fracción -140 (Au) o ley Ag")
+    ley_grueso: float = Field(0.0, ge=0, description="Oz/TC fracción +140 (Au). 0 para Ag")
+    punto: str | None = Field(None, description="Ag: CABEZA | COLA | LIQUIDO")
     origen_datos: str = OrigenDatos.MANUAL
+    muestras_detalle: list[NewmontMuestraIn] | None = None
     fecha_analisis: date | None = None
+
+    @model_validator(mode="after")
+    def validar_segun_material(self) -> "AnalisisLeyCreate":
+        if self.material == "Au":
+            if self.ley_fino <= 0:
+                raise ValueError("ley_fino debe ser > 0 para Au")
+            if self.ley_grueso <= 0:
+                raise ValueError("ley_grueso debe ser > 0 para Au")
+        elif self.material == "Ag":
+            if self.ley_fino <= 0:
+                raise ValueError("ley_fino (ley Ag oz/TC) debe ser > 0")
+            self.ley_grueso = 0.0  # garantizar
+            if not self.punto:
+                raise ValueError("punto (CABEZA/COLA/LIQUIDO) es requerido para Ag")
+        return self
 
 
 class AnalisisLeyPorIPCreate(BaseModel):
-    """
-    Para registrar ley minero o dirimencia directamente por IP del lote,
-    sin requerir CIP (ley minero no pasa por laboratorio de planta).
-    """
-
     tipo_analisis: TipoAnalisis = Field(..., description="minero | dirimencia")
     laboratorio: str = Field(..., description="Nombre del laboratorio o minero")
-    ley_fino: float = Field(..., ge=0, description="Oz/TC malla fina")
-    ley_grueso: float = Field(..., ge=0, description="Oz/TC malla gruesa")
-    material: str = Field("Au")
+    ley_fino: float = Field(..., ge=0, description="Oz/TC malla fina (Au) o ley Ag")
+    ley_grueso: float = Field(0.0, ge=0, description="Oz/TC malla gruesa. 0 para Ag")
+    material: str = Field("Au", description="Au | Ag")
+    punto: str | None = Field(None, description="Ag: CABEZA | COLA | LIQUIDO")
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
+
+    @model_validator(mode="after")
+    def validar_segun_material(self) -> "AnalisisLeyPorIPCreate":
+        if self.material == "Ag":
+            self.ley_grueso = 0.0
+            if not self.punto:
+                raise ValueError("punto es requerido para Ag")
+        return self
 
 
 class AnalisisLeyOut(BaseModel):
@@ -61,6 +104,39 @@ class AnalisisLeyOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Análisis de Plata (Ag) ────────────────────────────────────────────────────
+
+
+class AnalisisAgCreate(BaseModel):
+    """
+    Ingreso de señal combinada Au+Ag para calcular ley de plata.
+    Blank correction fija: 0.1444 (no editable por usuario).
+    ley_ag_gr_tm = ((au_ag_mg - au_mg - 0.1444) * 1000) / peso_muestra
+    ley_ag_oz_tc = ley_ag_gr_tm / 34.2857
+    """
+
+    au_ag_mg: float = Field(..., gt=0, description="Señal combinada Au+Ag (mg)")
+    au_mg: float = Field(..., ge=0, description="Señal Au pura (mg)")
+    peso_muestra: float = Field(..., gt=0, description="Peso de la muestra (g)")
+    laboratorio: str = Field(..., description="Nombre del laboratorio")
+    fecha_analisis: date | None = None
+
+
+class AnalisisAgOut(BaseModel):
+    id: int
+    lote_id: int
+    lote_ip: str | None = None
+    laboratorio: str
+    ley_ag_gr_tm: Decimal
+    ley_ag_oz_tc: Decimal
+    fecha_analisis: date | None
+    vigente: bool
+    creado_por: int
+    creado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Análisis de Recuperación ──────────────────────────────────────────────────
 
 
@@ -73,14 +149,6 @@ class AnalisisRecuperacionCreate(BaseModel):
     ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     origen_datos: str = OrigenDatos.MANUAL
-    fecha_analisis: date | None = None
-
-
-class CompletarRecuperacionRequest(BaseModel):
-    """Para que laboratorista complete un pending (ley_cola + ley_liquido)."""
-
-    ley_cola: Decimal | None = None
-    ley_liquido: Decimal | None = None
     fecha_analisis: date | None = None
 
 
@@ -104,13 +172,17 @@ class AnalisisRecuperacionOut(BaseModel):
     laboratorio: str
     ley_cabeza: Decimal
     ley_cola: Decimal | None = None
-    ley_liquido: Decimal | None = None
+    ley_liquido: Decimal | None = None  # solución Au
     recuperacion: Decimal | None = None
+    solucion_ag_g_m3: Decimal | None = None  # Ag en solución (g/m³)
+    # ── Detalles por muestra (solo se incluyen cuando se piden explícitamente) ─
+    detalles: list[AnalisisDetalleOut] = []
+    # ── Estado y trazabilidad ─────────────────────────────────────────────────
     estado: str
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
-    creado_por_nombre: str | None = None  # nombre del laboratorista que registró
+    creado_por_nombre: str | None = None
     descartado_por: int | None = None
     fecha_descarte: datetime | None = None
     eliminado: bool = False
@@ -118,6 +190,50 @@ class AnalisisRecuperacionOut(BaseModel):
     eliminado_por: int | None = None
 
     model_config = {"from_attributes": True}
+
+
+class MuestraReconocimientoIn(BaseModel):
+    """
+    Una muestra física del reconocimiento de pulpa (sala de metalurgia).
+    Cada lote produce 3 filas en analisis_detalle:
+      - origen AU1  : peso + mineral_mg=Au1_mg → ley Au1 (Gr/TM)
+      - origen AU2  : peso + mineral_mg=Au2_mg → ley Au2 (Gr/TM)
+      - origen AU_AG: peso + mineral_mg=AuAg_mg → ley Ag (Gr/TM)
+    La ley Au final de esta muestra = avg(ley_au1, ley_au2).
+    numero_ensayo: 1 normal, 2 = remuestreo.
+    """
+
+    peso_g: Decimal = Field(..., gt=0, description="Peso de muestra sólida (g)")
+    au1_mg: Decimal = Field(..., ge=0, description="Señal Au primera lectura (mg)")
+    au2_mg: Decimal = Field(..., ge=0, description="Señal Au segunda lectura (mg)")
+    au_ag_mg: Decimal = Field(..., ge=0, description="Señal Au+Ag combinada (mg)")
+    numero_ensayo: int = Field(default=1, ge=1, le=10)
+
+
+class CompletarRecuperacionRequest(BaseModel):
+    """
+    Para que laboratorista complete un PENDIENTE.
+
+    Flujo A (reconocimiento de planta): proveer muestras[].
+    El service calcula ley_cola y ley_cola_ag automáticamente.
+    Flujo B (fallback / certificado externo): proveer ley_cola directo.
+    """
+
+    # Flujo A — muestras crudas
+    muestras: list[MuestraReconocimientoIn] | None = Field(
+        default=None,
+        description="Muestras de reconocimiento. Si se proveen, ley_cola se calcula automáticamente.",
+    )
+    # Flujo B — fallback
+    ley_cola: Decimal | None = Field(
+        default=None, description="Ley cola directa (Oz/TC). Solo si no hay muestras."
+    )
+    # Solución (líquido)
+    ley_liquido: Decimal | None = Field(default=None, description="Ley líquido Au (Oz/TC).")
+    solucion_ag_g_m3: Decimal | None = Field(
+        default=None, description="Concentración Ag en solución (g/m³)."
+    )
+    fecha_analisis: date | None = None
 
 
 # ── Acciones de Comercial ─────────────────────────────────────────────────────
@@ -170,6 +286,9 @@ class LoteLabOut(BaseModel):
     tiene_prueba_pendiente: bool = False
     cert_ley_url: str | None = None
     cert_rec_url: str | None = None
+    cert_reconocimiento_url: str | None = None
+    ley_ag_gr_tm: float | None = None  # ley de plata vigente (g/TM), None si no hay
+    ley_ag_oz_tc: float | None = None
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

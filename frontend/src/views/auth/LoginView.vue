@@ -4,8 +4,8 @@
     <!-- Logo -->
     <div class="logo-area">
       <div class="logo-placeholder">
-        <!-- Reemplazar con: <img src="@/assets/logo.png" alt="Logo" class="logo-img" /> -->
-        <span class="logo-symbol">✹</span>
+        <img src="@/assets/logo invermin.png" alt="Logo" class="logo-img" />
+
       </div>
       <p class="app-title">INVERMIN PAITITI</p>
     </div>

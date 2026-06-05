@@ -1,11 +1,21 @@
 <template>
   <div class="page-container">
     <header class="page-header">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+      <div class="header-title-row">
+        <Beaker class="header-icon" :size="26" />
         <div>
           <h1 class="page-title">Pruebas Metalúrgicas</h1>
           <p class="page-subtitle">Gestión y registro de análisis de preparación</p>
         </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <button
+          class="btn-secondary"
+          style="font-size:0.78rem;padding:0.4rem 0.9rem"
+          @click="router.push('/pruebas/recuperaciones')"
+        >
+          Ver Recuperaciones →
+        </button>
         <button
           class="btn-refresh"
           @click="cargarDatos"
@@ -16,6 +26,8 @@
         </button>
       </div>
     </header>
+
+    <AlertasBanner modulo="PRUEBAS" con-observaciones />
 
     <!-- Offline queue -->
     <div v-if="pruebasOffline.length > 0" class="offline-section">
@@ -181,10 +193,11 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
+import AlertasBanner from '@/components/AlertasBanner.vue'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
 import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'
-import { WifiOff, Tag, RefreshCw } from 'lucide-vue-next'
+import { WifiOff, Tag, RefreshCw, Beaker } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()

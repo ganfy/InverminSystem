@@ -42,8 +42,13 @@ export interface GuardarCertResult {
 }
 
 export interface LeyComercialCalc {
-    ley_planta: number
-    ley_comercial: number
+    ley_planta: number              // base para factores = average(planta+externo)
+    ley_planta_solo: number | null  // solo lab propio — para display
+    ley_externo: number | null      // labs externos — para display
+    ley_comercial: number           // ley_base → factores aplicados
+    ley_minero: number | null
+    ley_promedio: number | null     // (comercial+minero)/2 o clamp dirimencia
+    tiene_dirimencia: boolean
     descuento_aplicado: number
     factor_aplicado: number
     ajuste_rango: boolean
@@ -71,6 +76,27 @@ export interface SyncResultado {
     error: string | null
 }
 
+export interface AnalisisAgCreate {
+    au_ag_mg: number
+    au_mg: number
+    peso_muestra: number
+    laboratorio: string
+    fecha_analisis?: string | null
+}
+
+export interface AnalisisAgOut {
+    id: number
+    lote_id: number
+    lote_ip: string | null
+    laboratorio: string
+    ley_ag_gr_tm: number
+    ley_ag_oz_tc: number
+    fecha_analisis: string | null
+    vigente: boolean
+    creado_por: number
+    creado_en: string
+}
+
 export const laboratorioApi = {
 
     // ── Vista por CIP (Laboratorista + Comercial) ─────────────────────────────
@@ -85,14 +111,21 @@ export const laboratorioApi = {
         return data
     },
 
-    async detalleLote(ip: string): Promise<LoteLabOut> {
-        const { data } = await api.get(`/laboratorio/lotes/${ip}`)
+    async detalleLote(ip: string, material?:string): Promise<LoteLabOut> {
+        const { data } = await api.get(`/laboratorio/lotes/${ip}`, {
+            params: material ? { material } : undefined,
+        })
         return data
     },
 
     // ── Análisis de Ley ───────────────────────────────────────────────────────
     async registrarLey(datos: AnalisisLeyCreate): Promise<AnalisisLeyOut> {
         const { data } = await api.post('/laboratorio/ley', datos)
+        return data
+    },
+
+    async registrarLeyAg(analisisId: number, datos: AnalisisAgCreate): Promise<AnalisisAgOut> {
+        const { data } = await api.post(`/laboratorio/ley/${analisisId}/ag`, datos)
         return data
     },
 
@@ -251,6 +284,21 @@ export const laboratorioApi = {
     /** Genera y guarda el cert de recuperación en storage del servidor */
     async guardarCertificadoRec(ip: string): Promise<GuardarCertResult> {
         const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-recuperacion`)
+        return data
+    },
+
+    async previewCertReconocimientoPdf(ip: string): Promise<void> {
+        const response = await api.get(
+            `/laboratorio/lotes/${ip}/guardar-certificado-reconocimiento?inline=true`,
+            { responseType: 'blob' },
+        )
+        const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+        window.open(url, '_blank')
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    },
+
+    async guardarCertReconocimiento(ip: string): Promise<GuardarCertResult> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-reconocimiento`)
         return data
     },
 

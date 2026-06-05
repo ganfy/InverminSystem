@@ -15,6 +15,7 @@ from pathlib import Path
 
 from app.models.enums import EstadoRecuperacion, OrigenDatos, TipoAnalisis, TipoMuestra
 from app.models.models import (
+    AnalisisDetalle,
     AnalisisLey,
     AnalisisRecuperacion,
     Lote,
@@ -24,6 +25,8 @@ from app.models.models import (
     SesionDescarga,
 )
 from app.schemas.laboratorio import (
+    AnalisisAgCreate,
+    AnalisisAgOut,
     AnalisisLeyCreate,
     AnalisisLeyOut,
     AnalisisRecuperacionCreate,
@@ -37,16 +40,14 @@ from app.schemas.laboratorio import (
     SyncLaboratorioResponse,
     SyncResultado,
 )
+from app.services.config_calculo import get_constantes
 from app.services.pruebas import calcular_ley_planta
 from fastapi import UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-FACTOR_OZ_TC = Decimal("34.2857")
 STORAGE_PATH = Path(os.getenv("STORAGE_PATH", "storage"))
 TIPOS_PERMITIDOS = {"pdf", "jpg", "jpeg", "png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
-UMBRAL_VOLADO = 0.100
-
 
 # ── Helpers de cálculo ────────────────────────────────────────────────────────
 
@@ -55,8 +56,8 @@ def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
     return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.0001"))
 
 
-def _calcular_ley_gr_tm(ley_final: Decimal) -> Decimal:
-    return (Decimal(str(ley_final)) * FACTOR_OZ_TC).quantize(Decimal("0.001"))
+def _calcular_ley_gr_tm(ley_final: Decimal, factor_oz_tc: Decimal) -> Decimal:
+    return (Decimal(str(ley_final)) * factor_oz_tc).quantize(Decimal("0.001"))
 
 
 def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
@@ -66,11 +67,63 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.tipo_analisis == TipoAnalisis.MINERO,
+            AnalisisLey.material == "Au",
             AnalisisLey.vigente == True,  # noqa: E712
         )
         .first()
     )
     return a.ley_final if a else None
+
+
+def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
+    """Solo análisis tipo 'planta' (lab propio). Para display."""
+    analisis = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipo_analisis == TipoAnalisis.PLANTA,
+            AnalisisLey.material == "Au",
+        )
+        .all()
+    )
+    if not analisis:
+        return None
+    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
+    return (total / len(analisis)).quantize(Decimal("0.0001"))
+
+
+def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
+    """Solo análisis tipo 'externo'. Para display."""
+    analisis = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipo_analisis == TipoAnalisis.EXTERNO,
+            AnalisisLey.material == "Au",
+        )
+        .all()
+    )
+    if not analisis:
+        return None
+    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
+    return (total / len(analisis)).quantize(Decimal("0.0001"))
+
+
+def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
+    """Ley del análisis de dirimencia vigente, si existe."""
+    a = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.tipo_analisis == TipoAnalisis.DIRIMENCIA,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.material == "Au",
+        )
+        .first()
+    )
+    return Decimal(str(a.ley_final)) if a and a.ley_final else None
 
 
 def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
@@ -81,6 +134,14 @@ def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
 
     rows = db.query(Usuario.id, Usuario.nombre_completo).filter(Usuario.id.in_(ids)).all()
     return {r.id: r.nombre_completo for r in rows}
+
+
+def _ag_fields_for_lote(db: Session, lote_id: int) -> dict:
+    resultado = obtener_ley_ag_vigente(db, lote_id)
+    if resultado is None:
+        return {"ley_ag_gr_tm": None, "ley_ag_oz_tc": None}
+    gr_tm, oz_tc = resultado
+    return {"ley_ag_gr_tm": float(gr_tm), "ley_ag_oz_tc": float(oz_tc)}
 
 
 # ── Serializadores ────────────────────────────────────────────────────────────
@@ -99,7 +160,9 @@ def _ley_out(
         material=a.material or "Au",
         ley_fino=a.ley_fino or Decimal("0"),
         ley_grueso=a.ley_grueso or Decimal("0"),
-        ley_final=a.ley_final or Decimal("0"),
+        ley_final=(a.ley_fino or Decimal("0"))
+        if (a.material == "Ag" and not a.ley_final)
+        else (a.ley_final or Decimal("0")),
         ley_gr_tm=a.ley_gr_tm or Decimal("0"),
         vigente=a.vigente,
         fecha_analisis=a.fecha_analisis,
@@ -123,6 +186,7 @@ def _rec_out(
         ley_cabeza=a.ley_cabeza if a.ley_cabeza is not None else Decimal("0"),
         ley_cola=a.ley_cola,
         ley_liquido=a.ley_liquido,
+        solucion_ag_g_m3=a.solucion_ag_g_m3,
         recuperacion=a.recuperacion,
         estado=a.estado,
         vigente=a.vigente,
@@ -232,7 +296,7 @@ def obtener_cips_laboratorio(
 # ── Vista Comercial: lista por Lote/IP ────────────────────────────────────────
 
 
-def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
+def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) -> LoteLabOut:
     try:
         proveedor = lote.sesion.provacop.proveedor.razon_social
     except AttributeError:
@@ -258,7 +322,10 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
     )
     # Separar: registros de cert interno vs análisis reales
     analisis_ley = [
-        a for a in todos_analisis_ley if a.tipo_analisis not in (TipoAnalisis.COMERCIAL,)
+        a
+        for a in todos_analisis_ley
+        if a.tipo_analisis not in (TipoAnalisis.COMERCIAL,)
+        and (material is None or a.material == material)
     ]
     cert_ley_rec = next(
         (a for a in todos_analisis_ley if a.tipo_analisis == TipoAnalisis.COMERCIAL and a.vigente),
@@ -278,6 +345,14 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
             a
             for a in todos_analisis_rec
             if a.estado == EstadoRecuperacion.CERT_COMERCIAL and a.vigente
+        ),
+        None,
+    )
+    cert_reconocimiento_record = next(
+        (
+            a
+            for a in todos_analisis_rec
+            if a.estado == EstadoRecuperacion.CERT_RECONOCIMIENTO and a.vigente
         ),
         None,
     )
@@ -303,17 +378,6 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
         c.codigo_cip not in cips_con_rec_vigente for c in cips_recuperacion
     )
 
-    # Debug
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.info(
-        "cert_ley_url=%s | cert_rec_url=%s | lote=%s",
-        cert_ley_rec.certificado_url if cert_ley_rec else None,
-        cert_rec_record.certificado_url if cert_rec_record else None,
-        lote.ip,
-    )
-
     return LoteLabOut(
         ip=lote.ip,
         lote_id=lote.id,
@@ -329,10 +393,14 @@ def _build_lote_lab_out(db: Session, lote: Lote) -> LoteLabOut:
             _rec_out(a, lote.ip, nombres.get(a.creado_por)) for a in analisis_rec
         ],
         tiene_dirimencia=bool(lote.dirimencia),
+        **_ag_fields_for_lote(db, lote.id),
         tiene_prueba_pendiente=tiene_prueba_pendiente,
         tiene_cip_listo_sin_enviar=tiene_cip_listo_sin_enviar,
         cert_ley_url=cert_ley_rec.certificado_url if cert_ley_rec else None,
         cert_rec_url=cert_rec_record.certificado_url if cert_rec_record else None,
+        cert_reconocimiento_url=cert_reconocimiento_record.certificado_url
+        if cert_reconocimiento_record
+        else None,
     )
 
 
@@ -358,7 +426,7 @@ def obtener_lotes_laboratorio(db: Session) -> list[LoteLabOut]:
     return [_build_lote_lab_out(db, lote) for lote in lotes]
 
 
-def obtener_detalle_lote(db: Session, ip: str) -> LoteLabOut | None:
+def obtener_detalle_lote(db: Session, ip: str, material: str | None = None) -> LoteLabOut | None:
     lote = (
         db.query(Lote)
         .options(
@@ -372,7 +440,7 @@ def obtener_detalle_lote(db: Session, ip: str) -> LoteLabOut | None:
     )
     if not lote:
         return None
-    return _build_lote_lab_out(db, lote)
+    return _build_lote_lab_out(db, lote, material=material)
 
 
 # ── Registro de análisis ──────────────────────────────────────────────────────
@@ -405,8 +473,18 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     #     for p in previos:
     #         p.vigente = False
 
+    # Para Ag: garantizar ley_grueso=0, desactivar Ag anterior vigente
+    if datos.material == "Ag":
+        datos.ley_grueso = 0.0
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == mapeo.lote_id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        ).update({"vigente": False}, synchronize_session="fetch")
+
     ley_final = _calcular_ley_final(datos.ley_fino, datos.ley_grueso)
-    ley_gr_tm = _calcular_ley_gr_tm(ley_final)
+    constantes = get_constantes(db)
+    ley_gr_tm = _calcular_ley_gr_tm(ley_final, constantes.factor_oz_tc)
 
     nuevo = AnalisisLey(
         lote_id=mapeo.lote_id,
@@ -426,6 +504,10 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
+    if datos.material == "Ag":
+        _crear_detalle_ag(db, nuevo.id, datos)
+    else:
+        _crear_detalles_newmont(db, nuevo.id, datos)
     return nuevo
 
 
@@ -441,7 +523,6 @@ def registrar_ley_por_ip(
     el laboratorio de planta. La dirimencia se registra cuando ya se tiene
     el CIP pero se invoca desde la vista por IP para simplificar el flujo.
     """
-    from app.models.models import Lote
 
     if datos.tipo_analisis not in (TipoAnalisis.MINERO, TipoAnalisis.DIRIMENCIA):
         raise ValueError("Este endpoint solo acepta tipo_analisis 'minero' o 'dirimencia'")
@@ -463,8 +544,17 @@ def registrar_ley_por_ip(
     #     for p in previos:
     #         p.vigente = False
 
+    if datos.material == "Ag":
+        datos.ley_grueso = 0.0
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == lote.id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        ).update({"vigente": False}, synchronize_session="fetch")
+
     ley_final = _calcular_ley_final(Decimal(str(datos.ley_fino)), Decimal(str(datos.ley_grueso)))
-    ley_gr_tm = _calcular_ley_gr_tm(ley_final)
+    constantes = get_constantes(db)
+    ley_gr_tm = _calcular_ley_gr_tm(ley_final, constantes.factor_oz_tc)
 
     nuevo = AnalisisLey(
         lote_id=lote.id,
@@ -484,6 +574,9 @@ def registrar_ley_por_ip(
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
+    if datos.material == "Ag":
+        _crear_detalle_ag(db, nuevo.id, datos)
+
     return nuevo
 
 
@@ -620,15 +713,174 @@ def enviar_recuperacion_interna(
     return nuevo
 
 
-def completar_recuperacion(
-    db: Session,
-    analisis_id: int,
-    datos: CompletarRecuperacionRequest,
+def _calcular_ley_reco_gr_tm(mineral_mg: Decimal, peso_g: Decimal) -> Decimal:
+    """ley (Gr/TM) = mineral_mg / peso_g * 1000"""
+    if peso_g == 0:
+        raise ValueError("El peso de la muestra no puede ser 0")
+    return (Decimal(str(mineral_mg)) / Decimal(str(peso_g)) * 1000).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
+
+
+def _promedio_decimal(*values) -> Decimal | None:
+    vals = [Decimal(str(v)) for v in values if v is not None]
+    if not vals:
+        return None
+    return (sum(vals) / len(vals)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _procesar_muestras_reconocimiento(
+    db: "Session",
+    recuperacion_id: int,
+    muestras,  # list[MuestraReconocimientoIn]
     usuario_id: int,
-) -> AnalisisRecuperacion:
+) -> "tuple[Decimal | None, Decimal | None]":
+    """
+    Crea 3 filas en analisis_detalle por cada muestra física:
+      AU1  : mineral_mg=au1_mg, ley=ley_au1 (Gr/TM)
+      AU2  : mineral_mg=au2_mg, ley=ley_au2 (Gr/TM)
+      AU_AG: mineral_mg=au_ag_mg, ley=ley_ag (Gr/TM)
+    Retorna (ley_cola_oz_tc, ley_cola_ag_gr_tm).
+    ley_cola_oz_tc = promedio de avg(Au1,Au2) por muestra / 34.2857
+    """
+    constantes = get_constantes(db)
+    leyes_au_gr_tm: list[Decimal] = []
+    leyes_ag_gr_tm: list[Decimal] = []
+
+    for m in muestras:
+        peso = Decimal(str(m.peso_g))
+
+        ley_au1 = _calcular_ley_reco_gr_tm(m.au1_mg, peso)
+        ley_au2 = _calcular_ley_reco_gr_tm(m.au2_mg, peso)
+        ley_au_avg = _promedio_decimal(ley_au1, ley_au2)
+
+        # Ag = señal neta: (Au+Ag_mg - avg(Au1,Au2)_mg) / peso * 1000
+        au_avg_mg = (Decimal(str(m.au1_mg)) + Decimal(str(m.au2_mg))) / 2
+        ag_mg = max(
+            Decimal("0"), Decimal(str(m.au_ag_mg)) - au_avg_mg - constantes.blank_correction_ag
+        )
+        ley_ag = _calcular_ley_reco_gr_tm(ag_mg, peso) if ag_mg > 0 else Decimal("0")
+
+        leyes_au_gr_tm.append(ley_au_avg)
+        leyes_ag_gr_tm.append(ley_ag)
+
+        db.add(
+            AnalisisDetalle(
+                recuperacion_id=recuperacion_id,
+                origen="AU1",
+                peso=peso,
+                mineral_mg=Decimal(str(m.au1_mg)),
+                ley=ley_au1,
+                numero_ensayo=m.numero_ensayo,
+            )
+        )
+        db.add(
+            AnalisisDetalle(
+                recuperacion_id=recuperacion_id,
+                origen="AU2",
+                peso=peso,
+                mineral_mg=Decimal(str(m.au2_mg)),
+                ley=ley_au2,
+                numero_ensayo=m.numero_ensayo,
+            )
+        )
+        db.add(
+            AnalisisDetalle(
+                recuperacion_id=recuperacion_id,
+                origen="AU_AG",
+                peso=peso,
+                mineral_mg=Decimal(str(m.au_ag_mg)),
+                ley=None,
+                numero_ensayo=m.numero_ensayo,
+            )
+        )
+
+    db.flush()
+
+    ley_cola_gr_tm = _promedio_decimal(*leyes_au_gr_tm)
+    ley_cola_oz_tc = (
+        (ley_cola_gr_tm / constantes.factor_oz_tc).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
+        if ley_cola_gr_tm
+        else None
+    )
+    ley_cola_ag = _promedio_decimal(*leyes_ag_gr_tm)
+    return ley_cola_oz_tc, ley_cola_ag
+
+
+def _crear_detalles_newmont(
+    db: "Session",
+    analisis_id: int,
+    datos,  # AnalisisLeyCreate — necesita campo opcional muestras_detalle
+) -> None:
+    """
+    Crea hasta 3 filas en analisis_detalle con los datos crudos del triple sampling.
+    Solo si el payload incluye muestras_detalle (campo opcional, no breaking change).
+    Orden esperado: [FINO1, GRUESO, FINO2]
+    """
+    muestras = getattr(datos, "muestras_detalle", None)
+    if not muestras:
+        return
+
+    mapa_origen = {0: "FINO1", 1: "GRUESO", 2: "FINO2"}
+    for i, m in enumerate(muestras):
+        db.add(
+            AnalisisDetalle(
+                analisis_id=analisis_id,
+                origen=mapa_origen.get(i, f"MUESTRA_{i+1}"),
+                peso=Decimal(str(m.peso_g)),
+                mineral_mg=Decimal(str(m.au_mg)),
+                ley=Decimal(str(m.ley_oz_tc)),
+                numero_ensayo=1,
+            )
+        )
+    db.flush()
+
+
+def _crear_detalle_ag(
+    db: "Session",
+    analisis_id: int,
+    datos,  # AnalisisLeyCreate | AnalisisLeyPorIPCreate
+) -> None:
+    """
+    Crea 1 fila en analisis_detalle para análisis de Ag.
+    origen = datos.punto (CABEZA | COLA | LIQUIDO).
+    ley almacenada en oz/TC (ley_fino del payload).
+    """
+    if getattr(datos, "material", "Au") != "Ag":
+        return
+    punto = getattr(datos, "punto", None)
+    if not punto:
+        return
+    db.add(
+        AnalisisDetalle(
+            analisis_id=analisis_id,
+            origen=punto,  # CABEZA | COLA | LIQUIDO
+            ley=Decimal(str(datos.ley_fino)),
+            numero_ensayo=1,
+        )
+    )
+    db.flush()
+
+
+def completar_recuperacion(
+    db: "Session",
+    analisis_id: int,
+    datos: "CompletarRecuperacionRequest",
+    usuario_id: int,
+) -> "AnalisisRecuperacion":
     """
     Laboratorista completa un análisis de recuperación PENDIENTE.
-    Ingresa ley_cola y ley_liquido; el sistema calcula recuperacion automáticamente.
+
+    Flujo A — con muestras crudas (reconocimiento de planta):
+      Requiere datos.muestras (list[MuestraReconocimientoIn]).
+      Crea filas en analisis_detalle (AU1, AU2, AU_AG) y calcula:
+        ley_cola        = promedio leyes Au (convertido a Oz/TC)
+
+    Flujo B — fallback (certificado externo / sin muestras):
+      Requiere datos.ley_cola directo.
+      No crea filas de detalle.
     """
     a = (
         db.query(AnalisisRecuperacion)
@@ -643,15 +895,84 @@ def completar_recuperacion(
     if not a.vigente:
         raise ValueError("No se puede completar un análisis descartado")
 
-    if datos.ley_cola >= a.ley_cabeza:
+    # ── Determinar ley_cola ───────────────────────────────────────────────────
+    muestras = getattr(datos, "muestras", None)
+    if muestras:
+        ley_cola, ley_cola_ag = _procesar_muestras_reconocimiento(db, a.id, muestras, usuario_id)
+    else:
+        if datos.ley_cola is None:
+            raise ValueError("Debe ingresar muestras o ley_cola directamente")
+        ley_cola = Decimal(str(datos.ley_cola))
+        ley_cola_ag = None
+
+    if ley_cola >= a.ley_cabeza:
         raise ValueError("La ley cola debe ser estrictamente menor a la ley cabeza")
 
-    a.ley_cola = datos.ley_cola
+    a.ley_cola = ley_cola
     a.ley_liquido = datos.ley_liquido
+    a.solucion_ag_g_m3 = getattr(datos, "solucion_ag_g_m3", None)
     a.estado = EstadoRecuperacion.COMPLETADO
     a.fecha_analisis = datos.fecha_analisis
     a.modificado_por = usuario_id
     db.flush()
+
+    # ── Generar Análisis de Ley de Plata (Ag) Automáticamente ──────────
+    if ley_cola_ag is not None:
+        # Obtenemos el análisis Au padre para heredar el tipo de análisis
+        analisis_au = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.lote_id == a.lote_id,
+                AnalisisLey.material == "Au",
+                AnalisisLey.vigente,
+            )
+            .first()
+        )
+
+        tipo_an = analisis_au.tipo_analisis if analisis_au else TipoAnalisis.PLANTA
+
+        # Inactivamos cualquier análisis de Ag previo del lote
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == a.lote_id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        ).update({"vigente": False}, synchronize_session="fetch")
+
+        # Calculamos Ag Oz/TC (ley_fino) a partir de Gr/TM
+        constantes = get_constantes(db)
+        ley_oz_tc = (ley_cola_ag / constantes.factor_oz_tc).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
+
+        nuevo_ag = AnalisisLey(
+            lote_id=a.lote_id,
+            cip=a.cip,
+            laboratorio=a.laboratorio,
+            tipo_analisis=tipo_an,
+            material="Ag",
+            ley_fino=float(ley_oz_tc),
+            ley_grueso=0.0,
+            ley_final=float(ley_oz_tc),
+            ley_gr_tm=float(ley_cola_ag),
+            origen_datos=OrigenDatos.MANUAL,
+            fecha_analisis=datos.fecha_analisis,
+            vigente=True,
+            creado_por=usuario_id,
+        )
+        db.add(nuevo_ag)
+        db.flush()
+
+        # Guardamos el detalle que justifica la ley de Ag creada
+        db.add(
+            AnalisisDetalle(
+                analisis_id=nuevo_ag.id,
+                origen="COLA",
+                ley=ley_oz_tc,
+                numero_ensayo=1,
+            )
+        )
+        db.flush()
+
     db.refresh(a)
     return a
 
@@ -719,7 +1040,7 @@ def eliminar_analisis_recuperacion(
     if a.eliminado:
         raise ValueError("El analisis ya esta eliminado")
     a.eliminado = True
-    a.eliminado_en = datetime.utcnow()
+    a.eliminado_en = datetime.now()
     a.eliminado_por = usuario_id
     if a.vigente:
         a.vigente = False
@@ -1141,7 +1462,9 @@ def sincronizar_batch(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
+def calcular_ley_comercial(
+    ley_planta: Decimal, params, umbral_volado: Decimal | None = None
+) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
     params: instancia de ParametrosComerciales (puede ser None → sin reglas).
@@ -1165,9 +1488,10 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
             "detalle": "Sin parametros comerciales configurados para este proveedor-acopiador",
         }
 
-    q = Decimal("0.0001")
+    q = Decimal("0.001")
     ley = ley_planta
     descuento = Decimal("0")
+    factor = Decimal("1")
     detalle_pasos = []
 
     # Regla 1: descuento si ley < límite comercial
@@ -1183,19 +1507,19 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
             )
 
     # Regla 2: factor porcentual aplicado a ley_planta (sin clamping de rango)
-    factor = Decimal("1")
-    if params.porcentaje_ley_comercial:
+    elif params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
         ley_antes = ley
         ley = (ley * factor).quantize(q, rounding=ROUND_HALF_UP)
         detalle_pasos.append(
-            f"Factor {float(factor):.3f}: {float(ley_antes):.4f} x {float(factor):.3f} = {float(ley):.4f}"
+            f"Factor {float(factor):.3f}: {float(ley_antes):.3f} x {float(factor):.3f} = {float(ley):.3f}"
         )
 
     # Check volado:
-    if ley < UMBRAL_VOLADO:
+    _umbral = umbral_volado if umbral_volado is not None else Decimal("0.100")
+    if ley < _umbral:
         detalle_pasos.append(
-            f"Resultado {float(ley):.4f} < umbral volado {float(UMBRAL_VOLADO):.4f}: se marca como volado"
+            f"Resultado {float(ley):.3f} < umbral volado {float(_umbral):.4f}: se marca como volado"
         )
         ley = Decimal("0")
 
@@ -1208,3 +1532,120 @@ def calcular_ley_comercial(ley_planta: Decimal, params) -> dict:
         "sin_parametros": False,
         "detalle": " | ".join(detalle_pasos) if detalle_pasos else "Sin ajustes aplicados",
     }
+
+
+# ── Análisis de Plata (Ag) ────────────────────────────────────────────────────
+
+
+def _calcular_ley_ag(
+    au_ag_mg: float,
+    au_mg: float,
+    peso_muestra: float,
+    factor_oz_tc: Decimal,
+    blank_correction: Decimal,
+) -> tuple[Decimal, Decimal]:
+    """
+    Retorna (ley_ag_gr_tm, ley_ag_oz_tc).
+    Fórmula: ley_ag_gr_tm = ((au_ag_mg - au_mg - blank_correction) * 1000) / peso_muestra
+    """
+    neto = Decimal(str(au_ag_mg)) - Decimal(str(au_mg)) - blank_correction
+    if neto < 0:
+        neto = Decimal("0")
+    ley_gr_tm = (neto * 1000 / Decimal(str(peso_muestra))).quantize(
+        Decimal("0.001"), rounding=ROUND_HALF_UP
+    )
+    ley_oz_tc = (ley_gr_tm / factor_oz_tc).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    return ley_gr_tm, ley_oz_tc
+
+
+def registrar_analisis_ag(
+    db: Session,
+    analisis_au_id: int,
+    datos: "AnalisisAgCreate",
+    usuario_id: int,
+) -> "AnalisisAgOut":
+    """
+    Crea un AnalisisLey con material='Ag' vinculado al mismo lote que analisis_au_id.
+    Si ya existe un Ag vigente para ese lote, lo marca como no vigente primero.
+    """
+    from app.models.models import AnalisisLey
+    from app.schemas.laboratorio import AnalisisAgOut
+
+    analisis_au = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_au_id).first()
+    if not analisis_au:
+        raise ValueError(f"Análisis Au {analisis_au_id} no encontrado")
+    if analisis_au.material != "Au":
+        raise ValueError("Solo se puede agregar Ag a análisis de material Au")
+
+    lote_id = analisis_au.lote_id
+
+    # Marcar Ag anterior como no vigente
+    db.query(AnalisisLey).filter(
+        AnalisisLey.lote_id == lote_id,
+        AnalisisLey.material == "Ag",
+        AnalisisLey.vigente == True,  # noqa: E712
+    ).update({"vigente": False}, synchronize_session="fetch")
+
+    constantes = get_constantes(db)
+    ley_gr_tm, ley_oz_tc = _calcular_ley_ag(
+        datos.au_ag_mg,
+        datos.au_mg,
+        datos.peso_muestra,
+        constantes.factor_oz_tc,
+        constantes.blank_correction_ag,
+    )
+
+    nuevo = AnalisisLey(
+        lote_id=lote_id,
+        cip=analisis_au.cip,
+        laboratorio=datos.laboratorio,
+        tipo_analisis=analisis_au.tipo_analisis,  # hereda tipo del Au padre
+        material="Ag",
+        ley_fino=0.0,
+        ley_grueso=0.0,
+        ley_final=float(ley_oz_tc),  # reutilizamos ley_final para Oz/TC de Ag
+        ley_gr_tm=float(ley_gr_tm),
+        origen_datos="manual",
+        fecha_analisis=datos.fecha_analisis,
+        vigente=True,
+        creado_por=usuario_id,
+    )
+    db.add(nuevo)
+    db.flush()
+
+    lote = db.query(Lote).filter(Lote.id == lote_id).first()
+    return AnalisisAgOut(
+        id=nuevo.id,
+        lote_id=lote_id,
+        lote_ip=lote.ip if lote else None,
+        laboratorio=nuevo.laboratorio,
+        ley_ag_gr_tm=ley_gr_tm,
+        ley_ag_oz_tc=ley_oz_tc,
+        fecha_analisis=nuevo.fecha_analisis,
+        vigente=nuevo.vigente,
+        creado_por=nuevo.creado_por,
+        creado_en=nuevo.creado_en,
+    )
+
+
+def obtener_ley_ag_vigente(db: Session, lote_id: int) -> tuple[Decimal, Decimal] | None:
+    """
+    Retorna (ley_ag_gr_tm, ley_ag_oz_tc) del análisis Ag vigente para el lote,
+    o None si no existe.
+    Usada por el servicio de liquidaciones.
+    """
+    a = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente == True,  # noqa: E712
+        )
+        .order_by(AnalisisLey.id.desc())
+        .first()
+    )
+    if not a:
+        return None
+    gr_tm = Decimal(str(a.ley_gr_tm)) if a.ley_gr_tm else Decimal("0")
+    oz_tc = Decimal(str(a.ley_final)) if a.ley_final else Decimal("0")
+    return gr_tm, oz_tc

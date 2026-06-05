@@ -4,16 +4,24 @@ import { ref } from 'vue'
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
 export interface Toast {
-  id:      number
+  id: number
   message: string
-  type:    ToastType
+  type: ToastType
 }
 
 export interface ConfirmOptions {
-  title:         string
-  message:       string
+  title: string
+  message: string
   confirmLabel?: string
-  danger?:       boolean
+  danger?: boolean
+}
+
+export interface PromptOptions {
+  title: string
+  message: string
+  placeholder?: string
+  inputType?: string   // 'password' | 'text'
+  confirmLabel?: string
 }
 
 export const useUiStore = defineStore('ui', () => {
@@ -48,8 +56,26 @@ export const useUiStore = defineStore('ui', () => {
     resolveFn = null
   }
 
+  // ── Prompt (input modal) ──────────────────────────────────
+  const prompt = ref<PromptOptions | null>(null)
+  let promptResolveFn: ((value: string | null) => void) | null = null
+
+  function showPrompt(opts: PromptOptions): Promise<string | null> {
+    prompt.value = opts
+    return new Promise(resolve => {
+      promptResolveFn = resolve
+    })
+  }
+
+  function resolvePrompt(value: string | null) {
+    prompt.value = null
+    promptResolveFn?.(value)
+    promptResolveFn = null
+  }
+
   return {
     toasts, toast, removeToast,
     confirm, showConfirm, resolveConfirm,
+    prompt, showPrompt, resolvePrompt,
   }
 })

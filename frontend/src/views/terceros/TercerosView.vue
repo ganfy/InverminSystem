@@ -2,10 +2,13 @@
   <div class="terceros-page">
 
     <!-- ── Encabezado ──────────────────────────────────────── -->
-    <div class="page-header">
-      <div class="page-header-left">
-        <h1 class="page-title">Terceros</h1>
-        <p class="page-subtitle">Proveedores y acopiadores registrados</p>
+    <header class="page-header">
+      <div class="header-title-row">
+        <Users class="header-icon" :size="26" />
+        <div>
+          <h1 class="page-title">Terceros</h1>
+          <p class="page-subtitle">Proveedores y acopiadores registrados</p>
+        </div>
       </div>
       <button
         v-if="puedeCrear"
@@ -15,7 +18,7 @@
         <PlusCircle :size="18" />
         <span>Registrar</span>
       </button>
-    </div>
+    </header>
 
     <!-- ── Filtros ─────────────────────────────────────────── -->
     <div class="filtros-bar">
@@ -161,6 +164,7 @@ import {
   RotateCcw,
   Ban,
   CheckCircle,
+  Users,
 } from 'lucide-vue-next'
 // ── Stores ────────────────────────────────────────────────────────────────────
 const store = useTercerosStore()

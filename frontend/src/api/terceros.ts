@@ -22,6 +22,9 @@ export interface ParametrosComerciales {
   dscto_ley_comercial: number | null
   porcentaje_ley_comercial: number | null
   riesgo_comercial: number | null
+  umbral_ag_oz_tc: number | null
+  rec_ag_pct: number | null
+  descuento_ag_usd: number | null
 }
 
 export interface ParametrosRespuesta extends ParametrosComerciales {

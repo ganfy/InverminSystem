@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from app.models.enums import TipoMuestra
@@ -79,6 +79,30 @@ class PruebaRecuperacionItem(BaseModel):
     fecha_salida: datetime | None
     ley_cabeza: Decimal  # ley planta calculada (snapshot al crear pending)
     tiene_analisis_recuperacion: bool = False
+
+
+# ── Recuperaciones (vista Pruebas: leyes de cola + recuperación) ─────────────
+
+
+class RecuperacionItem(BaseModel):
+    """Resultado de análisis de recuperación: leyes de cola y % recuperación.
+    Expuesto a TecnicoMuestreo sin mostrar ley_cabeza.
+    """
+
+    ip: str
+    cip: str | None = None
+    proveedor: str
+    fecha_analisis: date | None
+    # Ley cola sólidos
+    ley_cola_au_oz_tc: Decimal | None = None  # oz/TC (campo ley_cola de DB)
+    ley_cola_au_gr_tm: Decimal | None = None  # g/TM = oz_tc × 34.2857
+    ley_cola_ag_gr_tm: Decimal | None = None  # g/TM directo del campo
+    # Solución líquida (ambos en g/m³)
+    solucion_au_g_m3: Decimal | None = None  # ley_liquido × 34.2857
+    solucion_ag_g_m3: Decimal | None = None  # campo solucion_ag_g_m3
+    # Resultado
+    recuperacion: Decimal | None = None
+    vigente: bool
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

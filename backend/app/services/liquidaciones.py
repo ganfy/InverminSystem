@@ -24,6 +24,7 @@ from datetime import date, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any
 
+# pyrefly: ignore [missing-import]
 from app.models.enums import EstadoLiquidacion, EstadoLote, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
@@ -48,14 +49,13 @@ from app.schemas.liquidaciones import (
     LiquidacionResumenOut,
     LoteFinancieroOut,
 )
-from app.services.laboratorio import calcular_ley_comercial
-from app.services.pruebas import calcular_ley_planta
+from app.services.config_calculo import get_constantes
+from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
 from sqlalchemy.orm import Session, joinedload
 
 FACTOR = Decimal("1.1023")
 TROY_OZ = Decimal("31.1035")
 MIN_MAQUILA = Decimal("95")
-UMBRAL_VOLADO = Decimal("0.100")
 
 
 def _nombre_entidad(entidad) -> str:
@@ -86,9 +86,6 @@ def _calc_precio_x_tms(
     """col AB del Excel: ((oz*rec/100*(spot-riesgo)) - maquila - insumos + bono) * factor"""
     val_1 = oz_promedio * rec_liq / 100 * (spot - riesgo)
     val = val_1 - maquila - insumos + bono
-    print(
-        f"Debug: Precio x TMS - oz: {oz_promedio}, rec_liq: {rec_liq}, spot: {spot}, riesgo: {riesgo}, maquila: {maquila}, insumos: {insumos}, bono: {bono} => valor antes de factor: {val}, {val_1=}"
-    )
     return (val * FACTOR).quantize(Decimal("0.0001"))
 
 
@@ -126,9 +123,43 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisLey.lote_id == lote_id,
             AnalisisLey.tipo_analisis == TipoAnalisis.MINERO,
+            AnalisisLey.material == "Au",
             AnalisisLey.vigente == True,  # noqa: E712
         )
         .order_by(AnalisisLey.id.desc())
+        .first()
+    )
+    return Decimal(str(a.ley_final)) if a and a.ley_final else None
+
+
+def _ley_base_planta(db: Session, lote_id: int) -> Decimal | None:
+    """Promedio de análisis planta/externo vigentes. No incluye dirimencia."""
+    analisis = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
+            AnalisisLey.material == "Au",
+        )
+        .all()
+    )
+    if not analisis:
+        return None
+    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
+    return (total / len(analisis)).quantize(Decimal("0.0001"))
+
+
+def _ley_dirimencia_raw(db: Session, lote_id: int) -> Decimal | None:
+    """Ley final del análisis de dirimencia vigente, si existe."""
+    a = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_id,
+            AnalisisLey.tipo_analisis == TipoAnalisis.DIRIMENCIA,
+            AnalisisLey.material == "Au",
+            AnalisisLey.vigente == True,  # noqa: E712
+        )
         .first()
     )
     return Decimal(str(a.ley_final)) if a and a.ley_final else None
@@ -227,6 +258,7 @@ def _calcular_lote(
     rec_liq_override: Decimal | None,
     gasto_acopio_override: Decimal | None = None,
     gasto_consumo_override: Decimal | None = None,
+    spot_ag_usd: Decimal | None = None,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
@@ -283,9 +315,11 @@ def _calcular_lote(
     )
     insumos = gasto_acopio + gasto_consumo
 
-    # ── Ley Planta ────────────────────────────────────────────────────────────
-    ley_planta = calcular_ley_planta(db, lote.id)
-    if ley_planta is None:
+    # ── Ley Base Planta (solo planta/externo) y dirimencia ───────────────────
+    ley_paititi_raw = _ley_base_planta(db, lote.id)
+    ley_dirim_raw = _ley_dirimencia_raw(db, lote.id)
+
+    if ley_paititi_raw is None and ley_dirim_raw is None:
         alertas.append(
             AlertaLote(
                 tipo="SIN_LEY_PLANTA",
@@ -295,7 +329,10 @@ def _calcular_lote(
         )
         return {}, alertas
 
-    # ── Ley Comercial (usa logica existente de laboratorio) ───────────────────
+    # ley_planta para snapshot: ley paititi base (o dirimencia como fallback)
+    ley_planta = ley_paititi_raw if ley_paititi_raw is not None else ley_dirim_raw
+
+    # ── Ley Comercial (parámetros aplicados a ley paititi) ───────────────────
     lc_result = calcular_ley_comercial(ley_planta, params)
     oz_tc_comercial = max(
         Decimal("0"),
@@ -303,7 +340,8 @@ def _calcular_lote(
     )
 
     # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
-    if not lote.volado and oz_tc_comercial < UMBRAL_VOLADO:
+    constantes = get_constantes(db)
+    if not lote.volado and oz_tc_comercial < constantes.umbral_volado_oz_tc:
         lote.volado = True  # se persiste al commit de crear_liquidacion
     if lote.volado:
         oz_tc_comercial = Decimal("0")
@@ -320,12 +358,29 @@ def _calcular_lote(
             )
         )
 
-    # ── Promedio ──────────────────────────────────────────────────────────────
-    oz_promedio = (
-        ((oz_tc_comercial + oz_tc_minero) / 2).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
-        if oz_tc_minero
-        else oz_tc_comercial
-    )
+    # ── Promedio con lógica de dirimencia ────────────────────────────────────
+    # Sin dirimencia: promedio simple (paititi + minero) / 2
+    # Con dirimencia: clamp(dirimencia, min(paititi,minero), max(paititi,minero))
+    #   - dirimencia entre ambos  → se usa dirimencia directamente
+    #   - dirimencia > ley_minero → se usa ley_minero (cap)
+    #   - dirimencia < ley_paititi → se usa ley_paititi (piso)
+    if ley_dirim_raw is not None and oz_tc_minero:
+        lc_dir = calcular_ley_comercial(ley_dirim_raw, params)
+        oz_tc_dirimencia = max(
+            Decimal("0"),
+            Decimal(str(lc_dir["ley_comercial"])).quantize(Decimal("0.001"), rounding=ROUND_DOWN),
+        )
+        ley_low = min(oz_tc_comercial, oz_tc_minero)
+        ley_high = max(oz_tc_comercial, oz_tc_minero)
+        oz_promedio = max(ley_low, min(ley_high, oz_tc_dirimencia)).quantize(
+            Decimal("0.001"), rounding=ROUND_DOWN
+        )
+    elif oz_tc_minero:
+        oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(
+            Decimal("0.001"), rounding=ROUND_DOWN
+        )
+    else:
+        oz_promedio = oz_tc_comercial
 
     # ── Recuperacion ──────────────────────────────────────────────────────────
     if rec_liq_override is not None:
@@ -351,6 +406,39 @@ def _calcular_lote(
     )
     total_usd = _calc_total(precio_x_tms, tms)
     fino_recuperable = _calc_fino_recuperable(tms, rec_liq, oz_promedio)
+
+    # ── Plata (Ag) ────────────────────────────────────────────────────────────
+    # Parámetros contractuales (todos deben estar presentes para pagar Ag)
+    ag_result = obtener_ley_ag_vigente(db, lote.id)
+    ley_ag_gr_tm: Decimal | None = None
+    ley_ag_oz_tc: Decimal | None = None
+    valor_ag_usd = Decimal("0")
+    aplica_ag = False
+
+    umbral_ag = Decimal(str(params.umbral_ag_oz_tc)) if params and params.umbral_ag_oz_tc else None
+    rec_ag = Decimal(str(params.rec_ag_pct)) if params and params.rec_ag_pct else None
+    dscto_ag = (
+        Decimal(str(params.descuento_ag_usd))
+        if params and params.descuento_ag_usd is not None
+        else None
+    )
+
+    params_ag_completos = all(v is not None for v in (umbral_ag, rec_ag, dscto_ag))
+
+    if ag_result is not None and params_ag_completos and spot_ag_usd:
+        ley_ag_gr_tm, ley_ag_oz_tc = ag_result
+        if ley_ag_oz_tc >= umbral_ag:
+            # oz_ag_pagables = TMS × ley_ag_oz_tc × (rec_ag / 100)
+            oz_ag_pagables = (tms * ley_ag_oz_tc * rec_ag / 100).quantize(
+                Decimal("0.0001"), rounding=ROUND_HALF_UP
+            )
+            precio_neto_ag = spot_ag_usd - dscto_ag
+            if precio_neto_ag > 0:
+                valor_ag_usd = (oz_ag_pagables * precio_neto_ag).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                aplica_ag = True
+        # ley_ag_gr_tm se expone siempre que exista análisis (para mostrar en UI aunque no se pague)
 
     # ── Alertas no criticas ───────────────────────────────────────────────────
     if lote.volado:
@@ -399,6 +487,12 @@ def _calcular_lote(
         "fino_recuperable": fino_recuperable,
         "usa_dirimencia": lote.dirimencia,
         "alertas": alertas,
+        # Ag
+        "ley_ag_gr_tm": ley_ag_gr_tm if aplica_ag else None,
+        "ley_ag_oz_tc": ley_ag_oz_tc if aplica_ag else None,
+        "spot_ag_usd": spot_ag_usd if aplica_ag else None,
+        "valor_ag_usd": valor_ag_usd if aplica_ag else None,
+        "aplica_ag": aplica_ag,
         # campos para el modelo LiquidacionLote
         "tms_snapshot": tms,
         "tmh_snapshot": tmh,
@@ -477,6 +571,7 @@ def preview_liquidacion(
             item.rec_liq_override,
             item.gasto_acopio_override,
             item.gasto_consumo_override,
+            spot_ag_usd=req.spot_ag_usd,
         )
 
         if alertas:
@@ -501,6 +596,7 @@ def preview_liquidacion(
     total_tms = sum(lo.tms for lo in lotes_out)
     total_tmh = sum(lo.tmh for lo in lotes_out)
     total_oz = sum(lo.fino_recuperable for lo in lotes_out)
+    total_ag = sum((lo.valor_ag_usd or Decimal("0")) for lo in lotes_out)
 
     return LiquidacionPreviewOut(
         provacop_id=req.provacop_id,
@@ -516,6 +612,8 @@ def preview_liquidacion(
         count_lotes=len(lotes_out),
         alertas_globales=alertas_globales,
         puede_generar=puede_generar and bool(lotes_out),
+        total_ag_usd=total_ag,
+        hay_ag=total_ag > 0,
     )
 
 
@@ -563,7 +661,14 @@ def crear_liquidacion(
             raise ValueError(f"Lote {item.ip} no encontrado")
 
         snap, alertas = _calcular_lote(
-            db, lote, req.spot_usd, item.bono or Decimal("0"), item.rec_liq_override
+            db,
+            lote,
+            req.spot_usd,
+            item.bono or Decimal("0"),
+            item.rec_liq_override,
+            item.gasto_acopio_override,
+            item.gasto_consumo_override,
+            spot_ag_usd=req.spot_ag_usd,
         )
 
         if any(a.critico for a in alertas):
@@ -597,6 +702,9 @@ def crear_liquidacion(
             tmh_snapshot=snap["tmh"],
             humedad_snapshot=snap["pct_humedad"],
             sacos_snapshot=snap["sacos"],
+            ley_ag_gr_tm_snapshot=snap.get("ley_ag_gr_tm"),
+            spot_ag_snapshot=snap.get("spot_ag_usd"),
+            valor_ag_usd=snap.get("valor_ag_usd"),
             creado_por=usuario_id,
         )
         db.add(ll)
@@ -674,6 +782,19 @@ def cambiar_estado(
     if nuevo_estado == EstadoLiquidacion.PAGADA:
         liq.cerrado_por = usuario_id
         liq.fecha_cierre = datetime.now()
+
+    # Actualizar estado de lotes
+    for ll in liq.liquidacion_lotes:
+        lote = ll.lote
+        if lote:
+            if nuevo_estado == EstadoLiquidacion.FACTURADA:
+                lote.estado = EstadoLote.FACTURADO
+                lote.estado_modificado_por = usuario_id
+                lote.fecha_modificacion_estado = datetime.now()
+            elif nuevo_estado == EstadoLiquidacion.PAGADA:
+                lote.estado = EstadoLote.PAGADO
+                lote.estado_modificado_por = usuario_id
+                lote.fecha_modificacion_estado = datetime.now()
 
     db.commit()
     db.refresh(liq)
@@ -771,6 +892,10 @@ def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
         fino_recuperable=ll.fino_recuperable or Decimal("0"),
         usa_dirimencia=ll.usa_dirimencia or False,
         alertas=[],
+        ley_ag_gr_tm=ll.ley_ag_gr_tm_snapshot,
+        spot_ag_usd=ll.spot_ag_snapshot,
+        valor_ag_usd=ll.valor_ag_usd,
+        aplica_ag=bool(ll.valor_ag_usd and ll.valor_ag_usd > 0),
     )
 
 
@@ -796,7 +921,8 @@ def evaluar_volado(db: Session, lote_id: int, ley_planta: Decimal, usuario_id: i
     lote = db.query(Lote).filter(Lote.id == lote_id).first()
     if not lote:
         return False
-    if not lote.volado and ley_planta < UMBRAL_VOLADO:
+    constantes = get_constantes(db)
+    if not lote.volado and ley_planta < constantes.umbral_volado_oz_tc:
         lote.volado = True
         lote.modificado_por = usuario_id
         return True
@@ -840,26 +966,46 @@ def lotes_disponibles_para_liquidar(
         pesaje = _pesaje_principal(db, lote.id)
 
         # ── Ley y recuperación ──────────────────────────────────────
-        ley_planta = calcular_ley_planta(db, lote.id)
-        oz_tc_planta = float(ley_planta) if ley_planta else None
+        ley_paititi_r = _ley_base_planta(db, lote.id)
+        ley_dirim_r = _ley_dirimencia_raw(db, lote.id)
+        oz_tc_planta = float(ley_paititi_r) if ley_paititi_r else None
         oz_tc_minero_val = _ley_minero(db, lote.id)
         oz_tc_minero = float(oz_tc_minero_val) if oz_tc_minero_val else None
         usa_dir = bool(lote.dirimencia)
 
-        if ley_planta is not None and not lote.volado and ley_planta < UMBRAL_VOLADO:
-            lote.volado = True
-            db.flush()
-
-        # Ley comercial: dirimencia > promedio planta+minero
-        ley_comercial = None
+        constantes = get_constantes(db)
         params = lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
-        if lote.volado:
-            ley_comercial = Decimal("0")
-        elif usa_dir and ley_planta:
-            ley_comercial = oz_tc_planta
-        elif oz_tc_planta:
-            lc = calcular_ley_comercial(ley_planta, params)
-            ley_comercial = max(0.0, float(lc["ley_comercial"])) if lc else None
+        ley_comercial = None
+        ley_base = ley_paititi_r if ley_paititi_r is not None else ley_dirim_r
+
+        if ley_base is not None:
+            lc = calcular_ley_comercial(ley_base, params, constantes.umbral_volado_oz_tc)
+            oz_com_paititi = Decimal(
+                str(max(0.0, float(lc["ley_comercial"])) if lc else 0)
+            ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+
+            # Auto-set volado basado en ley comercial paititi
+            if not lote.volado and oz_com_paititi < constantes.umbral_volado_oz_tc:
+                lote.volado = True
+                db.flush()
+
+            if lote.volado:
+                ley_comercial = Decimal("0")
+            elif ley_dirim_r is not None and oz_tc_minero_val:
+                # Dirimencia: clamp(dir, min(paititi,minero), max(paititi,minero))
+                lc_dir = calcular_ley_comercial(ley_dirim_r, params, constantes.umbral_volado_oz_tc)
+                oz_dir = Decimal(
+                    str(max(0.0, float(lc_dir["ley_comercial"])) if lc_dir else 0)
+                ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+                ley_low = min(oz_com_paititi, oz_tc_minero_val)
+                ley_high = max(oz_com_paititi, oz_tc_minero_val)
+                ley_comercial = max(ley_low, min(ley_high, oz_dir))
+            elif oz_tc_minero_val:
+                ley_comercial = ((oz_com_paititi + oz_tc_minero_val) / 2).quantize(
+                    Decimal("0.001"), rounding=ROUND_DOWN
+                )
+            else:
+                ley_comercial = oz_com_paititi
 
         ley_comercial = (
             Decimal(str(ley_comercial)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)

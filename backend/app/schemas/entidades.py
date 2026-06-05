@@ -47,6 +47,13 @@ class ParametrosSchema(BaseModel):
     # Extra del Excel
     riesgo_comercial: float | None = None
 
+    # Plata (Ag) - opcionales
+    umbral_ag_oz_tc: float | None = None  # Umbral de plata en oz/TM para aplicar ajuste comercial
+    rec_ag_pct: float | None = None  # % de recuperación de plata para calcular valor a descontar
+    descuento_ag_usd: float | None = (
+        None  # Descuento fijo en USD por TM cuando se aplica ajuste de plata
+    )
+
 
 class ParametrosRespuesta(ParametrosSchema):
     id: int

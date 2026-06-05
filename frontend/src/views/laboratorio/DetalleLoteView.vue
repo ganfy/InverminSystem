@@ -43,18 +43,6 @@
             <span class="di-label">MATERIAL:</span>
             <span class="di-value">{{ lote.material ?? '-' }}</span>
           </div>
-          <div class="detalle-item" v-if="lote.ley_planta != null">
-            <span class="di-label">LEY PLANTA (promedio):</span>
-            <span class="di-value" style="color:var(--color-gold);font-family:var(--font-mono)">
-              {{ Number(lote.ley_planta).toFixed(4) }} oz/TC
-            </span>
-          </div>
-          <div class="detalle-item" v-if="lote.ley_minero != null">
-            <span class="di-label">LEY MINERO:</span>
-            <span class="di-value" style="font-family:var(--font-mono)">
-              {{ Number(lote.ley_minero).toFixed(4) }} oz/TC
-            </span>
-          </div>
         </div>
 
         <div v-if="lote.tiene_dirimencia" class="dirimencia-alert" style="margin-top:0.75rem">
@@ -65,9 +53,22 @@
       <!-- ═══════════════════════════════════════ TAB LEY ═══════════════════════════════════════ -->
       <template v-if="tabActual === 'ley'">
 
+        <!-- Toggle Au / Ag -->
+        <div class="material-toggle-bar">
+          <span class="mtog-label">MATERIAL:</span>
+          <div class="mtog-group">
+            <button :class="['mtog-btn', { active: materialFiltro === 'Au' }]" @click="materialFiltro = 'Au'">Au — Oro</button>
+            <button :class="['mtog-btn', 'mtog-btn--ag', { active: materialFiltro === 'Ag' }]" @click="materialFiltro = 'Ag'"><span class="ag-dot" style="margin-right:0.2rem">Ag</span> Plata</button>
+          </div>
+          <span v-if="materialFiltro === 'Ag' && leyAgDesdeRecuperacion" class="ag-registered">
+            <span class="ag-dot">Ag</span>
+            {{ Number(leyAgDesdeRecuperacion).toFixed(3) }} Gr/TM
+          </span>
+        </div>
+
         <div class="labs-grid">
           <div
-            v-for="a in lote.analisis_ley"
+            v-for="a in analisisFiltrado"
             :key="a.id"
             class="lab-card"
             :class="{
@@ -88,10 +89,43 @@
               <span class="lf-label">RESPONSABLE:</span>
               <span class="lf-value" style="color:var(--color-text-muted)">{{ a.creado_por_nombre }}</span>
             </div>
-            <div class="lab-field"><span class="lf-label">MALLA +140:</span>  <span class="lf-value">{{ a.ley_grueso }}</span></div>
-            <div class="lab-field"><span class="lf-label">MALLA -140:</span>  <span class="lf-value">{{ a.ley_fino }}</span></div>
-            <div class="lab-field"><span class="lf-label">LEY OZ/TC:</span>   <span class="lf-value highlight">{{ a.ley_final }}</span></div>
-            <div class="lab-field"><span class="lf-label">LEY GR/TM:</span>   <span class="lf-value">{{ a.ley_gr_tm }}</span></div>
+            <!-- Au: triple sampling con ambas unidades -->
+            <template v-if="a.material !== 'Ag'">
+              <div class="lab-field">
+                <span class="lf-label">MALLA +140:</span>
+                <span class="lf-value">
+                  {{ fmtOz(a.ley_grueso) }} oz/TC
+                  <span class="lf-unit-alt">/ {{ ozToGt(a.ley_grueso) }} g/TM</span>
+                </span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">MALLA −140:</span>
+                <span class="lf-value">
+                  {{ fmtOz(a.ley_fino) }} oz/TC
+                  <span class="lf-unit-alt">/ {{ ozToGt(a.ley_fino) }} g/TM</span>
+                </span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">LEY Au (OZ/TC):</span>
+                <span class="lf-value highlight">{{ fmtOz(a.ley_final) }}</span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">LEY Au (GR/TM):</span>
+                <span class="lf-value" style="color:var(--color-gold)">{{ fmtGt(a.ley_gr_tm) }}</span>
+              </div>
+            </template>
+
+            <!-- Ag: ley directa -->
+            <template v-else>
+              <div class="lab-field">
+                <span class="lf-label">LEY Ag (OZ/TC):</span>
+                <span class="lf-value highlight" style="color:#60a5fa">{{ fmtOz(a.ley_final) }}</span>
+              </div>
+              <div class="lab-field">
+                <span class="lf-label">LEY Ag (G/TM):</span>
+                <span class="lf-value" style="color:#93c5fd">{{ fmtGt(a.ley_gr_tm) }}</span>
+              </div>
+            </template>
 
             <div v-if="a.certificado_url" class="lab-field">
               <span class="lf-label">CERTIFICADO:</span>
@@ -113,6 +147,7 @@
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                     @change="adjuntarCertLey($event, a.id)" />
                 </label>
+
               </template>
               <button
                 v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
@@ -126,12 +161,12 @@
             </div>
           </div>
 
-          <div v-if="lote.analisis_ley.length === 0" class="estado-tabla sin-datos">
-            Sin análisis de ley registrados
+          <div v-if="analisisFiltrado.length === 0" class="estado-tabla sin-datos">
+            Sin análisis de {{ materialFiltro === 'Au' ? 'oro' : 'plata' }} registrados
           </div>
         </div>
 
-        <section class="card" v-if="lote.ley_planta != null">
+        <section class="card" v-if="tieneAnalisisLeyVigente">
           <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
             <span>
               LEY PLANTA
@@ -177,31 +212,76 @@
 
           <template v-else-if="leyComercialCalc">
             <div class="lc-grid">
+              <!-- Ley Planta — solo lab propio -->
               <div class="lc-item">
-                <span class="lc-label">LEY PLANTA (vigentes seleccionados):</span>
+                <span class="lc-label">
+                  LEY PLANTA
+                  <span style="font-size:0.7rem;color:var(--color-text-faint)">(lab propio)</span>
+                  <span v-if="excluidos.size > 0" class="badge-simulando" style="margin-left:0.4rem;font-size:0.6rem">SIM</span>
+                </span>
                 <span class="lc-valor mono" :class="{ gold: excluidos.size === 0 }">
-                  {{ leyPlantaSimulada != null ? Number(leyPlantaSimulada).toFixed(4) : '-' }} oz/TC
-                  <span v-if="excluidos.size > 0 && lote.ley_planta != null"
+                  {{ leyPlantaSoloSimulada != null ? Number(leyPlantaSoloSimulada).toFixed(4) : '-' }} oz/TC
+                  <span v-if="excluidos.size > 0 && leyComercialCalc?.ley_planta_solo != null"
                     style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.35rem">
-                    (antes: {{ Number(lote.ley_planta).toFixed(4) }})
+                    (antes: {{ Number(leyComercialCalc.ley_planta_solo).toFixed(4) }})
                   </span>
                 </span>
               </div>
-              <div class="lc-item" v-if="lote.ley_minero">
-                <span class="lc-label">LEY MINERO:</span>
-                <span class="lc-valor mono">{{ Number(lote.ley_minero).toFixed(4) }} oz/TC</span>
+
+              <!-- Ley Externo — labs externos (si hay) -->
+              <div class="lc-item" v-if="leyComercialCalc?.ley_externo != null">
+                <span class="lc-label">
+                  LEY EXTERNO
+                  <span style="font-size:0.7rem;color:var(--color-text-faint)">(labs externos)</span>
+                </span>
+                <span class="lc-valor mono">{{ Number(leyComercialCalc.ley_externo).toFixed(4) }} oz/TC</span>
               </div>
+
+              <div v-if="leyComercialCalc?.ley_externo != null"
+                style="grid-column:1/-1;border-top:1px dashed var(--color-border);opacity:0.4;margin:0.1rem 0" />
+
+              <!-- Ley Comercial -->
               <div class="lc-item">
-                <span class="lc-label">LEY COMERCIAL (a entregar):</span>
+                <span class="lc-label">
+                  LEY COMERCIAL
+                  <span style="font-size:0.7rem;color:var(--color-text-faint)">(a entregar)</span>
+                </span>
                 <span class="lc-valor mono gold">{{ leyComercialCalc.ley_comercial.toFixed(4) }} oz/TC</span>
               </div>
+
               <div class="lc-item" v-if="leyComercialCalc.descuento_aplicado">
                 <span class="lc-label">DESCUENTO APLICADO:</span>
                 <span class="lc-valor mono">- {{ leyComercialCalc.descuento_aplicado.toFixed(4) }}</span>
               </div>
               <div class="lc-item" v-if="leyComercialCalc.factor_aplicado !== 1">
                 <span class="lc-label">FACTOR:</span>
-                <span class="lc-valor mono"> x {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
+                <span class="lc-valor mono">× {{ leyComercialCalc.factor_aplicado.toFixed(3) }}</span>
+              </div>
+
+              <!-- Ley Minero -->
+              <div class="lc-item" v-if="leyComercialCalc?.ley_minero != null">
+                <span class="lc-label">LEY MINERO:</span>
+                <span class="lc-valor mono">{{ Number(leyComercialCalc.ley_minero).toFixed(4) }} oz/TC</span>
+              </div>
+
+              <div v-if="leyComercialCalc?.ley_promedio != null"
+                style="grid-column:1/-1;border-top:1px solid var(--color-border);opacity:0.5;margin:0.1rem 0" />
+
+              <!-- Ley Promedio — resultado final para liquidación -->
+              <div class="lc-item" v-if="leyComercialCalc?.ley_promedio != null">
+                <span class="lc-label">
+                  LEY PROMEDIO
+                  <span v-if="leyComercialCalc.tiene_dirimencia"
+                    style="font-size:0.7rem;color:var(--color-warning);margin-left:0.3rem">
+                    (clamp dirimencia)
+                  </span>
+                  <span v-else style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.3rem">
+                    (comercial + minero) / 2
+                  </span>
+                </span>
+                <span class="lc-valor mono" style="color:var(--color-gold);font-weight:700;font-size:1.05em">
+                  {{ Number(leyComercialCalc.ley_promedio).toFixed(4) }} oz/TC
+                </span>
               </div>
             </div>
 
@@ -240,8 +320,11 @@
         </div>
 
         <div class="acciones-lote" style="display:flex;gap:0.75rem;flex-wrap:wrap">
-          <button class="btn-primary" @click="abrirModalAgregarLeyNormal">
+          <button v-if="materialFiltro === 'Au'" class="btn-primary" @click="abrirModalAgregarLeyNormal">
             + Registrar nueva ley
+          </button>
+          <button v-if="materialFiltro === 'Ag'" class="btn-primary btn-ag" @click="abrirModalAgregarLeyAg">
+            <span class="ag-dot">Ag</span> Registrar Ley Ag
           </button>
           <button v-if="!lote.ley_minero" class="btn-secondary" @click="modalLeyMinero = true">
             Registrar Ley Minero
@@ -266,14 +349,20 @@
             <div class="modal-body">
               <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem">
                 Ley declarada por el proveedor. Si difiere más de 0.10 oz/TC
-                de la ley de planta, se habilitará la solicitud de dirimencia.
+                de la ley comercial, se habilitará la solicitud de dirimencia.
               </p>
+
+              <!-- Certificado opcional -->
               <div class="field" style="margin-bottom:0.75rem">
-                <label class="field-label">CERTIFICADO (opcional — pre-llena los campos)</label>
+                <label class="field-label">
+                  CERTIFICADO
+                  <span style="font-weight:400;opacity:.65;margin-left:0.3rem">(opcional — pre-llena los campos)</span>
+                </label>
                 <label
                   class="upload-zone-sm"
                   :class="{ uploading: extrayendoMinero }"
-                  style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 0.75rem;border:1px dashed var(--color-border);border-radius:6px;cursor:pointer"
+                  style="display:flex;align-items:center;gap:0.5rem;padding:0.6rem 0.75rem;
+                        border:1px dashed var(--color-border);border-radius:6px;cursor:pointer"
                 >
                   <span v-if="extrayendoMinero" class="spinner"></span>
                   <span v-else-if="archivoMinero" style="color:var(--color-success);font-size:0.82rem">
@@ -288,20 +377,95 @@
                   {{ errOcrMinero }}
                 </p>
               </div>
-              <div class="field">
+
+              <!-- Laboratorio con autocomplete -->
+              <div class="field" style="margin-bottom:0.75rem">
                 <label class="field-label">LABORATORIO / ORIGEN</label>
-                <input class="field-input" v-model="formLeyMinero.laboratorio" placeholder="Ej: Laboratorio del Minero" />
+                <input
+                  class="field-input"
+                  v-model="formLeyMinero.laboratorio"
+                  list="labs-minero-list"
+                  placeholder="Ej: Laboratorio del Minero"
+                  autocomplete="off"
+                />
+                <datalist id="labs-minero-list">
+                  <option v-for="lab in labsConocidos" :key="lab" :value="lab" />
+                </datalist>
               </div>
-              <div class="form-grid" style="grid-template-columns:1fr 1fr">
-                <div class="field">
-                  <label class="field-label">LEY FINO (Oz/TC)</label>
-                  <input type="number" class="field-input" v-model.number="formLeyMinero.ley_fino" step="0.0001" placeholder="0.0000" />
-                </div>
-                <div class="field">
-                  <label class="field-label">LEY GRUESO (Oz/TC)</label>
-                  <input type="number" class="field-input" v-model.number="formLeyMinero.ley_grueso" step="0.0001" placeholder="0.0000" />
-                </div>
+
+              <!-- Toggle: modo de ingreso -->
+              <div style="display:flex;gap:0;margin-bottom:0.75rem;border:1px solid var(--color-border);border-radius:6px;overflow:hidden">
+                <button
+                  type="button"
+                  class="btn-toggle-tab"
+                  :class="{ active: !formLeyMinero.modoFinal }"
+                  style="flex:1;padding:0.45rem;font-size:0.78rem;border:none;cursor:pointer;
+                        background:transparent;transition:background .15s"
+                  @click="toggleModoFinal(false)"
+                >
+                  Fino + Grueso
+                </button>
+                <button
+                  type="button"
+                  class="btn-toggle-tab"
+                  :class="{ active: formLeyMinero.modoFinal }"
+                  style="flex:1;padding:0.45rem;font-size:0.78rem;border:none;border-left:1px solid var(--color-border);
+                        cursor:pointer;background:transparent;transition:background .15s"
+                  @click="toggleModoFinal(true)"
+                >
+                  Solo Ley Final
+                </button>
               </div>
+
+              <!-- Modo: Fino + Grueso -->
+              <template v-if="!formLeyMinero.modoFinal">
+                <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
+                  <div class="field">
+                    <label class="field-label">LEY FINO — malla -140 (Oz/TC)</label>
+                    <input type="number" class="field-input" style="font-family:var(--font-mono)"
+                      v-model.number="formLeyMinero.ley_fino"
+                      step="0.0001" min="0" placeholder="0.0000" />
+                  </div>
+                  <div class="field">
+                    <label class="field-label">LEY GRUESO — malla +140 (Oz/TC)</label>
+                    <input type="number" class="field-input" style="font-family:var(--font-mono)"
+                      v-model.number="formLeyMinero.ley_grueso"
+                      step="0.0001" min="0" placeholder="0.0000" />
+                  </div>
+                </div>
+
+                <!-- Preview ley_final calculada -->
+                <div
+                  v-if="formLeyMinero.ley_final != null"
+                  style="background:var(--color-bg-alt);border:1px solid var(--color-border);border-radius:6px;
+                        padding:0.5rem 0.75rem;margin-bottom:0.75rem;display:flex;
+                        justify-content:space-between;align-items:center"
+                >
+                  <span style="font-size:0.78rem;color:var(--color-text-muted)">LEY FINAL (fino + grueso):</span>
+                  <span style="font-family:var(--font-mono);color:var(--color-gold);font-weight:600">
+                    {{ formLeyMinero.ley_final.toFixed(4) }} oz/TC
+                  </span>
+                </div>
+              </template>
+
+              <!-- Modo: Solo Ley Final -->
+              <template v-else>
+                <div class="field" style="margin-bottom:0.75rem">
+                  <label class="field-label">LEY FINAL (Oz/TC)</label>
+                  <input
+                    type="number"
+                    class="field-input"
+                    style="font-family:var(--font-mono);font-size:1.05em"
+                    v-model.number="formLeyMinero.ley_final"
+                    step="0.0001" min="0" placeholder="0.0000"
+                  />
+                  <p style="font-size:0.75rem;color:var(--color-text-faint);margin-top:0.3rem">
+                    Se registrará como ley_fino = ley_final, ley_grueso = 0.
+                  </p>
+                </div>
+              </template>
+
+              <!-- Fecha -->
               <div class="field">
                 <label class="field-label">FECHA ANÁLISIS</label>
                 <input type="date" class="field-input" v-model="formLeyMinero.fecha_analisis" />
@@ -309,7 +473,11 @@
             </div>
             <div class="modal-footer">
               <button class="btn-secondary" @click="modalLeyMinero = false">Cancelar</button>
-              <button class="btn-primary" @click="guardarLeyMinero" :disabled="guardandoLeyMinero || extrayendoMinero">
+              <button
+                class="btn-primary"
+                :disabled="!formLeyMinero.fecha_analisis || formLeyMinero.ley_fino == null || formLeyMinero.ley_grueso == null || guardandoLeyMinero"
+                @click="guardarLeyMinero"
+              >
                 <span v-if="guardandoLeyMinero" class="spinner" style="margin-right:0.4rem"></span>
                 Guardar Ley Minero
               </button>
@@ -360,6 +528,12 @@
             <div class="lab-field">
               <span class="lf-label">% RECUPERACIÓN:</span>
               <span class="lf-value highlight">{{ a.recuperacion != null ? a.recuperacion + '%' : '-' }}</span>
+            </div>
+            <div class="lab-field" v-if="a.solucion_ag_g_m3 != null">
+              <span class="lf-label">Ag SOLUCIÓN:</span>
+              <span class="lf-value" style="color:#60a5fa">
+                {{ Number(a.solucion_ag_g_m3).toFixed(4) }} g/m³
+              </span>
             </div>
 
             <div v-if="a.certificado_url" class="lab-field">
@@ -431,45 +605,36 @@
         <!-- Sección: certificado de recuperación comercial -->
         <section class="card" v-if="tieneRecuperacionVigente">
           <h2 class="card-titulo" style="display:flex;justify-content:space-between;align-items:center">
-            <span>CERTIFICADO DE RECUPERACIÓN</span>
+            <span>CERTIFICADO DE RECONOCIMIENTO</span>
             <div style="display:flex;gap:0.5rem;align-items:center">
               <button
+                v-if="certReconocimientoGuardado"
                 class="btn-secondary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="previsualizarCertRec"
-                :disabled="previsualizandoRec"
-                title="Abrir previsualización del certificado de recuperación"
-              >
-                <span v-if="previsualizandoRec" class="spinner" style="margin-right:0.4rem"></span>
-                <span v-else><Eye /> Previsualizar</span>
-              </button>
-              <button
-                v-if="certRecGuardado"
-                class="btn-secondary"
-                style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="verCertificado(certRecGuardado)"
+                @click="verCertificado(certReconocimientoGuardado)"
                 title="Ver el último PDF generado"
               >
                 <File /> Ver último PDF
               </button>
               <button
-                v-if="!certRecGuardado || puedeRegenerarCerts"
+                v-if="!certReconocimientoGuardado || puedeRegenerarCerts"
                 class="btn-primary"
                 style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="guardarCertRecuperacion"
-                :disabled="guardandoRec"
-                :title="certRecGuardado ? 'Regenerar certificado (sobreescribe el anterior)' : 'Guardar certificado PDF definitivo'"
+                @click="guardarCertReconocimientoFn"
+                :disabled="guardandoReconocimiento"
+                :title="certReconocimientoGuardado ? 'Regenerar certificado' : 'Guardar certificado PDF definitivo'"
               >
-                <span v-if="guardandoRec" class="spinner" style="margin-right:0.4rem"></span>
-                {{ certRecGuardado ? 'Regenerar PDF' : 'Guardar PDF definitivo' }}
+                <span v-if="guardandoReconocimiento" class="spinner" style="margin-right:0.4rem"></span>
+                {{ certReconocimientoGuardado ? 'Regenerar PDF' : 'Guardar PDF' }}
               </button>
             </div>
           </h2>
           <p style="font-size:0.8rem;color:var(--color-text-muted)">
-            Genera el informe de recuperación (formato Paititi) para entregar al proveedor.
+            Certificado de reconocimiento de pulpa — ley cola Au, ley líquido Au y solución Ag.
+            El certificado de recuperación (%) se genera desde el módulo de Pruebas Metalúrgicas.
           </p>
-          <div v-if="certRecGuardado" class="cert-guardado-info">
-            ✓ Certificado de recuperación generado
+          <div v-if="certReconocimientoGuardado" class="cert-guardado-info">
+            ✓ Certificado de reconocimiento generado
             <span v-if="!puedeRegenerarCerts" style="font-size:0.72rem;color:var(--color-text-faint);margin-left:0.4rem">
               — solo Admin y Gerencia pueden regenerarlo
             </span>
@@ -556,6 +721,81 @@
           >
             <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
             Confirmar y guardar PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: registrar ley Ag -->
+    <div v-if="modalAgAnalisisId !== null" class="modal-overlay" @click.self="modalAgAnalisisId = null">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2 style="display:flex;align-items:center;gap:0.5rem">
+            <span class="ag-badge-modal">Ag</span> Registrar Ley de Plata
+          </h2>
+          <button class="btn-cerrar" @click="modalAgAnalisisId = null"><X :size="18" /></button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:0.78rem;color:var(--color-text-muted);margin-bottom:1rem">
+            Corrección en blanco: <code style="font-family:var(--font-mono)">0.1444 mg</code> (fija) ·
+            Fórmula: <code style="font-family:var(--font-mono)">((Au+Ag − Au − 0.1444) × 1000) / Peso</code>
+          </p>
+
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:1rem">
+            <div class="field">
+              <label class="field-label">SEÑAL Au+Ag (mg) *</label>
+              <input type="number" step="0.0001" min="0" class="field-input"
+                v-model.number="formAg.au_ag_mg" placeholder="Ej: 2.3450" />
+            </div>
+            <div class="field">
+              <label class="field-label">SEÑAL Au PURA (mg) *</label>
+              <input type="number" step="0.0001" min="0" class="field-input"
+                v-model.number="formAg.au_mg" placeholder="Ej: 0.1230" />
+            </div>
+            <div class="field">
+              <label class="field-label">PESO MUESTRA (g) *</label>
+              <input type="number" step="0.01" min="0.01" class="field-input"
+                v-model.number="formAg.peso_muestra" placeholder="Ej: 29.16" />
+            </div>
+            <div class="field">
+              <label class="field-label">LABORATORIO *</label>
+              <input class="field-input" v-model="formAg.laboratorio" placeholder="Laboratorio" />
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label class="field-label">FECHA ANÁLISIS</label>
+              <input type="date" class="field-input" v-model="formAg.fecha_analisis" />
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div v-if="previewAg" class="ag-preview-inline">
+            <div class="ag-preview-row">
+              <span class="ag-preview-label">Neto (mg)</span>
+              <span class="ag-preview-val">{{ previewAg.neto.toFixed(4) }}</span>
+            </div>
+            <div class="ag-preview-row">
+              <span class="ag-preview-label">Ley Ag (g/TM)</span>
+              <span class="ag-preview-val" style="color:var(--color-gold);font-size:var(--text-lg)">
+                {{ previewAg.ley_gr_tm.toFixed(3) }}
+              </span>
+            </div>
+            <div class="ag-preview-row">
+              <span class="ag-preview-label">Ley Ag (Oz/TC)</span>
+              <span class="ag-preview-val">{{ previewAg.ley_oz_tc.toFixed(4) }}</span>
+            </div>
+          </div>
+
+          <p v-if="agErr" class="error-msg" style="margin-top:0.75rem">{{ agErr }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalAgAnalisisId = null">Cancelar</button>
+          <button
+            class="btn-primary"
+            :disabled="!previewAg || !formAg.laboratorio.trim() || agGuardando"
+            @click="guardarAg"
+          >
+            <span v-if="agGuardando" class="spinner" style="margin-right:0.4rem"></span>
+            Guardar Ley Ag
           </button>
         </div>
       </div>
@@ -677,7 +917,31 @@ const ipActual  = route.params.ip as string
 const cargando  = ref(false)
 const enviando  = ref(false)
 const lote      = ref<LoteLabOut | null>(null)
-const tabActual = ref<'ley' | 'rec'>('ley')
+const tabActual      = ref<'ley' | 'rec'>('ley')
+const materialFiltro = ref<'Au' | 'Ag'>('Au')
+const analisisAgCache = ref<import('@/types/laboratorio').AnalisisLeyOut[]>([])
+const cargandoAg      = ref(false)
+
+const analisisFiltrado = computed(() => {
+  if (!lote.value) return []
+  if (materialFiltro.value === 'Ag') return analisisAgCache.value
+  return lote.value.analisis_ley.filter(a =>
+    a.material !== 'Ag')
+})
+
+watch(materialFiltro, async (mat) => {
+  if (mat === 'Ag' && analisisAgCache.value.length === 0) {
+    cargandoAg.value = true
+    try {
+      const res = await laboratorioApi.detalleLote(ipActual, 'Ag')
+      analisisAgCache.value = res.analisis_ley
+    } catch {
+      ui.toast('Error al cargar análisis Ag', 'error')
+    } finally {
+      cargandoAg.value = false
+    }
+  }
+})
 
 // ── Flujo ley: exclusión local + guardar ──────────────────────────────────────
 const excluidos             = ref<Set<number>>(new Set())
@@ -689,22 +953,78 @@ const certLeyGuardado       = ref<string | null>(null)
 
 const ley_cabeza = ref<number | null>(null)
 
+// ── Ag: modal inline ──────────────────────────────────────────────────────────
+const modalAgAnalisisId = ref<number | null>(null)  // analisis Au sobre el que se registra Ag
+const agGuardando       = ref(false)
+const agErr             = ref('')
+const formAg = ref({
+  au_ag_mg:       null as number | null,
+  au_mg:          null as number | null,
+  peso_muestra:   null as number | null,
+  laboratorio:    '',
+  fecha_analisis: new Date().toISOString().split('T')[0],
+})
+
+// Helpers
+function fmtOz(v: number | string | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toFixed(4)   // oz/TC
+}
+
+// Convierte oz/TC → g/TM (para ley_fino y ley_grueso que vienen en oz/TC)
+function ozToGt(v: number | string | null | undefined): string {
+  if (v == null) return '-'
+  return (Number(v) * 34.2857).toFixed(3)
+}
+
+// Formatea un valor ya en g/TM (ley_gr_tm que viene calculado del backend)
+function fmtGt(v: number | string | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toFixed(3)
+}
+
+const leyAgDesdeRecuperacion = computed(() => lote.value?.ley_ag_gr_tm ?? null)
+
 function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)
   s.has(id) ? s.delete(id) : s.add(id)
   excluidos.value = s
 }
 
-const leyPlantaSimulada = computed<number | null>(() => {
+// Simula ley_planta_solo (solo tipo 'planta') para display con exclusiones
+const leyPlantaSoloSimulada = computed<number | null>(() => {
   if (!lote.value) return null
-  // Sin exclusiones locales → usar el valor calculado por el servidor (incluye dirimencia)
-  if (excluidos.value.size === 0) {
-    return lote.value.ley_planta != null ? Number(lote.value.ley_planta) : null
-  }
-  // Simulación: recalcular excluyendo los marcados localmente (solo planta/externo)
+  if (excluidos.value.size === 0)
+    return leyComercialCalc.value?.ley_planta_solo ?? null
   const vigentes = lote.value.analisis_ley.filter(
     a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo'),
+      && a.tipo_analisis === 'planta' && a.material !== 'Ag',
+  )
+  if (vigentes.length === 0) return null
+  const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
+  return parseFloat(prom.toFixed(4))
+})
+
+// ¿Tiene algún análisis Au vigente (cualquier tipo)? Controla visibilidad del card
+const tieneAnalisisLeyVigente = computed(() => {
+  if (!lote.value) return false
+  return lote.value.analisis_ley.some(
+    a => a.vigente && !a.eliminado && a.material !== 'Ag',
+  )
+})
+
+// Base para deshabilitar botones: average(planta+externo), o dirimencia como fallback
+const leyPlantaSimulada = computed<number | null>(() => {
+  if (!lote.value) return null
+  if (excluidos.value.size === 0) {
+    if (lote.value.ley_planta != null) return Number(lote.value.ley_planta)
+    // Fallback para casos con solo dirimencia (legacy): usar ley_planta del endpoint
+    return leyComercialCalc.value?.ley_planta ?? null
+  }
+  const vigentes = lote.value.analisis_ley.filter(
+    a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
+      && (a.tipo_analisis === 'planta' || a.tipo_analisis === 'externo')
+      && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
   const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
@@ -712,8 +1032,20 @@ const leyPlantaSimulada = computed<number | null>(() => {
 })
 
 const analisisADescartar = computed(() =>
-  lote.value?.analisis_ley.filter(a => excluidos.value.has(a.id)) ?? [],
+lote.value?.analisis_ley.filter(a => excluidos.value.has(a.id)) ?? [],
 )
+
+// leyPromedio: (planta + minero) / 2, o ley dirimencia si tiene dirimencia
+const leyPromedio = computed<number | null>(() => {
+if (!lote.value) return null
+if (lote.value.tiene_dirimencia && leyComercialCalc.value) {
+  return leyComercialCalc.value.ley_comercial   // dirimencia prevalece
+}
+const planta = leyPlantaSimulada.value
+const minero = lote.value.ley_minero != null ? Number(lote.value.ley_minero) : null
+if (planta == null || minero == null) return null
+return parseFloat(((planta + minero) / 2).toFixed(4))
+})
 
 function abrirConfirmarGenerar() {
   justificacionGenerar.value = ''
@@ -730,7 +1062,6 @@ async function previsualizarCertLey() {
     previsualizandoLey.value = false
   }
 }
-
 async function confirmarYGuardar() {
   for (const id of excluidos.value) {
     const ok = await store.descartarLey(id, justificacionGenerar.value)
@@ -744,6 +1075,15 @@ async function confirmarYGuardar() {
 
   lote.value = await store.cargarDetalleLote(ipActual)
   leyComercialCalc.value = null
+
+  // Limpiar cache de Ag si se descartó alguno
+  const hayAgDescartado = (lote.value?.analisis_ley ?? []).some(
+    a => a.material === 'Ag' && a.eliminado
+  )
+  if (hayAgDescartado) {
+    analisisAgCache.value = []
+  }
+
   await recargarLeyComercial()
 
   generando.value = true
@@ -758,38 +1098,76 @@ async function confirmarYGuardar() {
   }
 }
 
+// Plata
+const BLANK_AG = 0.1444
+const previewAg = computed(() => {
+  const { au_ag_mg, au_mg, peso_muestra } = formAg.value
+  if (au_ag_mg == null || au_mg == null || !peso_muestra || peso_muestra <= 0) return null
+  const neto      = Math.max(0, au_ag_mg - au_mg - BLANK_AG)
+  const ley_gr_tm = parseFloat(((neto * 1000) / peso_muestra).toFixed(3))
+  const ley_oz_tc = parseFloat((ley_gr_tm / 34.2857).toFixed(4))
+  return { neto, ley_gr_tm, ley_oz_tc }
+})
+
+function abrirModalAg(analisisAuId: number, labDefault: string) {
+  formAg.value = {
+    au_ag_mg: null, au_mg: null, peso_muestra: null,
+    laboratorio: labDefault,
+    fecha_analisis: new Date().toISOString().split('T')[0],
+  }
+  agErr.value = ''
+  modalAgAnalisisId.value = analisisAuId
+}
+
+async function guardarAg() {
+  if (!modalAgAnalisisId.value || !previewAg.value) return
+  const { au_ag_mg, au_mg, peso_muestra, laboratorio, fecha_analisis } = formAg.value
+  if (!au_ag_mg || !au_mg || !peso_muestra || !laboratorio.trim()) {
+    agErr.value = 'Complete todos los campos requeridos'; return
+  }
+  agGuardando.value = true
+  agErr.value = ''
+  try {
+    await laboratorioApi.registrarLeyAg(modalAgAnalisisId.value, {
+      au_ag_mg, au_mg, peso_muestra, laboratorio, fecha_analisis: fecha_analisis || null,
+    })
+    ui.toast(`Ley Ag registrada: ${previewAg.value.ley_gr_tm.toFixed(3)} g/TM`, 'success')
+    modalAgAnalisisId.value = null
+    lote.value = await store.cargarDetalleLote(ipActual)
+
+    analisisAgCache.value = []  // forzar recarga en próxima visita al tab Ag
+    // disparar recarga inmediata si seguimos en tab Ag
+    if (materialFiltro.value === 'Ag') {
+      const res = await laboratorioApi.detalleLote(ipActual, 'Ag')
+      analisisAgCache.value = res.analisis_ley
+    }
+  } catch (e: any) {
+    agErr.value = e?.response?.data?.detail ?? 'Error al guardar'
+  } finally {
+    agGuardando.value = false
+  }
+}
+
 // ── Flujo rec: descartar + certificado ───────────────────────────────────────
 const modalDescartarRec  = ref<number | null>(null)
 const justificacionRec   = ref('')
-const previsualizandoRec = ref(false)
-const guardandoRec       = ref(false)
-const certRecGuardado    = ref<string | null>(null)
+const guardandoReconocimiento  = ref(false)
+const certReconocimientoGuardado = ref<string | null>(null)
 
 const tieneRecuperacionVigente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.vigente && a.estado === 'COMPLETADO') ?? false
 )
 
-async function previsualizarCertRec() {
-  previsualizandoRec.value = true
+async function guardarCertReconocimientoFn() {
+  guardandoReconocimiento.value = true
   try {
-    await laboratorioApi.previewCertificadoRecPdf(ipActual)
-  } catch (e: any) {
-    ui.toast(e?.response?.data?.detail ?? 'Error al generar previsualización', 'error')
-  } finally {
-    previsualizandoRec.value = false
-  }
-}
-
-async function guardarCertRecuperacion() {
-  guardandoRec.value = true
-  try {
-    const res = await laboratorioApi.guardarCertificadoRec(ipActual)
-    certRecGuardado.value = res.ruta
-    ui.toast('Certificado de recuperación guardado', 'success')
+    const res = await laboratorioApi.guardarCertReconocimiento(ipActual)
+    certReconocimientoGuardado.value = res.ruta
+    ui.toast('Certificado de reconocimiento guardado', 'success')
   } catch (e: any) {
     ui.toast(e?.response?.data?.detail ?? 'Error al guardar certificado', 'error')
   } finally {
-    guardandoRec.value = false
+    guardandoReconocimiento.value = false
   }
 }
 
@@ -814,7 +1192,7 @@ const cargandoLeyComercial = ref(false)
 const leyComercialCalc     = ref<LeyComercialCalc | null>(null)
 
 watch(lote, async (l: LoteLabOut | null) => {
-  if (l?.ley_planta != null && !leyComercialCalc.value) {
+  if (l != null && tieneAnalisisLeyVigente.value && !leyComercialCalc.value) {
     cargandoLeyComercial.value = true
     try {
       leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
@@ -825,7 +1203,7 @@ watch(lote, async (l: LoteLabOut | null) => {
 }, { immediate: true })
 
 async function recargarLeyComercial() {
-  if (!lote.value?.ley_planta) return
+  if (!tieneAnalisisLeyVigente.value) return
   cargandoLeyComercial.value = true
   try {
     leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
@@ -848,11 +1226,9 @@ const puedeRegenerarCerts = computed(() => {
 
 //watch para certificados
 watch(lote, (l) => {
-  // Siempre sincronizar desde el lote al cargar/recargar
-  // Solo sobreescribir si el lote trae valor (para no borrar lo que se acaba de guardar en sesión)
-  if (l?.cert_ley_url) certLeyGuardado.value = l.cert_ley_url
-  if (l?.cert_rec_url) certRecGuardado.value = l.cert_rec_url
-}, { immediate: true })
+  if (l?.cert_ley_url)             certLeyGuardado.value = l.cert_ley_url
+  if (l?.cert_reconocimiento_url)  certReconocimientoGuardado.value = l.cert_reconocimiento_url
+  }, { immediate: true })
 
 // ── Agregar nueva ley ─────────────────────────────────────────────────────────
 const modalAgregarLey = ref(false)
@@ -861,13 +1237,30 @@ const modoModalLey    = ref<'normal' | 'dirimencia'>('normal')
 
 const cipsDisponiblesLey = computed(() => {
   if (!lote.value) return []
-  return lote.value.cips_detalle.filter(
-    c => c.tipo_muestra === 'Laboratorio'
-      && !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip),
+  if (materialFiltro.value === 'Ag') {
+    // Ag reutiliza CIPs de recuperación. Bloquear solo si ya hay Ag vigente en ese CIP.
+    return lote.value.cips_detalle.filter(c =>
+      c.tipo_muestra === 'RecuperacionInterno'
+      && !lote.value!.analisis_ley.some(
+        a => a.cip === c.codigo_cip && a.material === 'Ag' && a.vigente,
+      ),
+    )
+  }
+  // Au: CIPs Laboratorio sin análisis Au previo
+  return lote.value.cips_detalle.filter(c =>
+    c.tipo_muestra === 'Laboratorio'
+    && !lote.value!.analisis_ley.some(a => a.cip === c.codigo_cip && a.material !== 'Ag'),
   )
 })
 
 function abrirModalAgregarLeyNormal() {
+  modoModalLey.value = 'normal'
+  cipSeleccionado.value = ''
+  modalAgregarLey.value = true
+}
+
+function abrirModalAgregarLeyAg() {
+  materialFiltro.value = 'Ag'
   modoModalLey.value = 'normal'
   cipSeleccionado.value = ''
   modalAgregarLey.value = true
@@ -882,10 +1275,11 @@ function abrirModalDirimencia() {
 function confirmarAgregarLey() {
   if (!cipSeleccionado.value) return
   const tipoPorUrl = modoModalLey.value === 'dirimencia' ? 'dirimencia' : 'externo'
-  if (store.puedeImportarCert) {
+  const matQ = materialFiltro.value === 'Ag' ? '&material=Ag' : ''
+  if (store.puedeImportarCert && materialFiltro.value !== 'Ag') {
     router.push(`/laboratorio/importar-ley/${cipSeleccionado.value}?ip=${ipActual}&tipo=${tipoPorUrl}`)
   } else {
-    router.push(`/laboratorio/ley/${cipSeleccionado.value}?tipo=${tipoPorUrl}`)
+    router.push(`/laboratorio/ley/${cipSeleccionado.value}?tipo=${tipoPorUrl}${matQ}`)
   }
 }
 
@@ -998,9 +1392,38 @@ const formLeyMinero = ref({
   laboratorio:    '',
   ley_fino:       null as number | null,
   ley_grueso:     null as number | null,
+  ley_final:      null as number | null,
+  modoFinal:      false,
   fecha_analisis: new Date().toISOString().split('T')[0],
 })
 
+const labsConocidos = computed<string[]>(() => {
+  if (!lote.value) return []
+  const nombres = lote.value.analisis_ley
+    .map(a => a.laboratorio)
+    .filter((l): l is string => !!l)
+  return [...new Set(nombres)]
+})
+
+
+// Auto-calcular ley_final cuando cambian fino o grueso
+watch(
+  () => [formLeyMinero.value.ley_fino, formLeyMinero.value.ley_grueso],
+  ([fino, grueso]) => {
+    if (formLeyMinero.value.modoFinal) return
+    if (fino != null && grueso != null)
+      formLeyMinero.value.ley_final = parseFloat((fino + grueso).toFixed(4))
+    else
+      formLeyMinero.value.ley_final = null
+  },
+)
+
+function toggleModoFinal(val: boolean) {
+  formLeyMinero.value.modoFinal = val
+  formLeyMinero.value.ley_final = null
+  formLeyMinero.value.ley_fino = null
+  formLeyMinero.value.ley_grueso = null
+}
 async function extraerCertMinero(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -1015,6 +1438,13 @@ async function extraerCertMinero(e: Event) {
     if (res.laboratorio && !formLeyMinero.value.laboratorio) formLeyMinero.value.laboratorio = res.laboratorio
     if (!res.ley_fino && !res.ley_grueso)
       errOcrMinero.value = 'No se pudieron extraer las leyes. Ingrese los valores manualmente.'
+    // Si el cert solo trajo ley_final (sin fino/grueso), cambiar a modoFinal
+    if (res.ley_fino == null && res.ley_grueso == null && res.ley_final != null) {
+      formLeyMinero.value.modoFinal  = true
+      formLeyMinero.value.ley_final  = res.ley_final
+    }
+    if (!res.ley_fino && !res.ley_grueso && !res.ley_final)
+      errOcrMinero.value = 'No se pudieron extraer las leyes. Ingrese los valores manualmente.'
   } catch {
     errOcrMinero.value = 'Error al procesar el certificado. Ingrese los valores manualmente.'
   } finally {
@@ -1026,16 +1456,30 @@ async function guardarLeyMinero() {
   if (!formLeyMinero.value.laboratorio.trim()) {
     ui.toast('Ingrese el nombre del laboratorio o minero', 'error'); return
   }
-  if (formLeyMinero.value.ley_fino == null || formLeyMinero.value.ley_grueso == null) {
-    ui.toast('Ingrese ambas leyes (fino y grueso)', 'error'); return
+
+  let ley_fino: number
+  let ley_grueso: number
+
+  if (formLeyMinero.value.modoFinal) {
+    if (!formLeyMinero.value.ley_final) {
+      ui.toast('Ingrese la ley final', 'error'); return
+    }
+    ley_fino   = formLeyMinero.value.ley_final   // ley_final = ley_fino + 0
+    ley_grueso = 0
+  } else {
+    if (formLeyMinero.value.ley_fino == null || formLeyMinero.value.ley_grueso == null) {
+      ui.toast('Ingrese ambas leyes (fino y grueso)', 'error'); return
+    }
+    ley_fino   = formLeyMinero.value.ley_fino
+    ley_grueso = formLeyMinero.value.ley_grueso
   }
   guardandoLeyMinero.value = true
   try {
     const nuevo = await laboratorioApi.registrarLeyPorIP(ipActual, {
       tipo_analisis:  'minero',
       laboratorio:    formLeyMinero.value.laboratorio,
-      ley_fino:       formLeyMinero.value.ley_fino,
-      ley_grueso:     formLeyMinero.value.ley_grueso,
+      ley_fino,
+      ley_grueso,
       fecha_analisis: formLeyMinero.value.fecha_analisis,
     })
     if (archivoMinero.value) await laboratorioApi.subirCertificadoLey(nuevo.id, archivoMinero.value)
@@ -1213,6 +1657,15 @@ onMounted(async () => {
   background: rgba(239,68,68,0.12); color: #f87171; border-color: rgba(239,68,68,0.3);
 }
 
+.btn-toggle-tab {
+  color: var(--color-text-muted);
+}
+.btn-toggle-tab.active {
+  background: var(--color-primary-muted, color-mix(in srgb, var(--color-gold) 15%, transparent));
+  color: var(--color-gold);
+  font-weight: 600;
+}
+
 .link-cert { font-size: 0.75rem; color: var(--color-gold); text-decoration: underline; cursor: pointer; }
 
 .acciones-lote {
@@ -1280,4 +1733,77 @@ onMounted(async () => {
   background: rgba(234,179,8,0.15); color: #fbbf24;
   border: 1px solid rgba(234,179,8,0.4); border-radius: 4px; cursor: pointer;
 }
+
+/* Ag button - mismo shape que btn-primary, color índigo */
+:deep(.btn-primary.btn-ag) {
+  background: #4f46e5;
+  color: #fff;
+}
+:deep(.btn-primary.btn-ag:not(:disabled)) {
+  background: #4338ca;
+}
+:deep(.btn-primary.btn-ag:hover:not(:disabled)) {
+  background: #6366f1;
+}
+.ag-dot {
+  background: #6366f1; color: #fff;
+  border-radius: 3px; padding: 0px 4px;
+  font-size: 0.62rem; font-weight: 700;
+}
+.ag-registered {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.72rem; color: #a5b4fc;
+  font-family: var(--font-mono); padding: 0.25rem 0.5rem;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.2); border-radius: 4px;
+}
+.ag-edit-btn {
+  background: none; border: none; cursor: pointer;
+  color: #818cf8; font-size: 0.8rem; padding: 0 0 0 2px;
+}
+.ag-badge-modal {
+  background: #6366f1; color: #fff;
+  border-radius: 4px; padding: 1px 8px;
+  font-size: 0.8rem; font-weight: 700;
+}
+.ag-preview-inline {
+  background: rgba(99,102,241,0.07);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: flex; gap: 1.5rem; flex-wrap: wrap;
+}
+.ag-preview-row { display: flex; flex-direction: column; gap: 0.15rem; }
+.ag-preview-label {
+  font-size: 0.65rem; font-family: var(--font-mono);
+  color: var(--color-text-faint); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.ag-preview-val { font-family: var(--font-mono); font-size: var(--text-md); }
+.lf-unit-alt {
+  font-size: 0.65rem;
+  color: var(--color-text-faint);
+  margin-left: 0.3rem;
+  font-family: var(--font-mono);
+}
+
+/* Material toggle Au/Ag */
+.material-toggle-bar {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-bottom: 0.75rem; padding: 0.4rem 0;
+}
+.mtog-label {
+  font-size: 0.65rem; font-family: var(--font-mono);
+  color: var(--color-text-faint); letter-spacing: 0.08em;
+}
+.mtog-group {
+  display: flex; border: 1px solid var(--color-border); border-radius: 6px; overflow: hidden;
+}
+.mtog-btn {
+  padding: 0.3rem 0.85rem; font-size: 0.75rem; font-family: var(--font-mono);
+  background: transparent; color: var(--color-text-muted);
+  border: none; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.mtog-btn + .mtog-btn { border-left: 1px solid var(--color-border); }
+.mtog-btn.active { background: rgba(184,151,75,0.15); color: var(--color-gold); font-weight: 600; }
+.mtog-btn--ag.active { background: rgba(99,102,241,0.15); color: #a5b4fc; }
 </style>

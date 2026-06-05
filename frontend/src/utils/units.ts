@@ -1,4 +1,5 @@
-// src/utils/unidades.ts
+// src/utils/units.ts
+import { reactive } from 'vue'
 
 // 1. Nuestra unidad base (Lo que siempre viaja desde y hacia el Backend)
 export const UNIDAD_BASE_PESO = 'TM'
@@ -11,19 +12,27 @@ export const FACTORES_PESO: Record<string, number> = {
 }
 
 // 3. Configuración Centralizada por Módulo
-// (En un futuro, esto podría venir de tu store/API configurado por el Admin)
-export const CONFIG_UNIDADES_MODULOS: Record<string, string> = {
+// (Esto ahora se carga dinámicamente desde el backend y es reactivo)
+export const CONFIG_UNIDADES_MODULOS = reactive<Record<string, string>>({
     'BALANZA': 'TM',
     'MUESTREO': 'TM',         // En muestreo ven toneladas métricas
     'LABORATORIO': 'KG',      // Laboratorio suele usar gramos/kg
     'LIQUIDACIONES': 'TMC',   // Comercial liquida en toneladas cortas
     'DEFAULT': 'TM'
+})
+
+export function updateUnidadesModulos(config: Record<string, string>) {
+    if (config.unidad_balanza) CONFIG_UNIDADES_MODULOS.BALANZA = config.unidad_balanza
+    if (config.unidad_muestreo) CONFIG_UNIDADES_MODULOS.MUESTREO = config.unidad_muestreo
+    if (config.unidad_laboratorio) CONFIG_UNIDADES_MODULOS.LABORATORIO = config.unidad_laboratorio
+    if (config.unidad_liquidaciones) CONFIG_UNIDADES_MODULOS.LIQUIDACIONES = config.unidad_liquidaciones
+    if (config.unidad_default) CONFIG_UNIDADES_MODULOS.DEFAULT = config.unidad_default
 }
 
 /**
  * Convierte un valor de la Base de Datos (TM) a la unidad configurada para el módulo,
  * y le añade su etiqueta.
- * * @param valorTM - El peso original en Toneladas Métricas
+ * @param valorTM - El peso original en Toneladas Métricas
  * @param modulo - El nombre del módulo (ej. 'MUESTREO')
  * @param decimales - Cantidad de decimales a mostrar
  */
@@ -54,7 +63,7 @@ export function getUnidadPorModulo(modulo: string): string {
     }
 
     return unidad;
-  }
+}
 
 /** Convierte un número de la BD (TM) al número que el usuario verá en el input */
 export function convertirParaInput(valorTM: number | null | undefined, modulo: string): number | null {
@@ -70,4 +79,4 @@ export function convertirParaBD(valorInput: number | null | undefined, modulo: s
     const unidadOrigen = getUnidadPorModulo(modulo)
     const factor = FACTORES_PESO[unidadOrigen] || 1
     return valorInput / factor
-  }
+}

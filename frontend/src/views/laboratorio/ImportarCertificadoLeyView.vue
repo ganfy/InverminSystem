@@ -126,10 +126,6 @@
               @input="validarCip" />
           </div>
           <div class="field">
-            <label class="field-label">LABORATORIO:</label>
-            <input class="field-input" v-model="form.laboratorio" />
-          </div>
-          <div class="field">
             <label class="field-label">N° INFORME / CERTIFICADO:</label>
             <input class="field-input" v-model="nInforme" placeholder="Ej: MSSC 001-34764-RLV" />
           </div>
@@ -206,7 +202,6 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import type { TipoAnalisis } from '@/types/laboratorio'
 import { AlertTriangle } from 'lucide-vue-next'
-import { f } from 'vue-router/dist/router-CWoNjPRp.mjs'
 import type { OrigenDatos } from '@/types/laboratorio'
 const router    = useRouter()
 const route     = useRoute()
@@ -318,23 +313,22 @@ async function extraer() {
   } catch {
     errExtraccion.value = 'No se pudo extraer datos del certificado. Complete los campos manualmente.'
     fase.value = 'form'
-    form.value.laboratorio = laboratorio.value
   } finally {
+    form.value.laboratorio = laboratorio.value // asegurar que se mantenga el laboratorio ingresado por operador aunque falle extracción
     extrayendo.value = false
   }
 }
 
 function saltarOcr() {
-  form.value.origen_datos = 'manual'
-  archivo.value = null
-  // Precarga el CIP esperado si no está ya
-  cipExtraido.value = cipActual
-  fase.value = 'form'
+  form.value.origen_datos  = 'manual'
+  form.value.laboratorio   = laboratorio.value   // propagar el lab del paso 1
+  archivo.value            = null
+  cipExtraido.value        = cipActual
+  fase.value               = 'form'
 }
 
 async function guardar() {
   errForm.value = ''
-  if (!form.value.laboratorio) { errForm.value = 'Ingrese el laboratorio'; return }
   if (!form.value.ley_fino && !form.value.ley_grueso) {
     errForm.value = 'Ingrese al menos una ley (fino o grueso)'
     return
