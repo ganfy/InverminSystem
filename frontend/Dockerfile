@@ -2,13 +2,13 @@ FROM node:20-alpine AS build-stage
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json ./
 
-RUN npm ci --quiet
+RUN yarn install --network-timeout 100000
 
 COPY . .
 
-RUN npm run build-only
+RUN yarn build-only
 
 FROM nginx:stable-alpine AS production-stage
 
