@@ -183,6 +183,16 @@
                         <option value="KG">KG (Kilogramo)</option>
                       </select>
 
+                      <!-- Textarea para listas JSON -->
+                      <textarea
+                        v-else-if="c.clave === 'labs_lista'"
+                        v-model="editsCalculo[c.clave]"
+                        class="field-input input-valor"
+                        :class="{ modified: editsCalculo[c.clave] !== c.valor }"
+                        rows="4"
+                        style="resize: vertical; min-height: 80px;"
+                      ></textarea>
+
                       <!-- Inputs estándar para otros valores -->
                       <input
                         v-else
@@ -481,6 +491,7 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   MUESTREO_MALLA_MIN_PCT: 'Malla Mínima Aceptable',
   MUESTREO_MALLA_MAX_PCT: 'Malla Máxima Aceptable',
   MAX_CIPS_GENERADOS: 'Cantidad Máxima de CIPs a Generar',
+  MUESTREO_CIPS_IMPRIMIR: 'Cantidad de CIPs a Imprimir (Etiquetas)',
   labs_lista: 'Lista de Laboratorios Externos',
 
   // Laboratorio
@@ -540,7 +551,7 @@ const PARAM_CATEGORIES = [
     id: 'muestreo',
     name: 'Muestreo y CIPs',
     icon: FlaskConical,
-    keys: ['MUESTREO_MAX_INTENTOS', 'MUESTREO_HUMEDAD_MAX_PCT', 'MUESTREO_MALLA_MIN_PCT', 'MUESTREO_MALLA_MAX_PCT', 'MAX_CIPS_GENERADOS', 'labs_lista']
+    keys: ['MUESTREO_MAX_INTENTOS', 'MUESTREO_HUMEDAD_MAX_PCT', 'MUESTREO_MALLA_MIN_PCT', 'MUESTREO_MALLA_MAX_PCT', 'MAX_CIPS_GENERADOS', 'MUESTREO_CIPS_IMPRIMIR', 'labs_lista']
   },
   {
     id: 'laboratorio',
