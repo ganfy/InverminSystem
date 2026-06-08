@@ -304,6 +304,14 @@
                       <Field label="Fecha"        :val="a.fecha_analisis ?? '—'"   mono />
                     </div>
                     <ResponsableRow :accion="a.registro" label="Registrado por" />
+                    <div
+                      v-if="a.ley_cola !== null && a.ley_cabeza !== null && Number(a.ley_cola) >= Number(a.ley_cabeza)"
+                      class="warn-row"
+                      style="margin-top:0.5rem"
+                    >
+                      <AlertTriangle :size="12" />
+                      <span>Advertencia: Ley cola mayor o igual a ley cabeza</span>
+                    </div>
                     <div v-if="!a.vigente && a.descarte" class="descarte-row">
                       <Trash2 :size="12" />
                       <span class="lbl">Descartado por</span>

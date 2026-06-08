@@ -591,9 +591,6 @@ def registrar_analisis_recuperacion(
     if not mapeo:
         raise ValueError(f"Código CIP '{datos.cip}' no encontrado en el sistema")
 
-    if datos.ley_cola >= datos.ley_cabeza:
-        raise ValueError("La ley cola debe ser estrictamente menor a la ley cabeza")
-
     # Actualizar laboratorio destino en el mapeo
     if datos.laboratorio:
         mapeo.laboratorio = datos.laboratorio or "Paititi"
@@ -904,9 +901,6 @@ def completar_recuperacion(
             raise ValueError("Debe ingresar muestras o ley_cola directamente")
         ley_cola = Decimal(str(datos.ley_cola))
         ley_cola_ag = None
-
-    if ley_cola >= a.ley_cabeza:
-        raise ValueError("La ley cola debe ser estrictamente menor a la ley cabeza")
 
     a.ley_cola = ley_cola
     a.ley_liquido = datos.ley_liquido

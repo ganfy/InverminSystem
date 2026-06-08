@@ -527,13 +527,22 @@
             <div class="lab-field"><span class="lf-label">LEY LÍQUIDO:</span>   <span class="lf-value">{{ a.ley_liquido ?? '-' }}</span></div>
             <div class="lab-field">
               <span class="lf-label">% RECUPERACIÓN:</span>
-              <span class="lf-value highlight">{{ a.recuperacion != null ? a.recuperacion + '%' : '-' }}</span>
+              <span class="lf-value highlight">{{ a.recuperacion != null ? Number(a.recuperacion).toFixed(2) + '%' : '-' }}</span>
             </div>
             <div class="lab-field" v-if="a.solucion_ag_g_m3 != null">
               <span class="lf-label">Ag SOLUCIÓN:</span>
               <span class="lf-value" style="color:#60a5fa">
                 {{ Number(a.solucion_ag_g_m3).toFixed(4) }} g/m³
               </span>
+            </div>
+
+            <div
+              v-if="a.ley_cola !== null && a.ley_cabeza !== null && Number(a.ley_cola) >= Number(a.ley_cabeza)"
+              class="alerta-warning"
+              style="margin-top:0.5rem; display:flex; align-items:center; gap:0.5rem"
+            >
+              <AlertTriangle :size="14" />
+              <span>Advertencia: Ley cola mayor o igual a ley cabeza</span>
             </div>
 
             <div v-if="a.certificado_url" class="lab-field">
@@ -1806,4 +1815,13 @@ onMounted(async () => {
 .mtog-btn + .mtog-btn { border-left: 1px solid var(--color-border); }
 .mtog-btn.active { background: rgba(184,151,75,0.15); color: var(--color-gold); font-weight: 600; }
 .mtog-btn--ag.active { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+
+.alerta-warning {
+  background: rgba(255, 160, 0, 0.1);
+  border: 1px solid rgba(255, 160, 0, 0.4);
+  border-radius: 4px;
+  padding: 0.6rem 0.9rem;
+  color: #ffa000;
+  font-size: var(--text-sm);
+}
 </style>

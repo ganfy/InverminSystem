@@ -170,8 +170,6 @@ const recuperacion = computed(() => {
 
 function recalc() {
   errCola.value = ''
-  if (form.value.ley_cabeza && form.value.ley_cola && form.value.ley_cola >= form.value.ley_cabeza)
-    errCola.value = 'Ley cola debe ser menor que ley cabeza'
 }
 
 function validarCip() {
