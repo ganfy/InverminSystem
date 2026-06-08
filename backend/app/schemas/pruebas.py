@@ -1,8 +1,15 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from app.models.enums import TipoMuestra
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def naive_to_utc(v: datetime | None) -> datetime | None:
+    if isinstance(v, datetime) and v.tzinfo is None:
+        return v.replace(tzinfo=UTC)
+    return v
+
 
 # ── Base CRUD ─────────────────────────────────────────────────────────────────
 
@@ -16,6 +23,11 @@ class PruebaMetalurgicaBase(BaseModel):
     adicion_naoh: float | None = None
     gasto_agno3: float | None = None
     fecha_ingreso: datetime | None = None
+
+    @field_validator("fecha_ingreso", mode="before")
+    @classmethod
+    def validate_fecha_ingreso(cls, v):
+        return naive_to_utc(v)
 
 
 class PruebaMetalurgicaCreate(PruebaMetalurgicaBase):
@@ -32,6 +44,11 @@ class PruebaMetalurgicaOut(PruebaMetalurgicaBase):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("fecha_salida", mode="before")
+    @classmethod
+    def validate_fecha_salida(cls, v):
+        return naive_to_utc(v)
+
 
 # ── Lista principal ───────────────────────────────────────────────────────────
 
@@ -46,6 +63,11 @@ class LotePruebaList(BaseModel):
     estado: str  # PENDIENTE | EN PROCESO | COMPLETADO
     cip_asignado: str | None = None  # primer CIP de recuperación (si fue etiquetado)
     etiquetado: bool = False
+
+    @field_validator("fecha_recepcion", "fecha_ingreso", "fecha_salida", mode="before")
+    @classmethod
+    def validate_dates(cls, v):
+        return naive_to_utc(v)
 
 
 # ── Etiquetado ────────────────────────────────────────────────────────────────
@@ -79,6 +101,11 @@ class PruebaRecuperacionItem(BaseModel):
     fecha_salida: datetime | None
     ley_cabeza: Decimal  # ley planta calculada (snapshot al crear pending)
     tiene_analisis_recuperacion: bool = False
+
+    @field_validator("fecha_salida", mode="before")
+    @classmethod
+    def validate_fecha_salida(cls, v):
+        return naive_to_utc(v)
 
 
 # ── Recuperaciones (vista Pruebas: leyes de cola + recuperación) ─────────────

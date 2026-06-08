@@ -9,7 +9,7 @@ import re
 import shutil
 import tempfile
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -361,7 +361,7 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
     nombres = _nombres_usuarios(db, ids)
 
     pruebas_lote = db.query(PruebaMetalurgica).filter(PruebaMetalurgica.lote_id == lote.id).all()
-    _ahora = datetime.now()
+    _ahora = datetime.now(UTC).replace(tzinfo=None)
     tiene_prueba_pendiente = any(
         p.fecha_ingreso is None or _ahora < p.fecha_ingreso + timedelta(hours=48)
         for p in pruebas_lote

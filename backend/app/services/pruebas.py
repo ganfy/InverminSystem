@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.models.enums import TipoMuestra
@@ -81,7 +81,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
     )
 
     lista: list[LotePruebaList] = []
-    ahora = datetime.now()
+    ahora = datetime.now(UTC).replace(tzinfo=None)
 
     for lote in lotes_db:
         pruebas = (
@@ -162,7 +162,7 @@ def registrar_prueba(
                 f"Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
             )
 
-    datos.fecha_ingreso = datetime.now()
+    datos.fecha_ingreso = datetime.now(UTC).replace(tzinfo=None)
 
     prueba_existente = (
         db.query(PruebaMetalurgica)
@@ -258,7 +258,7 @@ def etiquetar_prueba(
             "Todas las pruebas ya tienen CIP asignado."
         )
 
-    ahora = datetime.now()
+    ahora = datetime.now(UTC).replace(tzinfo=None)
     if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=48):
         raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
 
@@ -302,7 +302,7 @@ def obtener_pruebas_para_recuperacion(db: Session) -> list[PruebaRecuperacionIte
     2. El lote tiene ley planta calculable (al menos 1 análisis de ley vigente).
     Usado por Comercial para crear el registro pendiente de recuperación.
     """
-    ahora = datetime.now()
+    ahora = datetime.now(UTC).replace(tzinfo=None)
 
     # Lote IDs con CIP de recuperación interno
     lote_ids_con_cip_rec = (
