@@ -9,6 +9,7 @@ Solo Admin y Gerencia pueden modificarlas vía /api/v1/admin/config-calculo.
 from dataclasses import dataclass
 from decimal import Decimal
 
+# pyrefly: ignore [missing-import]
 from app.models.models import Configuracion
 from sqlalchemy.orm import Session
 
@@ -30,6 +31,7 @@ DEFAULTS: dict[str, str] = {
     "MUESTREO_MALLA_MIN_PCT": "88",
     "MUESTREO_MALLA_MAX_PCT": "94",
     "MAX_CIPS_GENERADOS": "5",
+    "MUESTREO_CIPS_IMPRIMIR": "3",
     "labs_lista": '["Minares South S.R.L.", "El Dorado - Invermin Paititi", "Quantum", "Otro"]',
     # Laboratorio
     "LAB_DIFERENCIA_MAX_PCT": "5",
@@ -64,6 +66,7 @@ DESCRIPCIONES: dict[str, str] = {
     "MUESTREO_MALLA_MIN_PCT": "Porcentaje de malla mínimo aceptable para muestreo",
     "MUESTREO_MALLA_MAX_PCT": "Porcentaje de malla máximo aceptable para muestreo",
     "MAX_CIPS_GENERADOS": "Cantidad máxima de códigos CIP que se pueden generar por lote",
+    "MUESTREO_CIPS_IMPRIMIR": "Cantidad de códigos CIP que se imprimen al dar clic en Etiquetar",
     "labs_lista": "Lista de laboratorios externos disponibles para asignar a CIPs (formato JSON)",
     "LAB_DIFERENCIA_MAX_PCT": "Diferencia porcentual máxima permitida entre laboratorios antes de alertar",
     "LAB_DIFERENCIA_PLANTA_MINERO": "Diferencia máxima de ley (Au) entre planta y minero antes de ir a dirimencia",
@@ -183,6 +186,7 @@ def get_config_public_dict(db: Session) -> dict[str, str]:
         "empresa_ruc",
         "empresa_direccion",
         "factor_oz_tc",
+        "MUESTREO_CIPS_IMPRIMIR",
     ]
     rows = (
         db.query(Configuracion.clave, Configuracion.valor)
