@@ -26,7 +26,7 @@ from app.models.models import (
     SesionDescarga,
     Usuario,
 )
-from app.services.laboratorio import calcular_ley_comercial
+from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
 from app.services.pruebas import calcular_ley_planta
 from sqlalchemy.orm import Session, joinedload
 
@@ -544,6 +544,13 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
     if not cip:
         raise ValueError(f"CIP {cip_code} no encontrado")
 
+    ley_plata_str = "-"
+    if cip and cip.lote_id:
+        ley_ag_vigente = obtener_ley_ag_vigente(db, cip.lote_id)
+        if ley_ag_vigente:
+            ley_ag_gr_tm, ley_ag_oz_tc = ley_ag_vigente
+            ley_plata_str = f"{float(ley_ag_gr_tm):.3f} g/TM ({float(ley_ag_oz_tc):.4f} Oz/TC)"
+
     analista_nombre = "DEPARTAMENTO TÉCNICO"
     analisis_list = (
         db.query(AnalisisRecuperacion)
@@ -599,6 +606,7 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
         fecha_recepcion=fecha,
         fecha_termino=_fmt_date(datetime.now()),
         laboratorio=analisis_list[0].laboratorio or "-",
+        ley_plata=ley_plata_str,
         filas_detalle=filas,
         bloque_notas="",
         logo_b64=logo_b64,
@@ -779,6 +787,7 @@ _TEMPLATE_RECONOCIMIENTO = """
 <div class="seccion">
   <div class="kv-row"><span class="kv-label">Referencia</span><span class="kv-val">: {referencia}</span></div>
   <div class="kv-row"><span class="kv-label">An&aacute;lisis</span><span class="kv-val">: Reconocimiento Au / Ag (CIP)</span></div>
+  <div class="kv-row"><span class="kv-label">Ley de Plata (Cabeza)</span><span class="kv-val">: {ley_plata}</span></div>
 </div>
 <hr class="linea-gold"/>
 <div class="seccion">
@@ -818,6 +827,13 @@ def generar_cert_reconocimiento_cip_pdf(db: Session, ip_lote: str) -> bytes:
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
         raise ValueError(f"Lote {ip_lote} no encontrado")
+
+    ley_plata_str = "-"
+    if lote:
+        ley_ag_vigente = obtener_ley_ag_vigente(db, lote.id)
+        if ley_ag_vigente:
+            ley_ag_gr_tm, ley_ag_oz_tc = ley_ag_vigente
+            ley_plata_str = f"{float(ley_ag_gr_tm):.3f} g/TM ({float(ley_ag_oz_tc):.4f} Oz/TC)"
 
     analisis_list = (
         db.query(AnalisisRecuperacion)
@@ -876,6 +892,7 @@ def generar_cert_reconocimiento_cip_pdf(db: Session, ip_lote: str) -> bytes:
         fecha_recepcion=fecha,
         fecha_termino=_fmt_date(datetime.now()),
         laboratorio=analisis_list[0].laboratorio or "-",
+        ley_plata=ley_plata_str,
         filas_detalle=filas,
         bloque_notas="",
         logo_b64=logo_b64,
