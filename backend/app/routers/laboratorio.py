@@ -651,7 +651,7 @@ def guardar_certificado_reconocimiento(
 ):
     """Genera y persiste el certificado de reconocimiento en storage."""
     try:
-        pdf_bytes = cert_svc.generar_cert_reconocimiento_pdf(db, ip)
+        pdf_bytes = cert_svc.generar_cert_reconocimiento_cip_pdf(db, ip)
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "reconocimiento")
 
         lote_obj = db.query(Lote).filter(Lote.ip == ip).first()

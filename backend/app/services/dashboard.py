@@ -182,7 +182,9 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     ids_rec_completa: set[int] = set()
     ids_rec_pendiente: set[int] = set()
     for lote_id, recs in recs_por_lote.items():
-        has_completado = any(r["estado"] in ("COMPLETADO", "CERT_COMERCIAL") for r in recs)
+        has_completado = any(
+            r["estado"] in ("COMPLETADO", "CERT_COMERCIAL", "CERT_RECONOCIMIENTO") for r in recs
+        )
         has_pendiente = any(r["estado"] == "PENDIENTE" for r in recs)
         if has_pendiente:
             ids_rec_pendiente.add(lote_id)
@@ -662,7 +664,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
     ids_con_rec = {
         lid
         for lid, estados in recs_dict.items()
-        if any(e in ("COMPLETADO", "CERT_COMERCIAL") for e in estados)
+        if any(e in ("COMPLETADO", "CERT_COMERCIAL", "CERT_RECONOCIMIENTO") for e in estados)
         and not any(e == "PENDIENTE" for e in estados)
     }
 
