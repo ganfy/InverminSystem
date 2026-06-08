@@ -151,6 +151,8 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     leyes_por_lote = defaultdict(list)
     ids_con_ley = set()
     for lote_id, tipo, ley_final, ley_gr_tm in leyes_db:
+        if ley_final is not None or ley_gr_tm is not None:
+            ids_con_ley.add(lote_id)
         leyes_por_lote[lote_id].append(
             {
                 "tipo": tipo,
