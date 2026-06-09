@@ -1061,6 +1061,7 @@ def obtener_trazabilidad_lote(db: Session, ip: str) -> TrazabilidadLoteResponse:
         )
         for a in sorted(lote.analisis_recuperacion, key=lambda x: x.id)
         if not getattr(a, "eliminado", False)
+        and a.estado not in ("CERT_COMERCIAL", "CERT_RECONOCIMIENTO")
     ]
 
     # ── Ruma ──

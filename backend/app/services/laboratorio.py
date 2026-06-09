@@ -338,8 +338,13 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         .order_by(AnalisisRecuperacion.id)
         .all()
     )
-    # Separar cert comercial de análisis reales de laboratorio
-    analisis_rec = [a for a in todos_analisis_rec if a.estado != EstadoRecuperacion.CERT_COMERCIAL]
+    # Separar cert comercial y reconocimiento de análisis reales de laboratorio
+    analisis_rec = [
+        a
+        for a in todos_analisis_rec
+        if a.estado
+        not in (EstadoRecuperacion.CERT_COMERCIAL, EstadoRecuperacion.CERT_RECONOCIMIENTO)
+    ]
     cert_rec_record = next(
         (
             a
@@ -751,10 +756,10 @@ def _procesar_muestras_reconocimiento(
         ley_au2 = _calcular_ley_reco_gr_tm(m.au2_mg, peso)
         ley_au_avg = _promedio_decimal(ley_au1, ley_au2)
 
-        # Ag = señal neta: (Au+Ag_mg - avg(Au1,Au2)_mg) / peso * 1000
-        au_avg_mg = (Decimal(str(m.au1_mg)) + Decimal(str(m.au2_mg))) / 2
+        # Ag = señal neta: (Au+Ag_mg - Au2_mg - 0.001) / peso * 1000
         ag_mg = max(
-            Decimal("0"), Decimal(str(m.au_ag_mg)) - au_avg_mg - constantes.blank_correction_ag
+            Decimal("0"),
+            Decimal(str(m.au_ag_mg)) - Decimal(str(m.au2_mg)) - Decimal("0.001"),
         )
         ley_ag = _calcular_ley_reco_gr_tm(ag_mg, peso) if ag_mg > 0 else Decimal("0")
 
@@ -787,7 +792,7 @@ def _procesar_muestras_reconocimiento(
                 origen="AU_AG",
                 peso=peso,
                 mineral_mg=Decimal(str(m.au_ag_mg)),
-                ley=None,
+                ley=ley_ag,
                 numero_ensayo=m.numero_ensayo,
             )
         )

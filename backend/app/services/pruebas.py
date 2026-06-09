@@ -419,6 +419,27 @@ def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
             else None
         )
 
+        # Obtener ley Ag de la tabla analisis_ley para el lote
+        ley_ag_record = None
+        if rec.cip:
+            mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == rec.cip).first()
+            if mapeo:
+                ley_ag_record = (
+                    db.query(AnalisisLey)
+                    .filter(
+                        AnalisisLey.lote_id == mapeo.lote_id,
+                        AnalisisLey.material == "Ag",
+                        AnalisisLey.vigente == True,  # noqa: E712
+                    )
+                    .order_by(AnalisisLey.id.desc())
+                    .first()
+                )
+        ley_cola_ag_gr_tm = (
+            Decimal(str(ley_ag_record.ley_gr_tm))
+            if ley_ag_record and ley_ag_record.ley_gr_tm
+            else None
+        )
+
         resultado.append(
             RecuperacionItem(
                 ip=ip or "-",
@@ -427,7 +448,7 @@ def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
                 fecha_analisis=rec.fecha_analisis,
                 ley_cola_au_oz_tc=cola_oz_tc,
                 ley_cola_au_gr_tm=cola_gr_tm,
-                ley_cola_ag_gr_tm=rec.ley_cola_ag_gr_tm,
+                ley_cola_ag_gr_tm=ley_cola_ag_gr_tm,
                 solucion_au_g_m3=solucion_au,
                 solucion_ag_g_m3=rec.solucion_ag_g_m3,
                 recuperacion=rec.recuperacion,

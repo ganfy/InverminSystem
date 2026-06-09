@@ -17,6 +17,7 @@ from pathlib import Path as _Path
 
 from app.models.enums import EstadoRecuperacion
 from app.models.models import (
+    AnalisisLey,
     AnalisisRecuperacion,
     Configuracion,
     Lote,
@@ -123,7 +124,7 @@ _TEMPLATE = """
 </div>
 
 <table class="detalle">
-  <thead><tr><th>N&deg;</th><th>CÓDIGO</th><th>Ley Au Oz/Tc</th></tr></thead>
+  <thead><tr>{cabecera_detalle}</tr></thead>
   <tbody>{filas_detalle}</tbody>
 </table>
 
@@ -158,7 +159,9 @@ def _n_lq(lote_id: int, extra: str = "") -> str:
     return f"{base}{extra}"
 
 
-def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
+def generar_certificado_ley_comercial_pdf(
+    db: Session, ip_lote: str, columnas: list[str] = None
+) -> bytes:
     """
     Genera el PDF de certificado de ley comercial (formato Paititi) para un lote.
     Aplica las reglas de parametros_comerciales del proveedor-acopiador.
@@ -239,13 +242,59 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
     calc = calcular_ley_comercial(ley_planta, params)
     ley_comercial = calc["ley_comercial"]
 
-    fila = (
-        f"<tr>"
-        f"<td>1</td>"
-        f'<td class="codigo">{ip_lote}</td>'
-        f"<td><strong>{_fmt_oz(ley_comercial)}</strong></td>"
-        f"</tr>"
-    )
+    # Verificar si hay ley de plata (Ag) vigente y si pasa el umbral de parámetros comerciales
+    ley_ag_vigente = obtener_ley_ag_vigente(db, lote.id)
+    mostrar_ag = False
+    ley_ag_gr_tm = 0.0
+    ley_ag_oz_tc = 0.0
+    if ley_ag_vigente:
+        ley_ag_gr_tm, ley_ag_oz_tc = ley_ag_vigente
+        umbral_ag = (
+            params.umbral_ag_oz_tc if params and params.umbral_ag_oz_tc is not None else None
+        )
+        if umbral_ag is not None and float(ley_ag_oz_tc) >= float(umbral_ag):
+            mostrar_ag = True
+
+    ley_au_gr_tm = ley_comercial * 34.2857 if ley_comercial is not None else 0.0
+
+    # Determinar qué columnas mostrar
+    if not columnas:
+        columnas = ["ley_au_oz"]
+        if mostrar_ag:
+            columnas.append("ley_ag_oz")
+
+    # Si se pide plata, forzamos mostrarla aunque no pase umbral si vino de UI?
+    # Mantenemos que muestre lo que haya si lo pide (si pide Ag y hay Ag, mostrar).
+    # Si la pidió desde la UI y no hay Ag, saldrá "-".
+    cabecera = ["<th>N&deg;</th>", "<th>CÓDIGO</th>"]
+    if "ley_au_oz" in columnas:
+        cabecera.append("<th>Ley Au Oz/Tc</th>")
+    if "ley_au_gr" in columnas:
+        cabecera.append("<th>Ley Au g/TM</th>")
+    if "ley_ag_oz" in columnas:
+        cabecera.append("<th>Ley Ag Oz/Tc</th>")
+    if "ley_ag_gr" in columnas:
+        cabecera.append("<th>Ley Ag g/TM</th>")
+
+    cabecera_detalle = "".join(cabecera)
+
+    fila_cols = ["<tr>", "<td>1</td>", f'<td class="codigo">{ip_lote}</td>']
+    if "ley_au_oz" in columnas:
+        fila_cols.append(f"<td><strong>{_fmt_oz(ley_comercial)}</strong></td>")
+    if "ley_au_gr" in columnas:
+        fila_cols.append(f"<td><strong>{float(ley_au_gr_tm):.3f}</strong></td>")
+    if "ley_ag_oz" in columnas:
+        if ley_ag_vigente and (mostrar_ag or "ley_ag_oz" in columnas):
+            fila_cols.append(f"<td><strong>{_fmt_oz(float(ley_ag_oz_tc))}</strong></td>")
+        else:
+            fila_cols.append("<td>-</td>")
+    if "ley_ag_gr" in columnas:
+        if ley_ag_vigente and (mostrar_ag or "ley_ag_gr" in columnas):
+            fila_cols.append(f"<td><strong>{float(ley_ag_gr_tm):.3f}</strong></td>")
+        else:
+            fila_cols.append("<td>-</td>")
+    fila_cols.append("</tr>")
+    fila = "".join(fila_cols)
 
     # Notas si hubo descarte / dirimencia
     notas = ""
@@ -261,6 +310,7 @@ def generar_certificado_ley_comercial_pdf(db: Session, ip_lote: str) -> bytes:
         referencia=referencia,
         fecha_recepcion=fecha_recepcion,
         fecha_termino=_fmt_date(datetime.now()),
+        cabecera_detalle=cabecera_detalle,
         filas_detalle=fila,
         bloque_notas=notas,
         logo_b64=logo_b64,
@@ -419,9 +469,13 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
         "empresa_direccion", "Otr.Las Terrazas KM.2 - Chala - Caraveli - Arequipa"
     )
 
+    # Separar análisis de Au y Ag
+    analisis_au = [a for a in analisis_list if a.material == "Au" or a.material is None]
+    analisis_ag = [a for a in analisis_list if a.material == "Ag"]
+
     # Filas Au: +140 = ley_grueso, -140 = ley_fino (convención del Excel de planta)
     filas_au = ""
-    for i, a in enumerate(analisis_list, 1):
+    for i, a in enumerate(analisis_au, 1):
         filas_au += (
             f"<tr>"
             f"<td>{i}</td>"
@@ -433,9 +487,35 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
             f"</tr>"
         )
 
-    # Bloque Ag: solo si hay análisis con ley_gr_tm (proxy de que hay dato Ag registrado)
-    # Por ahora se omite si no hay datos de Ag — la sección queda reservada para futuro
+    # Bloque Ag: tabla separada si existen análisis de plata
     bloque_ag = ""
+    if analisis_ag:
+        filas_ag = ""
+        for i, a in enumerate(analisis_ag, 1):
+            filas_ag += (
+                f"<tr>"
+                f"<td>{i}</td>"
+                f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
+                f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None)}</strong></td>"
+                f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None)}</td>"
+                f"</tr>"
+            )
+        bloque_ag = f"""
+<div class="seccion-titulo" style="margin-top:15px; font-weight:bold; color:#c8a84b; font-size:11px;">ANÁLISIS POR PLATA</div>
+<table class="det" style="margin-top:5px;">
+  <thead>
+    <tr>
+      <th>ITEM</th>
+      <th>CÓDIGO</th>
+      <th>Ag Oz/Tc</th>
+      <th>LEY Ag Gr/TM</th>
+    </tr>
+  </thead>
+  <tbody>
+    {filas_ag}
+  </tbody>
+</table>
+"""
 
     fecha_analisis = analisis_list[-1].fecha_analisis
     hoy = datetime.now()
@@ -544,13 +624,6 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
     if not cip:
         raise ValueError(f"CIP {cip_code} no encontrado")
 
-    ley_plata_str = "-"
-    if cip and cip.lote_id:
-        ley_ag_vigente = obtener_ley_ag_vigente(db, cip.lote_id)
-        if ley_ag_vigente:
-            ley_ag_gr_tm, ley_ag_oz_tc = ley_ag_vigente
-            ley_plata_str = f"{float(ley_ag_gr_tm):.3f} g/TM ({float(ley_ag_oz_tc):.4f} Oz/TC)"
-
     analista_nombre = "DEPARTAMENTO TÉCNICO"
     analisis_list = (
         db.query(AnalisisRecuperacion)
@@ -587,9 +660,26 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
         cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
         liquido = _fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)
         sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
+
+        # Buscar ley Ag de la tabla analisis_ley para el CIP
+        ley_ag_rec = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.cip == cip_code,
+                AnalisisLey.material == "Ag",
+                AnalisisLey.vigente == True,  # noqa: E712
+            )
+            .first()
+        )
+        cola_ag = (
+            f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+            if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None
+            else "-"
+        )
+
         filas += (
             f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
-            f"<td>{cola}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
+            f"<td>{cola}</td><td>{cola_ag}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
         )
 
     fecha_analisis = analisis_list[-1].fecha_analisis
@@ -606,7 +696,6 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
         fecha_recepcion=fecha,
         fecha_termino=_fmt_date(datetime.now()),
         laboratorio=analisis_list[0].laboratorio or "-",
-        ley_plata=ley_plata_str,
         filas_detalle=filas,
         bloque_notas="",
         logo_b64=logo_b64,
@@ -641,7 +730,6 @@ def generar_certificado_recuperacion_comercial_pdf(db: Session, ip_lote: str) ->
     Genera el PDF de certificado de recuperación (formato Paititi con marca de agua)
     para entregar al proveedor. Usa el análisis de recuperación COMPLETADO vigente del lote.
     """
-    from app.models.models import AnalisisRecuperacion, Configuracion
 
     lote = (
         db.query(Lote)
@@ -787,7 +875,6 @@ _TEMPLATE_RECONOCIMIENTO = """
 <div class="seccion">
   <div class="kv-row"><span class="kv-label">Referencia</span><span class="kv-val">: {referencia}</span></div>
   <div class="kv-row"><span class="kv-label">An&aacute;lisis</span><span class="kv-val">: Reconocimiento Au / Ag (CIP)</span></div>
-  <div class="kv-row"><span class="kv-label">Ley de Plata (Cabeza)</span><span class="kv-val">: {ley_plata}</span></div>
 </div>
 <hr class="linea-gold"/>
 <div class="seccion">
@@ -798,10 +885,7 @@ _TEMPLATE_RECONOCIMIENTO = """
 <table class="detalle">
   <thead>
     <tr>
-      <th>N&deg;</th><th>C&Oacute;DIGO</th>
-      <th>Ley Cola Au (Oz/TC)</th>
-      <th>Ley L&iacute;quido Au (Oz/TC)</th>
-      <th>Soluci&oacute;n Ag (g/m&sup3;)</th>
+      {cabecera_detalle}
     </tr>
   </thead>
   <tbody>{filas_detalle}</tbody>
@@ -819,21 +903,16 @@ _TEMPLATE_RECONOCIMIENTO = """
 """
 
 
-def generar_cert_reconocimiento_cip_pdf(db: Session, ip_lote: str) -> bytes:
+def generar_cert_reconocimiento_cip_pdf(
+    db: Session, ip_lote: str, columnas: list[str] = None
+) -> bytes:
     """
     Certificado de reconocimineto por IP para comercial/admin.
-    Muestra solo: ley cola Au, ley líquido Au y solución Ag (si hay).
+    Muestra las columnas solicitadas o un set por defecto.
     """
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
         raise ValueError(f"Lote {ip_lote} no encontrado")
-
-    ley_plata_str = "-"
-    if lote:
-        ley_ag_vigente = obtener_ley_ag_vigente(db, lote.id)
-        if ley_ag_vigente:
-            ley_ag_gr_tm, ley_ag_oz_tc = ley_ag_vigente
-            ley_plata_str = f"{float(ley_ag_gr_tm):.3f} g/TM ({float(ley_ag_oz_tc):.4f} Oz/TC)"
 
     analisis_list = (
         db.query(AnalisisRecuperacion)
@@ -868,15 +947,62 @@ def generar_cert_reconocimiento_cip_pdf(db: Session, ip_lote: str) -> bytes:
     logo_b64 = _get_image_b64("logo invermin.png")
     membrete_b64 = _get_image_b64("membrete invermin.png")
 
+    # Si no se especifican columnas, usamos las por defecto (comportamiento previo)
+    if not columnas:
+        columnas = ["ley_cola_au", "ley_ag", "liquido_au", "liquido_ag"]
+
+    headers_html = "<th>N&deg;</th><th>C&Oacute;DIGO</th>"
+    if "ley_cabeza_au" in columnas:
+        headers_html += "<th>Ley Cabeza Au (Oz/TC)</th>"
+    if "ley_cola_au" in columnas:
+        headers_html += "<th>Ley Cola Au (Oz/TC)</th>"
+    if "liquido_au" in columnas:
+        headers_html += "<th>Ley L&iacute;quido Au (Oz/TC)</th>"
+    if "ley_ag" in columnas:
+        headers_html += "<th>Ley Cola Ag (g/TM)</th>"
+    if "liquido_ag" in columnas:
+        headers_html += "<th>Soluci&oacute;n Ag (g/m&sup3;)</th>"
+    if "recuperacion" in columnas:
+        headers_html += "<th>% Recuperaci&oacute;n</th>"
+
     filas = ""
     for i, a in enumerate(analisis_list, 1):
+        cabeza = _fmt_oz(float(a.ley_cabeza) if a.ley_cabeza is not None else None)
         cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
         liquido = _fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)
         sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
-        filas += (
-            f"<tr><td>{i}</td><td style='color:#b8860b'>{a.cip or '-'}</td>"
-            f"<td>{cola}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
-        )
+        recuperacion = f"{float(a.recuperacion):.2f}%" if a.recuperacion is not None else "-"
+
+        # Buscar ley Ag de la tabla analisis_ley para el CIP
+        cola_ag = "-"
+        if a.cip:
+            ley_ag_rec = (
+                db.query(AnalisisLey)
+                .filter(
+                    AnalisisLey.cip == a.cip,
+                    AnalisisLey.material == "Ag",
+                    AnalisisLey.vigente == True,  # noqa: E712
+                )
+                .first()
+            )
+            if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None:
+                cola_ag = f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+
+        row_html = f"<tr><td>{i}</td><td style='color:#b8860b'>{a.cip or '-'}</td>"
+        if "ley_cabeza_au" in columnas:
+            row_html += f"<td>{cabeza}</td>"
+        if "ley_cola_au" in columnas:
+            row_html += f"<td>{cola}</td>"
+        if "liquido_au" in columnas:
+            row_html += f"<td>{liquido}</td>"
+        if "ley_ag" in columnas:
+            row_html += f"<td>{cola_ag}</td>"
+        if "liquido_ag" in columnas:
+            row_html += f"<td>{sol_ag}</td>"
+        if "recuperacion" in columnas:
+            row_html += f"<td>{recuperacion}</td>"
+        row_html += "</tr>"
+        filas += row_html
 
     fecha_analisis = analisis_list[-1].fecha_analisis
     fecha = _fmt_date(
@@ -892,11 +1018,208 @@ def generar_cert_reconocimiento_cip_pdf(db: Session, ip_lote: str) -> bytes:
         fecha_recepcion=fecha,
         fecha_termino=_fmt_date(datetime.now()),
         laboratorio=analisis_list[0].laboratorio or "-",
-        ley_plata=ley_plata_str,
+        cabecera_detalle=headers_html,
         filas_detalle=filas,
         bloque_notas="",
         logo_b64=logo_b64,
         membrete_b64=membrete_b64,
+        analista=analista_nombre,
+    )
+    return _html_to_pdf(html)
+
+
+def generar_certificado_ensayo_conjunto_pdf(db: Session, cips: list[str]) -> bytes:
+    """Genera un certificado de ensayo consolidado para múltiples CIPs.\"\"\" """
+
+    analista_nombre = ""
+    filas_au = ""
+    bloque_ag = ""
+    filas_ag_html = ""
+    total_muestras = 0
+    laboratorio = "-"
+    fecha_ingreso = None
+    fecha_entrega = datetime.now().strftime("%d-%m-%y")
+
+    for i, cip_code in enumerate(cips, 1):
+        cip = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_code).first()
+        if not cip:
+            continue
+
+        analisis_list = (
+            db.query(AnalisisLey)
+            .filter(AnalisisLey.cip == cip_code, AnalisisLey.vigente)
+            .order_by(AnalisisLey.id)
+            .all()
+        )
+        if not analisis_list:
+            continue
+
+        if total_muestras == 0:
+            if analisis_list[0].creado_por:
+                usuario = (
+                    db.query(Usuario).filter(Usuario.id == analisis_list[0].creado_por).first()
+                )
+                if usuario:
+                    analista_nombre = usuario.nombre_completo
+            laboratorio = analisis_list[0].laboratorio
+            if analisis_list[-1].fecha_analisis:
+                fecha_ingreso = _fmt_date(
+                    datetime.combine(analisis_list[-1].fecha_analisis, datetime.min.time())
+                )
+
+        total_muestras += 1
+        a_au = next(
+            (a for a in reversed(analisis_list) if a.material == "Au" or a.material is None), None
+        )
+        if a_au:
+            filas_au += (
+                f"<tr>"
+                f"<td>{i}</td>"
+                f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
+                f"<td>{_fmt_oz(float(a_au.ley_grueso) if a_au.ley_grueso is not None else None)}</td>"
+                f"<td>{_fmt_oz(float(a_au.ley_fino) if a_au.ley_fino is not None else None)}</td>"
+                f"<td><strong>{_fmt_oz(float(a_au.ley_final) if a_au.ley_final is not None else None)}</strong></td>"
+                f"<td>{_fmt_oz(float(a_au.ley_gr_tm) if a_au.ley_gr_tm is not None else None)}</td>"
+                f"</tr>"
+            )
+
+        a_ag = next((a for a in reversed(analisis_list) if a.material == "Ag"), None)
+        if a_ag:
+            filas_ag_html += (
+                f"<tr>"
+                f"<td>{i}</td>"
+                f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
+                f"<td><strong>{_fmt_oz(float(a_ag.ley_final) if a_ag.ley_final is not None else None)}</strong></td>"
+                f"<td>{_fmt_oz(float(a_ag.ley_gr_tm) if a_ag.ley_gr_tm is not None else None)}</td>"
+                f"</tr>"
+            )
+
+    if filas_ag_html:
+        bloque_ag = f"""
+<div class="seccion-titulo" style="margin-top:15px; font-weight:bold; color:#c8a84b; font-size:11px;">ANÁLISIS POR PLATA</div>
+<table class="det" style="margin-top:5px;">
+  <thead>
+    <tr>
+      <th>ITEM</th>
+      <th>CÓDIGO</th>
+      <th>Ag Oz/Tc</th>
+      <th>LEY Ag Gr/TM</th>
+    </tr>
+  </thead>
+  <tbody>
+    {filas_ag_html}
+  </tbody>
+</table>
+"""
+
+    cfg_rows = (
+        db.query(Configuracion.clave, Configuracion.valor)
+        .filter(Configuracion.clave.in_(["empresa_nombre", "empresa_planta", "empresa_direccion"]))
+        .all()
+    )
+    cfg = {r.clave: r.valor for r in cfg_rows}
+
+    html = _TEMPLATE_ENSAYO.format(
+        empresa_nombre=cfg.get("empresa_nombre", "INVERMIN PAITITI S.A.C."),
+        empresa_sub=cfg.get("empresa_planta", "Inversiones Mineras con Responsabilidad Social"),
+        empresa_direccion=cfg.get("empresa_direccion", ""),
+        n_ensayo="CONSOLIDADO",
+        laboratorio=laboratorio or "-",
+        fecha_ingreso=fecha_ingreso or "-",
+        fecha_entrega=fecha_entrega,
+        filas_au=filas_au,
+        bloque_ag=bloque_ag,
+        total_muestras=total_muestras,
+        reportado_por=analista_nombre,
+        analista=analista_nombre,
+        logo_b64=_get_image_b64("logo invermin.png"),
+        membrete_b64=_get_image_b64("membrete invermin.png"),
+    )
+    return _html_to_pdf(html)
+
+
+def generar_certificado_recuperacion_conjunto_pdf(db: Session, cips: list[str]) -> bytes:
+    analista_nombre = "DEPARTAMENTO TÉCNICO"
+    laboratorio = "-"
+    fecha_recepcion = "-"
+    filas = ""
+
+    for i, cip_code in enumerate(cips, 1):
+        cip = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_code).first()
+        if not cip:
+            continue
+
+        analisis_list = (
+            db.query(AnalisisRecuperacion)
+            .filter(AnalisisRecuperacion.cip == cip_code, AnalisisRecuperacion.vigente)
+            .order_by(AnalisisRecuperacion.id)
+            .all()
+        )
+        if not analisis_list:
+            continue
+
+        a = analisis_list[-1]
+
+        if i == 1:
+            if a.creado_por:
+                usuario = db.query(Usuario).filter(Usuario.id == a.creado_por).first()
+                if usuario:
+                    analista_nombre = usuario.nombre_completo
+            laboratorio = a.laboratorio
+            if a.fecha_analisis:
+                fecha_recepcion = _fmt_date(datetime.combine(a.fecha_analisis, datetime.min.time()))
+
+        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
+        liquido = _fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)
+        sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
+
+        cola_ag = "-"
+        ley_ag_rec = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.cip == cip_code,
+                AnalisisLey.material == "Ag",
+                AnalisisLey.vigente,
+            )
+            .first()
+        )
+        if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None:
+            cola_ag = f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+
+        filas += (
+            f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
+            f"<td>{cola}</td><td>{cola_ag}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
+        )
+
+    cfg_rows = (
+        db.query(Configuracion.clave, Configuracion.valor)
+        .filter(Configuracion.clave.in_(["empresa_nombre", "empresa_planta", "empresa_direccion"]))
+        .all()
+    )
+    cfg = {r.clave: r.valor for r in cfg_rows}
+
+    cabecera_html = (
+        "<th>N&deg;</th><th>C&Oacute;DIGO</th>"
+        "<th>Ley Cola Au (Oz/TC)</th>"
+        "<th>Ley Cola Ag (g/TM)</th>"
+        "<th>Ley L&iacute;quido Au (Oz/TC)</th>"
+        "<th>Soluci&oacute;n Ag (g/m&sup3;)</th>"
+    )
+
+    html = _TEMPLATE_RECONOCIMIENTO.format(
+        empresa_nombre=cfg.get("empresa_nombre", "INVERMIN PAITITI S.A.C."),
+        empresa_sub=cfg.get("empresa_planta", ""),
+        empresa_direccion=cfg.get("empresa_direccion", ""),
+        n_lq="CONSOLIDADO",
+        referencia="Múltiples CIPs",
+        fecha_recepcion=fecha_recepcion,
+        fecha_termino=_fmt_date(datetime.now()),
+        laboratorio=laboratorio or "-",
+        cabecera_detalle=cabecera_html,
+        filas_detalle=filas,
+        bloque_notas="",
+        logo_b64=_get_image_b64("logo invermin.png"),
+        membrete_b64=_get_image_b64("membrete invermin.png"),
         analista=analista_nombre,
     )
     return _html_to_pdf(html)

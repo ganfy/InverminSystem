@@ -96,7 +96,6 @@ def _actualizar_parametros(
     campos = [
         "umbral_recup_bajo",
         "umbral_recup_medio",
-        "umbral_recup_alto",
         "lim_ley_inferior",
         "lim_ley_superior",
         "gasto_acopio",
@@ -107,6 +106,9 @@ def _actualizar_parametros(
         "dscto_ley_comercial",
         "porcentaje_ley_comercial",
         "riesgo_comercial",
+        "umbral_ag_oz_tc",
+        "rec_ag_pct",
+        "descuento_ag_usd",
     ]
     for campo in campos:
         valor = getattr(datos, campo, None)
@@ -165,6 +167,9 @@ def _serializar_tercero(
                 "dscto_ley_comercial": pc.dscto_ley_comercial,
                 "porcentaje_ley_comercial": pc.porcentaje_ley_comercial,
                 "riesgo_comercial": pc.riesgo_comercial,
+                "umbral_ag_oz_tc": pc.umbral_ag_oz_tc,
+                "rec_ag_pct": pc.rec_ag_pct,
+                "descuento_ag_usd": pc.descuento_ag_usd,
             }
 
     return {
@@ -419,6 +424,9 @@ def obtener_parametros_acopiador(db: Session, acopiador_id: int) -> dict | None:
         "dscto_ley_comercial": pc.dscto_ley_comercial,
         "porcentaje_ley_comercial": pc.porcentaje_ley_comercial,
         "riesgo_comercial": pc.riesgo_comercial,
+        "umbral_ag_oz_tc": pc.umbral_ag_oz_tc,
+        "rec_ag_pct": pc.rec_ag_pct,
+        "descuento_ag_usd": pc.descuento_ag_usd,
     }
 
 

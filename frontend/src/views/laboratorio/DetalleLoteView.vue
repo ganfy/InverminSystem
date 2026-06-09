@@ -172,14 +172,31 @@
               LEY PLANTA
               <span v-if="excluidos.size > 0" class="badge-simulando">SIMULANDO</span>
             </span>
-            <div style="display:flex;gap:0.5rem">
-              <button
-                class="btn-secondary"
-                style="font-size:0.75rem;padding:0.35rem 0.9rem"
-                @click="previsualizarCertLey"
-                :disabled="previsualizandoLey || leyPlantaSimulada === null"
-                title="Abrir previsualización del certificado"
-              >
+            <div style="display:flex; flex-direction: column; align-items: flex-end; gap:0.5rem">
+              <!-- Selección de columnas -->
+              <div style="display:flex; gap:0.75rem; font-size:0.75rem; color:var(--color-text); margin-bottom: 0.25rem;">
+                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer">
+                  <input type="checkbox" value="ley_au_oz" v-model="columnasCertLey" /> Au (Oz/Tc)
+                </label>
+                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer">
+                  <input type="checkbox" value="ley_au_gr" v-model="columnasCertLey" /> Au (g/TM)
+                </label>
+                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer">
+                  <input type="checkbox" value="ley_ag_oz" v-model="columnasCertLey" /> Ag (Oz/Tc)
+                </label>
+                <label style="display:flex; align-items:center; gap:0.25rem; cursor:pointer">
+                  <input type="checkbox" value="ley_ag_gr" v-model="columnasCertLey" /> Ag (g/TM)
+                </label>
+              </div>
+
+              <div style="display:flex;gap:0.5rem">
+                <button
+                  class="btn-secondary"
+                  style="font-size:0.75rem;padding:0.35rem 0.9rem"
+                  @click="previsualizarCertLey"
+                  :disabled="previsualizandoLey || leyPlantaSimulada === null || columnasCertLey.length === 0"
+                  title="Abrir previsualización del certificado"
+                >
                 <span v-if="previsualizandoLey" class="spinner" style="margin-right:0.4rem"></span>
                 <span v-else><Eye /> Previsualizar</span>
               </button>
@@ -200,9 +217,10 @@
                 :disabled="generando || leyPlantaSimulada === null"
                 :title="certLeyGuardado ? 'Regenerar certificado (sobreescribe el anterior)' : 'Guardar certificado PDF definitivo'"
               >
-                <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
-                {{ certLeyGuardado ? 'Regenerar PDF' : 'Guardar PDF definitivo' }}
-              </button>
+                  <span v-if="generando" class="spinner" style="margin-right:0.4rem"></span>
+                  {{ certLeyGuardado ? 'Regenerar PDF' : 'Guardar PDF definitivo' }}
+                </button>
+              </div>
             </div>
           </h2>
 
@@ -638,10 +656,29 @@
               </button>
             </div>
           </h2>
-          <p style="font-size:0.8rem;color:var(--color-text-muted)">
-            Certificado de reconocimiento de pulpa — ley cola Au, ley líquido Au y solución Ag.
-            El certificado de recuperación (%) se genera desde el módulo de Pruebas Metalúrgicas.
+          <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:1rem">
+            Certificado de reconocimiento de pulpa. Seleccione las columnas a incluir en el PDF:
           </p>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;font-size:0.8rem;padding:0.75rem;background:var(--color-bg-alt);border:1px solid var(--color-border);border-radius:6px">
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+              <input type="checkbox" value="ley_cabeza_au" v-model="columnasReconocimiento" /> Ley Cabeza Au
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+              <input type="checkbox" value="ley_cola_au" v-model="columnasReconocimiento" /> Ley Cola Au
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+              <input type="checkbox" value="liquido_au" v-model="columnasReconocimiento" /> Ley Líquido Au
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+              <input type="checkbox" value="ley_ag" v-model="columnasReconocimiento" /> Ley Cola Ag
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+              <input type="checkbox" value="liquido_ag" v-model="columnasReconocimiento" /> Solución Ag
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+              <input type="checkbox" value="recuperacion" v-model="columnasReconocimiento" /> % Recuperación
+            </label>
+          </div>
           <div v-if="certReconocimientoGuardado" class="cert-guardado-info">
             ✓ Certificado de reconocimiento generado
             <span v-if="!puedeRegenerarCerts" style="font-size:0.72rem;color:var(--color-text-faint);margin-left:0.4rem">
@@ -1064,7 +1101,7 @@ function abrirConfirmarGenerar() {
 async function previsualizarCertLey() {
   previsualizandoLey.value = true
   try {
-    await laboratorioApi.previewCertificadoLeyPdf(ipActual)
+    await laboratorioApi.previewCertificadoLeyPdf(ipActual, columnasCertLey.value)
   } catch {
     ui.toast('Error al generar previsualización', 'error')
   } finally {
@@ -1097,7 +1134,7 @@ async function confirmarYGuardar() {
 
   generando.value = true
   try {
-    const res = await laboratorioApi.guardarCertificadoLey(ipActual)
+    const res = await laboratorioApi.guardarCertificadoLey(ipActual, columnasCertLey.value)
     certLeyGuardado.value = res.ruta
     ui.toast('Certificado guardado correctamente', 'success')
   } catch {
@@ -1162,6 +1199,8 @@ const modalDescartarRec  = ref<number | null>(null)
 const justificacionRec   = ref('')
 const guardandoReconocimiento  = ref(false)
 const certReconocimientoGuardado = ref<string | null>(null)
+const columnasReconocimiento = ref<string[]>(['cabeza', 'cola', 'liquido', 'recuperacion', 'ag'])
+const columnasCertLey = ref<string[]>(['ley_au_oz', 'ley_ag_oz'])
 
 const tieneRecuperacionVigente = computed(() =>
   lote.value?.analisis_recuperacion.some(a => a.vigente && a.estado === 'COMPLETADO') ?? false
@@ -1170,7 +1209,7 @@ const tieneRecuperacionVigente = computed(() =>
 async function guardarCertReconocimientoFn() {
   guardandoReconocimiento.value = true
   try {
-    const res = await laboratorioApi.guardarCertReconocimiento(ipActual)
+    const res = await laboratorioApi.guardarCertReconocimiento(ipActual, columnasReconocimiento.value)
     certReconocimientoGuardado.value = res.ruta
     ui.toast('Certificado de reconocimiento guardado', 'success')
   } catch (e: any) {
