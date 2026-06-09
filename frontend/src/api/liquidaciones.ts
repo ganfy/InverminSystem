@@ -174,6 +174,15 @@ export const obtenerPrecioOro = async (): Promise<number | null> => {
     return response.data;
 };
 
+/**
+ * Obtiene el precio diario de la plata (London Fix Noon)
+ * Retorna un number o null si no se pudo obtener.
+ */
+export const obtenerPrecioPlata = async (): Promise<number | null> => {
+    const response = await api.get('/liquidaciones/precio-plata');
+    return response.data;
+};
+
 
 export function getLotesDisponibles(provacop_id: number) {
     return api.get<LoteDisponible[]>('/liquidaciones/lotes-disponibles', {

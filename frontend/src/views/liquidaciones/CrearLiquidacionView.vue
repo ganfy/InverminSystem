@@ -394,7 +394,7 @@
   import { useUiStore } from '@/stores/ui'
   import { useAuthStore } from '@/stores/auth'
   import api from '@/api/axios'
-  import { obtenerPrecioOro, type EditOverrides } from '@/api/liquidaciones'
+  import { obtenerPrecioOro, obtenerPrecioPlata, type EditOverrides } from '@/api/liquidaciones'
 
   const router = useRouter()
   const store  = useLiquidacionesStore()
@@ -448,6 +448,11 @@
       spotUsd.value = await obtenerPrecioOro()
     } catch {
       spotUsd.value = null
+    }
+    try {
+      spotAgUsd.value = await obtenerPrecioPlata()
+    } catch {
+      spotAgUsd.value = null
     }
   }
 

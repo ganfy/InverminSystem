@@ -23,6 +23,7 @@ from app.schemas.liquidaciones import (
     LoteDisponible,
 )
 from app.services import liquidaciones as svc
+from app.services.liquidaciones_ag import obtener_ultimo_valor_plata_noon
 from app.services.liquidaciones_au import obtener_ultimo_valor_oro_pm
 from app.services.liquidaciones_pdf import guardar_pdf_liquidacion
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -40,6 +41,14 @@ def precio_oro(
 ):
     """Obtiene el último valor del Gold PM desde LBMA Fix. Retorna null si falla."""
     return obtener_ultimo_valor_oro_pm()
+
+
+@router.get("/precio-plata", response_model=float | None)
+def precio_plata(
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+):
+    """Obtiene el último valor de Plata Noon Fix. Retorna null si falla."""
+    return obtener_ultimo_valor_plata_noon()
 
 
 # ── Lotes disponibles para liquidar ──────────────────────────────────────────
