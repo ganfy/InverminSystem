@@ -199,6 +199,7 @@ def _determinar_rec_liq(
         .filter(
             AnalisisRecuperacion.lote_id == lote_id,
             AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.estado != "CERT_RECONOCIMIENTO",
         )
         .order_by(AnalisisRecuperacion.id.desc())
         .first()
@@ -213,6 +214,7 @@ def _rec_planta(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisRecuperacion.lote_id == lote_id,
             AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.estado != "CERT_RECONOCIMIENTO",
         )
         .order_by(AnalisisRecuperacion.id.desc())
         .first()
