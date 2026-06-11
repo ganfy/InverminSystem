@@ -173,8 +173,8 @@
               <td class="td-truncate td-muted" :title="lote.acopiador || ''">{{ lote.acopiador || '—' }}</td>
               <td class="align-center">
                 <div class="celda-analisis">
-                  <span class="badge-analisis" :class="badgeAnalisis(lote.estado_analisis)">
-                    {{ labelAnalisis(lote.estado_analisis) }}
+                  <span class="badge-analisis" :class="badgeAnalisis(lote)">
+                    {{ labelAnalisis(lote) }}
                   </span>
                   <div class="tags-secundarios">
                     <span
@@ -188,7 +188,12 @@
                       title="Este lote tiene o tuvo análisis de dirimencia"
                     >DIRIM</span>
                     <span
-                      v-if="lote.habilitado_ruma"
+                      v-if="['ASIGNADO_RUMA', 'LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(lote.estado)"
+                      class="tag-sec tag-en-ruma"
+                      title="Lote ya asignado a ruma"
+                    >EN RUMA</span>
+                    <span
+                      v-else-if="lote.habilitado_ruma"
                       class="tag-sec tag-habilitado"
                       title="Habilitado para ingresar a ruma"
                     >RUMA ✓</span>
@@ -1027,23 +1032,29 @@ function badgeLiq(estado: string) {
     PAGADA:    'badge-pagada',
   }[estado] ?? 'badge-generada'
 }
-function badgeAnalisis(estado: string): string {
+function badgeAnalisis(lote: LoteDashboard): string {
+  if (lote.estado_analisis === 'LISTO' && ['LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(lote.estado)) {
+    return 'analisis-completo'
+  }
   return {
       SIN_DATOS:       'analisis-sin-datos',
       FALTA_MUESTREO:  'analisis-falta-muestreo',
       FALTA_LEY:       'analisis-falta-ley',
       FALTA_REC:       'analisis-falta-rec',
       LISTO:           'analisis-listo',
-  }[estado] ?? 'analisis-sin-datos'
+  }[lote.estado_analisis] ?? 'analisis-sin-datos'
 }
-function labelAnalisis(estado: string): string {
+function labelAnalisis(lote: LoteDashboard): string {
+  if (lote.estado_analisis === 'LISTO' && ['LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(lote.estado)) {
+    return 'COMPLETO'
+  }
   return {
     SIN_DATOS: 'Sin datos',
     FALTA_MUESTREO: 'Falta humedad',
     FALTA_LEY: 'Falta ley',
     FALTA_REC: 'Falta recuperación',
     LISTO:     'Listo para liquidar',
-  }[estado] ?? estado
+  }[lote.estado_analisis] ?? lote.estado_analisis
 }
 
 onMounted(() => {
@@ -1298,6 +1309,7 @@ onMounted(() => {
 .analisis-falta-ley    { background: rgba(59,130,246,0.15);  color: #60a5fa; border: 1px solid rgba(59,130,246,0.25); }
 .analisis-falta-rec { background: rgba(245,158,11,0.15);  color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
 .analisis-listo     { background: rgba(34,197,94,0.15);   color: #22c55e; border: 1px solid rgba(34,197,94,0.25); }
+.analisis-completo  { background: rgba(34,197,94,0.05);   color: #15803d; border: 1px solid rgba(34,197,94,0.15); }
 .analisis-falta-muestreo { background: rgba(168,85,247,0.12); color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
 
 /* Tags secundarios */
@@ -1310,6 +1322,7 @@ onMounted(() => {
 .tag-volado     { background: var(--color-volado-bg);  color: var(--color-volado); border: 1px solid rgba(68, 122, 239, 0.2); }
 .tag-dirimencia { background: var(--color-dirimencia-bg);  color: var(--color-dirimencia); border: 1px solid rgba(168, 85, 247, 0.2); }
 .tag-habilitado { background: rgba(34,197,94,0.1);    color: #4ade80; border: 1px solid rgba(34,197,94,0.15); }
+.tag-en-ruma    { background: rgba(148,163,184,0.1); color: var(--color-text-muted); border: 1px solid rgba(148,163,184,0.2); }
 .tag-remu { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.2); }
 
 .btn-accion {
