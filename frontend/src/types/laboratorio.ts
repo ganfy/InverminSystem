@@ -1,6 +1,6 @@
 export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia' | 'comercial'
 export type OrigenDatos = 'manual' | 'certificado'
-export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO' | 'CERT_COMERCIAL'
+export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO' | 'CERT_COMERCIAL' | 'CERT_RECONOCIMIENTO'
 export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno'
 
 // ── Análisis de Ley ───────────────────────────────────────────────────────────

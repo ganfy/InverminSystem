@@ -199,6 +199,11 @@ CONFIGURACIONES = [
         "descripcion": "Cantidad máxima de códigos CIP que se pueden generar por lote",
     },
     {
+        "clave": "MUESTREO_CIPS_IMPRIMIR",
+        "valor": "3",
+        "descripcion": "Cantidad de códigos CIP que se imprimen al dar clic en Etiquetar",
+    },
+    {
         "clave": "labs_lista",
         "valor": '["Minares South S.R.L.", "El Dorado - Invermin Paititi", "Quantum", "Otro"]',
         "descripcion": "Lista de laboratorios disponibles para asignar a CIPs",

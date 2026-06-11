@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.models.enums import TipoMuestra
@@ -81,7 +81,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
     )
 
     lista: list[LotePruebaList] = []
-    ahora = datetime.now()
+    ahora = datetime.now(UTC).replace(tzinfo=None)
 
     for lote in lotes_db:
         pruebas = (
@@ -162,7 +162,7 @@ def registrar_prueba(
                 f"Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
             )
 
-    datos.fecha_ingreso = datetime.now()
+    datos.fecha_ingreso = datetime.now(UTC).replace(tzinfo=None)
 
     prueba_existente = (
         db.query(PruebaMetalurgica)
@@ -258,7 +258,7 @@ def etiquetar_prueba(
             "Todas las pruebas ya tienen CIP asignado."
         )
 
-    ahora = datetime.now()
+    ahora = datetime.now(UTC).replace(tzinfo=None)
     if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=48):
         raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
 
@@ -302,7 +302,7 @@ def obtener_pruebas_para_recuperacion(db: Session) -> list[PruebaRecuperacionIte
     2. El lote tiene ley planta calculable (al menos 1 análisis de ley vigente).
     Usado por Comercial para crear el registro pendiente de recuperación.
     """
-    ahora = datetime.now()
+    ahora = datetime.now(UTC).replace(tzinfo=None)
 
     # Lote IDs con CIP de recuperación interno
     lote_ids_con_cip_rec = (
@@ -419,6 +419,27 @@ def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
             else None
         )
 
+        # Obtener ley Ag de la tabla analisis_ley para el lote
+        ley_ag_record = None
+        if rec.cip:
+            mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == rec.cip).first()
+            if mapeo:
+                ley_ag_record = (
+                    db.query(AnalisisLey)
+                    .filter(
+                        AnalisisLey.lote_id == mapeo.lote_id,
+                        AnalisisLey.material == "Ag",
+                        AnalisisLey.vigente == True,  # noqa: E712
+                    )
+                    .order_by(AnalisisLey.id.desc())
+                    .first()
+                )
+        ley_cola_ag_gr_tm = (
+            Decimal(str(ley_ag_record.ley_gr_tm))
+            if ley_ag_record and ley_ag_record.ley_gr_tm
+            else None
+        )
+
         resultado.append(
             RecuperacionItem(
                 ip=ip or "-",
@@ -427,7 +448,7 @@ def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
                 fecha_analisis=rec.fecha_analisis,
                 ley_cola_au_oz_tc=cola_oz_tc,
                 ley_cola_au_gr_tm=cola_gr_tm,
-                ley_cola_ag_gr_tm=rec.ley_cola_ag_gr_tm,
+                ley_cola_ag_gr_tm=ley_cola_ag_gr_tm,
                 solucion_au_g_m3=solucion_au,
                 solucion_ag_g_m3=rec.solucion_ag_g_m3,
                 recuperacion=rec.recuperacion,

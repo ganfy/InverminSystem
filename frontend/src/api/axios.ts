@@ -5,6 +5,9 @@ import { useAuthStore } from '@/stores/auth'
 const api = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
+  paramsSerializer: {
+    indexes: null // Serializa arrays como key=val1&key=val2 sin []
+  }
 })
 
 // Inyectar token en cada request

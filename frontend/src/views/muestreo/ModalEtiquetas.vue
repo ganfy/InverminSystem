@@ -101,6 +101,7 @@ import type { MapeoCIPOut } from '@/api/muestreo'
 import { X, WifiOff } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { muestreoApi } from '@/api/muestreo'
+import { adminApi } from '@/api/admin'
 
 const props = defineProps<{ ipLote: string }>()
 const emit = defineEmits(['close', 'etiquetado'])
@@ -146,9 +147,19 @@ const inicializarEtiquetas = async () => {
 
   let historial = historialInicial
 
+  let cantidadAImprimir = 3; // Default
+  try {
+    const config = await adminApi.getPublicConfig()
+    if (config['MUESTREO_CIPS_IMPRIMIR']) {
+      cantidadAImprimir = parseInt(config['MUESTREO_CIPS_IMPRIMIR'], 10) || 3
+    }
+  } catch (e) {
+    console.error('No se pudo cargar config de impresión', e)
+  }
+
   if (!historial || historial.length === 0) {
-    mensajeCarga.value = 'Generando muestras iniciales (Laboratorio y Dirimencia)...'
-    const nuevos = await store.generarCodigosCip(props.ipLote, 2)
+    mensajeCarga.value = 'Generando muestras iniciales...'
+    const nuevos = await store.generarCodigosCip(props.ipLote, cantidadAImprimir)
     if (nuevos) {
       historial = nuevos
       emit('etiquetado')

@@ -228,8 +228,9 @@ export const laboratorioApi = {
     // ── Certificado LEY ───────────────────────────────────────────────────────
 
     /** Abre el cert de ley en nueva pestaña para previsualizar */
-    async previewCertificadoLeyPdf(ip: string): Promise<void> {
-        const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf?inline=true`, {
+    async previewCertificadoLeyPdf(ip: string, columnas?: string[]): Promise<void> {
+        const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf`, {
+            params: { inline: true, columnas },
             responseType: 'blob',
         })
         const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
@@ -238,8 +239,9 @@ export const laboratorioApi = {
     },
 
     /** Descarga el cert de ley como archivo */
-    async descargarCertificadoPdf(ip: string): Promise<void> {
+    async descargarCertificadoPdf(ip: string, columnas?: string[]): Promise<void> {
         const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf`, {
+            params: { columnas },
             responseType: 'blob',
         })
         const url = URL.createObjectURL(response.data)
@@ -251,8 +253,9 @@ export const laboratorioApi = {
     },
 
     /** Genera y guarda el cert de ley en storage del servidor */
-    async guardarCertificadoLey(ip: string): Promise<GuardarCertResult> {
-        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-ley`)
+    async guardarCertificadoLey(ip: string, columnas?: string[]): Promise<GuardarCertResult> {
+        const params = columnas ? { columnas } : undefined
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-ley`, null, { params })
         return data
     },
 
@@ -297,9 +300,37 @@ export const laboratorioApi = {
         setTimeout(() => URL.revokeObjectURL(url), 10_000)
     },
 
-    async guardarCertReconocimiento(ip: string): Promise<GuardarCertResult> {
-        const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-reconocimiento`)
+    async guardarCertReconocimiento(ip: string, columnas?: string[]): Promise<GuardarCertResult> {
+        let url = `/laboratorio/lotes/${ip}/guardar-certificado-reconocimiento`
+        if (columnas && columnas.length > 0) {
+            url += `?columnas=${columnas.join(',')}`
+        }
+        const { data } = await api.post(url)
         return data
+    },
+
+    async descargarCertificadoEnsayoConjunto(cips: string[]): Promise<void> {
+        const response = await api.get(`/laboratorio/cips/certificado-ensayo-conjunto?cips=${cips.join(',')}`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(response.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `ensayos_consolidados.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+    },
+
+    async descargarCertificadoRecuperacionConjunto(cips: string[]): Promise<void> {
+        const response = await api.get(`/laboratorio/cips/certificado-recuperacion-conjunto?cips=${cips.join(',')}`, {
+            responseType: 'blob',
+        })
+        const url = URL.createObjectURL(response.data)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `recuperaciones_consolidadas.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
     },
 
     async descargarCertificadoEnsayo(cip: string): Promise<void> {

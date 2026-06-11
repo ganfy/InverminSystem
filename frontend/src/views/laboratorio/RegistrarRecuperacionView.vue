@@ -318,7 +318,7 @@ const resumen = computed(() => {
 
   // Cálculo del % de Recuperación usando Oz/TC contra la ley cabeza
   const cabeza = analisisPendiente.value ? Number(analisisPendiente.value.ley_cabeza) : null
-  const recuperacion = (cabeza && leyColaAuOzTc < cabeza)
+  const recuperacion = (cabeza && cabeza > 0)
     ? parseFloat(((cabeza - leyColaAuOzTc) / cabeza * 100).toFixed(2))
     : null
 
@@ -372,11 +372,6 @@ async function guardar() {
     return
   }
 
-  const cabeza = Number(analisisPendiente.value.ley_cabeza)
-  if (resumen.value.leyColaAuOzTc >= cabeza) {
-    errForm.value = 'La ley cola calculada debe ser menor a la ley cabeza'
-    return
-  }
 
   const okConf = await ui.showConfirm({
     title: 'Generar Certificado',

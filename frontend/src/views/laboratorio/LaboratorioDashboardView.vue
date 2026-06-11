@@ -139,10 +139,24 @@
         </div>
       </div>
 
+      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+        <button
+          class="btn-primary"
+          :disabled="cipsSeleccionados.length === 0 || generandoConjunto"
+          @click="generarCertificadoConjunto"
+        >
+          <span v-if="generandoConjunto" class="spinner" style="margin-right:0.4rem"></span>
+          Generar Certificado en Conjunto ({{ cipsSeleccionados.length }})
+        </button>
+      </div>
+
       <div class="tabla-wrapper">
         <table class="tabla">
           <thead>
             <tr>
+              <th style="width:40px;text-align:center">
+                <input type="checkbox" :checked="todosSeleccionados" @change="toggleTodosSeleccionados" />
+              </th>
               <th>CIP</th>
               <th>FECHA ENVÍO</th>
               <template v-if="tabActual === 'ley'">
@@ -161,17 +175,20 @@
           </thead>
           <tbody>
             <tr v-if="store.cargando">
-              <td :colspan="tabActual === 'ley' ? 8 : 6" class="estado-tabla">
+              <td :colspan="tabActual === 'ley' ? 9 : 7" class="estado-tabla">
                 <span class="spinner" style="margin-right:0.5rem"></span> Cargando...
               </td>
             </tr>
             <template v-else>
               <tr v-if="filasMostrar.length === 0">
-                <td :colspan="tabActual === 'ley' ? 8 : 6" class="estado-tabla sin-datos">Sin registros</td>
+                <td :colspan="tabActual === 'ley' ? 9 : 7" class="estado-tabla sin-datos">Sin registros</td>
               </tr>
 
               <template v-if="tabActual === 'ley'">
                 <tr v-for="fila in filasMostrar" :key="fila.cip">
+                  <td style="text-align:center">
+                    <input type="checkbox" :value="fila.cip" v-model="cipsSeleccionados" />
+                  </td>
                   <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                   <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
                   <td>{{ fila.leyMas ?? '-' }}</td>
@@ -191,6 +208,9 @@
 
               <template v-if="tabActual === 'rec'">
                 <tr v-for="fila in filasMostrar" :key="fila.cip">
+                  <td style="text-align:center">
+                    <input type="checkbox" :value="fila.cip" v-model="cipsSeleccionados" />
+                  </td>
                   <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                   <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
                   <td>{{ fila.leyCola ?? '-' }}</td>
@@ -239,6 +259,14 @@ const tabActual      = ref<'ley' | 'rec'>('ley')
 const filtroEstado   = ref('')
 const filtroBusqueda = ref('')
 const filtroBusquedaLotes = ref('')
+
+const cipsSeleccionados = ref<string[]>([])
+const generandoConjunto = ref(false)
+
+// Resetear selección al cambiar de pestaña
+watch(tabActual, () => {
+  cipsSeleccionados.value = []
+})
 
 const lotes = ref<LoteLabOut[]>([])
 const cargandoLotes = ref(false)
@@ -422,6 +450,35 @@ async function generarCertRec(fila: any) {
     if (!fila.id) return
     await store.generarCertificadoRecInterno(fila.id)
     recargar()
+}
+
+const todosSeleccionados = computed(() => {
+  return filasMostrar.value.length > 0 && cipsSeleccionados.value.length === filasMostrar.value.length
+})
+
+function toggleTodosSeleccionados(e: Event) {
+  const checked = (e.target as HTMLInputElement).checked
+  if (checked) {
+    cipsSeleccionados.value = filasMostrar.value.map(f => f.cip)
+  } else {
+    cipsSeleccionados.value = []
+  }
+}
+
+async function generarCertificadoConjunto() {
+  if (cipsSeleccionados.value.length === 0) return
+  generandoConjunto.value = true
+  try {
+    if (tabActual.value === 'ley') {
+      await laboratorioApi.descargarCertificadoEnsayoConjunto(cipsSeleccionados.value)
+    } else {
+      await laboratorioApi.descargarCertificadoRecuperacionConjunto(cipsSeleccionados.value)
+    }
+  } catch (e) {
+    ui.toast('Error al generar certificado consolidado', 'error')
+  } finally {
+    generandoConjunto.value = false
+  }
 }
 </script>
 

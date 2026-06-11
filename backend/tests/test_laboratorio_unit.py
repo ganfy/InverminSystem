@@ -228,22 +228,7 @@ class TestCalcularLeyComercial:
 
 
 class TestValidacionRecuperacion:
-    """Tests de la regla: ley_cola debe ser estrictamente menor a ley_cabeza."""
-
-    def test_ley_cola_menor_a_cabeza_es_valido(self):
-        ley_cabeza = Decimal("0.559")
-        ley_cola = Decimal("0.041")
-        assert ley_cola < ley_cabeza  # regla de negocio
-
-    def test_ley_cola_igual_a_cabeza_debe_rechazarse(self):
-        ley_cabeza = Decimal("0.559")
-        ley_cola = Decimal("0.559")
-        assert not (ley_cola < ley_cabeza)
-
-    def test_ley_cola_mayor_a_cabeza_fisicamente_imposible(self):
-        ley_cabeza = Decimal("0.300")
-        ley_cola = Decimal("0.400")
-        assert not (ley_cola < ley_cabeza)
+    """Tests del cálculo de porcentaje de recuperación."""
 
     def test_calculo_porcentaje_recuperacion(self):
         """% recup = ((cabeza - cola) / cabeza) × 100"""

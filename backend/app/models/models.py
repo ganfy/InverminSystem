@@ -403,7 +403,10 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
     )
     modificador_estado = relationship("Usuario", foreign_keys=[estado_modificado_por])
 
-    __table_args__ = (UniqueConstraint("sesion_id", "numero_lote", name="uq_lote_sesion_numero"),)
+    __table_args__ = (
+        UniqueConstraint("sesion_id", "numero_lote", name="uq_lote_sesion_numero"),
+        {"implicit_returning": False},
+    )
 
 
 class Pesaje(Base, AuditMixin):
@@ -574,6 +577,8 @@ class AnalisisLey(AuditMixin, Base):
 
     __tablename__ = "analisis_ley"
 
+    __table_args__ = {"implicit_returning": False}
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
@@ -734,6 +739,8 @@ class Campana(AuditMixin, Base):
     """
 
     __tablename__ = "campanas"
+
+    __table_args__ = {"implicit_returning": False}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     codigo = Column(String(50), unique=True, nullable=False)  # CAMP2026-01

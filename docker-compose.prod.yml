@@ -11,8 +11,6 @@ services:
       - /mnt/datos_invermin/storage:/mnt/datos_invermin/storage
     expose:
       - "8000"
-    ports:
-      - "8000:8000" # Opcional: expone el backend en el puerto 8000 para depuración externa o monitoreo directos
 
   frontend:
     build:

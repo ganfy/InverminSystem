@@ -199,6 +199,7 @@ def _determinar_rec_liq(
         .filter(
             AnalisisRecuperacion.lote_id == lote_id,
             AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.estado != "CERT_RECONOCIMIENTO",
         )
         .order_by(AnalisisRecuperacion.id.desc())
         .first()
@@ -213,6 +214,7 @@ def _rec_planta(db: Session, lote_id: int) -> Decimal | None:
         .filter(
             AnalisisRecuperacion.lote_id == lote_id,
             AnalisisRecuperacion.vigente == True,  # noqa: E712
+            AnalisisRecuperacion.estado != "CERT_RECONOCIMIENTO",
         )
         .order_by(AnalisisRecuperacion.id.desc())
         .first()
@@ -425,19 +427,20 @@ def _calcular_lote(
 
     params_ag_completos = all(v is not None for v in (umbral_ag, rec_ag, dscto_ag))
 
-    if ag_result is not None and params_ag_completos and spot_ag_usd:
+    if ag_result is not None and params_ag_completos:
         ley_ag_gr_tm, ley_ag_oz_tc = ag_result
         if ley_ag_oz_tc >= umbral_ag:
-            # oz_ag_pagables = TMS × ley_ag_oz_tc × (rec_ag / 100)
-            oz_ag_pagables = (tms * ley_ag_oz_tc * rec_ag / 100).quantize(
-                Decimal("0.0001"), rounding=ROUND_HALF_UP
-            )
-            precio_neto_ag = spot_ag_usd - dscto_ag
-            if precio_neto_ag > 0:
-                valor_ag_usd = (oz_ag_pagables * precio_neto_ag).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
+            aplica_ag = True
+            if spot_ag_usd:
+                # oz_ag_pagables = TMS × ley_ag_oz_tc × (rec_ag / 100)
+                oz_ag_pagables = (tms * ley_ag_oz_tc * rec_ag / 100).quantize(
+                    Decimal("0.0001"), rounding=ROUND_HALF_UP
                 )
-                aplica_ag = True
+                precio_neto_ag = spot_ag_usd - dscto_ag
+                if precio_neto_ag > 0:
+                    valor_ag_usd = (oz_ag_pagables * precio_neto_ag).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
         # ley_ag_gr_tm se expone siempre que exista análisis (para mostrar en UI aunque no se pague)
 
     # ── Alertas no criticas ───────────────────────────────────────────────────
@@ -613,7 +616,7 @@ def preview_liquidacion(
         alertas_globales=alertas_globales,
         puede_generar=puede_generar and bool(lotes_out),
         total_ag_usd=total_ag,
-        hay_ag=total_ag > 0,
+        hay_ag=any(lo.aplica_ag for lo in lotes_out),
     )
 
 

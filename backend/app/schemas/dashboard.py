@@ -1,6 +1,12 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def naive_to_utc(v: datetime | None) -> datetime | None:
+    if isinstance(v, datetime) and v.tzinfo is None:
+        return v.replace(tzinfo=UTC)
+    return v
 
 
 class DashboardKPIs(BaseModel):
@@ -161,6 +167,11 @@ class TrazabilidadPrueba(BaseModel):
     adicion_naoh: float | None
     gasto_agno3: float | None
     registro: AccionRegistro
+
+    @field_validator("fecha_ingreso", "fecha_salida", mode="before")
+    @classmethod
+    def validate_dates(cls, v):
+        return naive_to_utc(v)
 
 
 class TrazabilidadAnalisisLey(BaseModel):

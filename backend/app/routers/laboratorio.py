@@ -467,22 +467,21 @@ def registrar_ley_por_ip(
 
 # ── Generar certificado PDF (formato Paititi) ──────────────────────────────
 @router.get("/lotes/{ip}/certificado-pdf")
-def generar_certificado_pdf(
+def ver_certificado_ley_comercial(
     ip: str,
-    inline: bool = False,
-    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    inline: bool = True,
+    columnas: list[str] = Query(None),
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """
-    Genera el PDF del certificado de ley comercial.
-    ?inline=true → previsualización en navegador.
-    ?inline=false → descarga (default).
+    Descarga o previsualiza (inline) el certificado comercial de ley (PDF).
     Solo Comercial, Gerencia, Admin.
     """
     from app.services import certificado_ley_pdf as cert_svc
 
     try:
-        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip)
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip, columnas=columnas)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -500,12 +499,13 @@ def generar_certificado_pdf(
 @router.post("/lotes/{ip}/guardar-certificado-ley")
 def guardar_certificado_ley(
     ip: str,
+    columnas: list[str] = Query(None),
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
     """Genera y persiste el certificado de ley en storage. Retorna ruta relativa."""
     try:
-        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip)
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip, columnas=columnas)
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "ley")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -646,12 +646,14 @@ def guardar_certificado_recuperacion(
 @router.post("/lotes/{ip}/guardar-certificado-reconocimiento")
 def guardar_certificado_reconocimiento(
     ip: str,
+    columnas: str = Query(None, description="Columnas separadas por comas"),
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
     """Genera y persiste el certificado de reconocimiento en storage."""
     try:
-        pdf_bytes = cert_svc.generar_cert_reconocimiento_pdf(db, ip)
+        col_list = columnas.split(",") if columnas else None
+        pdf_bytes = cert_svc.generar_cert_reconocimiento_cip_pdf(db, ip, columnas=col_list)
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "reconocimiento")
 
         lote_obj = db.query(Lote).filter(Lote.ip == ip).first()
@@ -707,6 +709,58 @@ def generar_certificado_ensayo(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     nombre = f"ensayo_{cip.replace('-', '_')}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/cips/certificado-ensayo-conjunto")
+def generar_certificado_ensayo_conjunto(
+    cips: str = Query(..., description="CIPs separados por coma"),
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Genera PDF de informe de ensayo consolidado para múltiples CIPs."""
+    from app.services import certificado_ley_pdf as cert_svc
+
+    cip_list = [c.strip() for c in cips.split(",")]
+    if not cip_list:
+        raise HTTPException(status_code=400, detail="Debe proveer al menos un CIP")
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_ensayo_conjunto_pdf(db, cip_list)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = "ensayos_consolidados.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/cips/certificado-recuperacion-conjunto")
+def generar_certificado_recuperacion_conjunto(
+    cips: str = Query(..., description="CIPs separados por coma"),
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Genera PDF de informe de recuperación consolidado para múltiples CIPs."""
+    from app.services import certificado_ley_pdf as cert_svc
+
+    cip_list = [c.strip() for c in cips.split(",")]
+    if not cip_list:
+        raise HTTPException(status_code=400, detail="Debe proveer al menos un CIP")
+
+    try:
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_conjunto_pdf(db, cip_list)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    nombre = "recuperaciones_consolidadas.pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
