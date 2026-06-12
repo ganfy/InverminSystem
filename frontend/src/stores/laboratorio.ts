@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { laboratorioApi } from '@/api/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { generateUUID } from '@/utils/uuid'
 import type {
     AnalisisLeyCreate,
     AnalisisRecuperacionCreate,
@@ -110,7 +111,7 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
             ui.toast('Sin conexion: el analisis se guardara pero el certificado no podra adjuntarse hasta reconectar.', 'warning')
         }
         try {
-            const offline_id = crypto.randomUUID()
+            const offline_id = generateUUID()
             await encolarAnalisisLey({
                 offline_id,
                 datos: {
@@ -176,7 +177,7 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
         try {
             await encolarAnalisisRecuperacion({
-                offline_id: crypto.randomUUID(),
+                offline_id: generateUUID(),
                 analisis_id: analisisId,
                 datos: {
                     ley_cola: datos.ley_cola,
