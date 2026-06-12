@@ -5,7 +5,20 @@ import { authApi } from '@/api/auth'
 import router from '@/router'
 
 async function hashearCredenciales(username: string, pass: string): Promise<string> {
-  const msgUint8 = new TextEncoder().encode(username.toLowerCase() + ':' + pass)
+  const text = username.toLowerCase() + ':' + pass
+  // crypto.subtle solo está disponible en contextos seguros (HTTPS o localhost).
+  // Si no está disponible (ej. acceso por HTTP IP en móvil), usamos un fallback no criptográfico.
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    let hash = 0
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i)
+      hash = (hash << 5) - hash + char
+      hash |= 0
+    }
+    return 'fallback-' + Math.abs(hash).toString(16)
+  }
+  
+  const msgUint8 = new TextEncoder().encode(text)
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -44,15 +57,19 @@ export const useAuthStore = defineStore('auth', () => {
       await fetchMe()
 
       // 2. Guardar respaldo para futuros accesos Offline (Diccionario de usuarios)
-      const hash = await hashearCredenciales(userKey, password)
-      const cachedUsers = JSON.parse(localStorage.getItem('offline_users_dict') || '{}')
+      try {
+        const hash = await hashearCredenciales(userKey, password)
+        const cachedUsers = JSON.parse(localStorage.getItem('offline_users_dict') || '{}')
 
-      cachedUsers[userKey] = {
-        hash: hash,
-        perfil: user.value
+        cachedUsers[userKey] = {
+          hash: hash,
+          perfil: user.value
+        }
+        localStorage.setItem('offline_users_dict', JSON.stringify(cachedUsers))
+        localStorage.setItem('last_offline_user', userKey) // Para saber a quién cargarle el perfil
+      } catch (offlineError) {
+        console.warn('No se pudo guardar el respaldo offline:', offlineError)
       }
-      localStorage.setItem('offline_users_dict', JSON.stringify(cachedUsers))
-      localStorage.setItem('last_offline_user', userKey) // Para saber a quién cargarle el perfil
 
     } catch (e: any) {
       // 3. Fallback: Modo Offline

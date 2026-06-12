@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { muestreoApi, type LoteMuestreo, type MapeoCIPOut, type MuestreoCreate } from '@/api/muestreo'
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
+import { generateUUID } from '@/utils/uuid'
 import {
     encolarMuestreoOffline,
     obtenerMuestreosPendientes ,
@@ -61,7 +62,7 @@ export const useMuestreoStore = defineStore('muestreo', () => {
                 ui.toast(`Intento ${datos.intento} guardado en el servidor`, 'success')
             } else {
                 // OFFLINE: Guardar en IndexedDB
-                const offlineId = `muestreo-off-${crypto.randomUUID()}`
+                const offlineId = `muestreo-off-${generateUUID()}`
 
                 await encolarMuestreoOffline({
                     offline_id: offlineId,
