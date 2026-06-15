@@ -46,6 +46,8 @@ import { _TICKET_CSS, _TICKET_CSS_MULTI } from './_TICKET_CSS'
 
 const FORCE_OFFLINE = import.meta.env.VITE_FORCE_OFFLINE === 'true'
 
+import { networkOnline } from '@/composables/useSync'
+
 // ── Helpers privados ───────────────────────────────────────
 
 function esOfflineId(id: number | string): id is string {
@@ -53,7 +55,7 @@ function esOfflineId(id: number | string): id is string {
 }
 
 function estamosOffline(): boolean {
-  return FORCE_OFFLINE || !navigator.onLine
+  return FORCE_OFFLINE || !networkOnline.value
 }
 
 function loteOfflineADetalle(lote: LoteOfflineData): LoteDetalle {

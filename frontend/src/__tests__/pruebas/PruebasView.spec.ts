@@ -5,7 +5,6 @@ import PruebasView from '@/views/pruebas/PruebasView.vue'
 import { useRouter } from 'vue-router'
 import { pruebasApi } from '@/api/pruebas'
 import { obtenerPruebasPendientes } from '@/composables/useOfflineQueue'
-import { ref } from 'vue'
 
 vi.mock('vue-router', async (importOriginal) => {
     const actual = await importOriginal<typeof import('vue-router')>()
@@ -15,35 +14,35 @@ vi.mock('vue-router', async (importOriginal) => {
             push: vi.fn()
         })),
         useRoute: vi.fn(() => ({
-            params: {},
-            query: {}
+            params: {}
         }))
     }
-  })
+})
 
 vi.mock('@/api/pruebas', () => ({
     pruebasApi: {
-        obtenerListaPruebas: vi.fn()
+        obtenerListaPruebas: vi.fn(),
+        syncBatch: vi.fn()
     }
 }))
 
-vi.mock('@/composables/useOfflineQueue', () => ({
-    obtenerPruebasPendientes: vi.fn()
-}))
+vi.mock('@/composables/useOfflineQueue', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/composables/useOfflineQueue')>()
+    return {
+        ...actual,
+        obtenerPruebasPendientes: vi.fn(() => Promise.resolve([])),
+        marcarPruebaSynced: vi.fn(),
+        marcarPruebaError: vi.fn(),
+        limpiarPruebasSynced: vi.fn(),
+        contarPendientes: vi.fn(() => Promise.resolve(0)),
+        ipsDisponibles: vi.fn(() => Promise.resolve(100))
+    }
+})
 
-vi.mock('@/composables/useSync', () => ({
-    useSync: () => ({
-        pendientes: ref(0),
-        online: ref(true),
-        ultimoSync: ref(Date.now())
-    })
-}))
-
-describe('PruebasView.vue', () => {
+describe('PruebasView', () => {
     let wrapper: any
     let routerPushMock: any
 
-    // Datos simulados (Online)
     const mockLotesOnline = [
         { ip: 'IP-001', fecha_recepcion: '2026-04-01T10:00:00Z', estado: 'PENDIENTE' },
         { ip: 'IP-002', fecha_recepcion: '2026-04-01T11:00:00Z', estado: 'EN PROCESO' },
@@ -63,11 +62,11 @@ describe('PruebasView.vue', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         routerPushMock = vi.fn()
-            ; (useRouter as any).mockReturnValue({ push: routerPushMock })
+        ;(useRouter as any).mockReturnValue({ push: routerPushMock })
 
-            // Configuramos los retornos por defecto de nuestras funciones mockeadas
-            ; (pruebasApi.obtenerListaPruebas as any).mockResolvedValue(mockLotesOnline)
-            ; (obtenerPruebasPendientes as any).mockResolvedValue([]) // Por defecto sin datos offline
+        // Configuramos los retornos por defecto de nuestras funciones mockeadas
+        ;(pruebasApi.obtenerListaPruebas as any).mockResolvedValue(mockLotesOnline)
+        ;(obtenerPruebasPendientes as any).mockResolvedValue([]) // Por defecto sin datos offline
     })
 
     const mountView = () => {
@@ -93,7 +92,7 @@ describe('PruebasView.vue', () => {
 
     it('2. Muestra la sección "SIN SINCRONIZAR" cuando hay datos locales', async () => {
         // Forzamos a que la función offline devuelva nuestro mock
-        ; (obtenerPruebasPendientes as any).mockResolvedValue(mockLotesOffline)
+        ;(obtenerPruebasPendientes as any).mockResolvedValue(mockLotesOffline)
 
         wrapper = mountView()
         await flushPromises()

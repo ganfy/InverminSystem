@@ -7,6 +7,7 @@ import { ref } from 'vue'
 import { obtenerSesionesPendientes, obtenerProvacops } from '@/composables/useOfflineQueue'
 
 vi.mock('@/composables/useSync', () => ({
+    networkOnline: { value: true },
     useSync: () => ({
         pendientes: ref(false),
         online: ref(true),

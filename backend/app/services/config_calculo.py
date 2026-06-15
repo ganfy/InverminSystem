@@ -50,6 +50,11 @@ DEFAULTS: dict[str, str] = {
     "alerta_horas_muestreo_ley": "24",
     "alerta_horas_ley_recuperacion": "72",
     "alerta_dias_volado_stock": "30",
+    # Balanza offline - bloques IP y Ticket
+    "proximo_ip": "1",
+    "tamano_bloque_ip": "50",
+    "proximo_ticket": "1",
+    "tamano_bloque_ticket": "50",
 }
 
 DESCRIPCIONES: dict[str, str] = {
@@ -81,6 +86,11 @@ DESCRIPCIONES: dict[str, str] = {
     "alerta_horas_muestreo_ley": "Horas máximas entre muestreo y resultado de ley antes de generar alerta",
     "alerta_horas_ley_recuperacion": "Horas máximas entre resultado de ley y recuperación antes de generar alerta",
     "alerta_dias_volado_stock": "Días máximos permitidos para lotes volados en stock antes de generar alerta",
+    # Balanza offline - bloques IP y Ticket
+    "proximo_ip": "Número de IP desde el que comenzará el próximo bloque reservado para balanza offline (cambiar en producción para continuar la numeración)",
+    "tamano_bloque_ip": "Cantidad de IPs reservados por cada sync/login del frontend (cuántos lotes offline puede registrar por sesión sin conexión)",
+    "proximo_ticket": "Número de ticket desde el que comenzará el próximo bloque reservado para balanza offline",
+    "tamano_bloque_ticket": "Cantidad de tickets reservados por cada sync/login del frontend",
 }
 
 
@@ -151,6 +161,16 @@ def actualizar_constante(db: Session, clave: str, valor: str) -> dict:
     elif clave in ("empresa_nombre", "empresa_planta", "empresa_ruc", "empresa_direccion"):
         if not val:
             raise ValueError(f"El campo '{clave}' no puede estar vacío.")
+    elif clave in ("proximo_ip", "tamano_bloque_ip", "proximo_ticket", "tamano_bloque_ticket"):
+        # Deben ser enteros positivos
+        try:
+            int_val = int(val)
+            if int_val < 1:
+                raise ValueError()
+        except (ValueError, TypeError) as e:
+            raise ValueError(
+                f"El valor para '{clave}' debe ser un número entero positivo (≥ 1)."
+            ) from e
     else:
         # Por defecto, todas las demás son numéricas (constantes, alertas, metas, etc.)
         try:

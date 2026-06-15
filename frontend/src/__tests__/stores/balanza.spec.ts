@@ -9,6 +9,7 @@ import {
     obtenerSesionesPendientes,
     type LoteOnlineData
 } from '@/composables/useOfflineQueue'
+import { networkOnline } from '@/composables/useSync'
 
 // Interceptor para limpiar la BD
 let dbRef: IDBDatabase | null = null
@@ -43,6 +44,7 @@ describe('Store: Balanza (Flujo Híbrido y Offline)', () => {
 
         // 3. Forzar que el navegador empiece "Online"
         vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+        networkOnline.value = true
     })
 
     afterEach(() => {
@@ -66,6 +68,7 @@ describe('Store: Balanza (Flujo Híbrido y Offline)', () => {
 
             // 3. ¡SE CAE LA RED! Simulamos desconexión
             vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+            networkOnline.value = false
 
             // 4. Intentamos agregar un lote. Como no hay red, debe ir a 'lotes_online_q'
             const loteAgregado = await store.agregarLote(99, {
@@ -99,6 +102,7 @@ describe('Store: Balanza (Flujo Híbrido y Offline)', () => {
 
             // 2. Sin red, agregamos el lote
             vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+            networkOnline.value = false
             const lote = await store.agregarLote(99, {
                 tipo_material: 'zinc',
                 pesaje: { peso_inicial: 40, peso_final: 15 }
@@ -125,6 +129,7 @@ describe('Store: Balanza (Flujo Híbrido y Offline)', () => {
         it('debe permitir crear una sesión entera desde cero sin internet y guardarla en sesiones_q', async () => {
             // 1. Apagamos el internet desde el inicio
             vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+            networkOnline.value = false
 
             // 2. Preparamos la caché local
             const { guardarProvacops, obtenerSesionesPendientes } = await import('@/composables/useOfflineQueue')
