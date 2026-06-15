@@ -4,7 +4,10 @@
       <div v-if="ui.confirm" class="modal-overlay" @click.self="ui.resolveConfirm(false)">
         <div class="modal modal-sm confirm-modal">
           <div class="modal-header">
-            <h2>{{ ui.confirm.title }}</h2>
+            <h2 class="confirm-title">
+              <AlertTriangle v-if="ui.confirm.danger" class="danger-icon" :size="20" />
+              {{ ui.confirm.title }}
+            </h2>
           </div>
           <div class="modal-body">
             <p class="confirm-msg">{{ ui.confirm.message }}</p>
@@ -29,10 +32,23 @@
 
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
+import { AlertTriangle } from 'lucide-vue-next'
+
 const ui = useUiStore()
 </script>
 
 <style scoped>
+.confirm-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.danger-icon {
+  color: var(--color-warning, #cf973d);
+}
+
 .confirm-msg {
   color: var(--color-text-muted);
   font-family: var(--font-mono);

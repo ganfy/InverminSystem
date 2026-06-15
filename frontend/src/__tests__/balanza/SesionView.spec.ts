@@ -23,6 +23,7 @@ vi.mock('vue-router', async (importOriginal) => {
 
 // 2. Mockear el Composable de Sincronización
 vi.mock('@/composables/useSync', () => ({
+    networkOnline: { value: true },
     useSync: () => ({
         online: ref(true),
         sesionRecargada: ref(null),

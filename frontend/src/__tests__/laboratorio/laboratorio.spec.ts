@@ -34,6 +34,7 @@ vi.mock('@/api/laboratorio', () => ({
 
 vi.mock('@/composables/useSync', () => ({
     useSync: vi.fn(() => ({ online: { value: true } })),
+    networkOnline: { value: true }
 }))
 
 vi.mock('@/composables/useOfflineQueue', () => ({

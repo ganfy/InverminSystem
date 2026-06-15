@@ -275,7 +275,7 @@
   // ── Métodos: servidor ─────────────────────────────────────────────────────────
   async function cargarDelServidor() {
     if (!props.sesionId) return
-    if (!navigator.onLine) return
+    if (!online.value) return
     try {
       documentosServidor.value = await balanzaApi.listarDocumentos(props.sesionId)
     } catch (err: any) {

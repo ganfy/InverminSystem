@@ -212,13 +212,24 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   factor_oz_tc: 'Factor de Conversión (Oz/TC → Gr/TM)',
   umbral_volado_oz_tc: 'Umbral de Ley para Lote Volado',
   blank_correction_ag: 'Corrección en Blanco de Plata (Ag)',
+  proximo_ip: 'IP Inicial del Próximo Bloque (Balanza Offline)',
+  tamano_bloque_ip: 'Tamaño del Bloque de IPs (Balanza Offline)',
+  proximo_ticket: 'Ticket Inicial del Próximo Bloque (Balanza Offline)',
+  tamano_bloque_ticket: 'Tamaño del Bloque de Tickets (Balanza Offline)',
 }
 
 const UNIDADES: Record<string, string> = {
   factor_oz_tc: 'Gr/TM',
   umbral_volado_oz_tc: 'Oz/TC',
   blank_correction_ag: 'mg',
+  proximo_ip: '#',
+  proximo_ticket: '#',
+  tamano_bloque_ip: 'IPs',
+  tamano_bloque_ticket: 'tickets',
 }
+
+// Claves críticas que requieren advertencia especial al editar
+const CLAVES_CRITICAS = new Set(['proximo_ip', 'proximo_ticket'])
 
 // ── Constantes de cálculo ───────────────────────────────────────────────────
 const cargandoCalculo  = ref(true)
@@ -241,12 +252,20 @@ async function cargarConstantes() {
 async function guardarConstante(clave: string) {
   const valor = editsCalculo[clave]?.trim()
   if (!valor) return
+
+  const esCritica = CLAVES_CRITICAS.has(clave)
+  const mensaje = esCritica
+    ? `Atención: Estás cambiando "${clave}" a ${valor}.\n\nEsto define desde qué número comenzará el próximo bloque de IPs/Tickets reservado para la balanza offline.\n\n• Si el valor ya fue asignado antes, se generarán colisiones al sincronizar.\n• El cambio aplica en el próximo login o sincronización del operador de balanza.\n\n¿Confirmar cambio?`
+    : `¿Cambiar "${clave}" a ${valor}? Afecta futuros cálculos de ley.`
+
   const ok = await ui.showConfirm({
-    title: 'Actualizar constante',
-    message: `¿Cambiar "${clave}" a ${valor}? Afecta futuros cálculos de ley.`,
-    confirmLabel: 'Actualizar',
+    title: esCritica ? 'Cambio crítico de numeración' : 'Actualizar constante',
+    message: mensaje,
+    confirmLabel: 'Confirmar',
+    danger: esCritica
   })
   if (!ok) return
+
   guardandoCalculo[clave] = true
   try {
     await adminApi.updateConstante(clave, valor)

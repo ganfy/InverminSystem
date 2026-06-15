@@ -26,9 +26,23 @@ let isRefreshing = false
 let queue: Array<(token: string) => void> = []
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Petición exitosa: notificar que la red está disponible.
+    // Permite restaurar el estado online si habíamos detectado un error de red previo
+    // (ej. después de reconectar el WiFi físico).
+    window.dispatchEvent(new CustomEvent('app-network-online'))
+    return response
+  },
   async (error) => {
     const originalRequest = error.config
+
+    // Si es un error de red real (sin respuesta del servidor): WiFi caído, servidor inalcanzable.
+    // Esto cubre casos donde navigator.onLine no se actualiza a tiempo (ej. desconexión física
+    // mientras otras interfaces virtuales como Docker/WSL siguen activas).
+    const esErrorDeRed = !error.response || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED'
+    if (esErrorDeRed) {
+      window.dispatchEvent(new CustomEvent('app-network-offline'))
+    }
 
     // Si el backend dice "Prohibido" (El usuario no tiene el rol necesario)
     if (error.response?.status === 403) {

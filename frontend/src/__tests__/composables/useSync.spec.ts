@@ -93,7 +93,7 @@ describe('useSync - Manager de Sincronización', () => {
             window.dispatchEvent(new Event('online'))
 
             await flushPromises()
-            await delay(100)
+            await delay(400)
             await flushPromises()
 
             expect(syncManager.online.value).toBe(true)
@@ -137,7 +137,7 @@ describe('useSync - Manager de Sincronización', () => {
             wrapper = mount(TestComponent)
 
             await flushPromises()
-            await delay(100)
+            await delay(400)
             await flushPromises()
 
             // Comprobamos la llamada usando el Singleton
