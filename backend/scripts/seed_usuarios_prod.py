@@ -104,6 +104,14 @@ USUARIOS_PROD = [
         "email": "gerencia.comercial@invermin.pe",
         "password": "GerenciaComercial#2026",
     },
+    # Pruebas Metalúrgicas
+    {
+        "username": "metalurgista",
+        "nombre_completo": "PC Pruebas Metalúrgicas",
+        "rol": "Metalurgista",
+        "email": "metalurgista@invermin.pe",
+        "password": "Pruebas#2026",
+    },
     # Admin
     {
         "username": "admin",

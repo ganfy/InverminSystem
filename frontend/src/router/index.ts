@@ -103,6 +103,8 @@ const router = createRouter({
                 return '/muestreo'
               case 'Laboratorista':
                 return '/laboratorio'
+              case 'Metalurgista':
+                return '/pruebas'
               default:
                 return '/login'
             }
