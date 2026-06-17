@@ -37,7 +37,7 @@
         <div class="filtros">
           <select class="field-input field-select filtro-select" v-model="filtroRol">
             <option value="">Todos los roles</option>
-            <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
+            <option v-for="r in ROLES" :key="r.value" :value="r.value">{{ r.label }}</option>
           </select>
           <select class="field-input field-select filtro-select" v-model="filtroEstado">
             <option value="">Todos los estados</option>
@@ -80,7 +80,7 @@
             <tr v-for="u in usuariosFiltrados" :key="u.id" :class="{ inactivo: !u.activo }">
               <td class="td-nombre">{{ u.nombre_completo }}</td>
               <td class="td-mono">{{ u.username }}</td>
-              <td><span class="badge-rol" :class="rolClass(u.rol)">{{ u.rol }}</span></td>
+              <td><span class="badge-rol" :class="rolClass(u.rol)">{{ getRolLabel(u.rol) }}</span></td>
               <td>
                 <span class="badge-estado" :class="u.activo ? 'activo' : 'inactivo'">
                   {{ u.activo ? 'ACTIVO' : 'INACTIVO' }}
@@ -384,7 +384,7 @@
               <label class="field-label">Rol *</label>
               <select class="field-input field-select" v-model="form.rol">
                 <option value="" disabled>Seleccionar rol</option>
-                <option v-for="r in ROLES" :key="r" :value="r">{{ r }}</option>
+                <option v-for="r in ROLES" :key="r.value" :value="r.value">{{ r.label }}</option>
               </select>
             </div>
             <div class="field">
@@ -462,8 +462,13 @@ const tabActivo = ref<'usuarios' | 'parametros' | 'notificaciones'>('usuarios')
 
 // ── Datos estáticos ───────────────────────────────────────────────────────────
 const ROLES = [
-  'Admin', 'Gerencia', 'Comercial',
-  'Laboratorista', 'Operador Balanza', 'Técnico Muestreo', 'Metalurgista',
+  { value: 'Admin', label: 'Admin' },
+  { value: 'Gerencia', label: 'Gerencia' },
+  { value: 'Comercial', label: 'Comercial' },
+  { value: 'Laboratorista', label: 'Laboratorista' },
+  { value: 'OperadorBalanza', label: 'Operador Balanza' },
+  { value: 'TecnicoMuestreo', label: 'Técnico Muestreo' },
+  { value: 'Metalurgista', label: 'Metalurgista' },
 ]
 
 const NOMBRES_AMIGABLES: Record<string, string> = {
@@ -627,17 +632,22 @@ function formatFecha(iso: string | null | undefined) {
   })
 }
 
-function rolClass(rol: string) {
+function getRolLabel(rolCodigo: string) {
+  const r = ROLES.find(x => x.value === rolCodigo)
+  return r ? r.label : rolCodigo
+}
+
+function rolClass(rolCodigo: string) {
   const map: Record<string, string> = {
     'Admin':            'rol-admin',
     'Gerencia':         'rol-gerencia',
     'Comercial':        'rol-comercial',
     'Laboratorista':    'rol-lab',
-    'Operador Balanza': 'rol-operador',
-    'Técnico Muestreo': 'rol-tecnico',
+    'OperadorBalanza':  'rol-operador',
+    'TecnicoMuestreo':  'rol-tecnico',
     'Metalurgista':     'rol-metalurgista',
   }
-  return map[rol] ?? ''
+  return map[rolCodigo] ?? ''
 }
 
 async function cargarUsuarios() {
@@ -691,7 +701,7 @@ async function guardarUsuario() {
     if (modoEditar.value && editandoId.value) {
       await usuariosApi.editar(editandoId.value, {
         nombre_completo: form.value.nombre_completo,
-        rol: form.value.rol,
+        rol_codigo: form.value.rol,
         email: form.value.email || undefined,
       })
     } else {
@@ -699,7 +709,7 @@ async function guardarUsuario() {
         username:        form.value.username,
         password:        form.value.password,
         nombre_completo: form.value.nombre_completo,
-        rol:             form.value.rol,
+        rol_codigo:      form.value.rol,
         email:           form.value.email || undefined,
       })
     }
