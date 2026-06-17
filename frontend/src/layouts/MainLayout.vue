@@ -183,7 +183,7 @@ watch(() => online.value, (isOnline) => {
 .sidebar {
   width: 220px;
   min-height: 100vh;
-  background: #1e1e16;
+  background: var(--color-bg-card);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -381,7 +381,7 @@ watch(() => online.value, (isOnline) => {
   gap: 1rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-border);
-  background: #1e1e16;
+  background: var(--color-bg-card);
   position: sticky;
   top: 0;
   z-index: 50;
