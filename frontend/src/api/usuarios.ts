@@ -14,13 +14,13 @@ export interface UsuarioCrear {
   username:        string
   password:        string
   nombre_completo: string
-  rol:             string
+  rol_codigo:      string
   email?:          string
 }
 
 export interface UsuarioEditar {
   nombre_completo?: string
-  rol?:             string
+  rol_codigo?:      string
   email?:           string
 }
 
