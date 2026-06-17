@@ -72,7 +72,7 @@ def _serializar_lote(lote: Lote) -> LoteDetalle:
         numero_lote=lote.numero_lote,
         tipo_material=lote.tipo_material,
         estado=lote.estado,
-        volado=lote.volado,
+        volado=bool(lote.volado or False),
         peso_neto=_peso_neto(pesaje.peso_inicial, pesaje.peso_final) if pesaje else None,
         fecha_pesaje=pesaje.fecha_fin if pesaje else None,
         eliminado=lote.eliminado,

@@ -34,3 +34,24 @@ body.modo-offline::after {
   z-index: 9999;
   transition: background-color 0.3s ease-in-out;
 }
+
+/* =========================================
+   MODOS DE ACCESIBILIDAD (a11y)
+   Aplicados al :root por accessibility.ts
+========================================= */
+
+/* Transición suave al cambiar preferencias */
+html {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+/* Modo Solar: ajustes que no se cubren solo con variables CSS */
+html.a11y-solar .tabla tr:hover:not(.inactivo) td {
+  background: rgba(106, 72, 0, 0.06);
+}
+
+html.a11y-solar .modal-overlay {
+  background: rgba(80, 70, 40, 0.55);
+}
