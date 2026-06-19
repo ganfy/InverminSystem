@@ -29,6 +29,12 @@ export interface LotePruebaList {
     // Etiquetado (nuevo)
     cip_asignado: string | null
     etiquetado: boolean
+    // Adiciones acumuladas
+    adicion_nacn: number | null
+    adicion_naoh: number | null
+    // Descarte
+    descartado: boolean
+    motivo_descarte: string | null
 }
 
 export interface EtiquetadoPruebaOut {
@@ -115,6 +121,18 @@ export const pruebasApi = {
     /** Solicita remuestreo: siempre crea un nuevo registro (auditoría) */
     async solicitarRemuestreo(ip: string): Promise<PruebaMetalurgicaOut> {
         const { data } = await api.post(`/pruebas/${ip}/remuestreo`)
+        return data
+    },
+
+    /** Descartar prueba (envase roto, etc.) — mantiene registro para trazabilidad */
+    async descartar(ip: string, motivo: string): Promise<PruebaMetalurgicaOut> {
+        const { data } = await api.post(`/pruebas/${ip}/descartar`, { motivo })
+        return data
+    },
+
+    /** Registrar adición parcial de NaCN/NaOH (acumulativa a lo existente) */
+    async registrarAdicion(ip: string, datos: { adicion_nacn?: number | null, adicion_naoh?: number | null, porcentaje_nacn?: number | null }): Promise<PruebaMetalurgicaOut> {
+        const { data } = await api.post(`/pruebas/${ip}/adicion`, datos)
         return data
     },
 }

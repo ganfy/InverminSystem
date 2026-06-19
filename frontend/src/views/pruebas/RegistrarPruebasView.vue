@@ -41,28 +41,13 @@
           </div>
 
           <div class="field">
-            <label class="field-label">ADICIÓN NaCN (g):</label>
-            <input type="number" class="field-input" v-model.number="form.adicion_nacn" step="0.01" />
-          </div>
-
-          <div class="field">
             <label class="field-label">NaCN (%):</label>
             <input type="number" class="field-input" v-model.number="form.porcentaje_nacn" step="0.01" />
           </div>
 
           <div class="field">
-            <label class="field-label">ADICIÓN NaOH (g):</label>
-            <input type="number" class="field-input" v-model.number="form.adicion_naoh" step="0.01" />
-          </div>
-
-          <div class="field">
             <label class="field-label">pH INICIAL:</label>
             <input type="number" class="field-input" v-model.number="form.ph_inicial" step="0.01" />
-          </div>
-
-          <div class="field">
-            <label class="field-label">pH FINAL:</label>
-            <input type="number" class="field-input" v-model.number="form.ph_final" step="0.01" />
           </div>
         </div>
       </div>
@@ -100,7 +85,7 @@
   const form = ref({
     malla_porcentaje: null as number | null,
     porcentaje_nacn: null as number | null,
-    ph_inicial: null as number | null,
+    ph_inicial: 6 as number | null,
     ph_final: null as number | null,
     adicion_nacn: null as number | null,
     adicion_naoh: null as number | null,

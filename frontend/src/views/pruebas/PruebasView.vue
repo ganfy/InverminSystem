@@ -95,13 +95,19 @@
             <th>INGRESO A RODILLOS</th>
             <th>FIN PROYECTADO</th>
             <th>MALLA (%)</th>
+            <th>ADIC. NaCN</th>
+            <th>ADIC. NaOH</th>
             <th>CIP RECUPERACIÓN</th>
             <th>ESTADO</th>
             <th>ACCIONES</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="prueba in pruebasFiltradas" :key="prueba.ip">
+          <tr
+            v-for="prueba in pruebasFiltradas"
+            :key="prueba.ip + (prueba.fecha_ingreso ?? '')"
+            :class="{ 'fila-descartada': prueba.descartado }"
+          >
             <td class="td-mono" style="color:var(--color-gold)">{{ prueba.ip }}</td>
             <td class="td-fecha">{{ fmt(prueba.fecha_recepcion) }}</td>
             <td class="td-fecha">{{ fmt(prueba.fecha_ingreso) }}</td>
@@ -109,6 +115,15 @@
               {{ fmt(prueba.fecha_salida) }}
             </td>
             <td class="td-mono">{{ prueba.malla_porcentaje?.toFixed(1) ?? '---' }}</td>
+            <!-- Columnas de adición acumulada -->
+            <td class="td-mono">
+              <span v-if="prueba.adicion_nacn != null" class="adicion-badge">{{ prueba.adicion_nacn.toFixed(2) }}g</span>
+              <span v-else class="td-mono" style="color:var(--color-text-faint)">—</span>
+            </td>
+            <td class="td-mono">
+              <span v-if="prueba.adicion_naoh != null" class="adicion-badge">{{ prueba.adicion_naoh.toFixed(2) }}g</span>
+              <span v-else class="td-mono" style="color:var(--color-text-faint)">—</span>
+            </td>
             <!-- CIP de recuperación -->
             <td>
               <span v-if="prueba.cip_asignado" class="td-mono" style="color:var(--color-gold);font-size:0.8rem">
@@ -117,48 +132,82 @@
               <span v-else class="badge-estado pendiente" style="font-size:0.65rem">Sin CIP</span>
             </td>
             <td>
-              <span class="badge-estado" :class="estadoClase(prueba.estado)">
-                {{ prueba.estado }}
-              </span>
+              <template v-if="prueba.descartado">
+                <span class="badge-estado descartado" :title="prueba.motivo_descarte ?? ''">
+                  DESCARTADO
+                </span>
+              </template>
+              <template v-else>
+                <span class="badge-estado" :class="estadoClase(prueba.estado)">
+                  {{ prueba.estado }}
+                </span>
+              </template>
             </td>
             <td class="td-acciones">
-              <!-- Registrar / Ver prueba -->
-              <button
-                class="btn-primary"
-                style="font-size:0.75rem;padding:0.3rem 0.75rem"
-                :disabled="estadoBotonRegistrar(prueba).disabled"
-                @click="irARegistrar(prueba.ip)"
-              >
-                {{ estadoBotonRegistrar(prueba).texto }}
-              </button>
+              <template v-if="!prueba.descartado">
+                <!-- Registrar / Ver prueba -->
+                <button
+                  class="btn-primary"
+                  style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                  :disabled="estadoBotonRegistrar(prueba).disabled"
+                  @click="irARegistrar(prueba.ip)"
+                >
+                  {{ estadoBotonRegistrar(prueba).texto }}
+                </button>
 
-              <!-- Etiquetar: solo cuando COMPLETADO y sin CIP aún -->
-              <button
-                v-if="prueba.estado === 'COMPLETADO' && !prueba.etiquetado"
-                class="btn-secondary"
-                style="font-size:0.75rem;padding:0.3rem 0.75rem"
-                :disabled="etiquetando === prueba.ip"
-                @click="etiquetar(prueba.ip)"
-                title="Generar CIP de recuperación para laboratorio"
-              >
-                <span v-if="etiquetando === prueba.ip" class="spinner" style="margin-right:0.3rem"></span>
-                Etiquetar
-              </button>
+                <!-- Adición: solo cuando EN PROCESO (rodando) -->
+                <button
+                  v-if="prueba.estado === 'EN PROCESO'"
+                  class="btn-adicion"
+                  style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                  @click="abrirModalAdicion(prueba)"
+                >
+                  + Adición
+                </button>
 
-              <!-- Ver CIP (ya etiquetado) -->
-              <button
-                v-if="prueba.etiquetado"
-                class="btn-secondary"
-                style="font-size:0.75rem;padding:0.3rem 0.75rem"
-                @click="verEtiqueta(prueba)"
-                title="Ver etiqueta CIP"
-              >
-                <Tag :size="14" /> Reimprimir
-              </button>
+                <!-- Etiquetar: solo cuando COMPLETADO y sin CIP aún -->
+                <button
+                  v-if="prueba.estado === 'COMPLETADO' && !prueba.etiquetado"
+                  class="btn-secondary"
+                  style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                  :disabled="etiquetando === prueba.ip"
+                  @click="etiquetar(prueba.ip)"
+                  title="Generar CIP de recuperación para laboratorio"
+                >
+                  <span v-if="etiquetando === prueba.ip" class="spinner" style="margin-right:0.3rem"></span>
+                  Etiquetar
+                </button>
+
+                <!-- Ver CIP (ya etiquetado) -->
+                <button
+                  v-if="prueba.etiquetado"
+                  class="btn-secondary"
+                  style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                  @click="verEtiqueta(prueba)"
+                  title="Ver etiqueta CIP"
+                >
+                  <Tag :size="14" /> Reimprimir
+                </button>
+
+                <!-- Descartar: disponible para pruebas activas -->
+                <button
+                  class="btn-descartar"
+                  style="font-size:0.72rem;padding:0.25rem 0.6rem"
+                  @click="abrirModalDescartar(prueba.ip)"
+                  title="Descartar prueba (envase roto, etc.)"
+                >
+                  Descartar
+                </button>
+              </template>
+              <template v-else>
+                <span class="td-mono" style="font-size:0.72rem;color:var(--color-text-faint)">
+                  {{ prueba.motivo_descarte }}
+                </span>
+              </template>
             </td>
           </tr>
           <tr v-if="pruebasFiltradas.length === 0">
-            <td colspan="8" class="estado-tabla sin-datos">Sin pruebas registradas</td>
+            <td colspan="10" class="estado-tabla sin-datos">Sin pruebas registradas</td>
           </tr>
         </tbody>
       </table>
@@ -182,6 +231,103 @@
         <div class="modal-footer">
           <button class="btn-secondary" @click="etiquetaModal = null">Cerrar</button>
           <button class="btn-primary" @click="imprimirEtiqueta(etiquetaModal)">Imprimir</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Descartar Prueba -->
+    <div v-if="modalDescartar" class="modal-overlay" @click.self="modalDescartar = null">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2>Descartar Prueba</h2>
+          <button class="btn-cerrar" @click="modalDescartar = null">×</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem">
+            Esta prueba será descartada (ej: envase roto, derrame, etc.).<br>
+            El registro se conserva para <strong>seguimiento de insumos gastados</strong>,
+            pero <strong>no se tomará para etiquetado ni análisis</strong>.
+          </p>
+          <div class="field">
+            <label class="field-label">MOTIVO DEL DESCARTE (obligatorio):</label>
+            <textarea
+              class="field-input"
+              v-model="motivoDescarte"
+              rows="3"
+              placeholder="Ej: Se rompió el envase durante el transporte"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalDescartar = null">Cancelar</button>
+          <button
+            class="btn-danger"
+            :disabled="!motivoDescarte.trim() || descartando"
+            @click="confirmarDescartar"
+          >
+            <span v-if="descartando" class="spinner" style="margin-right:0.3rem"></span>
+            Confirmar Descarte
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Adición (NaCN / NaOH) -->
+    <div v-if="modalAdicion" class="modal-overlay" @click.self="modalAdicion = null">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2>Registrar Adición</h2>
+          <button class="btn-cerrar" @click="modalAdicion = null">×</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:0.75rem">
+            Lote <strong style="font-family:var(--font-mono);color:var(--color-gold)">{{ modalAdicion.ip }}</strong>
+            — Los valores se <strong>suman</strong> al acumulado existente.
+          </p>
+
+          <div v-if="modalAdicion.adicion_nacn != null || modalAdicion.adicion_naoh != null"
+            class="adicion-acumulado-info"
+          >
+            <span>Acumulado actual:</span>
+            <span v-if="modalAdicion.adicion_nacn != null">NaCN: <strong>{{ modalAdicion.adicion_nacn.toFixed(2) }}g</strong></span>
+            <span v-if="modalAdicion.adicion_naoh != null">NaOH: <strong>{{ modalAdicion.adicion_naoh.toFixed(2) }}g</strong></span>
+          </div>
+
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div class="field">
+              <label class="field-label">ADICIÓN NaCN (g)</label>
+              <input
+                type="number"
+                class="field-input"
+                v-model.number="formAdicion.adicion_nacn"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+              />
+            </div>
+            <div class="field">
+              <label class="field-label">ADICIÓN NaOH (g)</label>
+              <input
+                type="number"
+                class="field-input"
+                v-model.number="formAdicion.adicion_naoh"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalAdicion = null">Cancelar</button>
+          <button
+            class="btn-primary"
+            :disabled="(!formAdicion.adicion_nacn && !formAdicion.adicion_naoh) || registrandoAdicion"
+            @click="confirmarAdicion"
+          >
+            <span v-if="registrandoAdicion" class="spinner" style="margin-right:0.3rem"></span>
+            Registrar Adición
+          </button>
         </div>
       </div>
     </div>
@@ -212,6 +358,16 @@ const etiquetaModal = ref<{ ip: string; cip: string } | null>(null)
 
 const filtroEstado   = ref('Todos')
 const filtroBusqueda = ref('')
+
+// ── Descartar prueba ──────────────────────────────────────────────────────────
+const modalDescartar  = ref<string | null>(null)  // IP de la prueba a descartar
+const motivoDescarte  = ref('')
+const descartando     = ref(false)
+
+// ── Adición modal ─────────────────────────────────────────────────────────────
+const modalAdicion = ref<LotePruebaList | null>(null)
+const formAdicion  = ref({ adicion_nacn: null as number | null, adicion_naoh: null as number | null })
+const registrandoAdicion = ref(false)
 
 const estadosPrueba = [
   { id: 'PENDIENTE', nombre: 'Pendiente' },
@@ -408,6 +564,51 @@ function verEtiqueta(prueba: LotePruebaList) {
   }
 }
 
+// ── Descartar ─────────────────────────────────────────────────────────────────
+function abrirModalDescartar(ip: string) {
+  modalDescartar.value = ip
+  motivoDescarte.value = ''
+}
+
+async function confirmarDescartar() {
+  if (!modalDescartar.value || !motivoDescarte.value.trim()) return
+  descartando.value = true
+  try {
+    await pruebasApi.descartar(modalDescartar.value, motivoDescarte.value.trim())
+    ui.toast('Prueba descartada. El registro se conserva para trazabilidad.', 'success')
+    modalDescartar.value = null
+    await cargarDatos()
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al descartar la prueba', 'error')
+  } finally {
+    descartando.value = false
+  }
+}
+
+// ── Adición ───────────────────────────────────────────────────────────────────
+function abrirModalAdicion(prueba: LotePruebaList) {
+  modalAdicion.value = prueba
+  formAdicion.value = { adicion_nacn: null, adicion_naoh: null }
+}
+
+async function confirmarAdicion() {
+  if (!modalAdicion.value) return
+  registrandoAdicion.value = true
+  try {
+    await pruebasApi.registrarAdicion(modalAdicion.value.ip, {
+      adicion_nacn: formAdicion.value.adicion_nacn,
+      adicion_naoh: formAdicion.value.adicion_naoh,
+    })
+    ui.toast('Adición registrada correctamente', 'success')
+    modalAdicion.value = null
+    await cargarDatos()
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al registrar adición', 'error')
+  } finally {
+    registrandoAdicion.value = false
+  }
+}
+
 function imprimirEtiqueta(e: { ip: string; cip: string }) {
   const svgEl = document.querySelector<SVGElement>('#barcode-prueba')
   const svgHtml = svgEl ? svgEl.outerHTML : ''
@@ -472,6 +673,98 @@ function imprimirEtiqueta(e: { ip: string; cip: string }) {
 .pendiente   { background: rgba(220,60,60,.1);  color: var(--color-error);   border: 1px solid rgba(220,60,60,.3); }
 .en-proceso  { background: rgba(220,160,20,.1); color: var(--color-warning); border: 1px solid rgba(220,160,20,.3); }
 .completo    { background: rgba(60,180,80,.1);  color: var(--color-success); border: 1px solid rgba(60,180,80,.3); }
+.descartado  { background: rgba(120,120,120,.15); color: var(--color-text-muted); border: 1px solid rgba(120,120,120,.3); }
+
+/* ── Fila descartada ─────────────────────────────────── */
+.fila-descartada {
+  opacity: 0.55;
+  text-decoration: line-through;
+  text-decoration-color: rgba(255,255,255,0.2);
+}
+.fila-descartada .td-mono,
+.fila-descartada .td-fecha { text-decoration: line-through; }
+.fila-descartada .badge-estado { text-decoration: none; }
+.fila-descartada .td-acciones { text-decoration: none; }
+
+/* ── Adición badge ───────────────────────────────────── */
+.adicion-badge {
+  display: inline-block;
+  background: rgba(34,197,94,0.12);
+  color: #4ade80;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.adicion-acumulado-info {
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+.adicion-acumulado-info strong {
+  color: #4ade80;
+}
+
+/* ── Botón descartar ─────────────────────────────────── */
+.btn-descartar {
+  background: transparent;
+  border: 1px solid rgba(220,60,60,.3);
+  color: var(--color-error);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-main);
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-descartar:hover {
+  background: rgba(220,60,60,.1);
+  border-color: rgba(220,60,60,.5);
+}
+
+/* ── Botón adición ───────────────────────────────────── */
+.btn-adicion {
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,.3);
+  color: #4ade80;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-main);
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-adicion:hover {
+  background: rgba(34,197,94,0.18);
+  border-color: rgba(34,197,94,.5);
+}
+
+/* ── Botón danger (modal) ────────────────────────────── */
+.btn-danger {
+  background: rgba(220,60,60,.15);
+  border: 1px solid rgba(220,60,60,.4);
+  color: #f87171;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-main);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(220,60,60,.25);
+}
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ── Etiqueta CIP (modal) ────────────────────────────── */
 .etiqueta-cip {
