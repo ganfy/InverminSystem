@@ -5,6 +5,8 @@ from app.core.deps import check_permiso
 from app.models.enums import TipoMuestra
 from app.models.models import MapeoCIP
 from app.schemas.pruebas import (
+    AdicionRequest,
+    DescartarPruebaRequest,
     EtiquetadoPruebaOut,
     EtiquetarPruebaRequest,
     LotePruebaList,
@@ -73,6 +75,46 @@ def listar_recuperaciones(
 
 
 # ── Rutas con path param ──────────────────────────────────────────────────────
+
+
+@router.post(
+    "/{ip_lote}/descartar",
+    response_model=PruebaMetalurgicaOut,
+    summary="Descartar una prueba (envase roto, etc.) — mantiene registro para trazabilidad",
+)
+def descartar_prueba(
+    ip_lote: str,
+    datos: DescartarPruebaRequest,
+    current_user=Depends(check_permiso("PRUEBAS_MET", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    try:
+        prueba = pruebas_service.descartar_prueba(db, ip_lote, datos.motivo, current_user.id)
+        db.commit()
+        return PruebaMetalurgicaOut.model_validate(prueba)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post(
+    "/{ip_lote}/adicion",
+    response_model=PruebaMetalurgicaOut,
+    summary="Registrar adición parcial de NaCN/NaOH (acumulativa)",
+)
+def registrar_adicion(
+    ip_lote: str,
+    datos: AdicionRequest,
+    current_user=Depends(check_permiso("PRUEBAS_MET", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    try:
+        prueba = pruebas_service.registrar_adicion(db, ip_lote, datos, current_user.id)
+        db.commit()
+        return PruebaMetalurgicaOut.model_validate(prueba)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/{ip_lote}", response_model=PruebaMetalurgicaOut)

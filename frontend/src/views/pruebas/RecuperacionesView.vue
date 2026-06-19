@@ -47,6 +47,7 @@
             <th class="th-group th-liq">SOLUCIÓN Au</th>
             <th class="th-group th-liq">SOLUCIÓN Ag</th>
             <th class="th-group th-rec">% RECUP</th>
+            <th>ACCIONES</th>
           </tr>
           <tr class="thead-units">
             <th colspan="3"></th>
@@ -55,11 +56,12 @@
             <th><span class="u-primary">g/m³</span><span class="u-sep">/</span><span class="u-secondary">oz/TC</span></th>
             <th><span class="u-primary blue">g/m³</span><span class="u-sep">/</span><span class="u-secondary">oz/TC</span></th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="filtrados.length === 0">
-            <td colspan="8" class="estado-tabla sin-datos">
+            <td colspan="9" class="estado-tabla sin-datos">
               {{ busqueda ? 'Sin resultados para "' + busqueda + '"' : 'Sin recuperaciones registrados' }}
             </td>
           </tr>
@@ -107,6 +109,19 @@
               </span>
               <span v-else class="td-mono" style="color:var(--color-text-faint)">—</span>
             </td>
+            <!-- Acciones -->
+            <td class="td-acciones">
+              <button
+                v-if="item.recuperacion != null && Number(item.recuperacion) < 70"
+                class="btn-remuestreo"
+                :disabled="remuestreando === item.ip"
+                @click="mandarARemuestreo(item.ip)"
+                title="Recuperación baja — crear nueva prueba metalúrgica"
+              >
+                <span v-if="remuestreando === item.ip" class="spinner" style="margin-right:0.3rem"></span>
+                Mandar a Remuestreo
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -126,11 +141,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import { pruebasApi, type RecuperacionItem } from '@/api/pruebas'
+import { useUiStore } from '@/stores/ui'
 
 const router  = useRouter()
+const ui      = useUiStore()
 const items   = ref<RecuperacionItem[]>([])
 const cargando = ref(false)
 const busqueda = ref('')
+const remuestreando = ref<string | null>(null)
 
 async function cargar() {
   cargando.value = true
@@ -168,6 +186,25 @@ function fmt(d?: string | null) {
 function fmtD(v?: number | null, dec = 3) {
   if (v == null) return null
   return Number(v).toFixed(dec)
+}
+
+async function mandarARemuestreo(ip: string) {
+  const ok = await ui.showConfirm({
+    title: 'Mandar a Remuestreo',
+    message: `Recuperación baja detectada para ${ip}. Se creará una nueva prueba metalúrgica. ¿Confirmar?`,
+    confirmLabel: 'Confirmar Remuestreo',
+  })
+  if (!ok) return
+  remuestreando.value = ip
+  try {
+    await pruebasApi.solicitarRemuestreo(ip)
+    ui.toast(`Remuestreo solicitado para ${ip}. Nueva prueba creada en Pruebas Metalúrgicas.`, 'success')
+    await cargar()
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al solicitar remuestreo', 'error')
+  } finally {
+    remuestreando.value = null
+  }
 }
 </script>
 
@@ -245,5 +282,28 @@ function fmtD(v?: number | null, dec = 3) {
 .leyenda-item {
   font-size: 0.7rem; font-family: var(--font-mono);
   padding: 2px 8px; border-radius: 3px;
+}
+
+/* Botón remuestreo */
+.btn-remuestreo {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #f87171;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-family: var(--font-main);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn-remuestreo:hover:not(:disabled) {
+  background: rgba(239,68,68,0.2);
+  border-color: rgba(239,68,68,.5);
+}
+.btn-remuestreo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

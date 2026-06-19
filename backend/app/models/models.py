@@ -716,12 +716,19 @@ class PruebaMetalurgica(AuditMixin, Base):
     porcentaje_nacn = Column(Numeric(5, 2))
     ph_inicial = Column(Numeric(4, 2))
     ph_final = Column(Numeric(4, 2))
-    adicion_nacn = Column(Numeric(10, 4))  # gramos
-    adicion_naoh = Column(Numeric(10, 4))  # gramos
+    adicion_nacn = Column(Numeric(10, 4))  # gramos (acumulativo)
+    adicion_naoh = Column(Numeric(10, 4))  # gramos (acumulativo)
     gasto_agno3 = Column(Numeric(10, 4))  # ml
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
+    # Descarte de prueba (envase roto, etc.)
+    descartado = Column(Boolean, default=False, nullable=False)
+    descartado_por = Column(Integer, ForeignKey("usuarios.id"))
+    fecha_descarte = Column(DateTime)
+    motivo_descarte = Column(Text)
+
     lote = relationship("Lote", back_populates="prueba_metalurgica")
     mapeo_cip = relationship("MapeoCIP", foreign_keys=[cip])
+    usuario_descarte = relationship("Usuario", foreign_keys=[descartado_por])
 
 
 # =============================================================================

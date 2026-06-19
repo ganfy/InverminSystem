@@ -70,7 +70,7 @@
         </button>
 
         <button v-if="intentoActual < maxIntentos" class="btn-secondary btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="() => guardar(true)">
-          Guardar y Remuestrear
+          Guardar y Añadir Ensayo
         </button>
       </div>
     </div>

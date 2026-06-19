@@ -67,7 +67,7 @@
               <div class="actions-grid">
 
                 <button v-if="!lote.etiquetado && lote.cantidad_intentos_previos < 3" class="btn-secondary flex-1" @click="irARegistrarHumedad(lote.ip)">
-                  Remuestrear
+                  Añadir Ensayo
                 </button>
 
                 <button class="btn-secondary flex-1" @click="abrirDetalles(lote.ip)">

@@ -11,6 +11,7 @@ from app.models.models import (
     PruebaMetalurgica,
 )
 from app.schemas.pruebas import (
+    AdicionRequest,
     EtiquetadoPruebaOut,
     LotePruebaList,
     PruebaMetalurgicaCreate,
@@ -139,6 +140,14 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                     estado=estado,
                     cip_asignado=cip_asignado,
                     etiquetado=cip_asignado is not None,
+                    adicion_nacn=float(prueba.adicion_nacn)
+                    if prueba.adicion_nacn is not None
+                    else None,
+                    adicion_naoh=float(prueba.adicion_naoh)
+                    if prueba.adicion_naoh is not None
+                    else None,
+                    descartado=bool(prueba.descartado),
+                    motivo_descarte=prueba.motivo_descarte,
                 )
             )
 
@@ -258,6 +267,9 @@ def etiquetar_prueba(
             "Todas las pruebas ya tienen CIP asignado."
         )
 
+    if prueba.descartado:
+        raise ValueError("No se puede etiquetar una prueba descartada")
+
     ahora = datetime.now(UTC).replace(tzinfo=None)
     if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=48):
         raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
@@ -290,6 +302,91 @@ def etiquetar_prueba(
         tipo=tipo,
         mensaje=f"CIP de recuperación ({tipo}) generado",
     )
+
+
+# ── Descartar prueba ─────────────────────────────────────────────────────────────
+
+
+def descartar_prueba(
+    db: Session,
+    ip_lote: str,
+    motivo: str,
+    usuario_id: int,
+) -> PruebaMetalurgica:
+    """Marca la prueba más reciente como descartada.
+    Mantiene el registro para trazabilidad de insumos gastados
+    pero no se toma para etiquetado ni análisis."""
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise ValueError(f"Lote '{ip_lote}' no encontrado")
+
+    prueba = (
+        db.query(PruebaMetalurgica)
+        .filter(
+            PruebaMetalurgica.lote_id == lote.id,
+            PruebaMetalurgica.descartado == False,  # noqa: E712
+        )
+        .order_by(PruebaMetalurgica.id.desc())
+        .first()
+    )
+    if not prueba:
+        raise ValueError(f"No hay prueba activa para descartar en '{ip_lote}'")
+
+    prueba.descartado = True
+    prueba.descartado_por = usuario_id
+    prueba.fecha_descarte = datetime.now(UTC).replace(tzinfo=None)
+    prueba.motivo_descarte = motivo
+    prueba.modificado_por = usuario_id
+
+    db.flush()
+    db.refresh(prueba)
+    return prueba
+
+
+# ── Adición acumulativa ────────────────────────────────────────────────────────
+
+
+def registrar_adicion(
+    db: Session,
+    ip_lote: str,
+    datos: AdicionRequest,
+    usuario_id: int,
+) -> PruebaMetalurgica:
+    """Suma la adición parcial de NaCN/NaOH al acumulado de la prueba en proceso."""
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise ValueError(f"Lote '{ip_lote}' no encontrado")
+
+    prueba = (
+        db.query(PruebaMetalurgica)
+        .filter(
+            PruebaMetalurgica.lote_id == lote.id,
+            PruebaMetalurgica.descartado == False,  # noqa: E712
+        )
+        .order_by(PruebaMetalurgica.id.desc())
+        .first()
+    )
+    if not prueba:
+        raise ValueError(f"No hay prueba activa para '{ip_lote}'")
+    if not prueba.fecha_ingreso:
+        raise ValueError("La prueba aún no ha iniciado (sin fecha de ingreso)")
+
+    from decimal import Decimal
+
+    if datos.adicion_nacn is not None and datos.adicion_nacn > 0:
+        actual = prueba.adicion_nacn or Decimal("0")
+        prueba.adicion_nacn = actual + Decimal(str(datos.adicion_nacn))
+    if datos.adicion_naoh is not None and datos.adicion_naoh > 0:
+        actual = prueba.adicion_naoh or Decimal("0")
+        prueba.adicion_naoh = actual + Decimal(str(datos.adicion_naoh))
+    if datos.porcentaje_nacn is not None:
+        prueba.porcentaje_nacn = Decimal(str(datos.porcentaje_nacn))
+
+    prueba.modificado_por = usuario_id
+
+    db.flush()
+    db.refresh(prueba)
+    return prueba
 
 
 # ── Pruebas listas para recuperación ─────────────────────────────────────────

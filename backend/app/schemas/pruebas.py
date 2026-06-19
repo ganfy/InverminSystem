@@ -63,11 +63,33 @@ class LotePruebaList(BaseModel):
     estado: str  # PENDIENTE | EN PROCESO | COMPLETADO
     cip_asignado: str | None = None  # primer CIP de recuperación (si fue etiquetado)
     etiquetado: bool = False
+    # Adiciones acumuladas (columnas extra en tabla)
+    adicion_nacn: float | None = None
+    adicion_naoh: float | None = None
+    # Descarte
+    descartado: bool = False
+    motivo_descarte: str | None = None
 
     @field_validator("fecha_recepcion", "fecha_ingreso", "fecha_salida", mode="before")
     @classmethod
     def validate_dates(cls, v):
         return naive_to_utc(v)
+
+
+# ── Descartar prueba ──────────────────────────────────────────────────────────
+
+
+class DescartarPruebaRequest(BaseModel):
+    motivo: str
+
+
+# ── Adición acumulativa (NaCN / NaOH) ─────────────────────────────────────────
+
+
+class AdicionRequest(BaseModel):
+    adicion_nacn: float | None = None
+    adicion_naoh: float | None = None
+    porcentaje_nacn: float | None = None
 
 
 # ── Etiquetado ────────────────────────────────────────────────────────────────
