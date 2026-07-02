@@ -479,7 +479,7 @@ function preFillSacosGranel() {
 
 const pesoError = computed(() => {
   const { peso_inicial: bruto, peso_final: tara } = loteForm
-  if (bruto !== null && tara !== null && bruto > 0 && tara > 0 && bruto <= tara) {
+  if (bruto !== null && tara !== null && bruto > 0 && tara >= 0 && bruto <= tara) {
     return 'El BRUTO debe ser mayor que la TARA'
   }
   return ''
@@ -494,10 +494,10 @@ const loteFormFaltantes = computed(() => {
   const f: string[] = []
   if (!tipoMaterial.value)                                  f.push('seleccionar PRODUCTO')
   if ((loteForm.peso_inicial ?? 0) <= 0)                    f.push('ingresar BRUTO')
-  if ((loteForm.peso_final   ?? 0) <= 0)                    f.push('ingresar TARA')
+  if (loteForm.peso_final === null || loteForm.peso_final < 0) f.push('ingresar TARA')
   if (
     loteForm.peso_inicial !== null && loteForm.peso_final !== null &&
-    loteForm.peso_inicial > 0 && loteForm.peso_final > 0 &&
+    loteForm.peso_inicial > 0 && loteForm.peso_final >= 0 &&
     loteForm.peso_inicial <= loteForm.peso_final
   )                                                         f.push('BRUTO debe ser > TARA')
   if (requiereJustificacion.value && !loteForm.justificacion_manual.trim()) f.push('justificación manual')

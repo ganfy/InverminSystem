@@ -190,8 +190,8 @@
                     <span
                       v-if="['ASIGNADO_RUMA', 'LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(lote.estado)"
                       class="tag-sec tag-en-ruma"
-                      title="Lote ya asignado a ruma"
-                    >EN RUMA</span>
+                      :title="lote.ruma_codigo ? 'Asignado a ' + lote.ruma_codigo : 'Lote ya asignado a ruma'"
+                    >{{ labelEnRuma(lote) }}</span>
                     <span
                       v-else-if="lote.habilitado_ruma"
                       class="tag-sec tag-habilitado"
@@ -723,6 +723,17 @@ const totalGeneralMatriz = computed(() => {
   if (!data.value?.acopiadores_tmh) return 0;
   return data.value.acopiadores_tmh.reduce((acc, current) => acc + (current.total || 0), 0);
 });
+
+function labelEnRuma(lote: LoteDashboard) {
+  if (lote.ruma_codigo) {
+    const parts = lote.ruma_codigo.split('-')
+    const numStr = parts[parts.length - 1]
+    const num = Number(numStr)
+    if (!isNaN(num)) return `EN RUMA ${num}`
+    return `EN RUMA`
+  }
+  return 'EN RUMA'
+}
 
 // ── Filtros ───────────────────────────────────────────────────────────
 const busquedaLote     = ref('')

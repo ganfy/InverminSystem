@@ -352,6 +352,10 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 s["oz_sum"] += (tms * ley_gr_tm_prom) / 31.1035
                 s["ley_tms"] += tms * ley_gr_tm_prom
 
+        ruma_codigo = None
+        if lote.ruma_id and getattr(lote, "ruma", None):
+            ruma_codigo = lote.ruma.codigo
+
         lotes_resumen.append(
             LoteDashboard(
                 ip=lote.ip,
@@ -370,6 +374,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
                 dirimencia=bool(lote.dirimencia),
                 dias_almacen=dias,
                 tiene_rec_pendiente=lote.id in ids_rec_pendiente,
+                ruma_codigo=ruma_codigo,
             )
         )
 

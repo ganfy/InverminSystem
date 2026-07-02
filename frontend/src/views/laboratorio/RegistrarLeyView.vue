@@ -9,7 +9,7 @@
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
         <button class="btn-secondary" @click="router.back()">← Volver</button>
-        <button v-if="form.material === 'Au' && form.cip" class="btn-secondary" @click="irARegistrarPlata" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4)">
+        <button v-if="form.material === 'Au' && (form.cip || modoNuevo)" class="btn-secondary" @click="irARegistrarPlata" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4)">
           + Agregar Ley Plata
         </button>
         <button class="btn-primary" @click="guardar" :disabled="guardando || certificadoGenerado">
@@ -477,29 +477,31 @@ async function generarCertificado() {
 }
 
 function irARegistrarPlata() {
-  const cip = form.value.cip
-  if (!cip) return
+  const cip = form.value.cip || '_nuevo'
 
   const query = new URLSearchParams()
-  // Check if SOLIDOS analysis already exists for this CIP
-  const cipObj = store.cips.find(c => c.cip === cip)
-  const solidosExistente = cipObj?.analisis_recuperacion.find(
-    (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
-  )
+  if (cip !== '_nuevo') {
+    // Check if SOLIDOS analysis already exists for this CIP
+    const cipObj = store.cips.find(c => c.cip === cip)
+    const solidosExistente = cipObj?.analisis_recuperacion.find(
+      (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
+    )
 
-  if (solidosExistente) {
-    // Navigate to existing SOLIDOS analysis (just view/use it)
-    query.set('id', solidosExistente.id.toString())
-    const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
-    window.open(url.href, '_blank')
-  } else {
-    // Create new SOLIDOS analysis pre-filling au1 and au2 from Newmont form
-    if (auFino1.value != null) query.set('au1', auFino1.value.toString())
-    if (auFino2.value != null) query.set('au2', auFino2.value.toString())
-    query.set('direct', '1')
-    const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
-    window.open(url.href, '_blank')
+    if (solidosExistente) {
+      // Navigate to existing SOLIDOS analysis (just view/use it)
+      query.set('id', solidosExistente.id.toString())
+      const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+      window.open(url.href, '_blank')
+      return
+    }
   }
+
+  // Create new SOLIDOS analysis pre-filling au1 and au2 from Newmont form
+  if (auFino1.value != null) query.set('au1', auFino1.value.toString())
+  if (auFino2.value != null) query.set('au2', auFino2.value.toString())
+  query.set('direct', '1')
+  const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+  window.open(url.href, '_blank')
 }
 </script>
 

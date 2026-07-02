@@ -139,6 +139,12 @@
             <option value="COMPLETADO">Completado</option>
           </select>
         </div>
+        <div class="field" style="display:flex;align-items:center;">
+          <label style="color:var(--color-text); font-size:var(--text-sm); display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-top:1rem;">
+            <input type="checkbox" v-model="mostrarSoloCIPs" />
+            Mostrar solo CIPs
+          </label>
+        </div>
         <div class="field" style="flex:1;min-width:200px">
           <label class="field-label">BÚSQUEDA</label>
           <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="CIP" />
@@ -331,6 +337,7 @@ const tabActual      = ref<'ley' | 'solidos' | 'solucion'>('ley')
 const filtroEstado   = ref('')
 const filtroBusqueda = ref('')
 const filtroBusquedaLotes = ref('')
+const mostrarSoloCIPs = ref(false)
 
 const cipsSeleccionados = ref<string[]>([])
 const generandoConjunto = ref(false)
@@ -475,16 +482,21 @@ const filasMostrar = computed(() => {
   )
 
   const cipsFiltrados = store.cips.filter(c => {
+    const tm = (c.tipo_muestra || '').toUpperCase()
+
     if (tabActual.value === 'ley') {
-      if (c.tipo_muestra !== 'Laboratorio' && c.tipo_muestra !== 'PROCESO') return false
+      if (tm !== 'LABORATORIO' && tm !== 'PROCESO') return false
       if (cipsConAnalisisOffline.has(c.cip)) return false  // excluir si ya está en sección offline
-      // For PROCESO, only show in ley tab if it actually has ley analysis
-      if (c.tipo_muestra === 'PROCESO' && c.analisis_ley.length === 0) return false
+      
+      if (tm === 'PROCESO' && mostrarSoloCIPs.value) return false
       return true
     }
     // For solidos/solucion tab: show Recuperacion types, or PROCESO if it has recuperacion analysis
-    if (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') return true
-    if (c.tipo_muestra === 'PROCESO' && c.analisis_recuperacion.length > 0) return true
+    if (tm === 'RECUPERACIONINTERNO' || tm === 'RECUPERACIONEXTERNO') return true
+    if (tm === 'PROCESO' && c.analisis_recuperacion.length > 0) {
+      if (mostrarSoloCIPs.value) return false
+      return true
+    }
     return false
   })
 

@@ -222,11 +222,16 @@ def obtener_cips_laboratorio(
 
     resultados: list[CIPAnalisisOut] = []
     for cip in cips:
-        if not incluir_ip and cip.laboratorio not in [
-            "Paititi",
-            "Laboratorio Interno",
-            "El Dorado - Invermin Paititi",
-        ]:
+        if (
+            not incluir_ip
+            and cip.laboratorio
+            not in [
+                "Paititi",
+                "Laboratorio Interno",
+                "El Dorado - Invermin Paititi",
+            ]
+            and cip.tipo_muestra != TipoMuestra.PROCESO
+        ):
             continue
         lote = db.query(Lote).filter(Lote.id == cip.lote_id).first() if cip.lote_id else None
         if cip.lote_id and not lote:
