@@ -22,7 +22,7 @@ def upgrade() -> None:
     """Add descarte fields to pruebas_metalurgicas."""
     op.add_column(
         "pruebas_metalurgicas",
-        sa.Column("descartado", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("descartado", sa.Boolean(), nullable=False, server_default=sa.text("0")),
     )
     op.add_column(
         "pruebas_metalurgicas",
