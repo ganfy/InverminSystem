@@ -4,9 +4,11 @@ from app.core.database import get_db
 from app.core.deps import check_permiso
 from app.models.enums import TipoMuestra
 from app.models.models import MapeoCIP
+from app.schemas.laboratorio import AnalisisRecuperacionOut
 from app.schemas.pruebas import (
     AdicionRequest,
     DescartarPruebaRequest,
+    EnviarLaboratorioRequest,
     EtiquetadoPruebaOut,
     EtiquetarPruebaRequest,
     LotePruebaList,
@@ -215,6 +217,45 @@ def etiquetar_prueba(
         resultado = pruebas_service.etiquetar_prueba(db, ip_lote, current_user.id, tipo=datos.tipo)
         db.commit()
         return resultado
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post(
+    "/{ip_lote}/enviar-laboratorio",
+    response_model=AnalisisRecuperacionOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Envía muestras de prueba COMPLETADO al laboratorio interno (Paititi)",
+)
+def enviar_a_laboratorio(
+    ip_lote: str,
+    datos: EnviarLaboratorioRequest,
+    current_user=Depends(check_permiso("PRUEBAS_MET", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Crea registros PENDIENTE de recuperación para el laboratorio interno Paititi.
+    Accesible por TecnicoMet, Comercial, Admin.
+    sub_tipos: ['SOLIDOS', 'SOLUCION'] para ambos análisis, o solo uno.
+    Requiere que la prueba esté COMPLETADO y tenga CIP de RecuperacionInterno.
+    La ley_cabeza se calcula automáticamente desde los análisis de ley vigentes del lote.
+    """
+    from app.models.models import Lote
+    from app.schemas.laboratorio import EnviarRecuperacionInternaRequest
+    from app.services.laboratorio import _rec_out, enviar_recuperacion_interna
+
+    try:
+        req = EnviarRecuperacionInternaRequest(
+            sub_tipos=datos.sub_tipos,
+            laboratorio="Paititi",
+            cip=datos.cip,
+        )
+        nuevo = enviar_recuperacion_interna(db, ip_lote, req, current_user.id)
+        db.commit()
+        lote = db.query(Lote).filter(Lote.id == nuevo.lote_id).first()
+        ip_lote_res = lote.ip if lote else None
+        return _rec_out(nuevo, ip_lote_res)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e

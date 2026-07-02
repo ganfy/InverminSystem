@@ -186,6 +186,7 @@ class Entidad(AuditMixin, Base):
     telefono = Column(String(20))
     email = Column(String(100))
     activo = Column(Boolean, default=True)
+    ocultar_insumos = Column(Boolean, default=False)
 
     entidades_roles = relationship("EntidadRol", back_populates="entidad")
     # parametros = relationship(
@@ -260,6 +261,8 @@ class ParametrosComerciales(AuditMixin, Base):
     lim_ley_superior = Column(Numeric(8, 3))
     gasto_acopio = Column(Numeric(10, 2))  # USD
     gasto_consumo = Column(Numeric(10, 2))  # USD
+    gasto_acopio_llampo = Column(Numeric(10, 2))  # USD
+    gasto_consumo_llampo = Column(Numeric(10, 2))  # USD
     maquila = Column(Numeric(5, 2))  # %
     comision = Column(Numeric(5, 2))  # %
     # Plata (Ag) — parámetros contractuales, todos nullable
@@ -534,9 +537,13 @@ class MapeoCIP(Base):
     __tablename__ = "mapeo_cip"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id"), nullable=True
+    )  # nullable para tipo Proceso (sin lote)
     ruma_id = Column(Integer, ForeignKey("rumas.id"))
-    codigo_cip = Column(String(20), unique=True, nullable=False)
+    codigo_cip = Column(
+        String(50), unique=True, nullable=False
+    )  # hasta 50 chars para códigos de proceso libres
     laboratorio = Column(String(50))
     fecha_envio = Column(Date)
     tipo_muestra = Column(String(50))
@@ -580,7 +587,9 @@ class AnalisisLey(AuditMixin, Base):
     __table_args__ = {"implicit_returning": False}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id"), nullable=True
+    )  # nullable para análisis de Proceso
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
     laboratorio = Column(String(50), nullable=False)
     tipo_analisis = Column(String(20), nullable=False)  # sin default - siempre explícito
@@ -654,7 +663,9 @@ class AnalisisRecuperacion(AuditMixin, Base):
     __tablename__ = "analisis_recuperacion"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=False)
+    lote_id = Column(
+        Integer, ForeignKey("lotes.id"), nullable=True
+    )  # nullable para análisis de Proceso
     cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
     laboratorio = Column(String(50), nullable=False)
     ley_cabeza = Column(Numeric(10, 4))
@@ -666,12 +677,13 @@ class AnalisisRecuperacion(AuditMixin, Base):
         Computed(
             "CASE "
             "WHEN ley_cabeza IS NOT NULL AND ley_cola IS NOT NULL AND ley_cabeza > 0 "
-            "THEN ((ley_cabeza - ley_cola) * 100.0) / ley_cabeza "
+            "THEN ((ley_cabeza - ley_cola) * 100.0) / NULLIF(ley_cabeza, 0) "
             "ELSE NULL END",
             persisted=True,
         ),
     )
     estado = Column(String(20), default=EstadoRecuperacion.COMPLETADO, nullable=False)
+    sub_tipo = Column(String(10), nullable=True)  # 'SOLIDOS' | 'SOLUCION' | null (legacy)
     origen_datos = Column(String(20), default=OrigenDatos.MANUAL)
     fecha_analisis = Column(Date)
     certificado_url = Column(Text)

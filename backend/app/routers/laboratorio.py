@@ -196,10 +196,11 @@ async def subir_certificado_ley(
 @router.post("/ley/{analisis_id}/generar-certificado", response_model=AnalisisLeyOut)
 def generar_certificado_ley_interno(
     analisis_id: int,
+    descripcion: str | None = Query(None, description="Descripción para el PDF (e.g. PROCESO)"),
     current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
     db: Session = Depends(get_db),
 ):
-    svc.generar_y_guardar_certificado_interno(db, analisis_id, "ley")
+    svc.generar_y_guardar_certificado_interno(db, analisis_id, "ley", descripcion_pdf=descripcion)
     db.commit()
     return svc._ley_out(db.query(AnalisisLey).get(analisis_id))
 
@@ -209,10 +210,13 @@ def generar_certificado_ley_interno(
 )
 def generar_certificado_recuperacion_interno(
     analisis_id: int,
+    descripcion: str | None = Query(None, description="Descripción para el PDF"),
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
-    svc.generar_y_guardar_certificado_interno(db, analisis_id, "recuperacion")
+    svc.generar_y_guardar_certificado_interno(
+        db, analisis_id, "recuperacion", descripcion_pdf=descripcion
+    )
     db.commit()
     return svc._rec_out(db.query(AnalisisRecuperacion).get(analisis_id))
 

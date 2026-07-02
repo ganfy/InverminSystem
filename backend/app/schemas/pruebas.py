@@ -69,6 +69,8 @@ class LotePruebaList(BaseModel):
     # Descarte
     descartado: bool = False
     motivo_descarte: str | None = None
+    # Sub-tipos ya enviados al laboratorio (tienen análisis PENDIENTE o COMPLETADO vigente)
+    sub_tipos_enviados: list[str] = []
 
     @field_validator("fecha_recepcion", "fecha_ingreso", "fecha_salida", mode="before")
     @classmethod
@@ -97,6 +99,17 @@ class AdicionRequest(BaseModel):
 
 class EtiquetarPruebaRequest(BaseModel):
     tipo: TipoMuestra = TipoMuestra.RECUPERACION_INTERNO
+
+
+class EnviarLaboratorioRequest(BaseModel):
+    """
+    Solicitud para enviar muestras al laboratorio interno (Paititi).
+    sub_tipos: lista con 'SOLIDOS', 'SOLUCION' o ambos.
+    Si se omite, se envían ambos por defecto.
+    """
+
+    sub_tipos: list[str] = ["SOLIDOS", "SOLUCION"]
+    cip: str | None = None
 
 
 class EtiquetadoPruebaOut(BaseModel):

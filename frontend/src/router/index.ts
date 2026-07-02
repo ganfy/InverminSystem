@@ -12,6 +12,8 @@ import RecuperacionesPruebasView from '@/views/pruebas/RecuperacionesView.vue'
 import LaboratorioView from '@/views/laboratorio/LaboratorioDashboardView.vue'
 import RegistrarLeyView from '@/views/laboratorio/RegistrarLeyView.vue'
 import RegistrarRecuperacionView from '@/views/laboratorio/RegistrarRecuperacionView.vue'
+import RegistrarSolidosView from '@/views/laboratorio/RegistrarSolidosView.vue'
+import RegistrarSolucionView from '@/views/laboratorio/RegistrarSolucionView.vue'
 import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
 import UnauthorizedView from '@/views/auth/UnauthorizedView.vue'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
@@ -60,6 +62,8 @@ const router = createRouter({
         { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
         { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
         { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
+        { path: 'laboratorio/solidos/:cip', name: 'RegistrarSolidos', component: RegistrarSolidosView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
+        { path: 'laboratorio/solucion/:cip', name: 'RegistrarSolucion', component: RegistrarSolucionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
         { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView, meta: { roles: ['Admin', 'Gerencia', 'Comercial'] } },
         { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },
         { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] } },

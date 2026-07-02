@@ -9,6 +9,16 @@
         </div>
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center">
+        <!-- Botón de registro en lote: aparece cuando hay IPs seleccionados -->
+        <button
+          v-if="ipsSeleccionados.length > 0"
+          class="btn-primary"
+          style="font-size:0.78rem;padding:0.4rem 0.9rem"
+          @click="irARegistrarLote"
+        >
+          <Layers :size="15" style="margin-right:0.3rem;vertical-align:middle" />
+          Registrar Lote ({{ ipsSeleccionados.length }})
+        </button>
         <button
           class="btn-secondary"
           style="font-size:0.78rem;padding:0.4rem 0.9rem"
@@ -80,6 +90,12 @@
         <label class="field-label">Búsqueda</label>
         <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="Buscar por IP, CIP..." />
       </div>
+      <div class="field" style="align-items:center; flex-direction:row; gap:0.5rem; justify-content:flex-end">
+        <input type="checkbox" id="toggleDescartadas" v-model="mostrarDescartadas" />
+        <label for="toggleDescartadas" class="field-label" style="margin-bottom:0; cursor:pointer">
+          Mostrar descartadas
+        </label>
+      </div>
     </div>
 
     <!-- Tabla principal -->
@@ -90,6 +106,9 @@
       <table class="tabla">
         <thead>
           <tr>
+            <th style="width:36px;text-align:center">
+              <input type="checkbox" :checked="todosPendientesSeleccionados" @change="toggleTodosPendientes" title="Seleccionar todos los pendientes" />
+            </th>
             <th>IP</th>
             <th>FECHA RECEPCIÓN</th>
             <th>INGRESO A RODILLOS</th>
@@ -100,14 +119,24 @@
             <th>CIP RECUPERACIÓN</th>
             <th>ESTADO</th>
             <th>ACCIONES</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="prueba in pruebasFiltradas"
             :key="prueba.ip + (prueba.fecha_ingreso ?? '')"
-            :class="{ 'fila-descartada': prueba.descartado }"
+            :class="{ 'fila-descartada': prueba.descartado, 'fila-seleccionada': ipsSeleccionados.includes(prueba.ip) }"
           >
+            <!-- Checkbox de selección (solo para pruebas no descartadas) -->
+            <td style="text-align:center">
+              <input
+                v-if="!prueba.descartado && esPendienteSeleccionable(prueba)"
+                type="checkbox"
+                :value="prueba.ip"
+                v-model="ipsSeleccionados"
+              />
+            </td>
             <td class="td-mono" style="color:var(--color-gold)">{{ prueba.ip }}</td>
             <td class="td-fecha">{{ fmt(prueba.fecha_recepcion) }}</td>
             <td class="td-fecha">{{ fmt(prueba.fecha_ingreso) }}</td>
@@ -143,6 +172,7 @@
                 </span>
               </template>
             </td>
+            <!-- Columna ACCIONES: registrar, adición, etiquetar -->
             <td class="td-acciones">
               <template v-if="!prueba.descartado">
                 <!-- Registrar / Ver prueba -->
@@ -189,7 +219,38 @@
                   <Tag :size="14" /> Reimprimir
                 </button>
 
-                <!-- Descartar: disponible para pruebas activas -->
+                <!-- Enviar a Lab: badge si TODO enviado, botón si quedan sub-tipos -->
+                <template v-if="prueba.estado === 'COMPLETADO' && prueba.etiquetado">
+                  <!-- Todo ya fue enviado -->
+                  <span
+                    v-if="prueba.sub_tipos_enviados.includes('SOLIDOS') && prueba.sub_tipos_enviados.includes('SOLUCION')"
+                    class="badge-lab-enviado"
+                    :title="'Enviado: ' + prueba.sub_tipos_enviados.join(' + ')"
+                  >
+                    <FlaskConical :size="12" style="margin-right:0.25rem;vertical-align:middle" />
+                    Enviado
+                  </span>
+
+                  <!-- Quedan sub-tipos por enviar -->
+                  <button
+                    v-else
+                    class="btn-enviar-lab"
+                    style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                    :disabled="enviandoLab === prueba.ip"
+                    @click="abrirModalEnviarLab(prueba)"
+                    :title="prueba.sub_tipos_enviados.length ? 'Ya enviado: ' + prueba.sub_tipos_enviados.join(', ') + '. Click para enviar el resto.' : 'Enviar muestras al laboratorio interno Paititi'"
+                  >
+                    <span v-if="enviandoLab === prueba.ip" class="spinner" style="margin-right:0.3rem"></span>
+                    <FlaskConical v-else :size="14" style="margin-right:0.25rem;vertical-align:middle" />
+                    Enviar a Lab
+                    <span v-if="prueba.sub_tipos_enviados.length" style="font-size:0.65rem;opacity:0.7;margin-left:0.2rem">(parcial)</span>
+                  </button>
+                </template>
+              </template>
+            </td>
+            <!-- Columna DESCARTAR: separada para mejor orden -->
+            <td class="td-descartar">
+              <template v-if="!prueba.descartado">
                 <button
                   class="btn-descartar"
                   style="font-size:0.72rem;padding:0.25rem 0.6rem"
@@ -200,14 +261,14 @@
                 </button>
               </template>
               <template v-else>
-                <span class="td-mono" style="font-size:0.72rem;color:var(--color-text-faint)">
-                  {{ prueba.motivo_descarte }}
+                <span class="td-mono" style="font-size:0.7rem;color:var(--color-text-faint);font-style:italic" :title="prueba.motivo_descarte ?? ''">
+                  {{ prueba.motivo_descarte ? prueba.motivo_descarte.slice(0, 30) + (prueba.motivo_descarte.length > 30 ? '…' : '') : '' }}
                 </span>
               </template>
             </td>
           </tr>
           <tr v-if="pruebasFiltradas.length === 0">
-            <td colspan="10" class="estado-tabla sin-datos">Sin pruebas registradas</td>
+            <td colspan="12" class="estado-tabla sin-datos">Sin pruebas registradas</td>
           </tr>
         </tbody>
       </table>
@@ -332,6 +393,111 @@
       </div>
     </div>
 
+    <!-- Modal Enviar a Laboratorio Interno -->
+    <div v-if="modalEnviarLab" class="modal-overlay" @click.self="modalEnviarLab = null">
+      <div class="modal modal-md">
+        <div class="modal-header">
+          <h2 style="display:flex;align-items:center;gap:0.5rem">
+            <FlaskConical :size="18" style="color:var(--color-gold)" />
+            Enviar a Laboratorio Interno
+          </h2>
+          <button class="btn-cerrar" @click="modalEnviarLab = null">×</button>
+        </div>
+        <div class="modal-body">
+          <div style="background:rgba(184,151,75,0.06);border:1px solid rgba(184,151,75,0.2);border-radius:6px;padding:0.55rem 0.85rem;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:0.5rem 1.25rem;font-size:0.82rem">
+            <span style="color:var(--color-text-muted)">Lote IP: <strong style="font-family:var(--font-mono);color:var(--color-gold)">{{ modalEnviarLab.ip }}</strong></span>
+            <span style="color:var(--color-text-muted)">CIP Recuperación: <strong style="font-family:var(--font-mono);color:var(--color-gold)">{{ modalEnviarLab.cip_asignado }}</strong></span>
+          </div>
+          <p style="font-size:0.84rem;color:var(--color-text-muted);margin-bottom:1rem">
+            Seleccione qué análisis debe realizar el laboratorio Paititi sobre el CIP asignado.
+          </p>
+
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
+
+            <!-- Info de lo ya enviado -->
+            <div
+              v-if="modalEnviarLab.sub_tipos_enviados.length"
+              style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.25);border-radius:6px;padding:0.55rem 0.8rem;font-size:0.78rem;color:#a5b4fc"
+            >
+              Ya en laboratorio:
+              <strong>{{ modalEnviarLab.sub_tipos_enviados.join(' + ') }}</strong>
+            </div>
+
+            <!-- Opción: Ambos (solo disponible si ninguno fue enviado) -->
+            <label
+              class="lab-opcion"
+              :class="{ activo: envioModo === 'ambos', deshabilitado: modalEnviarLab.sub_tipos_enviados.length > 0 }"
+            >
+              <input
+                type="radio" name="subtipo" value="ambos" v-model="envioModo"
+                style="margin-right:0.5rem"
+                :disabled="modalEnviarLab.sub_tipos_enviados.length > 0"
+              />
+              <div>
+                <div style="font-weight:700;font-size:0.85rem">Sólidos + Solución (completo)</div>
+                <div style="font-size:0.75rem;color:var(--color-text-muted)">Reconocimiento de pulpa (FA) y Absorción Atómica (AAS)</div>
+              </div>
+            </label>
+
+            <!-- Opción: Solo Sólidos -->
+            <label
+              class="lab-opcion"
+              :class="{ activo: envioModo === 'solidos', deshabilitado: modalEnviarLab.sub_tipos_enviados.includes('SOLIDOS') }"
+            >
+              <input
+                type="radio" name="subtipo" value="solidos" v-model="envioModo"
+                style="margin-right:0.5rem"
+                :disabled="modalEnviarLab.sub_tipos_enviados.includes('SOLIDOS')"
+              />
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <div>
+                  <div style="font-weight:700;font-size:0.85rem">Solo Sólidos (FA)</div>
+                  <div style="font-size:0.75rem;color:var(--color-text-muted)">Reconocimiento de sólidos por Fire Assay</div>
+                </div>
+                <span
+                  v-if="modalEnviarLab.sub_tipos_enviados.includes('SOLIDOS')"
+                  style="font-size:0.7rem;background:rgba(99,102,241,0.15);color:#a5b4fc;border-radius:4px;padding:0.1rem 0.4rem;white-space:nowrap"
+                >✓ Enviado</span>
+              </div>
+            </label>
+
+            <!-- Opción: Solo Solución -->
+            <label
+              class="lab-opcion"
+              :class="{ activo: envioModo === 'solucion', deshabilitado: modalEnviarLab.sub_tipos_enviados.includes('SOLUCION') }"
+            >
+              <input
+                type="radio" name="subtipo" value="solucion" v-model="envioModo"
+                style="margin-right:0.5rem"
+                :disabled="modalEnviarLab.sub_tipos_enviados.includes('SOLUCION')"
+              />
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <div>
+                  <div style="font-weight:700;font-size:0.85rem">Solo Solución (AAS)</div>
+                  <div style="font-size:0.75rem;color:var(--color-text-muted)">Leyes en solución por Absorción Atómica</div>
+                </div>
+                <span
+                  v-if="modalEnviarLab.sub_tipos_enviados.includes('SOLUCION')"
+                  style="font-size:0.7rem;background:rgba(99,102,241,0.15);color:#a5b4fc;border-radius:4px;padding:0.1rem 0.4rem;white-space:nowrap"
+                >✓ Enviado</span>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalEnviarLab = null">Cancelar</button>
+          <button
+            class="btn-primary"
+            :disabled="enviandoLab === modalEnviarLab.ip || envioSubTiposEfectivos.length === 0"
+            @click="confirmarEnviarLab"
+          >
+            <span v-if="enviandoLab === modalEnviarLab.ip" class="spinner" style="margin-right:0.3rem"></span>
+            Enviar al Laboratorio
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -343,7 +509,7 @@ import AlertasBanner from '@/components/AlertasBanner.vue'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
 import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'
-import { WifiOff, Tag, RefreshCw, Beaker } from 'lucide-vue-next'
+import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()
@@ -356,13 +522,33 @@ const cargando      = ref(false)
 const etiquetando   = ref<string | null>(null)   // IP en proceso de etiquetado
 const etiquetaModal = ref<{ ip: string; cip: string } | null>(null)
 
+const ipsSeleccionados = ref<string[]>([])
 const filtroEstado   = ref('Todos')
 const filtroBusqueda = ref('')
+const mostrarDescartadas = ref(false)
 
 // ── Descartar prueba ──────────────────────────────────────────────────────────
 const modalDescartar  = ref<string | null>(null)  // IP de la prueba a descartar
 const motivoDescarte  = ref('')
 const descartando     = ref(false)
+
+// ── Enviar a Laboratorio ──────────────────────────────────────────────────────
+const modalEnviarLab = ref<LotePruebaList | null>(null)
+const enviandoLab    = ref<string | null>(null)
+const envioModo      = ref<'ambos' | 'solidos' | 'solucion'>('ambos')
+
+// Sub-tipos seleccionados por el usuario en el modo actual
+const envioSubTipos = computed(() => {
+  if (envioModo.value === 'ambos')   return ['SOLIDOS', 'SOLUCION']
+  if (envioModo.value === 'solidos') return ['SOLIDOS']
+  return ['SOLUCION']
+})
+
+// Sub-tipos efectivos a enviar = seleccionados menos los ya enviados
+const envioSubTiposEfectivos = computed(() => {
+  const yaEnviados = modalEnviarLab.value?.sub_tipos_enviados ?? []
+  return envioSubTipos.value.filter(t => !yaEnviados.includes(t))
+})
 
 // ── Adición modal ─────────────────────────────────────────────────────────────
 const modalAdicion = ref<LotePruebaList | null>(null)
@@ -444,7 +630,7 @@ const pruebasFiltradas = computed(() => {
   // 1. Filtrar IPs que están en cola offline para no duplicar
   const estaOffline = new Set(pruebasOffline.value.map(p => p.ip));
 
-  return pruebas.value.filter(p => {
+  const filtrado = pruebas.value.filter(p => {
     // Regla 1: Ocultar si está en cola de subida
     if (estaOffline.has(p.ip)) return false;
 
@@ -465,9 +651,55 @@ const pruebasFiltradas = computed(() => {
       if (!coincideIP && !coincideCIP) return false;
     }
 
+    // Regla 4: Ocultar descartadas a menos que se solicite
+    if (!mostrarDescartadas.value && p.descartado) return false;
+
     return true;
   });
-});
+
+  // Ordenar para que los descartados vayan al final de la lista
+  return filtrado.sort((a, b) => {
+    if (a.descartado === b.descartado) return 0;
+    return a.descartado ? 1 : -1;
+  });
+})
+
+// ── Selección múltiple de IPs ─────────────────────────────────────────────────
+// Solo IPs PENDIENTE (sin fecha_ingreso) son seleccionables para registro en lote
+function esPendienteSeleccionable(p: LotePruebaList) {
+  return !p.fecha_ingreso && !p.descartado
+}
+
+const pendientesSeleccionables = computed(() =>
+  pruebasFiltradas.value.filter(p => esPendienteSeleccionable(p))
+)
+
+const todosPendientesSeleccionados = computed(() =>
+  pendientesSeleccionables.value.length > 0 &&
+  pendientesSeleccionables.value.every(p => ipsSeleccionados.value.includes(p.ip))
+)
+
+function toggleTodosPendientes(e: Event) {
+  const checked = (e.target as HTMLInputElement).checked
+  if (checked) {
+    ipsSeleccionados.value = pendientesSeleccionables.value.map(p => p.ip)
+  } else {
+    ipsSeleccionados.value = []
+  }
+}
+
+function irARegistrarLote() {
+  if (ipsSeleccionados.value.length === 0) return
+  if (ipsSeleccionados.value.length === 1) {
+    router.push({ name: 'RegistrarPrueba', params: { ip: ipsSeleccionados.value[0] } })
+    return
+  }
+  router.push({
+    name: 'RegistrarPrueba',
+    params: { ip: ipsSeleccionados.value[0] },
+    query: { ips: ipsSeleccionados.value.join(',') }
+  })
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(d: string | null | undefined) {
@@ -561,6 +793,45 @@ async function etiquetar(ip: string) {
 function verEtiqueta(prueba: LotePruebaList) {
   if (prueba.cip_asignado) {
     etiquetaModal.value = { ip: prueba.ip, cip: prueba.cip_asignado }
+  }
+}
+
+// ── Enviar a Laboratorio ──────────────────────────────────────────────────────
+function abrirModalEnviarLab(prueba: LotePruebaList) {
+  modalEnviarLab.value = prueba
+  const yaEnviados = prueba.sub_tipos_enviados
+  // Pre-seleccionar el modo con lo que falta
+  if (!yaEnviados.includes('SOLIDOS') && !yaEnviados.includes('SOLUCION')) {
+    envioModo.value = 'ambos'     // nada enviado → ofrecer ambos
+  } else if (!yaEnviados.includes('SOLIDOS')) {
+    envioModo.value = 'solidos'   // falta sólidos
+  } else if (!yaEnviados.includes('SOLUCION')) {
+    envioModo.value = 'solucion'  // falta solución
+  } else {
+    envioModo.value = 'ambos'     // ambos enviados (no debería abrir)
+  }
+}
+
+async function confirmarEnviarLab() {
+  if (!modalEnviarLab.value) return
+  const ip = modalEnviarLab.value.ip
+  const subTiposAEnviar = envioSubTiposEfectivos.value
+  if (!subTiposAEnviar.length) {
+    ui.toast('Todos los análisis ya fueron enviados al laboratorio', 'info')
+    modalEnviarLab.value = null
+    return
+  }
+  enviandoLab.value = ip
+  try {
+    await pruebasApi.enviarALaboratorio(ip, subTiposAEnviar, modalEnviarLab.value.cip_asignado)
+    const labels = subTiposAEnviar.join(' + ')
+    ui.toast(`✓ Enviado a laboratorio: ${labels} para ${ip}`, 'success')
+    modalEnviarLab.value = null
+    await cargarDatos()
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al enviar al laboratorio', 'error')
+  } finally {
+    enviandoLab.value = null
   }
 }
 
@@ -822,5 +1093,82 @@ function imprimirEtiqueta(e: { ip: string; cip: string }) {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+
+/* ── Fila seleccionada (batch) ───────────────────────────── */
+.fila-seleccionada {
+  background: rgba(212, 175, 55, 0.07) !important;
+  outline: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+/* ── Columna Descartar ───────────────────────────────────── */
+.td-descartar {
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  max-width: 140px;
+}
+
+/* ── Botón Enviar a Lab ──────────────────────────────────── */
+.btn-enviar-lab {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #a5b4fc;
+  border-radius: var(--radius-md);
+  padding: 0.3rem 0.75rem;
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.btn-enviar-lab:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+.btn-enviar-lab:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Opciones de análisis en modal Enviar a Lab ─────────── */
+.lab-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lab-opcion:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.06);
+}
+.lab-opcion.activo {
+  border-color: rgba(99, 102, 241, 0.6);
+  background: rgba(99, 102, 241, 0.1);
+}
+.lab-opcion.deshabilitado {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Badge "Enviado" (todos sub-tipos enviados al lab) ──── */
+.badge-lab-enviado {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  border-radius: var(--radius-md);
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
 }
 </style>

@@ -63,6 +63,7 @@ export interface TerceroRespuesta {
   telefono: string | null
   email: string | null
   activo: boolean
+  ocultar_insumos: boolean
   provacop_id: number | null
   acopiador: AcopiadorResumen | null
   parametros: ParametrosRespuesta | null
@@ -74,6 +75,7 @@ export interface TerceroCrearPayload {
   referencia: string | null
   telefono: string | null
   email: string | null
+  ocultar_insumos?: boolean
   tipo_acopiador: TipoAcopiador
   acopiador_id?: number | null
   acopiador_nuevo?: { razon_social: string; ruc?: string | null } | null
@@ -85,6 +87,7 @@ export interface TerceroEditarPayload {
   referencia?: string | null
   telefono?: string | null
   email?: string | null
+  ocultar_insumos?: boolean
   parametros?: Partial<ParametrosComerciales> | null
 }
 

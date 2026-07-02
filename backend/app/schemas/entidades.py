@@ -58,6 +58,8 @@ class ParametrosSchema(BaseModel):
 class ParametrosRespuesta(ParametrosSchema):
     id: int
     provacop_id: int
+    gasto_acopio_llampo: float | None = None
+    gasto_consumo_llampo: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -88,6 +90,7 @@ class TerceroRespuesta(BaseModel):
     telefono: str | None = None
     email: str | None = None
     activo: bool
+    ocultar_insumos: bool
     provacop_id: int | None = None
     acopiador: AcopiadorResumen | None = None
     parametros: ParametrosRespuesta | None = None
@@ -141,6 +144,7 @@ class TerceroCrear(BaseModel):
     referencia: str | None = None  # procedencia
     telefono: str | None = None
     email: EmailStr | None = None
+    ocultar_insumos: bool = False
 
     # Tipo de acopiador
     tipo_acopiador: TipoAcopiador
@@ -188,6 +192,7 @@ class TerceroEditar(BaseModel):
     referencia: str | None = None
     telefono: str | None = None
     email: EmailStr | None = None
+    ocultar_insumos: bool | None = None
     parametros: ParametrosSchema | None = None
 
 
