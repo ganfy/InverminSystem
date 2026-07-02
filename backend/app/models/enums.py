@@ -97,6 +97,18 @@ class EstadoRecuperacion(str, Enum):
     CERT_RECONOCIMIENTO = "CERT_RECONOCIMIENTO"  # PDF de reconocimiento
 
 
+class SubTipoRecuperacion(str, Enum):
+    """
+    Sub-tipo de un análisis de recuperación de tipo Reconocimiento.
+    SOLIDOS:  muestras físicas (pulpa). Genera certificado de reconocimiento de sólidos.
+    SOLUCION: leyes en solución (Absorción Atómica). Genera certificado de solución AA.
+    null (legacy): registros anteriores sin distinción entre sub-tipos.
+    """
+
+    SOLIDOS = "SOLIDOS"
+    SOLUCION = "SOLUCION"
+
+
 class EstadoComprobante(str, Enum):
     EMITIDA = "EMITIDA"
     PARCIALMENTE_PAGADA = (
@@ -152,11 +164,15 @@ class TipoMuestra(str, Enum):
                             para análisis de recuperación por el lab interno.
     - RecuperacionExterno:  CIP generado por pruebas metalúrgicas para envío
                             a laboratorio externo. Comercial sube el certificado.
+    - Proceso:              Código libre ingresado manualmente por laboratorista
+                            para muestras de Proceso (Desorción, Lixiviación, etc.)
+                            que no tienen lote de origen en el sistema.
     """
 
     LABORATORIO = "Laboratorio"
     RECUPERACION_INTERNO = "RecuperacionInterno"
     RECUPERACION_EXTERNO = "RecuperacionExterno"
+    PROCESO = "Proceso"  # sin lote de origen, código libre del area de proceso
 
 
 class TipoAnalisis(str, Enum):

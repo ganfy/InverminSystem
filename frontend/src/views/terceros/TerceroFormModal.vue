@@ -106,6 +106,17 @@
                 />
                 <span v-if="errores.email" class="field-error">{{ errores.email }}</span>
               </div>
+
+              <div class="field field-full">
+                <label class="field-label" style="display:flex; align-items:center; cursor:pointer;">
+                  <input
+                    type="checkbox"
+                    v-model="form.ocultar_insumos"
+                    style="margin-right: 8px;"
+                  />
+                  Ocultar insumos en PDF de liquidación
+                </label>
+              </div>
             </div>
 
             <!-- ─── SECCIÓN 1: Acopiador ───────────────────────────────── -->
@@ -516,6 +527,7 @@ const form = ref({
   referencia:      '',
   telefono:        '',
   email:           '',
+  ocultar_insumos: false,
   tipo_acopiador:  'sin_acopiador' as TipoAcopiador,
   acopiador_id:    null as number | null,
   params:          emptyParams(),
@@ -571,6 +583,7 @@ watch(() => props.visible, async (v) => {
         referencia:     t.referencia ?? '',
         telefono:       t.telefono ?? '',
         email:          t.email ?? '',
+        ocultar_insumos: t.ocultar_insumos ?? false,
         tipo_acopiador: 'sin_acopiador', // no editable
         acopiador_id:   null,
         params: t.parametros ? { ...t.parametros } : emptyParams(),
@@ -585,6 +598,7 @@ watch(() => props.visible, async (v) => {
     form.value = {
       razon_social: '', ruc: '', referencia: '',
       telefono: '', email: '',
+      ocultar_insumos: false,
       tipo_acopiador: 'sin_acopiador',
       acopiador_id: null,
       params: emptyParams(),
@@ -730,6 +744,7 @@ async function guardar() {
         referencia:   form.value.referencia || null,
         telefono:     form.value.telefono   || null,
         email:        form.value.email      || null,
+        ocultar_insumos: form.value.ocultar_insumos,
         parametros:   soloLecturaParams.value ? undefined : limpiarParams(form.value.params),
       })
       ui.toast(`${resultado.razon_social} actualizado`, 'success')
@@ -740,6 +755,7 @@ async function guardar() {
         referencia:     form.value.referencia || null,
         telefono:       form.value.telefono   || null,
         email:          form.value.email      || null,
+        ocultar_insumos: form.value.ocultar_insumos,
         tipo_acopiador: form.value.tipo_acopiador,
         parametros:     limpiarParams(form.value.params),
       }

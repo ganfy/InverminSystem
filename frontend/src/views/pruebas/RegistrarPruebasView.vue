@@ -2,17 +2,46 @@
     <div class="page-container">
       <header class="page-header">
         <div>
-          <h1 class="page-title">Registrar Prueba</h1>
+          <h1 class="page-title">Registrar Prueba{{ modoLote ? ' en Lote' : '' }}</h1>
           <p class="page-subtitle">Análisis de preparación para proceso metalúrgico</p>
         </div>
       </header>
+
+      <!-- Banner de modo lote -->
+      <div v-if="modoLote" class="lote-banner">
+        <div class="lote-banner-header">
+          <Layers :size="18" style="flex-shrink:0" />
+          <strong>REGISTRO EN LOTE — {{ ipsLote.length }} botellas</strong>
+        </div>
+        <div class="lote-ips">
+          <span v-for="ip in ipsLote" :key="ip" class="lote-ip-badge">{{ ip }}</span>
+        </div>
+        <p style="font-size:0.78rem;color:var(--color-text-muted);margin-top:0.4rem">
+          Los mismos valores se registrarán para todas las botellas seleccionadas.
+          La fecha de ingreso será la misma para todas.
+        </p>
+      </div>
+
+      <!-- Resultados del lote -->
+      <div v-if="resultadosLote.length > 0" class="lote-resultados">
+        <div
+          v-for="r in resultadosLote"
+          :key="r.ip"
+          class="lote-resultado-item"
+          :class="r.ok ? 'ok' : 'err'"
+        >
+          <span class="td-mono" style="font-weight:700">{{ r.ip }}</span>
+          <span v-if="r.ok">✓ Guardado</span>
+          <span v-else>✗ {{ r.error }}</span>
+        </div>
+      </div>
 
       <div class="card">
         <h2 class="card-titulo">DATOS DEL LOTE</h2>
         <div class="form-grid">
           <div class="field">
-            <label class="field-label">IP:</label>
-            <input type="text" class="field-input" :value="loteInfo.ip" disabled />
+            <label class="field-label">IP{{ modoLote ? ' (primer lote)' : '' }}:</label>
+            <input type="text" class="field-input" :value="ipActual" disabled />
           </div>
         </div>
       </div>
@@ -56,7 +85,7 @@
         <button class="btn-secondary" @click="volver">Volver</button>
         <button class="btn-primary" @click="guardarPrueba" :disabled="guardando">
           <span v-if="guardando" class="spinner-sm" style="margin-right: 0.5rem;"></span>
-          Guardar
+          {{ modoLote ? `Guardar Lote (${ipsLote.length})` : 'Guardar' }}
         </button>
       </div>
     </div>
@@ -69,18 +98,26 @@
   import { useSync } from '@/composables/useSync'
   import { pruebasApi } from '@/api/pruebas'
   import { encolarPruebaOffline } from '@/composables/useOfflineQueue'
-  import { AlertTriangle } from 'lucide-vue-next'
+  import { AlertTriangle, Layers } from 'lucide-vue-next'
+
   const router = useRouter()
   const route = useRoute()
   const ui = useUiStore()
   const { online } = useSync()
 
-  // Capturamos la IP directo de la ruta
+  // IP principal (del param de ruta)
   const ipActual = route.params.ip as string
 
-  const loteInfo = ref({
-    ip: ipActual
+  // Modo lote: si viene ?ips=IP-001,IP-002,...
+  const ipsLote = computed<string[]>(() => {
+    const qIps = route.query.ips as string | undefined
+    if (qIps) return qIps.split(',').map(s => s.trim()).filter(Boolean)
+    return [ipActual]
   })
+  const modoLote = computed(() => ipsLote.value.length > 1)
+
+  interface ResultadoLote { ip: string; ok: boolean; error?: string }
+  const resultadosLote = ref<ResultadoLote[]>([])
 
   const form = ref({
     malla_porcentaje: null as number | null,
@@ -96,16 +133,12 @@
   const guardando = ref(false)
 
   onMounted(async () => {
+    if (modoLote.value) return  // en modo lote no precargamos datos
     cargandoDatos.value = true
     try {
-      // 1. Preguntamos al servidor si ya hay datos
       const datosGuardados = await pruebasApi.obtenerDetallePrueba(ipActual)
-
-      // 2. Si existen datos, prellenamos el formulario
       if (datosGuardados) {
-        // Extraemos solo lo que nos importa
         form.value = {
-          // Asegúrate de formatear la fecha correctamente para tu input type="datetime-local" si lo usas
           malla_porcentaje: datosGuardados.malla_porcentaje,
           porcentaje_nacn: datosGuardados.porcentaje_nacn,
           ph_inicial: datosGuardados.ph_inicial,
@@ -116,75 +149,151 @@
         }
       }
     } catch (error) {
-      console.error("Error cargando la prueba:", error)
-      // Aquí puedes disparar una notificación de error si quieres
+      console.error('Error cargando la prueba:', error)
     } finally {
       cargandoDatos.value = false
     }
   })
-
-  // Función útil de utilidad para datetime-local
-  function formatearFechaInput(fechaIso: string) {
-    // Corta los milisegundos y la Z para que los inputs HTML5 lo acepten
-    return fechaIso.slice(0, 16)
-  }
 
   const mostrarWarningMalla = computed(() => {
     if (form.value.malla_porcentaje === null || form.value.malla_porcentaje === undefined) return false
     return form.value.malla_porcentaje < 88 || form.value.malla_porcentaje > 94
   })
 
-  const volver = () => {
-    router.push('/pruebas')
-  }
+  const volver = () => { router.push('/pruebas') }
 
-  const guardarPrueba = async () => {
-    if (!ipActual) {
-      ui.toast('No se detectó un código IP válido.', 'error')
-      return
-    }
+  const sanitizeNumber = (val: any) =>
+    (val === '' || val === null || val === undefined) ? null : Number(val)
 
+  async function guardarPrueba() {
     guardando.value = true
+    resultadosLote.value = []
     const fechaActual = new Date().toISOString()
 
-    const sanitizeNumber = (val: any) => (val === '' || val === null || val === undefined) ? null : Number(val)
     const payload = {
       malla_porcentaje: sanitizeNumber(form.value.malla_porcentaje),
-      porcentaje_nacn: sanitizeNumber(form.value.porcentaje_nacn),
-      ph_inicial: sanitizeNumber(form.value.ph_inicial),
-      ph_final: sanitizeNumber(form.value.ph_final),
-      adicion_nacn: sanitizeNumber(form.value.adicion_nacn),
-      adicion_naoh: sanitizeNumber(form.value.adicion_naoh),
-      gasto_agno3: sanitizeNumber(form.value.gasto_agno3),
-      fecha_ingreso: fechaActual
+      porcentaje_nacn:  sanitizeNumber(form.value.porcentaje_nacn),
+      ph_inicial:       sanitizeNumber(form.value.ph_inicial),
+      ph_final:         sanitizeNumber(form.value.ph_final),
+      adicion_nacn:     sanitizeNumber(form.value.adicion_nacn),
+      adicion_naoh:     sanitizeNumber(form.value.adicion_naoh),
+      gasto_agno3:      sanitizeNumber(form.value.gasto_agno3),
+      fecha_ingreso:    fechaActual,
     }
 
-    try {
-      if (online.value) {
-        // Guardado normal (Online) usando la IP
-        const response = await pruebasApi.registrarPrueba(ipActual, payload)
-        ui.toast('Prueba registrada correctamente', 'success')
-        //if (response.warning) ui.toast(response.warning, 'warning')
-      } else {
-        // Guardado a la cola (Offline) usando la IP
-        const offlineId = `pm-${Date.now()}`
-        await encolarPruebaOffline({
-          offline_id: offlineId,
-          ip: ipActual,
-          datos: payload,
-          synced: false,
-          sync_error: null
-        })
-        ui.toast('Sin conexión. Prueba guardada localmente.', 'warning')
+    const targets = modoLote.value ? ipsLote.value : [ipActual]
+    let errores = 0
+
+    for (const ip of targets) {
+      if (!ip) { errores++; resultadosLote.value.push({ ip, ok: false, error: 'IP vacío' }); continue }
+
+      try {
+        if (online.value) {
+          await pruebasApi.registrarPrueba(ip, payload)
+          resultadosLote.value.push({ ip, ok: true })
+        } else {
+          const offlineId = `pm-${Date.now()}-${ip}`
+          await encolarPruebaOffline({
+            offline_id: offlineId,
+            ip,
+            datos: payload,
+            synced: false,
+            sync_error: null
+          })
+          resultadosLote.value.push({ ip, ok: true })
+        }
+      } catch (error: any) {
+        errores++
+        const msg = error.response?.data?.detail || 'Error al guardar'
+        resultadosLote.value.push({ ip, ok: false, error: msg })
       }
+    }
 
-      setTimeout(() => { volver() }, 1000)
+    guardando.value = false
 
-    } catch (error: any) {
-      const msg = error.response?.data?.detail || 'Ocurrió un error al guardar la prueba'
-      ui.toast(msg, 'error')
-    } finally {
-      guardando.value = false
+    if (!modoLote.value) {
+      // Modo individual: comportamiento original
+      if (errores === 0) {
+        ui.toast(online.value ? 'Prueba registrada correctamente' : 'Sin conexión. Prueba guardada localmente.', online.value ? 'success' : 'warning')
+        setTimeout(() => volver(), 1000)
+      } else {
+        const msg = resultadosLote.value[0]?.error || 'Error al guardar'
+        ui.toast(msg, 'error')
+      }
+    } else {
+      // Modo lote: mostrar resumen
+      const ok = targets.length - errores
+      if (errores === 0) {
+        ui.toast(`✓ ${ok} prueba(s) registradas en lote`, 'success')
+        setTimeout(() => volver(), 1500)
+      } else {
+        ui.toast(`${ok} guardadas, ${errores} con error. Revise los detalles arriba.`, 'warning')
+      }
     }
   }
   </script>
+
+  <style scoped>
+  /* Banner de modo lote */
+  .lote-banner {
+    background: rgba(212, 175, 55, 0.06);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .lote-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-gold);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.5rem;
+  }
+  .lote-ips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .lote-ip-badge {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    background: rgba(212, 175, 55, 0.12);
+    color: var(--color-gold);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+
+  /* Resultados del lote */
+  .lote-resultados {
+    margin-bottom: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .lote-resultado-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .lote-resultado-item:last-child { border-bottom: none; }
+  .lote-resultado-item.ok  { color: var(--color-success); }
+  .lote-resultado-item.err { color: var(--color-error); }
+
+  .spinner-sm {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  </style>

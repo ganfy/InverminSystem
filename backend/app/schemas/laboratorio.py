@@ -32,7 +32,9 @@ class AnalisisDetalleOut(BaseModel):
 
 
 class AnalisisLeyCreate(BaseModel):
-    cip: str = Field(..., description="Código CIP de la muestra")
+    cip: str = Field(
+        ..., description="Código de la muestra (CIP de lote o código libre de Proceso)"
+    )
     laboratorio: str = Field(..., description="Nombre del laboratorio")
     tipo_analisis: TipoAnalisis = Field(..., description="planta | externo | minero | dirimencia")
     material: str = Field("Au", description="Au | Ag")
@@ -42,6 +44,12 @@ class AnalisisLeyCreate(BaseModel):
     origen_datos: str = OrigenDatos.MANUAL
     muestras_detalle: list[NewmontMuestraIn] | None = None
     fecha_analisis: date | None = None
+    descripcion_pdf: str | None = Field(
+        None,
+        description="Descripción para el campo 'Descripción' del certificado PDF. "
+        "Valores sugeridos: PROCESO, LAB. METAL\u00daRGICO, RECONOCIMIENTO, LOTE. "
+        "Si no se envía, se usa el default del template.",
+    )
 
     @model_validator(mode="after")
     def validar_segun_material(self) -> "AnalisisLeyCreate":
@@ -80,7 +88,7 @@ class AnalisisLeyPorIPCreate(BaseModel):
 
 class AnalisisLeyOut(BaseModel):
     id: int
-    lote_id: int
+    lote_id: int | None = None  # None para análisis de Proceso (sin lote)
     lote_ip: str | None = None
     cip: str | None
     laboratorio: str
@@ -124,7 +132,7 @@ class AnalisisAgCreate(BaseModel):
 
 class AnalisisAgOut(BaseModel):
     id: int
-    lote_id: int
+    lote_id: int | None = None  # None para Proceso
     lote_ip: str | None = None
     laboratorio: str
     ley_ag_gr_tm: Decimal
@@ -145,11 +153,19 @@ class AnalisisRecuperacionCreate(BaseModel):
 
     cip: str
     laboratorio: str
-    ley_cabeza: Decimal = Field(..., gt=0)
+    ley_cabeza: Decimal | None = Field(None, ge=0)
     ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None
     origen_datos: str = OrigenDatos.MANUAL
     fecha_analisis: date | None = None
+    descripcion_pdf: str | None = Field(
+        None,
+        description="Descripción para el PDF. Sugeridos: PROCESO, LAB. METAL\u00daRGICO, RECONOCIMIENTO, LOTE.",
+    )
+    sub_tipo: str | None = Field(None, description="SOLIDOS | SOLUCION | None")
+    ley_cola_ag: Decimal | None = Field(
+        None, description="Ley Ag g/TM (opcional, para crear el registro de plata automáticamente)"
+    )
 
 
 class EnviarRecuperacionInternaRequest(BaseModel):
@@ -157,27 +173,33 @@ class EnviarRecuperacionInternaRequest(BaseModel):
     Comercial crea un registro pendiente de recuperación para el laboratorio interno.
     El CIP debe ser de tipo RecuperacionInterno.
     Si el lote tiene solo 1 CIP interno, se puede omitir (se usa automáticamente).
+    sub_tipos: lista de sub-tipos a crear ('SOLIDOS', 'SOLUCION' o ambos). Default: ambos.
     """
 
     cip: str | None = None  # None → sistema elige el único RecuperacionInterno del lote
     laboratorio: str | None = None
     ley_cabeza: Decimal | None = None
+    sub_tipos: list[str] = Field(
+        default=["SOLIDOS", "SOLUCION"], description="Sub-tipos de análisis a crear"
+    )
 
 
 class AnalisisRecuperacionOut(BaseModel):
     id: int
-    lote_id: int
+    lote_id: int | None = None  # None para análisis de Proceso (sin lote)
     lote_ip: str | None = None
     cip: str | None
     laboratorio: str
-    ley_cabeza: Decimal
+    ley_cabeza: Decimal | None = None
     ley_cola: Decimal | None = None
     ley_liquido: Decimal | None = None  # solución Au
     recuperacion: Decimal | None = None
     solucion_ag_g_m3: Decimal | None = None  # Ag en solución (g/m³)
     # ── Detalles por muestra (solo se incluyen cuando se piden explícitamente) ─
     detalles: list[AnalisisDetalleOut] = []
-    # ── Estado y trazabilidad ─────────────────────────────────────────────────
+    # ── Sub-tipo Reconocimiento ────────────────────────────────────────
+    sub_tipo: str | None = None  # 'SOLIDOS' | 'SOLUCION' | null
+    # ── Estado y trazabilidad ──────────────────────────────────────
     estado: str
     vigente: bool
     fecha_analisis: date | None
@@ -248,7 +270,7 @@ class DescartarRequest(BaseModel):
 
 class CIPAnalisisOut(BaseModel):
     cip: str
-    lote_id: int
+    lote_id: int | None = None  # None para CIPs de Proceso (sin lote)
     lote_ip: str | None = None  # None para Laboratorista, IP real para Comercial
     fecha_envio: date | None
     tipo_muestra: str | None

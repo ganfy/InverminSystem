@@ -188,6 +188,7 @@ def _rec_out(
         ley_liquido=a.ley_liquido,
         solucion_ag_g_m3=a.solucion_ag_g_m3,
         recuperacion=a.recuperacion,
+        sub_tipo=a.sub_tipo,
         estado=a.estado,
         vigente=a.vigente,
         fecha_analisis=a.fecha_analisis,
@@ -213,22 +214,27 @@ def obtener_cips_laboratorio(
     """
     cips = (
         db.query(MapeoCIP)
-        .join(Lote, Lote.id == MapeoCIP.lote_id)
-        .filter(Lote.eliminado == False)  # noqa: E712
+        .outerjoin(Lote, Lote.id == MapeoCIP.lote_id)
+        .filter((MapeoCIP.lote_id == None) | (Lote.eliminado == False))  # noqa: E711, E712
         .order_by(MapeoCIP.id.desc())
         .all()
     )
 
     resultados: list[CIPAnalisisOut] = []
     for cip in cips:
-        if not incluir_ip and cip.laboratorio not in [
-            "Paititi",
-            "Laboratorio Interno",
-            "El Dorado - Invermin Paititi",
-        ]:
+        if (
+            not incluir_ip
+            and cip.laboratorio
+            not in [
+                "Paititi",
+                "Laboratorio Interno",
+                "El Dorado - Invermin Paititi",
+            ]
+            and cip.tipo_muestra != TipoMuestra.PROCESO
+        ):
             continue
-        lote = db.query(Lote).filter(Lote.id == cip.lote_id).first()
-        if not lote:
+        lote = db.query(Lote).filter(Lote.id == cip.lote_id).first() if cip.lote_id else None
+        if cip.lote_id and not lote:
             continue
 
         analisis_ley = (
@@ -274,7 +280,7 @@ def obtener_cips_laboratorio(
         resultados.append(
             CIPAnalisisOut(
                 cip=cip.codigo_cip,
-                lote_id=cip.lote_id,
+                lote_id=cip.lote_id if cip.lote_id else 0,  # Frontend expects number, 0 for PROCESO
                 lote_ip=ip,
                 fecha_envio=cip.fecha_envio,
                 tipo_muestra=cip.tipo_muestra,
@@ -452,13 +458,24 @@ def obtener_detalle_lote(db: Session, ip: str, material: str | None = None) -> L
 
 
 def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: int) -> AnalisisLey:
-    mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == datos.cip).first()
-    if not mapeo:
-        raise ValueError(f"Código CIP '{datos.cip}' no encontrado en el sistema")
+    from datetime import date
 
-    if mapeo.tipo_muestra not in (None, TipoMuestra.LABORATORIO):
+    mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == datos.cip).first()
+
+    if not mapeo:
+        # Auto-crear MapeoCIP de tipo Proceso (código libre, sin lote)
+        mapeo = MapeoCIP(
+            lote_id=None,
+            codigo_cip=datos.cip,
+            laboratorio=datos.laboratorio,
+            fecha_envio=date.today(),
+            tipo_muestra=TipoMuestra.PROCESO,
+        )
+        db.add(mapeo)
+        db.flush()
+    elif mapeo.tipo_muestra not in (None, TipoMuestra.LABORATORIO, TipoMuestra.PROCESO):
         raise ValueError(
-            f"El CIP '{datos.cip}' es de tipo '{mapeo.tipo_muestra}' y no se usa para análisis de ley"
+            f"El código '{datos.cip}' es de tipo '{mapeo.tipo_muestra}' y no se usa para análisis de ley directo"
         )
 
     # Actualizar laboratorio destino en el mapeo
@@ -590,11 +607,32 @@ def registrar_analisis_recuperacion(
 ) -> AnalisisRecuperacion:
     """
     Registro directo (COMPLETADO) de recuperación.
-    Usado para: laboratorio externo via certificado, o flujos sin pending previo.
+    Usado para: laboratorio externo via certificado, o flujos de Proceso sin pending previo.
     """
+    from datetime import date
+
     mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == datos.cip).first()
+
     if not mapeo:
-        raise ValueError(f"Código CIP '{datos.cip}' no encontrado en el sistema")
+        # Auto-crear MapeoCIP de tipo Proceso (código libre, sin lote)
+        mapeo = MapeoCIP(
+            lote_id=None,
+            codigo_cip=datos.cip,
+            laboratorio=datos.laboratorio,
+            fecha_envio=date.today(),
+            tipo_muestra=TipoMuestra.PROCESO,
+        )
+        db.add(mapeo)
+        db.flush()
+    elif mapeo.tipo_muestra not in (
+        None,
+        TipoMuestra.RECUPERACION_INTERNO,
+        TipoMuestra.RECUPERACION_EXTERNO,
+        TipoMuestra.PROCESO,
+    ):
+        raise ValueError(
+            f"El código '{datos.cip}' es de tipo '{mapeo.tipo_muestra}' y no acepta análisis de recuperación directo"
+        )
 
     # Actualizar laboratorio destino en el mapeo
     if datos.laboratorio:
@@ -608,6 +646,7 @@ def registrar_analisis_recuperacion(
         ley_cola=datos.ley_cola,
         ley_liquido=datos.ley_liquido,
         estado=EstadoRecuperacion.COMPLETADO,
+        sub_tipo=datos.sub_tipo,
         origen_datos=datos.origen_datos,
         fecha_analisis=datos.fecha_analisis,
         vigente=True,
@@ -616,6 +655,48 @@ def registrar_analisis_recuperacion(
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
+
+    if datos.ley_cola_ag is not None:
+        # Generate Ag record
+        analisis_au = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.lote_id == nuevo.lote_id,
+                AnalisisLey.material == "Au",
+                AnalisisLey.vigente,
+            )
+            .first()
+        )
+        tipo_an = analisis_au.tipo_analisis if analisis_au else TipoAnalisis.PLANTA
+        db.query(AnalisisLey).filter(
+            AnalisisLey.lote_id == nuevo.lote_id,
+            AnalisisLey.material == "Ag",
+            AnalisisLey.vigente,
+        ).update({"vigente": False}, synchronize_session="fetch")
+
+        constantes = get_constantes(db)
+        ley_oz_tc = (datos.ley_cola_ag / constantes.factor_oz_tc).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        )
+
+        nuevo_ag = AnalisisLey(
+            lote_id=nuevo.lote_id,
+            cip=nuevo.cip,
+            laboratorio=nuevo.laboratorio,
+            tipo_analisis=tipo_an,
+            material="Ag",
+            ley_fino=float(ley_oz_tc),
+            ley_grueso=0.0,
+            ley_final=float(ley_oz_tc),
+            ley_gr_tm=float(datos.ley_cola_ag),
+            origen_datos=OrigenDatos.MANUAL,
+            fecha_analisis=datos.fecha_analisis,
+            vigente=True,
+            creado_por=usuario_id,
+        )
+        db.add(nuevo_ag)
+        db.flush()
+
     return nuevo
 
 
@@ -639,12 +720,14 @@ def enviar_recuperacion_interna(
         raise ValueError(f"Lote '{ip_lote}' no encontrado")
 
     # Calcular ley comercial (snapshot)
+    # Si no hay ley disponible aún, se permite enviar con ley_cabeza=None.
+    # Se completará automáticamente cuando el laboratorio registre la ley cabeza.
     ley_comercial = datos.ley_cabeza
     if ley_comercial is None:
-        raise ValueError(
-            "El lote no tiene análisis de ley vigentes. "
-            "No es posible determinar la ley cabeza para recuperación."
-        )
+        from app.services.pruebas import calcular_ley_planta as _calc_ley
+
+        ley_comercial = _calc_ley(db, lote.id)
+    # No se lanza error si ley_comercial es None: el análisis queda pendiente sin ley_cabeza
 
     # Resolver CIP
     cips_internos = (
@@ -681,38 +764,51 @@ def enviar_recuperacion_interna(
 
     cip_obj.fecha_envio = date.today()
 
-    # Verificar que no haya pending vigente para ese CIP
-    pending_existente = (
-        db.query(AnalisisRecuperacion)
-        .filter(
+    # Verificar que no haya pending vigente para ese CIP+sub_tipo ya existente
+    sub_tipos = getattr(datos, "sub_tipos", [None])
+    if not sub_tipos:
+        sub_tipos = [None]  # comportamiento legacy
+
+    nuevos = []
+    for sub_tipo in sub_tipos:
+        # Verificar que no haya pending vigente para ese CIP (y sub_tipo si aplica)
+        q = db.query(AnalisisRecuperacion).filter(
             AnalisisRecuperacion.cip == cip_obj.codigo_cip,
             AnalisisRecuperacion.estado == EstadoRecuperacion.PENDIENTE,
             AnalisisRecuperacion.vigente == True,  # noqa: E712
         )
-        .first()
-    )
-    if pending_existente:
-        raise ValueError(
-            f"Ya existe un análisis de recuperación PENDIENTE para el CIP '{cip_obj.codigo_cip}'. "
-            "El laboratorista aún no lo ha completado."
-        )
+        if sub_tipo is not None:
+            q = q.filter(AnalisisRecuperacion.sub_tipo == sub_tipo)
+        pending_existente = q.first()
 
-    nuevo = AnalisisRecuperacion(
-        lote_id=lote.id,
-        cip=cip_obj.codigo_cip,
-        laboratorio=datos.laboratorio,
-        ley_cabeza=ley_comercial,  # snapshot: se congela aquí
-        ley_cola=None,
-        ley_liquido=None,
-        estado=EstadoRecuperacion.PENDIENTE,
-        origen_datos=OrigenDatos.MANUAL,
-        vigente=True,
-        creado_por=usuario_id,
-    )
-    db.add(nuevo)
+        if pending_existente:
+            raise ValueError(
+                f"Ya existe un análisis de recuperación PENDIENTE"
+                f"{f' ({sub_tipo})' if sub_tipo else ''}"
+                f" para el CIP '{cip_obj.codigo_cip}'."
+            )
+
+        nuevo = AnalisisRecuperacion(
+            lote_id=lote.id,
+            cip=cip_obj.codigo_cip,
+            laboratorio=datos.laboratorio,
+            ley_cabeza=ley_comercial,  # snapshot: se congela aquí
+            ley_cola=None,
+            ley_liquido=None,
+            estado=EstadoRecuperacion.PENDIENTE,
+            sub_tipo=sub_tipo,
+            origen_datos=OrigenDatos.MANUAL,
+            vigente=True,
+            creado_por=usuario_id,
+        )
+        db.add(nuevo)
+        nuevos.append(nuevo)
+
     db.flush()
-    db.refresh(nuevo)
-    return nuevo
+    for n in nuevos:
+        db.refresh(n)
+    # Retornar el primer registro creado (el router puede obtener todos via CIP)
+    return nuevos[0]
 
 
 def _calcular_ley_reco_gr_tm(mineral_mg: Decimal, peso_g: Decimal) -> Decimal:
@@ -902,9 +998,10 @@ def completar_recuperacion(
     if muestras:
         ley_cola, ley_cola_ag = _procesar_muestras_reconocimiento(db, a.id, muestras, usuario_id)
     else:
-        if datos.ley_cola is None:
+        # Para SOLUCION, ley_cola no aplica (solo ley_liquido) — no exigir
+        if datos.ley_cola is None and a.sub_tipo != "SOLUCION":
             raise ValueError("Debe ingresar muestras o ley_cola directamente")
-        ley_cola = Decimal(str(datos.ley_cola))
+        ley_cola = Decimal(str(datos.ley_cola)) if datos.ley_cola is not None else None
         ley_cola_ag = None
 
     a.ley_cola = ley_cola
@@ -1390,19 +1487,25 @@ def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def generar_y_guardar_certificado_interno(db: Session, analisis_id: int, tipo: str) -> str:
+def generar_y_guardar_certificado_interno(
+    db: Session, analisis_id: int, tipo: str, descripcion_pdf: str | None = None
+) -> str:
     from app.services import certificado_ley_pdf as cert_svc
 
     if tipo == "ley":
         a = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_id).first()
         if not a:
             raise ValueError("Análisis no encontrado")
-        pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(db, a.cip)
+        pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(
+            db, a.cip, descripcion=descripcion_pdf or "PROCESO"
+        )
     else:
         a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
         if not a:
             raise ValueError("Análisis no encontrado")
-        pdf_bytes = cert_svc.generar_certificado_recuperacion_cip_pdf(db, a.cip)
+        pdf_bytes = cert_svc.generar_certificado_recuperacion_cip_pdf(
+            db, a.id, descripcion=descripcion_pdf or "PROCESO"
+        )
 
     ahora = datetime.now()
     cip_str = (a.cip or "cert").replace("/", "_")

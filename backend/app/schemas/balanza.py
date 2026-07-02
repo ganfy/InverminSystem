@@ -34,11 +34,18 @@ class PesajeCrear(BaseModel):
     es_manual: bool = False
     justificacion_manual: Optional[str] = None
 
-    @field_validator("peso_inicial", "peso_final")
+    @field_validator("peso_inicial")
     @classmethod
-    def positivo(cls, v: Decimal) -> Decimal:
+    def positivo_inicial(cls, v: Decimal) -> Decimal:
         if v <= 0:
             raise ValueError("El peso debe ser mayor a 0")
+        return v
+
+    @field_validator("peso_final")
+    @classmethod
+    def positivo_final(cls, v: Decimal) -> Decimal:
+        if v < 0:
+            raise ValueError("La tara no puede ser negativa")
         return v
 
     @model_validator(mode="after")

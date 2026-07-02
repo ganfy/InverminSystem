@@ -315,6 +315,7 @@ font-size: var(--text-sm);
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--color-border);
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.75rem;
 }
@@ -428,7 +429,9 @@ font-size: var(--text-sm);
 
 .modal-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem;
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--color-border);

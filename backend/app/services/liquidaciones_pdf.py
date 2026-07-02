@@ -61,8 +61,9 @@ def _escape_css_braces(html_str: str) -> str:
 _TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "liquidacion.html"
 
 
-def _build_fila(ll: LiquidacionLote) -> str:
+def _build_fila(ll: LiquidacionLote, ocultar_insumos: bool = False) -> str:
     ip = ll.lote.ip if ll.lote else "-"
+    insumos_str = "***" if ocultar_insumos else _fmt_d(ll.insumos_liquidacion, 2)
     return f"""
     <tr>
       <td>{ip}</td>
@@ -76,7 +77,7 @@ def _build_fila(ll: LiquidacionLote) -> str:
       <td>{_fmt_d(ll.spot_usd_snapshot, 2)}</td>
       <td>{_fmt_d(ll.maquila_aplicada, 2)}</td>
       <td>1.1023</td>
-      <td>{_fmt_d(ll.insumos_liquidacion, 2)}</td>
+      <td>{insumos_str}</td>
       <td>{_fmt_d(ll.precio_x_tms, 4)}</td>
       <td><b>{_fmt_d(ll.total_usd, 2)}</b></td>
     </tr>"""
@@ -137,7 +138,8 @@ def generar_liquidacion_pdf(db: Session, liquidacion_id: int) -> bytes:
     lim_sup = _fmt_d(params.lim_ley_superior, 3) if params and params.lim_ley_superior else "0.099"
 
     # Filas de lotes
-    filas = "".join(_build_fila(ll) for ll in liq.liquidacion_lotes)
+    ocultar = prov.ocultar_insumos if prov else False
+    filas = "".join(_build_fila(ll, ocultar) for ll in liq.liquidacion_lotes)
 
     valor_ag_total = sum(float(ll.valor_ag_usd or 0) for ll in liq.liquidacion_lotes)
     spot_ag = next(

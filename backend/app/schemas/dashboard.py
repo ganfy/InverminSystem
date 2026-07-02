@@ -35,6 +35,7 @@ class LoteDashboard(BaseModel):
     dirimencia: bool
     dias_almacen: int
     tiene_rec_pendiente: bool = False
+    ruma_codigo: str | None = None
 
 
 class AcopiadorTMH(BaseModel):

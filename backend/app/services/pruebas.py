@@ -47,6 +47,30 @@ def _get_cips_recuperacion(db: Session, lote_id: int) -> list[MapeoCIP]:
     )
 
 
+def _get_sub_tipos_enviados(db: Session, cip: str | None) -> list[str]:
+    """Retorna los sub_tipos que ya tienen análisis de recuperación vigente (PENDIENTE o COMPLETADO)
+    para el CIP dado. Usado para saber qué sub-tipos NO hay que volver a enviar."""
+    if not cip:
+        return []
+    registros = (
+        db.query(AnalisisRecuperacion.sub_tipo)
+        .filter(
+            AnalisisRecuperacion.cip == cip,
+            AnalisisRecuperacion.vigente == True,  # noqa: E712
+            ~AnalisisRecuperacion.eliminado,
+        )
+        .all()
+    )
+    # Normalizar: None sub_tipo cuenta como 'SOLIDOS' (análisis legacy sin sub_tipo)
+    enviados: list[str] = []
+    for (sub_tipo,) in registros:
+        if sub_tipo:
+            enviados.append(sub_tipo)
+        else:
+            enviados.append("SOLIDOS")  # legacy
+    return list(set(enviados))
+
+
 def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
     """
     Calcula ley planta = promedio de análisis de ley VIGENTES del lote.
@@ -124,6 +148,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                 estado = "COMPLETADO" if ahora >= fecha_salida else "EN PROCESO"
 
             cip_asignado = cips_rec[n].codigo_cip if n < len(cips_rec) else None
+            sub_tipos_enviados = _get_sub_tipos_enviados(db, cip_asignado)
 
             lista.append(
                 LotePruebaList(
@@ -148,6 +173,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                     else None,
                     descartado=bool(prueba.descartado),
                     motivo_descarte=prueba.motivo_descarte,
+                    sub_tipos_enviados=sub_tipos_enviados,
                 )
             )
 

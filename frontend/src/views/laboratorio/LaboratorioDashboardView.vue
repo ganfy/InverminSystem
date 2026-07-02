@@ -111,15 +111,21 @@
     <template v-else>
       <div class="tabs-lab">
         <button class="tab-lab-btn" :class="{ active: tabActual === 'ley' }" @click="tabActual = 'ley'">
-          Análisis de Ley Newmont
+          Newmont
           <span v-if="pendientesLey > 0" class="badge-count">{{ pendientesLey }}</span>
           <ChevronUp v-if="tabActual === 'ley'" :size="14" class="tab-chevron" />
           <ChevronDown v-else :size="14" class="tab-chevron" />
         </button>
-        <button class="tab-lab-btn" :class="{ active: tabActual === 'rec' }" @click="tabActual = 'rec'">
-          Análisis de Reconocimientos
-          <span v-if="pendientesRec > 0" class="badge-count">{{ pendientesRec }}</span>
-          <ChevronUp v-if="tabActual === 'rec'" :size="14" class="tab-chevron" />
+        <button class="tab-lab-btn" :class="{ active: tabActual === 'solidos' }" @click="tabActual = 'solidos'">
+          Sólidos
+          <span v-if="pendientesSolidos > 0" class="badge-count">{{ pendientesSolidos }}</span>
+          <ChevronUp v-if="tabActual === 'solidos'" :size="14" class="tab-chevron" />
+          <ChevronDown v-else :size="14" class="tab-chevron" />
+        </button>
+        <button class="tab-lab-btn" :class="{ active: tabActual === 'solucion' }" @click="tabActual = 'solucion'">
+          Absorción Atómica
+          <span v-if="pendientesSolucion > 0" class="badge-count">{{ pendientesSolucion }}</span>
+          <ChevronUp v-if="tabActual === 'solucion'" :size="14" class="tab-chevron" />
           <ChevronDown v-else :size="14" class="tab-chevron" />
         </button>
       </div>
@@ -133,13 +139,37 @@
             <option value="COMPLETADO">Completado</option>
           </select>
         </div>
+        <div class="field" style="display:flex;align-items:center;">
+          <label style="color:var(--color-text); font-size:var(--text-sm); display:flex; align-items:center; gap:0.5rem; cursor:pointer; margin-top:1rem;">
+            <input type="checkbox" v-model="mostrarSoloCIPs" />
+            Mostrar solo CIPs
+          </label>
+        </div>
         <div class="field" style="flex:1;min-width:200px">
           <label class="field-label">BÚSQUEDA</label>
           <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="CIP" />
         </div>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div>
+          <template v-if="tabActual === 'ley'">
+            <button class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem" @click="irARegistrarLey('_nuevo')">
+              + Nuevo Análisis de Ley (Blanco)
+            </button>
+          </template>
+          <template v-else-if="tabActual === 'solidos'">
+            <button class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem" @click="irANuevoReconocimiento('solidos')">
+              + Nuevo Reconocimiento (Sólidos)
+            </button>
+          </template>
+          <template v-else-if="tabActual === 'solucion'">
+            <button class="btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem" @click="irANuevoReconocimiento('solucion')">
+              + Nuevo Reconocimiento (Solución)
+            </button>
+          </template>
+        </div>
+
         <button
           class="btn-primary"
           :disabled="cipsSeleccionados.length === 0 || generandoConjunto"
@@ -154,28 +184,48 @@
         <table class="tabla">
           <thead>
             <tr>
-              <th style="width:40px;text-align:center">
-                <input type="checkbox" :checked="todosSeleccionados" @change="toggleTodosSeleccionados" />
-              </th>
-              <th>CIP</th>
-              <th>FECHA ENVÍO</th>
               <template v-if="tabActual === 'ley'">
+                <th style="width:40px;text-align:center">
+                  <input type="checkbox" :checked="todosSeleccionados" @change="toggleTodosSeleccionados" />
+                </th>
+                <th>CIP</th>
+                <th>FECHA ENVÍO</th>
                 <th>MALLA +140</th>
                 <th>MALLA -140</th>
                 <th>AU OZ/TC</th>
                 <th>AU GR/TM</th>
+                <th>ESTADO</th>
+                <th></th>
               </template>
-              <template v-else>
-                <th>LEY COLA</th>
-                <th>LEY LÍQUIDO</th>
+              <template v-else-if="tabActual === 'solidos'">
+                <th style="width:36px;text-align:center">
+                  <input type="checkbox" :checked="todosSeleccionados" @change="toggleTodosSeleccionados" />
+                </th>
+                <th>CIP</th>
+                <th>FECHA ENVÍO</th>
+                <th>TIPO</th>
+                <th>LEY AU</th>
+                <th>LEY AG</th>
+                <th>ESTADO</th>
+                <th>ACCIONES</th>
               </template>
-              <th>ESTADO</th>
-              <th></th>
+              <template v-else-if="tabActual === 'solucion'">
+                <th style="width:36px;text-align:center">
+                  <input type="checkbox" :checked="todosSeleccionados" @change="toggleTodosSeleccionados" />
+                </th>
+                <th>CIP</th>
+                <th>FECHA ENVÍO</th>
+                <th>TIPO</th>
+                <th>LEY LÍQ. (Au)</th>
+                <th>LEY LÍQ. (Ag)</th>
+                <th>ESTADO</th>
+                <th>ACCIONES</th>
+              </template>
             </tr>
           </thead>
           <tbody>
             <tr v-if="store.cargando">
-              <td :colspan="tabActual === 'ley' ? 9 : 7" class="estado-tabla">
+              <td :colspan="tabActual === 'ley' ? 9 : 8" class="estado-tabla">
                 <span class="spinner" style="margin-right:0.5rem"></span> Cargando...
               </td>
             </tr>
@@ -206,21 +256,49 @@
                 </tr>
               </template>
 
-              <template v-if="tabActual === 'rec'">
-                <tr v-for="fila in filasMostrar" :key="fila.cip">
+              <template v-else-if="tabActual === 'solidos'">
+                <tr v-for="fila in filasMostrar" :key="fila.id || fila.cip">
                   <td style="text-align:center">
                     <input type="checkbox" :value="fila.cip" v-model="cipsSeleccionados" />
                   </td>
                   <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
                   <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
+                  <td>
+                    <span v-if="fila.sub_tipo === 'SOLIDOS'" class="badge-subtipo solidos">SÓLIDOS</span>
+                    <span v-else class="td-mono" style="font-size:0.75rem;color:var(--color-text-faint)">LEGACY</span>
+                  </td>
                   <td>{{ fila.leyCola ?? '-' }}</td>
-                  <td>{{ fila.leyLiquido ?? '-' }}</td>
+                  <td>{{ fila.leyColaAg ?? '-' }}</td>
                   <td>
                     <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
                   </td>
                   <td class="td-acciones">
-                    <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila.cip)">Registrar</button>
-                    <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="generarCertRec(fila)">Generar cert.</button>
+                    <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Registrar</button>
+                    <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Generar cert.</button>
+                    <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
+                  </td>
+                </tr>
+              </template>
+              
+              <template v-else-if="tabActual === 'solucion'">
+                <tr v-for="fila in filasMostrar" :key="fila.id || fila.cip">
+                  <td style="text-align:center">
+                    <input type="checkbox" :value="fila.cip" v-model="cipsSeleccionados" />
+                  </td>
+                  <td class="td-mono" style="color:var(--color-gold)">{{ fila.cip }}</td>
+                  <td class="td-fecha">{{ fmt(fila.fecha_envio) }}</td>
+                  <td>
+                    <span v-if="fila.sub_tipo === 'SOLUCION'" class="badge-subtipo solucion">SOLUCIÓN</span>
+                    <span v-else class="td-mono" style="font-size:0.75rem;color:var(--color-text-faint)">LEGACY</span>
+                  </td>
+                  <td>{{ fila.leyLiquido ?? '-' }}</td>
+                  <td>{{ fila.solucionAg ?? '-' }}</td>
+                  <td>
+                    <span class="badge-estado" :class="badgeClass(fila.estado)">{{ fila.estado }}</span>
+                  </td>
+                  <td class="td-acciones">
+                    <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Registrar</button>
+                    <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                   </td>
                 </tr>
@@ -255,10 +333,11 @@ const {
   sincronizar,
 } = useSync()
 
-const tabActual      = ref<'ley' | 'rec'>('ley')
+const tabActual      = ref<'ley' | 'solidos' | 'solucion'>('ley')
 const filtroEstado   = ref('')
 const filtroBusqueda = ref('')
 const filtroBusquedaLotes = ref('')
+const mostrarSoloCIPs = ref(false)
 
 const cipsSeleccionados = ref<string[]>([])
 const generandoConjunto = ref(false)
@@ -331,19 +410,34 @@ const pendientesLey = computed(() =>
   store.cips.filter(c => c.tipo_muestra === 'Laboratorio' && c.estado_ley === 'PENDIENTE').length
 )
 
-const pendientesRec = computed(() =>
-  store.cips.filter(c =>
-    (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') &&
-    c.estado_recuperacion === 'PENDIENTE'
-  ).length
-)
+const pendientesSolidos = computed(() => {
+  let count = 0
+  for (const c of store.cips) {
+    if (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') {
+      const hasPending = c.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.sub_tipo === 'SOLIDOS')
+      if (hasPending) count++
+    }
+  }
+  return count
+})
+
+const pendientesSolucion = computed(() => {
+  let count = 0
+  for (const c of store.cips) {
+    if (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') {
+      const hasPending = c.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.sub_tipo === 'SOLUCION')
+      if (hasPending) count++
+    }
+  }
+  return count
+})
 
 function mapearCIP(c: CIPAnalisisOut) {
   if (tabActual.value === 'ley') {
     const vigente = c.analisis_ley.find(x => x.vigente)
     const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
     const a = vigente ?? ultimo
-    return {
+    return [{
       id: a?.id,
       cip: c.cip,
       fecha_envio: c.fecha_envio,
@@ -353,22 +447,31 @@ function mapearCIP(c: CIPAnalisisOut) {
       ozTc:     (a?.ley_final   ?? null) ,
       grTm:    (a?.ley_gr_tm   ?? null) ,
       certificadoUrl: a?.certificado_url ?? null,
-    }
+    }]
   } else {
-    const pending   = c.analisis_recuperacion.find(x => x.estado === 'PENDIENTE'  && x.vigente)
-    const completado = c.analisis_recuperacion.find(x => x.estado === 'COMPLETADO' && x.vigente)
-    const vigente   = pending ?? completado
-    const ultimo    = c.analisis_recuperacion[c.analisis_recuperacion.length - 1]
-    const a         = vigente ?? ultimo
-    return {
-      id: a?.id,
-      cip: c.cip,
-      fecha_envio: c.fecha_envio,
-      estado: c.estado_recuperacion,
-      leyCola:     vigente ? (vigente.ley_cola     ?? null) : null,
-      leyLiquido:  vigente ? (vigente.ley_liquido  ?? null) : null,
-      certificadoUrl: a?.certificado_url ?? null,
+    // Solidos o Solucion
+    const subTipoDeseado = tabActual.value === 'solidos' ? 'SOLIDOS' : 'SOLUCION'
+    
+    // Filtrar vigentes por el sub_tipo deseado.
+    // Si queremos incluir 'LEGACY' en sólidos (opcional), podríamos hacerlo. Asumiremos que legacy va a sólidos.
+    const vigentes = c.analisis_recuperacion.filter(x => x.vigente && (x.sub_tipo === subTipoDeseado || (!x.sub_tipo && tabActual.value === 'solidos')))
+    
+    if (vigentes.length === 0) {
+      return []
     }
+    
+    return vigentes.map(a => ({
+      id: a.id,
+      cip: c.cip,
+      sub_tipo: a.sub_tipo,
+      fecha_envio: c.fecha_envio,
+      estado: a.estado,
+      leyCola: a.ley_cola ?? null,
+      leyColaAg: a.ley_cola_ag ?? null,
+      leyLiquido: a.ley_liquido ?? null,
+      solucionAg: a.solucion_ag_g_m3 ?? null,
+      certificadoUrl: a.certificado_url ?? null,
+    }))
   }
 }
 
@@ -379,15 +482,26 @@ const filasMostrar = computed(() => {
   )
 
   const cipsFiltrados = store.cips.filter(c => {
+    const tm = (c.tipo_muestra || '').toUpperCase()
+
     if (tabActual.value === 'ley') {
-      if (c.tipo_muestra !== 'Laboratorio') return false
+      if (tm !== 'LABORATORIO' && tm !== 'PROCESO') return false
       if (cipsConAnalisisOffline.has(c.cip)) return false  // excluir si ya está en sección offline
+      
+      if (tm === 'PROCESO' && mostrarSoloCIPs.value) return false
       return true
     }
-    return c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno'
+    // For solidos/solucion tab: show Recuperacion types, or PROCESO if it has recuperacion analysis
+    if (tm === 'RECUPERACIONINTERNO' || tm === 'RECUPERACIONEXTERNO') return true
+    if (tm === 'PROCESO' && c.analisis_recuperacion.length > 0) {
+      if (mostrarSoloCIPs.value) return false
+      return true
+    }
+    return false
   })
 
-  return cipsFiltrados.map(mapearCIP).filter(f => {
+  // map devuelve array de arrays, usamos flatMap
+  return cipsFiltrados.flatMap(mapearCIP).filter(f => {
     if (filtroEstado.value && f.estado !== filtroEstado.value) return false
     if (filtroBusqueda.value && !f.cip.toLowerCase().includes(filtroBusqueda.value.toLowerCase())) return false
     return true
@@ -423,10 +537,26 @@ async function verCertificado(ruta: string) {
   } catch { ui.toast('Error al abrir certificado', 'error') }
 }
 
-function irARegistrarLey(cip: string)          { router.push(`/laboratorio/ley/${cip}`) }
-function irARegistrarRecuperacion(cip: string) { router.push(`/laboratorio/recuperacion/${cip}`) }
-function irADetalleLote(ip: string) { router.push(`/laboratorio/lote/${ip}`) }
+function irARegistrarLey(cip: string) { router.push(`/laboratorio/ley/${cip}`) }
+function irARegistrarRecuperacion(fila: any) {
+  if (fila.sub_tipo === 'SOLIDOS') {
+    router.push(`/laboratorio/solidos/${fila.cip}?id=${fila.id}`)
+  } else if (fila.sub_tipo === 'SOLUCION') {
+    router.push(`/laboratorio/solucion/${fila.cip}?id=${fila.id}`)
+  } else {
+    router.push(`/laboratorio/recuperacion/${fila.cip}?id=${fila.id}`)
+  }
+}
+function irADetalleLote(ip: string) {
+  router.push(`/laboratorio/lote/${ip}`)
+}
 
+function irANuevoReconocimiento(subtipo: 'solidos' | 'solucion') {
+  if (subtipo === 'solidos') router.push(`/laboratorio/solidos/_nuevo`)
+  else router.push(`/laboratorio/solucion/_nuevo`)
+}
+
+// ── Generar Certificados Individuales ─────────────────────────────────────────
 const descargando = ref<string | null>(null)
 
 async function descargarInforme(cip: string) {
@@ -527,5 +657,23 @@ async function generarCertificadoConjunto() {
   background: rgba(245,158,11,.15); color: #f59e0b;
   border: 1px solid rgba(245,158,11,.3); border-radius: 3px;
   padding: 1px 5px;
+}
+.badge-subtipo {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+.badge-subtipo.solidos {
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--color-gold);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+.badge-subtipo.solucion {
+  background: rgba(96, 165, 250, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(96, 165, 250, 0.3);
 }
 </style>

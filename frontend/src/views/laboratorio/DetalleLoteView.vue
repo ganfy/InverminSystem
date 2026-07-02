@@ -515,9 +515,9 @@
           <AlertTriangle :size="16" /> Sin CIP de recuperación. El técnico debe completar pruebas metalúrgicas y etiquetar la muestra.
         </div>
 
-        <div class="labs-grid" v-if="lote.analisis_recuperacion.length > 0">
+        <div class="labs-grid" v-if="analisisRecuperacionList.length > 0">
           <div
-            v-for="(a, i) in lote.analisis_recuperacion"
+            v-for="(a, i) in analisisRecuperacionList"
             :key="a.id"
             class="lab-card"
             :class="{ descartado: !a.vigente }"
@@ -568,7 +568,7 @@
               <a href="#" @click.prevent="verCertificado(a.certificado_url)" class="link-cert">Ver PDF</a>
             </div>
 
-            <div class="lab-card-footer" v-if="!a.eliminado">
+            <div class="lab-card-footer" v-if="!a.eliminado && !a.agrupado">
               <template v-if="a.vigente">
                 <button class="btn-danger-sm" @click="toggleDescartarRec(a.id)" title="Excluir del cálculo">
                   Descartar
@@ -1369,6 +1369,41 @@ const cipsExternosPendienteCert = computed(() => {
     return esRec && tieneLabExterno && sinVigente
   })
 })
+
+const analisisRecuperacionList = computed(() => {
+  if (!lote.value) return []
+  // Solo agrupar para Comercial
+  if (auth.user?.rol !== 'Comercial') return lote.value.analisis_recuperacion
+
+  // Comercial view: agrupar por CIP para unificar SOLIDOS y SOLUCION
+  const agrupados = new Map<string, any>()
+  
+  for (const a of lote.value.analisis_recuperacion) {
+    if (!a.cip) {
+      agrupados.set(`no-cip-${a.id}`, { ...a })
+      continue
+    }
+    
+    if (agrupados.has(a.cip)) {
+      const existing = agrupados.get(a.cip)
+      if (a.ley_cola !== null) existing.ley_cola = a.ley_cola
+      if (a.ley_liquido !== null) existing.ley_liquido = a.ley_liquido
+      if (a.recuperacion !== null) existing.recuperacion = a.recuperacion
+      if (a.solucion_ag_g_m3 !== null) existing.solucion_ag_g_m3 = a.solucion_ag_g_m3
+      if (a.estado === 'PENDIENTE') existing.estado = 'PENDIENTE'
+      existing.agrupado = true
+    } else {
+      agrupados.set(a.cip, { ...a, agrupado: false })
+    }
+  }
+  return Array.from(agrupados.values())
+})
+
+function getLeyAgPorCip(cip: string) {
+  if (!lote.value) return '-'
+  const ag = lote.value.analisis_ley.find(l => l.cip === cip && l.material === 'Ag' && l.vigente)
+  return ag ? `${Number(ag.ley_fino).toFixed(4)}` : '-'
+}
 
 function abrirModalRecup() {
   console.log('Ley Cabeza para recuperación:', ley_cabeza.value)

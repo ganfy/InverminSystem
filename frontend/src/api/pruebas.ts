@@ -35,6 +35,8 @@ export interface LotePruebaList {
     // Descarte
     descartado: boolean
     motivo_descarte: string | null
+    // Sub-tipos ya enviados al laboratorio (tienen análisis vigente)
+    sub_tipos_enviados: string[]
 }
 
 export interface EtiquetadoPruebaOut {
@@ -133,6 +135,19 @@ export const pruebasApi = {
     /** Registrar adición parcial de NaCN/NaOH (acumulativa a lo existente) */
     async registrarAdicion(ip: string, datos: { adicion_nacn?: number | null, adicion_naoh?: number | null, porcentaje_nacn?: number | null }): Promise<PruebaMetalurgicaOut> {
         const { data } = await api.post(`/pruebas/${ip}/adicion`, datos)
+        return data
+    },
+
+    /**
+     * Envía las muestras de una prueba COMPLETADO al laboratorio interno (Paititi).
+     * subTipos: ['SOLIDOS', 'SOLUCION'] para ambos, o solo uno.
+     * Crea registros PENDIENTE en análisis_recuperacion para que el laboratorista los complete.
+     * Usa permiso PRUEBAS_MET (no requiere rol de Comercial/Laboratorio).
+     */
+    async enviarALaboratorio(ip: string, subTipos: string[], cip: string | null = null): Promise<any> {
+        const payload: any = { sub_tipos: subTipos }
+        if (cip) payload.cip = cip
+        const { data } = await api.post(`/pruebas/${ip}/enviar-laboratorio`, payload)
         return data
     },
 }

@@ -176,6 +176,7 @@ def cargar_terceros(dry_run: bool = False):
     )
 
     prefix = "[DRY-RUN] " if dry_run else ""
+    sql_statements = []
 
     proveedores = leer_hoja_ruc(EXCEL_PATH)
     print(f"Leídos {len(proveedores)} proveedores desde el Excel.\n")
@@ -240,10 +241,20 @@ def cargar_terceros(dry_run: bool = False):
                     db.add(acopiador)
                     db.flush()
                     # Asignar rol acopiador
-                    db.add(
-                        EntidadRol(entidad_id=acopiador.id, rol_id=rol_acopiador.id, activo=True)
+                    ent_rol = EntidadRol(
+                        entidad_id=acopiador.id, rol_id=rol_acopiador.id, activo=True
                     )
+                    db.add(ent_rol)
                     db.flush()
+
+                    sql_statements.append(f"-- Acopiador nuevo: {acopiador_nombre}")
+                    sql_statements.append(
+                        f"INSERT INTO entidades (ruc, razon_social, tipo, activo) VALUES ('{ruc_acop}', '{acopiador_nombre}', '{TipoEntidad.PERSONA_NATURAL.value}', true);"
+                    )
+                    sql_statements.append(
+                        f"INSERT INTO entidades_roles (entidad_id, rol_id, activo) VALUES ((SELECT id FROM entidades WHERE ruc = '{ruc_acop}'), {rol_acopiador.id}, true);"
+                    )
+
                     print(f"  + Acopiador creado: '{acopiador_nombre}'")
 
                 if acopiador:
@@ -262,14 +273,17 @@ def cargar_terceros(dry_run: bool = False):
                 print(
                     f"{prefix}[CREAR]  '{nombre}' (RUC: {p['ruc']}) - acopiador: {acopiador_nombre or 'propio'}"
                 )
+                tipo_entidad = (
+                    TipoEntidad.EMPRESA
+                    if p["ruc"] and len(p["ruc"]) == 11
+                    else TipoEntidad.PERSONA_NATURAL
+                )
                 if not dry_run:
                     proveedor = Entidad(
                         ruc=p["ruc"],
                         razon_social=nombre,
                         referencia=p["referencia"],
-                        tipo=TipoEntidad.EMPRESA
-                        if len(p["ruc"]) == 11
-                        else TipoEntidad.PERSONA_NATURAL,
+                        tipo=tipo_entidad,
                         activo=True,
                     )
                     db.add(proveedor)
@@ -278,6 +292,15 @@ def cargar_terceros(dry_run: bool = False):
                         EntidadRol(entidad_id=proveedor.id, rol_id=rol_proveedor.id, activo=True)
                     )
                     db.flush()
+
+                sql_statements.append(f"-- Proveedor nuevo: {nombre}")
+                sql_statements.append(
+                    f"INSERT INTO entidades (ruc, razon_social, referencia, tipo, activo) VALUES ('{p['ruc']}', '{nombre}', '{p['referencia'] or ''}', '{tipo_entidad.value}', true);"
+                )
+                sql_statements.append(
+                    f"INSERT INTO entidades_roles (entidad_id, rol_id, activo) VALUES ((SELECT id FROM entidades WHERE ruc = '{p['ruc']}'), {rol_proveedor.id}, true);"
+                )
+
                 stats["creados"] += 1
             else:
                 print(
@@ -343,6 +366,22 @@ def cargar_terceros(dry_run: bool = False):
                 if valor is not None:
                     setattr(pc, campo, valor)
 
+            # ── Lógica de Llampo ───────────────────────────────────────────────
+            # Standard rule: +40 for consumption and +10 for acopio
+            # Exception rule: 'Ronald Miranda' -> 40 for consumption, 50 for acopio
+            is_ronald = (
+                acopiador_final and "RONALD MIRANDA" in (acopiador_final.razon_social or "").upper()
+            )
+
+            if is_ronald:
+                pc.gasto_consumo_llampo = 40
+                pc.gasto_acopio_llampo = 50
+            else:
+                if pc.gasto_consumo is not None:
+                    pc.gasto_consumo_llampo = pc.gasto_consumo + 40
+                if pc.gasto_acopio is not None:
+                    pc.gasto_acopio_llampo = pc.gasto_acopio + 10
+
             db.flush()
 
         if not dry_run:
@@ -360,6 +399,11 @@ def cargar_terceros(dry_run: bool = False):
                 print(f"    - {w}")
         print("=" * 60)
 
+        if not dry_run:
+            db.commit()
+
+        return sql_statements, stats
+
     except Exception as e:
         db.rollback()
         print(f"\nERROR: {e}")
@@ -372,6 +416,11 @@ def main():
     parser = argparse.ArgumentParser(description="Carga proveedores de PL Paititi Excel -> BD.")
     parser.add_argument("--dry-run", action="store_true", help="Simula sin hacer cambios en la BD")
     parser.add_argument("--env", choices=["local", "prod"], default="local", help="Entorno de BD")
+    parser.add_argument(
+        "--sql-out",
+        type=str,
+        help="Ruta de archivo para guardar las sentencias SQL de inserción generadas (solo PostgreSQL)",
+    )
     args = parser.parse_args()
 
     if args.env == "prod":
@@ -390,7 +439,17 @@ def main():
     if args.dry_run:
         print("=== MODO DRY-RUN: sin cambios en BD ===\n")
 
-    cargar_terceros(dry_run=args.dry_run)
+    sql_stmts, stats = cargar_terceros(dry_run=args.dry_run)
+
+    if args.sql_out and sql_stmts:
+        out_path = Path(args.sql_out)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write("-- SQL INSERTS PARA NUEVOS TERCEROS\n")
+            f.write("BEGIN;\n\n")
+            for stmt in sql_stmts:
+                f.write(stmt + "\n")
+            f.write("\nCOMMIT;\n")
+        print(f"\n[OK] Archivo SQL generado en: {out_path.resolve()}")
 
 
 if __name__ == "__main__":

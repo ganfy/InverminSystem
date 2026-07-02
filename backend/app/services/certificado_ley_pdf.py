@@ -355,7 +355,7 @@ _TEMPLATE_ENSAYO = """
 </div>
 <hr class="linea-gold"/>
 
-<div class="titulo-cert">CERTIFICADO DE ENSAYO - NEWMONT - PROCESO - Au</div>
+<div class="titulo-cert">CERTIFICADO DE ENSAYO - NEWMONT - {descripcion} - Au</div>
 <div class="n-cert">N&deg;{n_ensayo}</div>
 
 <!-- METADATOS -->
@@ -376,7 +376,7 @@ _TEMPLATE_ENSAYO = """
     <span class="meta-label">Recepción de muestras:</span><span class="meta-val">Mineral de 0.5 Kg aproximado</span>
   </div>
   <div class="meta-row">
-    <span class="meta-label">Descripción:</span><span class="meta-val">PROCESO</span>
+    <span class="meta-label">Descripción:</span><span class="meta-val">{descripcion}</span>
   </div>
   <div class="meta-row">
     <span class="meta-label">Tipo de análisis:</span><span class="meta-val">Fire Assay - Gravimétrico</span>
@@ -433,7 +433,9 @@ _TEMPLATE_ENSAYO = """
 """
 
 
-def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
+def generar_certificado_ensayo_cip_pdf(
+    db: Session, cip_code: str, descripcion: str = "PROCESO"
+) -> bytes:
     """Certificado de ensayo Fire Assay para laboratorista (por CIP, sin revelar IP)."""
     from app.models.models import AnalisisLey, Configuracion, MapeoCIP
 
@@ -542,6 +544,7 @@ def generar_certificado_ensayo_cip_pdf(db: Session, cip_code: str) -> bytes:
         analista=analista_nombre,  # <-- Inyectando el nombre
         logo_b64=logo_b64,  # <-- Imagen de Logo
         membrete_b64=membrete_b64,
+        descripcion=descripcion,
     )
     return _html_to_pdf(html)
 
@@ -619,20 +622,20 @@ _TEMPLATE_RECUPERACION = """
 """
 
 
-def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> bytes:
+def generar_certificado_recuperacion_cip_pdf(
+    db: Session, analisis_id: int, descripcion: str = "PROCESO"
+) -> bytes:
+    a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+    if not a:
+        raise ValueError(f"Análisis {analisis_id} no encontrado")
+
+    cip_code = a.cip
     cip = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_code).first()
     if not cip:
         raise ValueError(f"CIP {cip_code} no encontrado")
 
     analista_nombre = "DEPARTAMENTO TÉCNICO"
-    analisis_list = (
-        db.query(AnalisisRecuperacion)
-        .filter(AnalisisRecuperacion.cip == cip_code, AnalisisRecuperacion.vigente)
-        .order_by(AnalisisRecuperacion.id)
-        .all()
-    )
-    if not analisis_list:
-        raise ValueError(f"No hay análisis vigentes para CIP {cip_code}")
+    analisis_list = [a]  # Solo imprimimos este registro específico
 
     if analisis_list[0].creado_por:
         usuario = db.query(Usuario).filter(Usuario.id == analisis_list[0].creado_por).first()
@@ -657,8 +660,8 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
     # Para el cert por CIP no tenemos IP/proveedor (confidencialidad)
     filas = ""
     for i, a in enumerate(analisis_list, 1):
-        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
-        liquido = _fmt_oz(float(a.ley_liquido) if a.ley_liquido is not None else None)
+        cola_au_oz = float(a.ley_cola) if a.ley_cola is not None else None
+        liquido_au_oz = float(a.ley_liquido) if a.ley_liquido is not None else None
         sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
 
         # Buscar ley Ag de la tabla analisis_ley para el CIP
@@ -671,23 +674,65 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
             )
             .first()
         )
-        cola_ag = (
-            f"{float(ley_ag_rec.ley_gr_tm):.3f}"
-            if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None
-            else "-"
-        )
+        if a.sub_tipo == "SOLIDOS":
+            headers_html = (
+                "<th>N&deg;</th><th>C&Oacute;DIGO</th>"
+                "<th>Ley Au (Oz/TC)</th>"
+                "<th>Ley Au (g/TM)</th>"
+                "<th>Ley Ag (Oz/TC)</th>"
+                "<th>Ley Ag (g/TM)</th>"
+            )
+            au_oz = _fmt_oz(cola_au_oz)
+            au_gtm = f"{(cola_au_oz * 34.2857):.3f}" if cola_au_oz is not None else "-"
+            ag_oz = _fmt_oz(
+                float(ley_ag_rec.ley_fino)
+                if ley_ag_rec and ley_ag_rec.ley_fino is not None
+                else None
+            )
+            ag_gtm = (
+                f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+                if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None
+                else "-"
+            )
 
-        filas += (
-            f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
-            f"<td>{cola}</td><td>{cola_ag}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
-        )
+            filas += (
+                f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
+                f"<td>{au_oz}</td><td>{au_gtm}</td><td>{ag_oz}</td><td>{ag_gtm}</td></tr>"
+            )
+        else:
+            headers_html = (
+                "<th>N&deg;</th><th>C&Oacute;DIGO</th>"
+                "<th>Ley Cola Au (Oz/TC)</th>"
+                "<th>Ley Cola Ag (g/TM)</th>"
+                "<th>Ley L&iacute;quido Au (Oz/TC)</th>"
+                "<th>Soluci&oacute;n Ag (g/m&sup3;)</th>"
+            )
+            cola = _fmt_oz(cola_au_oz)
+            cola_ag = (
+                f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+                if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None
+                else "-"
+            )
+            liquido = _fmt_oz(liquido_au_oz)
+
+            filas += (
+                f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
+                f"<td>{cola}</td><td>{cola_ag}</td><td>{liquido}</td><td>{sol_ag}</td></tr>"
+            )
 
     fecha_analisis = analisis_list[-1].fecha_analisis
     fecha = _fmt_date(
         datetime.combine(fecha_analisis, datetime.min.time()) if fecha_analisis else None
     )
 
+    sub_tipo_str = "RECONOCIMIENTO DE PULPA"
+    if a.sub_tipo == "SOLIDOS":
+        sub_tipo_str = "RECONOCIMIENTO SÓLIDOS (FA)"
+    elif a.sub_tipo == "SOLUCION":
+        sub_tipo_str = "RECONOCIMIENTO SOLUCIÓN (AAS)"
+
     html = _TEMPLATE_RECONOCIMIENTO.format(
+        sub_tipo_titulo=sub_tipo_str,
         empresa_nombre=empresa_nombre,
         empresa_sub=empresa_sub,
         empresa_direccion=empresa_dir,
@@ -696,11 +741,13 @@ def generar_certificado_recuperacion_cip_pdf(db: Session, cip_code: str) -> byte
         fecha_recepcion=fecha,
         fecha_termino=_fmt_date(datetime.now()),
         laboratorio=analisis_list[0].laboratorio or "-",
+        cabecera_detalle=headers_html,
         filas_detalle=filas,
         bloque_notas="",
         logo_b64=logo_b64,
         membrete_b64=membrete_b64,
         analista=analista_nombre,
+        descripcion=descripcion,
     )
     return _html_to_pdf(html)
 
@@ -870,10 +917,11 @@ _TEMPLATE_RECONOCIMIENTO = """
 <div class="watermark-pattern"></div>
 <div><img src="{membrete_b64}" class="logo-header" /></div>
 <hr class="linea-gold"/>
-<div class="titulo-cert">INFORME DE RECONOCIMIENTO DE PULPA</div>
+<div class="titulo-cert">INFORME DE {sub_tipo_titulo}</div>
 <div class="n-cert">N&deg; {n_lq}</div>
 <div class="seccion">
   <div class="kv-row"><span class="kv-label">Referencia</span><span class="kv-val">: {referencia}</span></div>
+  <div class="kv-row"><span class="kv-label">Descripci&oacute;n</span><span class="kv-val">: {descripcion}</span></div>
   <div class="kv-row"><span class="kv-label">An&aacute;lisis</span><span class="kv-val">: Reconocimiento Au / Ag (CIP)</span></div>
 </div>
 <hr class="linea-gold"/>
@@ -1010,6 +1058,7 @@ def generar_cert_reconocimiento_cip_pdf(
     )
 
     html = _TEMPLATE_RECONOCIMIENTO.format(
+        sub_tipo_titulo="RECONOCIMIENTO DE PULPA",
         empresa_nombre=empresa_nombre,
         empresa_sub=cfg.get("empresa_planta", ""),
         empresa_direccion=empresa_dir,
@@ -1024,6 +1073,7 @@ def generar_cert_reconocimiento_cip_pdf(
         logo_b64=logo_b64,
         membrete_b64=membrete_b64,
         analista=analista_nombre,
+        descripcion="RECONOCIMIENTO",
     )
     return _html_to_pdf(html)
 

@@ -6,12 +6,31 @@
         <h1 class="page-title">Reconocimientos</h1>
         <p class="page-subtitle" style="color:var(--color-gold);font-family:var(--font-mono)">{{ cipActual }}</p>
       </div>
-      <div style="display:flex;gap:0.75rem">
+      <div style="display:flex;gap:0.75rem;align-items:center">
         <button class="btn-secondary" @click="router.back()">← Volver</button>
-        <button class="btn-primary" @click="guardar" :disabled="guardando || !analisisPendiente">
+        <!-- Botón Guardar: disponible mientras no haya certificado generado -->
+        <button
+          class="btn-primary"
+          @click="guardar"
+          :disabled="guardando || !analisisPendiente || certificadoGenerado"
+        >
           <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
-          Guardar y Generar Certificado
+          {{ yaGuardado ? 'Re-Guardar' : 'Guardar' }}
         </button>
+        <!-- Botón Generar Certificado: solo cuando ya hay datos guardados y sin certificado -->
+        <button
+          v-if="yaGuardado && !certificadoGenerado"
+          class="btn-cert"
+          @click="generarCertificado"
+          :disabled="generandoCert"
+        >
+          <span v-if="generandoCert" class="spinner" style="margin-right:0.4rem"></span>
+          Generar Certificado
+        </button>
+        <!-- Indicador: certificado ya generado -->
+        <span v-if="certificadoGenerado" class="badge-cert-ok">
+          ✓ Certificado generado
+        </span>
       </div>
     </header>
 
@@ -22,6 +41,11 @@
     <div v-else-if="!analisisPendiente" class="estado-tabla" style="color:var(--color-error)">
       No se encontró un análisis de recuperación PENDIENTE para este CIP.<br>
       Verifique que Comercial haya enviado el lote a recuperación.
+    </div>
+
+    <!-- Aviso cuando el certificado ya fue generado -->
+    <div v-if="certificadoGenerado && !cargando" class="cert-generado-banner">
+      El certificado ya fue generado. Los datos son de solo lectura.
     </div>
 
     <template v-else>
@@ -36,7 +60,7 @@
           </div>
           <div class="field">
             <label class="field-label">FECHA ANÁLISIS:</label>
-            <input type="date" class="field-input" v-model="fechaAnalisis" />
+            <input type="date" class="field-input" v-model="fechaAnalisis" :disabled="certificadoGenerado" />
           </div>
           <div class="field" v-if="store.puedeVerIP">
             <label class="field-label">LEY CABEZA:</label>
@@ -224,10 +248,15 @@ const ui      = useUiStore()
 const cipActual      = route.params.cip as string
 const analisisIdParam = route.query.id ? Number(route.query.id) : null
 
-const cargando  = ref(true)
+const cargando = ref(true)
 const guardando = ref(false)
-const errForm   = ref('')
+const generandoCert = ref(false)
+const errForm = ref('')
 const errMuestras = ref('')
+
+const yaGuardado = ref(false)
+const certificadoGenerado = ref(false)
+const analisisCompletadoId = ref<number | null>(null)
 
 const analisisPendiente = ref<AnalisisRecuperacionOut | null>(null)
 const fechaAnalisis = ref(new Date().toISOString().split('T')[0])
@@ -244,12 +273,10 @@ interface MuestraForm {
   au2_mg:    number | null
   au_ag_mg:  number | null
   numero_ensayo: number
-  // calculados localmente
   _leyAu:  number | null
   _leyAg:  number | null
 }
 
-// ── Funciones Helper de Conversión ─────────────────────────────────────────────
 function toOzTc(grTm: number | null): number | null {
   if (grTm == null) return null
   return parseFloat((grTm / OZ_TC_TO_GR_TM).toFixed(4))
@@ -258,7 +285,6 @@ function toOzTc(grTm: number | null): number | null {
 function muestraVacia(): MuestraForm {
   return { peso_g: null, au1_mg: null, au2_mg: null, au_ag_mg: null, numero_ensayo: 1, _leyAu: null, _leyAg: null }
 }
-
 
 const muestras = ref<MuestraForm[]>([muestraVacia()])
 
@@ -284,7 +310,6 @@ function recalcMuestra(idx: number) {
   const au2 = calcLeyGrTm(m.au2_mg, m.peso_g)
   m._leyAu = (au1 != null && au2 != null) ? parseFloat(((au1 + au2) / 2).toFixed(4)) : null
 
-  // Ley Ag = (Au+Ag_mg -  Au2 mg - 0.001)) / peso * 1000
   if (m.au_ag_mg != null && m.au2_mg != null && m.peso_g != null && m.peso_g > 0) {
     const agMg = Math.max(0, m.au_ag_mg - m.au2_mg - 0.001)
     m._leyAg = parseFloat((agMg / m.peso_g * 1000).toFixed(4))
@@ -306,17 +331,14 @@ const resumen = computed(() => {
     }
   }
 
-  // Cálculos para Oro (Au)
   const avgAuGrTm = leyesAu.reduce((a, b) => a + b, 0) / leyesAu.length
   const leyColaAuGrTm = parseFloat(avgAuGrTm.toFixed(4))
   const leyColaAuOzTc = parseFloat((avgAuGrTm / OZ_TC_TO_GR_TM).toFixed(4))
 
-  // Cálculos para Plata (Ag)
   const avgAgGrTm = leyesAg.length ? leyesAg.reduce((a, b) => a + b, 0) / leyesAg.length : 0
   const leyColaAgGrTm = leyesAg.length ? parseFloat(avgAgGrTm.toFixed(4)) : null
   const leyColaAgOzTc = leyesAg.length ? parseFloat((avgAgGrTm / OZ_TC_TO_GR_TM).toFixed(4)) : null
 
-  // Cálculo del % de Recuperación usando Oz/TC contra la ley cabeza
   const cabeza = analisisPendiente.value ? Number(analisisPendiente.value.ley_cabeza) : null
   const recuperacion = (cabeza && cabeza > 0)
     ? parseFloat(((cabeza - leyColaAuOzTc) / cabeza * 100).toFixed(2))
@@ -340,11 +362,17 @@ onMounted(async () => {
       const pending = analisisIdParam
         ? cipObj.analisis_recuperacion.find(a => a.id === analisisIdParam && a.estado === 'PENDIENTE' && a.vigente)
         : cipObj.analisis_recuperacion.find(a => a.estado === 'PENDIENTE' && a.vigente)
-      analisisPendiente.value = pending ?? null
-    }
-    const yaCompletado = cipObj?.analisis_recuperacion.find(a => a.estado === 'COMPLETADO' && a.vigente)
-    if (yaCompletado) {
-      ui.toast('Este CIP ya tiene un análisis de recuperación completado', 'info')
+      
+      const completado = cipObj.analisis_recuperacion.find(a => a.estado === 'COMPLETADO' && a.vigente)
+
+      if (completado) {
+        yaGuardado.value = true
+        analisisCompletadoId.value = completado.id
+        certificadoGenerado.value = !!completado.certificado_url
+        if (!pending) analisisPendiente.value = completado
+      }
+      
+      if (pending) analisisPendiente.value = pending
     }
   } catch {
     ui.toast('Error al cargar datos', 'error')
@@ -358,7 +386,6 @@ async function guardar() {
   errForm.value = ''
   if (!analisisPendiente.value) { errForm.value = 'Sin análisis pendiente'; return }
 
-  // Validar que todas las muestras tengan datos suficientes
   const muestrasInvalidas = muestras.value.filter(
     m => !m.peso_g || m.au1_mg == null || m.au2_mg == null || m.au_ag_mg == null
   )
@@ -372,14 +399,6 @@ async function guardar() {
     return
   }
 
-
-  const okConf = await ui.showConfirm({
-    title: 'Generar Certificado',
-    message: 'Al guardar se generará el certificado y los datos no podrán modificarse. ¿Continuar?',
-    confirmLabel: 'Generar y Guardar',
-  })
-  if (!okConf) return
-
   guardando.value = true
   const payload = {
     muestras: muestras.value.map(m => ({
@@ -389,7 +408,7 @@ async function guardar() {
       au_ag_mg:      m.au_ag_mg,
       numero_ensayo: m.numero_ensayo,
     })),
-    ley_cola: resumen.value.leyColaAuOzTc, // Agregado para cumplir con CompletarRecuperacionRequest
+    ley_cola: resumen.value.leyColaAuOzTc,
     ley_liquido:     solucionAu.value != null ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(4)) : null,
     solucion_ag_g_m3: solucionAg.value,
     fecha_analisis:  fechaAnalisis.value,
@@ -397,10 +416,32 @@ async function guardar() {
 
   const result = await store.completarRecuperacion(analisisPendiente.value.id, payload)
   if (result) {
-    await store.generarCertificadoRecInterno(result.id)
-    router.push('/laboratorio')
+    yaGuardado.value = true
+    analisisCompletadoId.value = result.id
+    certificadoGenerado.value = !!result.certificado_url
+    ui.toast('Datos guardados exitosamente.', 'success')
   }
   guardando.value = false
+}
+
+// ── Generar Certificado ───────────────────────────────────────────────────────
+async function generarCertificado() {
+  if (!analisisCompletadoId.value) return
+  const ok = await ui.showConfirm({
+    title: 'Generar Certificado',
+    message: 'Al generar el certificado los datos quedarán bloqueados y no podrán ser editados. ¿Desea continuar?',
+    confirmLabel: 'Generar',
+  })
+  if (!ok) return
+
+  generandoCert.value = true
+  const result = await store.generarCertificadoRecInterno(analisisCompletadoId.value)
+  if (result) {
+    certificadoGenerado.value = true
+    ui.toast('Certificado generado exitosamente', 'success')
+    setTimeout(() => { router.push('/laboratorio') }, 1500)
+  }
+  generandoCert.value = false
 }
 </script>
 
@@ -421,7 +462,8 @@ async function guardar() {
   background: transparent;
   cursor: pointer;
 }
-.btn-add-muestra:hover { background: rgba(var(--color-accent-rgb), 0.08); }
+.btn-add-muestra:hover:not(:disabled) { background: rgba(var(--color-accent-rgb), 0.08); }
+.btn-add-muestra:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .muestra-block {
   border: 1px solid var(--color-border);
@@ -553,5 +595,29 @@ async function guardar() {
   font-size: .7rem;
   color: var(--color-text-faint);
   font-family: var(--font-mono);
+}
+
+.btn-cert {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: 0.83rem;
+  cursor: pointer;
+}
+.btn-cert:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cert-generado-banner {
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: var(--radius-md);
+  color: #4ade80;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.6rem 1rem;
+  margin-top: 1rem;
 }
 </style>

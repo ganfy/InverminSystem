@@ -115,6 +115,17 @@ def _actualizar_parametros(
         if valor is not None:
             setattr(pc, campo, valor)
 
+    if pc.gasto_acopio is not None and pc.gasto_consumo is not None:
+        acopiador_name = (
+            provacop.acopiador.razon_social.strip().lower() if provacop.acopiador else ""
+        )
+        if acopiador_name == "ronald miranda":
+            pc.gasto_acopio_llampo = 50
+            pc.gasto_consumo_llampo = 40
+        else:
+            pc.gasto_acopio_llampo = pc.gasto_acopio + 10
+            pc.gasto_consumo_llampo = pc.gasto_consumo + 40
+
     pc.modificado_por = usuario_id
     db.flush()
     return pc
@@ -170,6 +181,8 @@ def _serializar_tercero(
                 "umbral_ag_oz_tc": pc.umbral_ag_oz_tc,
                 "rec_ag_pct": pc.rec_ag_pct,
                 "descuento_ag_usd": pc.descuento_ag_usd,
+                "gasto_acopio_llampo": pc.gasto_acopio_llampo,
+                "gasto_consumo_llampo": pc.gasto_consumo_llampo,
             }
 
     return {
@@ -180,6 +193,7 @@ def _serializar_tercero(
         "telefono": entidad.telefono,
         "email": entidad.email,
         "activo": entidad.activo,
+        "ocultar_insumos": entidad.ocultar_insumos,
         "provacop_id": provacop.id if provacop else None,
         "acopiador": acopiador_data,
         "parametros": parametros_data,
@@ -268,6 +282,7 @@ def crear_tercero(
             email=datos.email,
             tipo=TipoEntidad.EMPRESA,
             activo=True,
+            ocultar_insumos=datos.ocultar_insumos,
             creado_por=usuario_id,
         )
         db.add(proveedor)
@@ -349,6 +364,8 @@ def editar_tercero(
         entidad.telefono = datos.telefono
     if datos.email is not None:
         entidad.email = datos.email
+    if datos.ocultar_insumos is not None:
+        entidad.ocultar_insumos = datos.ocultar_insumos
     entidad.modificado_por = usuario_id
 
     if datos.parametros:

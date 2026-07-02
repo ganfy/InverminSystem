@@ -7,12 +7,26 @@
           Análisis Newmont
         </h1>
       </div>
-      <div style="display:flex;gap:0.75rem">
+      <div style="display:flex;gap:0.75rem;align-items:center">
         <button class="btn-secondary" @click="router.back()">← Volver</button>
-        <button class="btn-primary" @click="guardar" :disabled="guardando">
-          <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
-          Guardar y Generar Certificado
+        <button v-if="form.material === 'Au' && (form.cip || modoNuevo)" class="btn-secondary" @click="irARegistrarPlata" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4)">
+          + Agregar Ley Plata
         </button>
+        <button class="btn-primary" @click="guardar" :disabled="guardando || certificadoGenerado">
+          <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
+          Guardar cambios
+        </button>
+        <button
+          v-if="!certificadoGenerado"
+          class="btn-primary"
+          @click="generarCertificado"
+          :disabled="generandoCert || !yaGuardado"
+          title="Generar y guardar certificado PDF"
+        >
+          <span v-if="generandoCert" class="spinner" style="margin-right:0.4rem"></span>
+          Guardar certificado
+        </button>
+        <span v-if="certificadoGenerado" class="badge-cert-ok">✓ Certificado Ley generado</span>
       </div>
     </header>
 
@@ -27,16 +41,12 @@
       <h2 class="card-titulo">DATOS DEL LOTE</h2>
       <div class="form-grid">
         <div class="field">
-          <label class="field-label">CIP:</label>
-          <input class="field-input" :value="cipActual" disabled style="color:var(--color-gold);font-family:var(--font-mono)" />
+          <label class="field-label">CÓDIGO:</label>
+          <input class="field-input" v-model="form.cip" :disabled="!modoNuevo" style="color:var(--color-gold);font-family:var(--font-mono)" placeholder="Ingrese código..." />
         </div>
         <div class="field">
           <label class="field-label">MATERIAL:</label>
           <input class="field-input" :value="materialInfo" disabled />
-        </div>
-        <div class="field">
-          <label class="field-label">LABORATORIO:</label>
-          <input class="field-input" value="Paititi" disabled />
         </div>
         <div class="field">
           <label class="field-label">MINERAL (Au/Ag):</label>
@@ -62,7 +72,12 @@
         </div>
         <div class="field">
           <label class="field-label">DESCRIPCIÓN:</label>
-          <input :value="'PROCESO'" class="field-input" disabled />
+          <select v-model="descripcionPDF" class="field-select field-input field-sm" :disabled="certificadoGenerado">
+            <option value="PROCESO">PROCESO</option>
+            <option value="LAB. METALÚRGICO">LAB. METALÚRGICO</option>
+            <option value="RECONOCIMIENTO">RECONOCIMIENTO</option>
+            <option value="LOTE">LOTE</option>
+          </select>
         </div>
         <div class="field">
           <label class="field-label">PUNTO:</label>
@@ -147,27 +162,27 @@
           <div class="resultados-grid">
             <div class="resultado-item">
               <span class="resultado-label">OZ/TC −140 (fino prom.)</span>
-              <span class="resultado-valor">{{ fmtNum(ozMenos) }}</span>
+              <span class="resultado-valor" style="font-size:var(--resultado-fs, var(--text-md))">{{ fmtNum(ozMenos) }}</span>
             </div>
             <div class="resultado-item resultado-item--sub">
               <span class="resultado-label resultado-label--unit">≡ GR/TM −140</span>
-              <span class="resultado-valor resultado-valor--sub">{{ ozMenos != null ? (ozMenos * FACTOR).toFixed(3) : '-' }}</span>
+              <span class="resultado-valor resultado-valor--sub" style="font-size:var(--resultado-sub-fs, 0.72rem)">{{ ozMenos != null ? (ozMenos * FACTOR).toFixed(3) : '-' }}</span>
             </div>
             <div class="resultado-item">
               <span class="resultado-label">OZ/TC +140 (grueso)</span>
-              <span class="resultado-valor">{{ fmtNum(ozMas) }}</span>
+              <span class="resultado-valor" style="font-size:var(--resultado-fs, var(--text-md))">{{ fmtNum(ozMas) }}</span>
             </div>
             <div class="resultado-item resultado-item--sub">
               <span class="resultado-label resultado-label--unit">≡ GR/TM +140</span>
-              <span class="resultado-valor resultado-valor--sub">{{ ozMas != null ? (ozMas * FACTOR).toFixed(3) : '-' }}</span>
+              <span class="resultado-valor resultado-valor--sub" style="font-size:var(--resultado-sub-fs, 0.72rem)">{{ ozMas != null ? (ozMas * FACTOR).toFixed(3) : '-' }}</span>
             </div>
             <div class="resultado-item resultado-item--gold">
               <span class="resultado-label">LEY AU (OZ/TC)</span>
-              <span class="resultado-valor highlight">{{ fmtNum(leyFinal) }}</span>
+              <span class="resultado-valor highlight" style="font-size:var(--resultado-hl-fs, var(--text-xl))">{{ fmtNum(leyFinal) }}</span>
             </div>
             <div class="resultado-item">
               <span class="resultado-label">LEY AU (GR/TM)</span>
-              <span class="resultado-valor" style="color:var(--color-gold)">
+              <span class="resultado-valor" style="color:var(--color-gold);font-size:var(--resultado-fs, var(--text-md))">
                 {{ leyGrTm != null ? leyGrTm.toFixed(3) : '-' }}
               </span>
             </div>
@@ -221,15 +236,22 @@ const { online } = useSync()
 
 const cipActual    = route.params.cip as string
 const guardando    = ref(false)
+const generandoCert= ref(false)
 const errCalc      = ref('')
 const materialInfo = ref('Mineral')
+
+const yaGuardado = ref(false)
+const certificadoGenerado = ref(false)
+const analisisCompletadoId = ref<number | null>(null)
 
 // ── Campos del formulario ─────────────────────────────────────────────────────
 const descripcion = ref('0.5kg aprox. de Mineral')
 const punto       = ref<'CABEZA' | 'COLA' | 'LIQUIDO'>('CABEZA')
+const descripcionPDF = ref('PROCESO')
+const modoNuevo = cipActual === '_nuevo'
 
 const form = ref({
-  cip:            cipActual,
+  cip:            modoNuevo ? '' : cipActual,
   laboratorio:    'Paititi',
   tipo_analisis:  ((route.query.tipo as TipoAnalisis | undefined) ?? 'planta'),
   material:       'Au' as 'Au' | 'Ag',
@@ -324,7 +346,8 @@ function fmtNum(n: number | null | undefined) {
 }
 
 // ── Cargar info del CIP ───────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
+  if (!store.cips.length) await store.cargarCips()
   const cip = store.cips.find(c => c.cip === cipActual)
   if (cip?.tipo_muestra) materialInfo.value = cip.tipo_muestra
   // Pre-select material from query param (e.g. ?material=Ag from DetalleLoteView)
@@ -332,11 +355,46 @@ onMounted(() => {
     form.value.material = 'Ag'
     leyAgOzTc.value = null
   }
+
+  if (cip) {
+    let analysisToLoad = null
+    if (route.query.id) {
+      analysisToLoad = cip.analisis_ley.find(a => a.id === Number(route.query.id))
+    } else if (route.query.find === '1' && route.query.material === 'Ag') {
+      // Find the most recently created Ag analysis that is COMPLETADO
+      analysisToLoad = cip.analisis_ley
+        .filter(a => a.material === 'Ag' && a.vigente)
+        .sort((a, b) => b.id - a.id)[0]
+    }
+
+    if (analysisToLoad) {
+      form.value.material = analysisToLoad.material as 'Au' | 'Ag'
+      form.value.fecha_analisis = analysisToLoad.fecha_analisis.split('T')[0]
+      if (analysisToLoad.material === 'Ag') {
+        leyAgOzTc.value = analysisToLoad.ley_fino
+        punto.value = analysisToLoad.detalles?.[0]?.origen || 'COLA'
+      }
+      
+      yaGuardado.value = true
+      analisisCompletadoId.value = analysisToLoad.id
+      certificadoGenerado.value = !!analysisToLoad.certificado_url
+
+      if (route.query.gen === '1') {
+        // Auto-trigger generation
+        setTimeout(() => generarCertificado(), 800)
+      }
+    }
+  }
 })
 
 // ── Guardar ───────────────────────────────────────────────────────────────────
 async function guardar() {
   errCalc.value = ''
+
+  if (!form.value.cip) {
+    errCalc.value = 'Ingrese el código de la muestra'
+    return
+  }
 
   if (form.value.material === 'Au') {
     if (leyFinal.value == null || leyFinal.value <= 0) {
@@ -356,11 +414,9 @@ async function guardar() {
   }
 
   const okConf = await ui.showConfirm({
-    title:        online.value ? 'Generar Certificado' : 'Guardar sin conexión',
-    message:      online.value
-      ? 'Al guardar y generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?'
-      : 'Sin conexión: el análisis se guardará localmente y se sincronizará al reconectar. El certificado se generará después del sync. ¿Continuar?',
-    confirmLabel: online.value ? 'Generar y Guardar' : 'Guardar localmente',
+    title:        'Guardar cambios',
+    message:      '¿Desea guardar los datos del análisis?',
+    confirmLabel: 'Guardar',
   })
   if (!okConf) return
 
@@ -391,12 +447,61 @@ async function guardar() {
   guardando.value = true
   const result = await store.registrarLey(payload)
   if (result) {
-    await store.generarCertificadoLeyInterno(result.id)
-    router.push('/laboratorio')
-  } else if (!online.value) {
-    router.push('/laboratorio')
+    yaGuardado.value = true
+    analisisCompletadoId.value = result.id
+    ui.toast('Datos guardados exitosamente. Puede generar el certificado.', 'success')
   }
   guardando.value = false
+}
+
+async function generarCertificado() {
+  if (!analisisCompletadoId.value) return
+
+  const okConf = await ui.showConfirm({
+    title:        online.value ? 'Generar Certificado' : 'Guardar sin conexión',
+    message:      online.value
+      ? 'Al generar el certificado, el informe será adjuntado automáticamente y los datos no podrán modificarse. ¿Desea continuar?'
+      : 'Sin conexión: el certificado se generará después del sync. ¿Continuar?',
+    confirmLabel: 'Generar',
+  })
+  if (!okConf) return
+
+  generandoCert.value = true
+  const result = await store.generarCertificadoLeyInterno(analisisCompletadoId.value, descripcionPDF.value)
+  if (result) {
+    certificadoGenerado.value = true
+    ui.toast('Certificado generado exitosamente', 'success')
+    setTimeout(() => router.push('/laboratorio'), 1500)
+  }
+  generandoCert.value = false
+}
+
+function irARegistrarPlata() {
+  const cip = form.value.cip || '_nuevo'
+
+  const query = new URLSearchParams()
+  if (cip !== '_nuevo') {
+    // Check if SOLIDOS analysis already exists for this CIP
+    const cipObj = store.cips.find(c => c.cip === cip)
+    const solidosExistente = cipObj?.analisis_recuperacion.find(
+      (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
+    )
+
+    if (solidosExistente) {
+      // Navigate to existing SOLIDOS analysis (just view/use it)
+      query.set('id', solidosExistente.id.toString())
+      const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+      window.open(url.href, '_blank')
+      return
+    }
+  }
+
+  // Create new SOLIDOS analysis pre-filling au1 and au2 from Newmont form
+  if (auFino1.value != null) query.set('au1', auFino1.value.toString())
+  if (auFino2.value != null) query.set('au2', auFino2.value.toString())
+  query.set('direct', '1')
+  const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+  window.open(url.href, '_blank')
 }
 </script>
 
@@ -428,6 +533,9 @@ async function guardar() {
 .muestra-card--resultados {
   border-color: rgba(184,151,75,0.3);
   background: rgba(184,151,75,0.04);
+  --resultado-fs: 1.25rem;
+  --resultado-sub-fs: 0.95rem;
+  --resultado-hl-fs: 1.8rem;
 }
 
 .muestra-card-titulo {
@@ -471,17 +579,23 @@ async function guardar() {
 .resultado-valor {
   font-family: var(--font-mono);
   color: var(--color-text-muted);
-  font-size: var(--text-md);
+  font-size: var(--resultado-fs, var(--text-md));
 }
 
 .resultado-valor--sub {
-  font-size: 0.72rem;
+  font-size: var(--resultado-sub-fs, 0.72rem);
   color: var(--color-text-faint);
 }
 
 .resultado-valor.highlight {
   color: var(--color-gold);
-  font-size: var(--text-xl);
+  font-size: var(--resultado-hl-fs, var(--text-xl));
   font-weight: 700;
+}
+
+.badge-cert-ok {
+  font-size: 0.78rem; font-weight: 700; color: #4ade80;
+  background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3);
+  border-radius: var(--radius-sm); padding: 0.3rem 0.7rem;
 }
 </style>

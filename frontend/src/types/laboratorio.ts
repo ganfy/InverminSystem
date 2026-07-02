@@ -1,7 +1,7 @@
 export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia' | 'comercial'
 export type OrigenDatos = 'manual' | 'certificado'
 export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO' | 'CERT_COMERCIAL' | 'CERT_RECONOCIMIENTO'
-export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno'
+export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno' | 'PROCESO'
 
 // ── Análisis de Ley ───────────────────────────────────────────────────────────
 export interface AnalisisLeyCreate {

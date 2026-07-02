@@ -305,15 +305,28 @@ def _calcular_lote(
 
     riesgo = Decimal(str(params.riesgo_comercial)) if params.riesgo_comercial else Decimal("0")
     maquila_base = Decimal(str(params.maquila)) if params.maquila else Decimal("0")
+    is_llampo = lote.tipo_material and lote.tipo_material.strip().lower() in ["llampo", "m.llampo"]
+
+    gasto_acopio_base = (
+        params.gasto_acopio_llampo
+        if is_llampo and params.gasto_acopio_llampo is not None
+        else params.gasto_acopio
+    )
+    gasto_consumo_base = (
+        params.gasto_consumo_llampo
+        if is_llampo and params.gasto_consumo_llampo is not None
+        else params.gasto_consumo
+    )
+
     gasto_acopio = (
         Decimal(str(gasto_acopio_override))
         if gasto_acopio_override is not None
-        else (Decimal(str(params.gasto_acopio)) if params.gasto_acopio else Decimal("0"))
+        else (Decimal(str(gasto_acopio_base)) if gasto_acopio_base else Decimal("0"))
     )
     gasto_consumo = (
         Decimal(str(gasto_consumo_override))
         if gasto_consumo_override is not None
-        else (Decimal(str(params.gasto_consumo)) if params.gasto_consumo else Decimal("0"))
+        else (Decimal(str(gasto_consumo_base)) if gasto_consumo_base else Decimal("0"))
     )
     insumos = gasto_acopio + gasto_consumo
 
