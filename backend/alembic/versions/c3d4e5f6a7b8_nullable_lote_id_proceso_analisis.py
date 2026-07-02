@@ -30,6 +30,28 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Make lote_id nullable to support Proceso analysis records."""
 
+    # ── Drop dependent constraints dynamically (FKs and Unique) ──────────────
+    op.execute("""
+    DECLARE @sql NVARCHAR(MAX) = N'';
+    
+    -- Drop FKs referencing mapeo_cip
+    SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_NAME(parent_object_id)) + N' DROP CONSTRAINT ' + QUOTENAME(name) + N'; '
+    FROM sys.foreign_keys
+    WHERE referenced_object_id = OBJECT_ID('mapeo_cip');
+    
+    -- Drop Unique Constraint on mapeo_cip.codigo_cip
+    SELECT @sql += N'ALTER TABLE mapeo_cip DROP CONSTRAINT ' + QUOTENAME(name) + N'; '
+    FROM sys.key_constraints
+    WHERE parent_object_id = OBJECT_ID('mapeo_cip') AND type = 'UQ';
+    
+    -- Drop unique index if created as index instead of constraint
+    SELECT @sql += N'DROP INDEX ' + QUOTENAME(name) + N' ON mapeo_cip; '
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID('mapeo_cip') AND is_unique = 1 AND is_primary_key = 0 AND is_unique_constraint = 0 AND name IS NOT NULL;
+
+    IF @sql <> N'' EXEC sp_executesql @sql;
+    """)
+
     # ── mapeo_cip: lote_id nullable + codigo_cip wider ───────────────────────
     op.alter_column(
         "mapeo_cip",
@@ -78,6 +100,32 @@ def upgrade() -> None:
         existing_type=sa.String(20),
         type_=sa.String(50),
         existing_nullable=True,
+    )
+
+    # ── pruebas_metalurgicas: cip ampliado a 50 ─────────────────────────────
+    # Also need to alter 'cip' in 'pruebas_metalurgicas' to 50
+    op.alter_column(
+        "pruebas_metalurgicas",
+        "cip",
+        existing_type=sa.String(20),
+        type_=sa.String(50),
+        existing_nullable=True,
+    )
+
+    # ── Recreate Constraints ─────────────────────────────────────────────────
+    op.create_unique_constraint("uq_mapeo_cip_codigo_cip", "mapeo_cip", ["codigo_cip"])
+    op.create_foreign_key(
+        "fk_analisis_ley_cip", "analisis_ley", "mapeo_cip", ["cip"], ["codigo_cip"]
+    )
+    op.create_foreign_key(
+        "fk_analisis_recuperacion_cip",
+        "analisis_recuperacion",
+        "mapeo_cip",
+        ["cip"],
+        ["codigo_cip"],
+    )
+    op.create_foreign_key(
+        "fk_pruebas_metalurgicas_cip", "pruebas_metalurgicas", "mapeo_cip", ["cip"], ["codigo_cip"]
     )
 
     # ── Actualizar check constraint tipo_muestra en mapeo_cip ────────────────
