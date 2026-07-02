@@ -129,11 +129,14 @@ def upgrade() -> None:
     )
 
     # ── Actualizar check constraint tipo_muestra en mapeo_cip ────────────────
-    # Eliminar constraint anterior e insertar uno nuevo que incluye 'Proceso'
-    try:
-        op.drop_constraint("ck_mapeo_cip_tipo_muestra", "mapeo_cip", type_="check")
-    except Exception:
-        pass  # puede no existir en algunos entornos
+    # Usar SQL dinámico para eliminar el constraint solo si existe (SQL Server no soporta DROP IF EXISTS para CHECK)
+    op.execute("""
+    DECLARE @ck NVARCHAR(128);
+    SELECT @ck = name FROM sys.check_constraints
+    WHERE parent_object_id = OBJECT_ID('mapeo_cip') AND name = 'ck_mapeo_cip_tipo_muestra';
+    IF @ck IS NOT NULL
+        EXEC('ALTER TABLE mapeo_cip DROP CONSTRAINT ck_mapeo_cip_tipo_muestra');
+    """)
 
     op.create_check_constraint(
         "ck_mapeo_cip_tipo_muestra",
