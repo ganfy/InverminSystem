@@ -590,7 +590,7 @@ class AnalisisLey(AuditMixin, Base):
     lote_id = Column(
         Integer, ForeignKey("lotes.id"), nullable=True
     )  # nullable para análisis de Proceso
-    cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
+    cip = Column(String(50), ForeignKey("mapeo_cip.codigo_cip"))
     laboratorio = Column(String(50), nullable=False)
     tipo_analisis = Column(String(20), nullable=False)  # sin default - siempre explícito
     material = Column(String(10), default="Au")
@@ -666,7 +666,7 @@ class AnalisisRecuperacion(AuditMixin, Base):
     lote_id = Column(
         Integer, ForeignKey("lotes.id"), nullable=True
     )  # nullable para análisis de Proceso
-    cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
+    cip = Column(String(50), ForeignKey("mapeo_cip.codigo_cip"))
     laboratorio = Column(String(50), nullable=False)
     ley_cabeza = Column(Numeric(10, 4))
     ley_cola = Column(Numeric(10, 4))
@@ -731,7 +731,7 @@ class PruebaMetalurgica(AuditMixin, Base):
     adicion_nacn = Column(Numeric(10, 4))  # gramos (acumulativo)
     adicion_naoh = Column(Numeric(10, 4))  # gramos (acumulativo)
     gasto_agno3 = Column(Numeric(10, 4))  # ml
-    cip = Column(String(20), ForeignKey("mapeo_cip.codigo_cip"))
+    cip = Column(String(50), ForeignKey("mapeo_cip.codigo_cip"))
     # Descarte de prueba (envase roto, etc.)
     descartado = Column(Boolean, default=False, nullable=False)
     descartado_por = Column(Integer, ForeignKey("usuarios.id"))
