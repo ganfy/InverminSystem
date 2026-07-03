@@ -251,9 +251,20 @@ const form = reactive({
   procedencia:     '',
 })
 
+/** Normaliza una placa extraída: la pone en mayúsculas, elimina caracteres no válidos
+ * y añade un guión tras los primeros 3 caracteres si vino sin él. */
+function normalizarPlacaExtraida(placa: string): string {
+  let p = placa.toUpperCase().replace(/[^A-Z0-9-]/g, '')
+  // Si no tiene guión y tiene 6+ caracteres, insertar guión después del 3ro
+  if (!p.includes('-') && p.length >= 4) {
+    p = p.slice(0, 3) + '-' + p.slice(3)
+  }
+  return p
+}
+
 /** Aplica datos extraídos del DocumentosPanel al formulario */
 function aplicarDatosExtraidos(datos: Partial<Record<string, string | null>>) {
-  if (datos.placa)          form.placa          = datos.placa
+  if (datos.placa)          form.placa          = normalizarPlacaExtraida(datos.placa)
   if (datos.carreta)        form.carreta        = datos.carreta
   if (datos.conductor)      form.conductor      = datos.conductor
   if (datos.transportista)  form.transportista  = datos.transportista
@@ -288,7 +299,7 @@ function aplicarDatosExtraidos(datos: Partial<Record<string, string | null>>) {
 }
 
 // ── Validaciones ──────────────────────────────────────────
-const regexPlaca = /^[A-Z0-9]{3}-\d{3}$|^[A-Z0-9]{2}-\d{4}$/
+const regexPlaca = /^[A-Z0-9]{3}-[A-Z0-9]{3}$|^[A-Z0-9]{2}-[A-Z0-9]{4}$/
 
 function normalizarPlaca() {
   form.placa = form.placa.toUpperCase().replace(/[^A-Z0-9-]/g, '')

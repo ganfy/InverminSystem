@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import io
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from app.models.models import Configuracion, Lote, ProveedorAcopiador, SesionDescarga
 from sqlalchemy.orm import Session, joinedload
@@ -80,8 +81,19 @@ def _fmt(valor: Decimal | None) -> str:
     return f"{valor:.3f}" if valor is not None else "-"
 
 
+_TZ_LIMA = ZoneInfo("America/Lima")
+
+
 def _fecha_fmt(dt: datetime | None) -> str:
-    return dt.strftime("%d/%m/%Y  %H:%M:%S") if dt else "-"
+    """Formatea un datetime al horario de Lima (America/Lima).
+    Los timestamps en BD son UTC sin marca de zona; se convierten explcítamente."""
+    if dt is None:
+        return "-"
+    # Si el datetime no tiene tzinfo, asumimos que es UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    lima_dt = dt.astimezone(_TZ_LIMA)
+    return lima_dt.strftime("%d/%m/%Y  %H:%M:%S")
 
 
 def _val(valor: str | None, fallback: str = "-") -> str:

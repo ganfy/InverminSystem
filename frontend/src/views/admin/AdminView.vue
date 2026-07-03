@@ -136,6 +136,18 @@
             <h2 class="category-header-title">{{ activeCategoryDetails.name }}</h2>
           </div>
 
+          <!-- Aviso contextual para la categoría de numeración -->
+          <div v-if="currentParamCategory === 'numeracion'" class="nota-info-card" style="margin-bottom: 1.25rem; background: rgba(207,151,61,0.07); border-color: rgba(207,151,61,0.3);">
+            <AlertTriangle :size="16" class="warn-icon" />
+            <p class="nota-text">
+              <strong>Numeración de IPs y Tickets:</strong>
+              <br/>• <code>proximo_ip</code>: define el número mínimo desde el que se generarán nuevos IPs de lote
+              (tanto online como en bloques offline). El sistema usa el mayor entre este valor y el máximo ya registrado.
+              <br/>• <code>proximo_ticket</code>: define el inicio del próximo bloque de tickets reservados para dispositivos sin conexión.
+              <br/>El sistema valida que el valor nuevo no esté ya registrado. Usa esto para <em>saltar</em> la numeración en producción (p. ej. tras importar datos o reiniciar el año).
+            </p>
+          </div>
+
           <div class="settings-grid">
             <div
               v-for="c in filteredConstantes"
@@ -513,6 +525,12 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   alerta_horas_muestreo_ley: 'SLA Muestreo a Ley',
   alerta_horas_ley_recuperacion: 'SLA Ley a Recuperación',
   alerta_dias_volado_stock: 'SLA Lote Volado en Stock sin Ruma',
+
+  // Balanza offline
+  proximo_ticket: 'Próximo Número de Ticket',
+  tamano_bloque_ticket: 'Tamaño de Bloque de Tickets Offline',
+  proximo_ip: 'Próximo Número de IP de Lote',
+  tamano_bloque_ip: 'Tamaño de Bloque de IPs Offline',
 }
 
 const UNIDADES: Record<string, string> = {
@@ -575,6 +593,12 @@ const PARAM_CATEGORIES = [
     name: 'SLA y Alertas de Tiempos (Dashboard)',
     icon: BellRing,
     keys: ['alerta_horas_pesado_muestreo', 'alerta_horas_muestreo_ley', 'alerta_horas_ley_recuperacion', 'alerta_dias_volado_stock']
+  },
+  {
+    id: 'numeracion',
+    name: 'Numeración Balanza (Tickets e IPs)',
+    icon: Scale,
+    keys: ['proximo_ticket', 'tamano_bloque_ticket', 'proximo_ip', 'tamano_bloque_ip']
   }
 ]
 

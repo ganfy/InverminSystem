@@ -171,6 +171,41 @@ def actualizar_constante(db: Session, clave: str, valor: str) -> dict:
             raise ValueError(
                 f"El valor para '{clave}' debe ser un número entero positivo (≥ 1)."
             ) from e
+
+        # Para proximo_ticket: verificar que no haya un ticket ya registrado con ese código
+        if clave == "proximo_ticket":
+            from app.models.models import Pesaje  # importación local para evitar ciclos
+
+            codigo_candidato = f"TK-{int_val:05d}"
+            existe = db.query(Pesaje.id).filter(Pesaje.numero_ticket == codigo_candidato).first()
+            if existe:
+                raise ValueError(
+                    f"El número de ticket TK-{int_val:05d} ya está registrado. "
+                    f"Elige un número mayor al último ticket generado."
+                )
+
+        # Para proximo_ip: verificar que el IP candidato no esté ya en uso este año
+        if clave == "proximo_ip":
+            from datetime import UTC, datetime
+
+            from app.models.models import Lote  # importación local para evitar ciclos
+            from sqlalchemy import extract
+
+            anio_actual = datetime.now(UTC).year
+            ip_candidato = f"IP-{int_val:04d}"
+            existe_ip = (
+                db.query(Lote.id)
+                .filter(
+                    Lote.ip == ip_candidato,
+                    extract("year", Lote.creado_en) == anio_actual,
+                )
+                .first()
+            )
+            if existe_ip:
+                raise ValueError(
+                    f"El IP {ip_candidato} ya está registrado en el año {anio_actual}. "
+                    f"Elige un número mayor al último IP generado."
+                )
     else:
         # Por defecto, todas las demás son numéricas (constantes, alertas, metas, etc.)
         try:

@@ -7,11 +7,21 @@
         </div>
         <div class="modal-body">
           <p class="elim-aviso">Acción irreversible - queda registrado en auditoría.</p>
-          <p v-if="modalData.error" class="error-msg">{{ modalData.error }}</p>
+          <div class="field" style="margin-top: 1rem;">
+            <label class="field-label">Motivo de eliminación *</label>
+            <textarea
+              v-model="modalData.motivo"
+              class="field-input"
+              rows="3"
+              placeholder="Describe el motivo por el que se elimina este lote..."
+              style="resize: vertical; min-height: 72px;"
+            ></textarea>
+          </div>
+          <p v-if="modalData.error" class="error-msg" style="margin-top: 0.5rem;">{{ modalData.error }}</p>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" @click="$emit('close')">Cancelar</button>
-          <button class="btn-danger" :disabled="guardando" @click="$emit('confirm')">
+          <button class="btn-danger" :disabled="guardando || !modalData.motivo?.trim()" @click="$emit('confirm')">
             <span v-if="guardando" class="spinner" />
             <span v-else>Eliminar</span>
           </button>
@@ -21,6 +31,7 @@
   </template>
 
   <script setup lang="ts">
+  import { X } from 'lucide-vue-next'
   defineProps<{ modalData: any; guardando: boolean }>()
   defineEmits(['close', 'confirm'])
   </script>

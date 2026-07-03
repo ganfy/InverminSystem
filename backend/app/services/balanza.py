@@ -160,8 +160,12 @@ def generar_ip(db: Session) -> str:
     Genera el siguiente IP secuencial del año en curso.
 
     Carga los IPs existentes del año y busca el máximo del sufijo numérico.
+    También respeta `proximo_ip` de configuracion como piso mínimo, de modo que
+    el administrador pueda saltar la numeración desde el panel de administración.
     La unicidad final la garantiza el UNIQUE constraint de lotes.ip.
     """
+    from app.models.models import Configuracion  # importación local para evitar ciclos
+
     anio_actual = _ahora().year
 
     ips_anio = (
@@ -180,6 +184,17 @@ def generar_ip(db: Session) -> str:
             if num > max_num:
                 max_num = num
         except (IndexError, ValueError):
+            pass
+
+    # Leer piso configurado (proximo_ip), para que el admin pueda saltar numeración
+    cfg_row = db.query(Configuracion).filter(Configuracion.clave == "proximo_ip").first()
+    if cfg_row:
+        try:
+            piso_config = int(cfg_row.valor)
+            # Usar el mayor entre el máximo actual en BD y el piso configurado - 1
+            # (el +1 posterior lo eleva al siguiente disponible)
+            max_num = max(max_num, piso_config - 1)
+        except (ValueError, TypeError):
             pass
 
     return f"IP-{max_num + 1:04d}"
