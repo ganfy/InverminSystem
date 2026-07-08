@@ -351,8 +351,11 @@ export const laboratorioApi = {
         return URL.createObjectURL(data)
     },
 
-    async generarCertificadoLeyInterno(analisisId: number, descripcion?: string): Promise<AnalisisLeyOut> {
-        const params = descripcion ? `?descripcion=${encodeURIComponent(descripcion)}` : ''
+    async generarCertificadoLeyInterno(analisisId: number, descripcion?: string, paraDest?: string): Promise<AnalisisLeyOut> {
+        const q = new URLSearchParams()
+        if (descripcion) q.set('descripcion', descripcion)
+        if (paraDest) q.set('para_dest', paraDest)
+        const params = q.toString() ? `?${q.toString()}` : ''
         const { data } = await api.post(`/laboratorio/ley/${analisisId}/generar-certificado${params}`)
         return data
     },

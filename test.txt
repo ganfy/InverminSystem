@@ -663,6 +663,8 @@ def generar_certificado_recuperacion_cip_pdf(
     filas = ""
     for i, a in enumerate(analisis_list, 1):
         cola_au_oz = float(a.ley_cola) if a.ley_cola is not None else None
+        liquido_au_oz = float(a.ley_liquido) if a.ley_liquido is not None else None
+        sol_ag = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
 
         # Buscar ley Ag de la tabla analisis_ley para el CIP
         ley_ag_rec = (
@@ -675,89 +677,85 @@ def generar_certificado_recuperacion_cip_pdf(
             .first()
         )
         if a.sub_tipo == "SOLIDOS":
-            headers_html = (
-                "<tr>"
-                "<th>N&deg;</th><th>C&Oacute;DIGO</th>"
-                "<th>Ley Au (Oz/TC)</th>"
-                "<th>Ley Au (g/TM)</th>"
-                "<th>Ley Ag (Oz/TC)</th>"
-                "<th>Ley Ag (g/TM)</th>"
-                "</tr>"
-            )
-            au_oz = _fmt_oz(cola_au_oz)
-            au_gtm = f"{(cola_au_oz * 34.2857):.3f}" if cola_au_oz is not None else "-"
-            ag_oz = _fmt_oz(
-                float(ley_ag_rec.ley_fino)
-                if ley_ag_rec and ley_ag_rec.ley_fino is not None
-                else None
-            )
-            ag_gtm = (
-                f"{float(ley_ag_rec.ley_gr_tm):.3f}"
-                if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None
-                else "-"
-            )
+        headers_html = (
+            "<tr>"
+            "<th>N&deg;</th><th>C&Oacute;DIGO</th>"
+            "<th>Ley Au (Oz/TC)</th>"
+            "<th>Ley Au (g/TM)</th>"
+            "<th>Ley Ag (Oz/TC)</th>"
+            "<th>Ley Ag (g/TM)</th>"
+            "</tr>"
+        )
+        au_oz = _fmt_oz(cola_au_oz)
+        au_gtm = f"{(cola_au_oz * 34.2857):.3f}" if cola_au_oz is not None else "-"
+        ag_oz = _fmt_oz(
+            float(ley_ag_rec.ley_fino) if ley_ag_rec and ley_ag_rec.ley_fino is not None else None
+        )
+        ag_gtm = (
+            f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+            if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None
+            else "-"
+        )
 
-            filas += (
-                f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
-                f"<td>{au_oz}</td><td>{au_gtm}</td><td>{ag_oz}</td><td>{ag_gtm}</td></tr>"
+        filas += (
+            f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
+            f"<td>{au_oz}</td><td>{au_gtm}</td><td>{ag_oz}</td><td>{ag_gtm}</td></tr>"
+        )
+    else:  # SOLUCION — tabla de 8 columnas: SOLIDOS (ref) + SOLUCION (AAS)
+        # Buscar análisis SOLIDOS vigente del mismo CIP para datos de referencia
+        solidos_rec = (
+            db.query(AnalisisRecuperacion)
+            .filter(
+                AnalisisRecuperacion.cip == cip_code,
+                AnalisisRecuperacion.sub_tipo == "SOLIDOS",
+                AnalisisRecuperacion.vigente == True,  # noqa: E712
+                AnalisisRecuperacion.eliminado == False,  # noqa: E712
             )
-        else:  # SOLUCION — tabla de 8 columnas: SOLIDOS (ref) + SOLUCION (AAS)
-            # Buscar análisis SOLIDOS vigente del mismo CIP para datos de referencia
-            solidos_rec = (
-                db.query(AnalisisRecuperacion)
-                .filter(
-                    AnalisisRecuperacion.cip == cip_code,
-                    AnalisisRecuperacion.sub_tipo == "SOLIDOS",
-                    AnalisisRecuperacion.vigente == True,  # noqa: E712
-                    AnalisisRecuperacion.eliminado == False,  # noqa: E712
-                )
-                .first()
-            )
+            .first()
+        )
 
-            # Columnas SOLIDOS (izquierda)
-            if solidos_rec and solidos_rec.ley_cola is not None:
-                s_au_oz = float(solidos_rec.ley_cola)
-                s_au_oz_str = _fmt_oz(s_au_oz)
-                s_au_gtm_str = f"{s_au_oz * 34.2857:.3f}"
-            else:
-                s_au_oz_str = "TRAZAS"
-                s_au_gtm_str = "TRAZAS"
+        # Columnas SOLIDOS (izquierda)
+        if solidos_rec and solidos_rec.ley_cola is not None:
+            s_au_oz = float(solidos_rec.ley_cola)
+            s_au_oz_str = _fmt_oz(s_au_oz)
+            s_au_gtm_str = f"{s_au_oz * 34.2857:.3f}"
+        else:
+            s_au_oz_str = "TRAZAS"
+            s_au_gtm_str = "TRAZAS"
 
-            if ley_ag_rec and ley_ag_rec.ley_fino is not None:
-                s_ag_oz_str = _fmt_oz(float(ley_ag_rec.ley_fino))
-            else:
-                s_ag_oz_str = "TRAZAS"
+        if ley_ag_rec and ley_ag_rec.ley_fino is not None:
+            s_ag_oz_str = _fmt_oz(float(ley_ag_rec.ley_fino))
+        else:
+            s_ag_oz_str = "TRAZAS"
 
-            if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None:
-                s_ag_gtm_str = f"{float(ley_ag_rec.ley_gr_tm):.3f}"
-            else:
-                s_ag_gtm_str = "TRAZAS"
+        if ley_ag_rec and ley_ag_rec.ley_gr_tm is not None:
+            s_ag_gtm_str = f"{float(ley_ag_rec.ley_gr_tm):.3f}"
+        else:
+            s_ag_gtm_str = "TRAZAS"
 
-            # Columnas SOLUCION (derecha) — ley_liquido y solucion_ag_g_m3 ya en g/m³
-            liq_au_gm3 = f"{float(a.ley_liquido):.4f}" if a.ley_liquido is not None else "-"
-            liq_ag_gm3 = (
-                f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
-            )
+        # Columnas SOLUCION (derecha) — ley_liquido y solucion_ag_g_m3 ya en g/m³
+        liq_au_gm3 = f"{float(a.ley_liquido):.4f}" if a.ley_liquido is not None else "-"
+        liq_ag_gm3 = f"{float(a.solucion_ag_g_m3):.4f}" if a.solucion_ag_g_m3 is not None else "-"
 
-            headers_html = (
-                "<tr>"
-                "<th rowspan='2'>N&deg;</th><th rowspan='2'>C&Oacute;DIGO</th>"
-                "<th colspan='4' style='background:#d4c48a'>AN&Aacute;LISIS S&Oacute;LIDOS</th>"
-                "<th colspan='2' style='background:#b0cce8'>SOLUCI&Oacute;N</th>"
-                "</tr>"
-                "<tr>"
-                "<th>Au Oz/TC</th><th>Au g/TM</th>"
-                "<th>Ag Oz/TC</th><th>Ag g/TM</th>"
-                "<th>Au g/m&sup3;</th><th>Ag g/m&sup3;</th>"
-                "</tr>"
-            )
+        headers_html = (
+            "<tr>"
+            "<th rowspan='2'>N&deg;</th><th rowspan='2'>C&Oacute;DIGO</th>"
+            "<th colspan='4' style='background:#d4c48a'>AN&Aacute;LISIS S&Oacute;LIDOS</th>"
+            "<th colspan='2' style='background:#b0cce8'>SOLUCI&Oacute;N</th>"
+            "</tr>"
+            "<tr>"
+            "<th>Au Oz/TC</th><th>Au g/TM</th>"
+            "<th>Ag Oz/TC</th><th>Ag g/TM</th>"
+            "<th>Au g/m&sup3;</th><th>Ag g/m&sup3;</th>"
+            "</tr>"
+        )
 
-            filas += (
-                f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
-                f"<td>{s_au_oz_str}</td><td>{s_au_gtm_str}</td>"
-                f"<td>{s_ag_oz_str}</td><td>{s_ag_gtm_str}</td>"
-                f"<td>{liq_au_gm3}</td><td>{liq_ag_gm3}</td></tr>"
-            )
+        filas += (
+            f"<tr><td>{i}</td><td style='color:#b8860b'>{cip_code}</td>"
+            f"<td>{s_au_oz_str}</td><td>{s_au_gtm_str}</td>"
+            f"<td>{s_ag_oz_str}</td><td>{s_ag_gtm_str}</td>"
+            f"<td>{liq_au_gm3}</td><td>{liq_ag_gm3}</td></tr>"
+        )
 
     # fecha_recepcion: usar MapeoCIP.fecha_envio (fecha llegada al Dashboard)
     fecha_ingreso_raw = cip.fecha_envio if cip and cip.fecha_envio else None
@@ -766,7 +764,7 @@ def generar_certificado_recuperacion_cip_pdf(
     )
 
     sub_tipo_str = "RECONOCIMIENTO DE PULPA"
-    if a.sub_tipo == "SOLIDOS":
+        if a.sub_tipo == "SOLIDOS":
         sub_tipo_str = "RECONOCIMIENTO SÓLIDOS (FA)"
     elif a.sub_tipo == "SOLUCION":
         sub_tipo_str = "RECONOCIMIENTO SOLUCIÓN (AAS)"

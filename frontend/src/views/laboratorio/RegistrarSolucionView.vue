@@ -79,45 +79,27 @@
 
           <!-- Au en Solución -->
           <div class="liquido-field">
-            <div class="liquido-label">Au en Solución</div>
-            <div class="liquido-input-row">
-              <div class="field" style="flex:1">
-                <label class="field-label">g/m³</label>
-                <input
-                  type="number" class="field-input"
-                  v-model.number="solucionAu"
-                  step="0.0001" placeholder="0.0000"
-                  :disabled="certificadoGenerado"
-                />
-              </div>
-              <div class="liquido-conv">
-                <span class="liquido-conv-label">≡ oz/TC</span>
-                <span class="liquido-conv-val">
-                  {{ solucionAu != null ? (solucionAu / OZ_TC_TO_GR_TM).toFixed(4) : '—' }}
-                </span>
-              </div>
+            <div class="liquido-label">Au en Solución (g/m³)</div>
+            <div class="field">
+              <input
+                type="number" class="field-input"
+                v-model.number="solucionAu"
+                step="0.0001" placeholder="0.0000"
+                :disabled="certificadoGenerado"
+              />
             </div>
           </div>
 
           <!-- Ag en Solución -->
           <div class="liquido-field">
-            <div class="liquido-label">Ag en Solución</div>
-            <div class="liquido-input-row">
-              <div class="field" style="flex:1">
-                <label class="field-label">g/m³</label>
-                <input
-                  type="number" class="field-input"
-                  v-model.number="solucionAg"
-                  step="0.0001" placeholder="0.0000"
-                  :disabled="certificadoGenerado"
-                />
-              </div>
-              <div class="liquido-conv">
-                <span class="liquido-conv-label">≡ oz/TC</span>
-                <span class="liquido-conv-val">
-                  {{ solucionAg != null ? (solucionAg / OZ_TC_TO_GR_TM).toFixed(4) : '—' }}
-                </span>
-              </div>
+            <div class="liquido-label">Ag en Solución (g/m³)</div>
+            <div class="field">
+              <input
+                type="number" class="field-input"
+                v-model.number="solucionAg"
+                step="0.0001" placeholder="0.0000"
+                :disabled="certificadoGenerado"
+              />
             </div>
           </div>
 
@@ -192,7 +174,7 @@ onMounted(async () => {
         analisisCompletadoId.value = completado.id
         certificadoGenerado.value = !!completado.certificado_url
         if (completado.ley_liquido != null)
-          solucionAu.value = parseFloat((Number(completado.ley_liquido) * OZ_TC_TO_GR_TM).toFixed(4))
+          solucionAu.value = parseFloat(Number(completado.ley_liquido).toFixed(4))
         if (completado.solucion_ag_g_m3 != null)
           solucionAg.value = parseFloat(String(completado.solucion_ag_g_m3))
         if (!analisisPendiente.value) analisisPendiente.value = completado
@@ -222,9 +204,7 @@ async function guardar() {
       laboratorio: laboratorio.value,
       ley_cabeza: null,
       ley_cola: null, // Solución no tiene ley_cola, solo ley_liquido
-      ley_liquido: solucionAu.value != null
-        ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(6))
-        : null,
+      ley_liquido: solucionAu.value,  // g/m³ — se guarda directamente
       solucion_ag_g_m3: solucionAg.value,
       fecha_analisis: fechaAnalisis.value,
       sub_tipo: 'SOLUCION',
@@ -240,9 +220,7 @@ async function guardar() {
     const payload = {
       muestras: null,
       ley_cola: null,
-      ley_liquido: solucionAu.value != null
-        ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(6))
-        : null,
+      ley_liquido: solucionAu.value,  // g/m³ — se guarda directamente
       solucion_ag_g_m3: solucionAg.value,
       fecha_analisis: fechaAnalisis.value,
     }

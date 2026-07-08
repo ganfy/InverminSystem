@@ -308,9 +308,9 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
-    async function generarCertificadoLeyInterno(analisisId: number, descripcion?: string) {
+    async function generarCertificadoLeyInterno(analisisId: number, descripcion?: string, paraDest?: string) {
         try {
-            await laboratorioApi.generarCertificadoLeyInterno(analisisId, descripcion)
+            await laboratorioApi.generarCertificadoLeyInterno(analisisId, descripcion, paraDest)
             ui.toast('Certificado generado y adjuntado', 'success')
             return true
         } catch {
