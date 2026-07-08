@@ -629,6 +629,7 @@ def registrar_analisis_recuperacion(
         TipoMuestra.RECUPERACION_INTERNO,
         TipoMuestra.RECUPERACION_EXTERNO,
         TipoMuestra.PROCESO,
+        TipoMuestra.LABORATORIO,
     ):
         raise ValueError(
             f"El código '{datos.cip}' es de tipo '{mapeo.tipo_muestra}' y no acepta análisis de recuperación directo"
@@ -655,6 +656,14 @@ def registrar_analisis_recuperacion(
     db.add(nuevo)
     db.flush()
     db.refresh(nuevo)
+
+    if datos.muestras:
+        ley_cola, ley_cola_ag = _procesar_muestras_reconocimiento(
+            db, nuevo.id, datos.muestras, usuario_id
+        )
+        nuevo.ley_cola = ley_cola
+        datos.ley_cola_ag = ley_cola_ag
+        db.flush()
 
     if datos.ley_cola_ag is not None:
         # Generate Ag record
@@ -988,8 +997,10 @@ def completar_recuperacion(
     )
     if not a:
         raise ValueError("Análisis de recuperación no encontrado")
-    if a.estado != EstadoRecuperacion.PENDIENTE:
-        raise ValueError("Solo se pueden completar análisis en estado PENDIENTE")
+    if a.estado not in (EstadoRecuperacion.PENDIENTE, EstadoRecuperacion.COMPLETADO):
+        raise ValueError(
+            "Solo se pueden completar análisis en estado PENDIENTE o actualizar COMPLETADOS"
+        )
     if not a.vigente:
         raise ValueError("No se puede completar un análisis descartado")
 
@@ -1488,7 +1499,11 @@ def _pdf_to_text(archivo_bytes: bytes, filename: str) -> str:
 
 
 def generar_y_guardar_certificado_interno(
-    db: Session, analisis_id: int, tipo: str, descripcion_pdf: str | None = None
+    db: Session,
+    analisis_id: int,
+    tipo: str,
+    descripcion_pdf: str | None = None,
+    para_dest: str = "COMERCIAL",
 ) -> str:
     from app.services import certificado_ley_pdf as cert_svc
 
@@ -1497,7 +1512,7 @@ def generar_y_guardar_certificado_interno(
         if not a:
             raise ValueError("Análisis no encontrado")
         pdf_bytes = cert_svc.generar_certificado_ensayo_cip_pdf(
-            db, a.cip, descripcion=descripcion_pdf or "PROCESO"
+            db, a.cip, descripcion=descripcion_pdf or "LOTE", para_dest=para_dest
         )
     else:
         a = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()

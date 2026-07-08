@@ -9,9 +9,6 @@
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
         <button class="btn-secondary" @click="router.back()">← Volver</button>
-        <button v-if="form.material === 'Au' && (form.cip || modoNuevo)" class="btn-secondary" @click="irARegistrarPlata" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4)">
-          + Agregar Ley Plata
-        </button>
         <button class="btn-primary" @click="guardar" :disabled="guardando || certificadoGenerado">
           <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
           Guardar cambios
@@ -34,6 +31,11 @@
     <div v-if="!online" class="offline-banner">
       <WifiOff :size="16" style="margin-right:0.5rem;vertical-align:middle" />
       Sin conexión — el análisis se guardará localmente y se sincronizará al reconectar.
+    </div>
+
+    <!-- Banner modo actualización Ag -->
+    <div v-if="form.material === 'Ag' && yaGuardado" class="cert-generado-banner" style="background:rgba(96,165,250,0.06);border-color:rgba(96,165,250,0.3);color:#93c5fd">
+      Actualizando ley de plata existente. Al guardar, el certificado Newmont se actualizará con el nuevo valor Ag.
     </div>
 
     <!-- DATOS DEL LOTE -->
@@ -77,6 +79,13 @@
             <option value="LAB. METALÚRGICO">LAB. METALÚRGICO</option>
             <option value="RECONOCIMIENTO">RECONOCIMIENTO</option>
             <option value="LOTE">LOTE</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">PARA:</label>
+          <select v-model="paraDest" class="field-select field-input field-sm" :disabled="certificadoGenerado">
+            <option value="COMERCIAL">COMERCIAL</option>
+            <option value="PLANTA">PLANTA</option>
           </select>
         </div>
         <div class="field">
@@ -247,7 +256,8 @@ const analisisCompletadoId = ref<number | null>(null)
 // ── Campos del formulario ─────────────────────────────────────────────────────
 const descripcion = ref('0.5kg aprox. de Mineral')
 const punto       = ref<'CABEZA' | 'COLA' | 'LIQUIDO'>('CABEZA')
-const descripcionPDF = ref('PROCESO')
+const descripcionPDF = ref('LOTE')
+const paraDest    = ref('COMERCIAL')
 const modoNuevo = cipActual === '_nuevo'
 
 const form = ref({
@@ -350,7 +360,7 @@ onMounted(async () => {
   if (!store.cips.length) await store.cargarCips()
   const cip = store.cips.find(c => c.cip === cipActual)
   if (cip?.tipo_muestra) materialInfo.value = cip.tipo_muestra
-  // Pre-select material from query param (e.g. ?material=Ag from DetalleLoteView)
+  // Pre-select material from query param (e.g. ?material=Ag from Dashboard)
   if (route.query.material === 'Ag') {
     form.value.material = 'Ag'
     leyAgOzTc.value = null
@@ -373,11 +383,16 @@ onMounted(async () => {
       if (analysisToLoad.material === 'Ag') {
         leyAgOzTc.value = analysisToLoad.ley_fino
         punto.value = analysisToLoad.detalles?.[0]?.origen || 'COLA'
+        // Para Ag: el formulario siempre es editable (el cert se regenera desde el Dashboard)
+        yaGuardado.value = true
+        analisisCompletadoId.value = analysisToLoad.id
+        certificadoGenerado.value = false  // nunca bloquear el form de Ag
+      } else {
+        // Au: bloquear si el cert ya fue generado
+        yaGuardado.value = true
+        analisisCompletadoId.value = analysisToLoad.id
+        certificadoGenerado.value = !!analysisToLoad.certificado_url
       }
-      
-      yaGuardado.value = true
-      analisisCompletadoId.value = analysisToLoad.id
-      certificadoGenerado.value = !!analysisToLoad.certificado_url
 
       if (route.query.gen === '1') {
         // Auto-trigger generation
@@ -467,7 +482,11 @@ async function generarCertificado() {
   if (!okConf) return
 
   generandoCert.value = true
-  const result = await store.generarCertificadoLeyInterno(analisisCompletadoId.value, descripcionPDF.value)
+  const result = await store.generarCertificadoLeyInterno(
+    analisisCompletadoId.value,
+    descripcionPDF.value,
+    paraDest.value,
+  )
   if (result) {
     certificadoGenerado.value = true
     ui.toast('Certificado generado exitosamente', 'success')
@@ -476,33 +495,7 @@ async function generarCertificado() {
   generandoCert.value = false
 }
 
-function irARegistrarPlata() {
-  const cip = form.value.cip || '_nuevo'
 
-  const query = new URLSearchParams()
-  if (cip !== '_nuevo') {
-    // Check if SOLIDOS analysis already exists for this CIP
-    const cipObj = store.cips.find(c => c.cip === cip)
-    const solidosExistente = cipObj?.analisis_recuperacion.find(
-      (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
-    )
-
-    if (solidosExistente) {
-      // Navigate to existing SOLIDOS analysis (just view/use it)
-      query.set('id', solidosExistente.id.toString())
-      const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
-      window.open(url.href, '_blank')
-      return
-    }
-  }
-
-  // Create new SOLIDOS analysis pre-filling au1 and au2 from Newmont form
-  if (auFino1.value != null) query.set('au1', auFino1.value.toString())
-  if (auFino2.value != null) query.set('au2', auFino2.value.toString())
-  query.set('direct', '1')
-  const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
-  window.open(url.href, '_blank')
-}
 </script>
 
 <style scoped>

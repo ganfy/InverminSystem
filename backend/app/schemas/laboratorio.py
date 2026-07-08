@@ -166,6 +166,9 @@ class AnalisisRecuperacionCreate(BaseModel):
     ley_cola_ag: Decimal | None = Field(
         None, description="Ley Ag g/TM (opcional, para crear el registro de plata automáticamente)"
     )
+    muestras: list["MuestraReconocimientoIn"] | None = Field(
+        default=None, description="Muestras de reconocimiento opcionales para creación directa."
+    )
 
 
 class EnviarRecuperacionInternaRequest(BaseModel):

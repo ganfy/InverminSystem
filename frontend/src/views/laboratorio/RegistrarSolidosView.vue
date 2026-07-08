@@ -13,7 +13,7 @@
         <button
           class="btn-primary"
           @click="guardar"
-          :disabled="guardando || !analisisPendiente || certificadoGenerado"
+          :disabled="guardando || (!modoNuevo && !esCreacionDirecta && !analisisPendiente && !analisisCompletadoId)"
         >
           <span v-if="guardando" class="spinner" style="margin-right:0.4rem"></span>
           Guardar cambios
@@ -25,9 +25,9 @@
           :disabled="generandoCert || !yaGuardado"
         >
           <span v-if="generandoCert" class="spinner" style="margin-right:0.4rem"></span>
-          Guardar certificado
+          {{ isFromAg ? 'Generar Certificado Newmont (Ag)' : 'Guardar certificado' }}
         </button>
-        <span v-if="certificadoGenerado" class="badge-cert-ok">✓ Certificado Sólidos generado</span>
+        <span v-if="certificadoGenerado && !isFromAg" class="badge-cert-ok">✓ Certificado Sólidos generado</span>
       </div>
     </header>
 
@@ -41,7 +41,7 @@
     </div>
 
     <div v-if="certificadoGenerado && !cargando" class="cert-generado-banner">
-      El certificado de sólidos ya fue generado. Los datos son de solo lectura.
+      ✓ Certificado Sólidos generado. Puede agregar Ley de Plata (Au + Ag) a las muestras; esto actualizará el análisis Newmont sin afectar el certificado original.
     </div>
 
     <template v-if="(analisisPendiente || modoNuevo || esCreacionDirecta) && !cargando">
@@ -56,13 +56,12 @@
           </div>
           <div class="field" v-if="modoNuevo || esCreacionDirecta">
             <label class="field-label">DESCRIPCIÓN:</label>
-            <input list="desc-list-sol" v-model="descripcionPDF" class="field-input field-sm" placeholder="Seleccione o ingrese..." />
-            <datalist id="desc-list-sol">
+            <select v-model="descripcionPDF" class="field-select field-input field-sm" :disabled="certificadoGenerado">
               <option value="PROCESO">PROCESO</option>
               <option value="LAB. METALÚRGICO">LAB. METALÚRGICO</option>
               <option value="RECONOCIMIENTO">RECONOCIMIENTO</option>
               <option value="LOTE">LOTE</option>
-            </datalist>
+            </select>
           </div>
           <div class="field">
             <label class="field-label">FECHA ANÁLISIS:</label>
@@ -82,9 +81,10 @@
       <section class="card">
         <div class="card-header-row">
           <h2 class="card-titulo">MUESTRAS SÓLIDAS (Fire Assay)</h2>
-          <button class="btn-add-muestra" @click="agregarMuestra" :disabled="certificadoGenerado">
+          <!-- TO DO: Revisar cómo se comporta el análisis al agregar muestra -->
+          <!-- <button class="btn-add-muestra" @click="agregarMuestra" :disabled="certificadoGenerado">
             + Agregar Muestra
-          </button>
+          </button> -->
         </div>
 
         <div v-if="errMuestras" class="err-msg">{{ errMuestras }}</div>
@@ -98,19 +98,19 @@
             <div class="form-grid">
               <div class="field">
                 <label class="field-label">Peso (g)</label>
-                <input type="number" class="field-input" v-model.number="m.peso_g" step="0.001" placeholder="0.000" :disabled="yaGuardado" @input="recalcMuestra(idx)" />
+                <input type="number" class="field-input" v-model.number="m.peso_g" step="0.001" placeholder="0.000" @input="recalcMuestra(idx)" />
               </div>
               <div class="field">
                 <label class="field-label">Au 1 (mg)</label>
-                <input type="number" class="field-input" v-model.number="m.au1_mg" step="0.0001" placeholder="0.0000" :disabled="yaGuardado" @input="recalcMuestra(idx)" />
+                <input type="number" class="field-input" v-model.number="m.au1_mg" step="0.0001" placeholder="0.0000" @input="recalcMuestra(idx)" />
               </div>
               <div class="field">
                 <label class="field-label">Au 2 (mg)</label>
-                <input type="number" class="field-input" v-model.number="m.au2_mg" step="0.0001" placeholder="0.0000" :disabled="yaGuardado" @input="recalcMuestra(idx)" />
+                <input type="number" class="field-input" v-model.number="m.au2_mg" step="0.0001" placeholder="0.0000" @input="recalcMuestra(idx)" />
               </div>
               <div class="field">
                 <label class="field-label">Au + Ag (mg)</label>
-                <input type="number" class="field-input" v-model.number="m.au_ag_mg" step="0.0001" placeholder="0.0000" :disabled="yaGuardado" @input="recalcMuestra(idx)" />
+                <input type="number" class="field-input" v-model.number="m.au_ag_mg" step="0.0001" placeholder="0.0000" @input="recalcMuestra(idx)" />
               </div>
             </div>
 
@@ -157,19 +157,22 @@ import { useRouter, useRoute } from 'vue-router'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import type { AnalisisRecuperacionOut } from '@/types/laboratorio'
+import { laboratorioApi } from '@/api/laboratorio'
 
 const router = useRouter()
 const route = useRoute()
 const store = useLaboratorioStore()
 const ui = useUiStore()
+const api = laboratorioApi
 
 const cipActual = route.params.cip as string
 const analisisIdParam = route.query.id ? Number(route.query.id) : null
 
 const modoNuevo = cipActual === '_nuevo'
 const esCreacionDirecta = route.query.peso != null || route.query.direct === '1'
+const isFromAg = route.query.fromAg === '1'
 const formCip = ref(modoNuevo ? '' : cipActual)
-const descripcionPDF = ref('PROCESO')
+const descripcionPDF = ref('LOTE')
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const cargando = ref(true)
@@ -296,6 +299,24 @@ onMounted(async () => {
         analisisCompletadoId.value = completado.id
         certificadoGenerado.value = !!completado.certificado_url
         if (!analisisPendiente.value) analisisPendiente.value = completado
+
+        // Cargar muestras del backend para que el usuario pueda verlas/editarlas
+        try {
+          const res = await api.get(`/laboratorio/recuperacion/${completado.id}`)
+          if (res.data && res.data.detalles && res.data.detalles.length) {
+            muestras.value = res.data.detalles.map((d: any) => ({
+              peso_g: d.peso_g,
+              au1_mg: d.au1_mg,
+              au2_mg: d.au2_mg,
+              au_ag_mg: d.au_ag_mg,
+              numero_ensayo: d.numero_ensayo || 1,
+              _calc: null
+            }))
+            muestras.value.forEach((_, i) => recalcMuestra(i))
+          }
+        } catch (e) {
+          console.warn('No se pudieron cargar los detalles del análisis', e)
+        }
       }
     }
   } catch {
@@ -308,7 +329,10 @@ onMounted(async () => {
 // ── Guardar ───────────────────────────────────────────────────────────────────
 async function guardar() {
   errForm.value = ''; errMuestras.value = ''
-  if (!modoNuevo && !esCreacionDirecta && !analisisPendiente.value) { errForm.value = 'Sin análisis pendiente'; return }
+  if (!modoNuevo && !esCreacionDirecta && !analisisPendiente.value && !analisisCompletadoId.value) { 
+    errForm.value = 'Sin análisis pendiente ni completado'
+    return 
+  }
   if ((modoNuevo || esCreacionDirecta) && !formCip.value) { errForm.value = 'Ingrese el código de la muestra'; return }
 
   const invalidas = muestras.value.filter(m => !m.peso_g || m.au1_mg == null || m.au2_mg == null || m.au_ag_mg == null)
@@ -317,7 +341,9 @@ async function guardar() {
 
   guardando.value = true
 
-  if (modoNuevo || esCreacionDirecta) {
+  const esActualizacionDirecta = esCreacionDirecta && yaGuardado.value
+
+  if ((modoNuevo || esCreacionDirecta) && !esActualizacionDirecta) {
     // Registro directo
     const payload = {
       cip: formCip.value,
@@ -328,7 +354,11 @@ async function guardar() {
       solucion_ag_g_m3: null,
       fecha_analisis: fechaAnalisis.value,
       sub_tipo: 'SOLIDOS',
-      ley_cola_ag: resumen.value.leyColaAgGrTm
+      ley_cola_ag: resumen.value.leyColaAgGrTm,
+      muestras: muestras.value.map(m => ({
+        peso_g: m.peso_g, au1_mg: m.au1_mg, au2_mg: m.au2_mg,
+        au_ag_mg: m.au_ag_mg, numero_ensayo: m.numero_ensayo,
+      }))
     }
     const result = await store.registrarRecuperacion(payload)
     if (result && typeof result === 'object' && 'id' in result) {
@@ -340,7 +370,7 @@ async function guardar() {
       ui.toast('Datos guardados.', 'success')
     }
   } else {
-    // Completar PENDIENTE
+    // Completar PENDIENTE o Actualizar COMPLETADO
     const payload = {
       muestras: muestras.value.map(m => ({
         peso_g: m.peso_g, au1_mg: m.au1_mg, au2_mg: m.au2_mg,
@@ -350,14 +380,18 @@ async function guardar() {
       ley_liquido: null,
       solucion_ag_g_m3: null,
       fecha_analisis: fechaAnalisis.value,
+      ley_cola_ag: resumen.value.leyColaAgGrTm,
     }
 
-    const result = await store.completarRecuperacion(analisisPendiente.value!.id, payload)
+    const idACompletar = analisisPendiente.value?.id || analisisCompletadoId.value
+    if (!idACompletar) { ui.toast('No se encontró el ID para actualizar', 'error'); guardando.value = false; return }
+
+    const result = await store.completarRecuperacion(idACompletar, payload)
     if (result) {
       yaGuardado.value = true
       analisisCompletadoId.value = result.id
       certificadoGenerado.value = !!result.certificado_url
-      ui.toast('Datos de sólidos guardados. Puede generar el certificado.', 'success')
+      ui.toast('Datos de sólidos guardados exitosamente.', 'success')
     }
   }
 
@@ -366,7 +400,41 @@ async function guardar() {
 
 // ── Generar Certificado ───────────────────────────────────────────────────────
 async function generarCertificado() {
-  if (!analisisCompletadoId.value) { ui.toast('Guarde primero los datos.', 'warning'); return }
+  if (!yaGuardado.value) { ui.toast('Guarde primero los datos.', 'warning'); return }
+
+  if (isFromAg) {
+    const ok = await ui.showConfirm({
+      title: 'Regenerar Certificado Newmont',
+      message: '¿Generar el certificado Newmont incluyendo la nueva Ley de Plata?',
+      confirmLabel: 'Generar',
+    })
+    if (!ok) return
+
+    generandoCert.value = true
+    try {
+      if (!store.cips.length) await store.cargarCips()
+      const cipObj = store.cips.find(c => c.cip === formCip.value)
+      const analisisLey = cipObj?.analisis_ley.find(a => a.material === 'Au' && a.estado === 'COMPLETADO' && a.vigente)
+      
+      if (analisisLey) {
+        const result = await store.generarCertificadoLeyInterno(analisisLey.id)
+        if (result) {
+          ui.toast('Certificado Newmont actualizado exitosamente.', 'success')
+          setTimeout(() => {
+            window.close() // Close the current tab and return to dashboard
+            router.push('/laboratorio')
+          }, 1000)
+        }
+      } else {
+        ui.toast('No se encontró el análisis de Newmont original para regenerarlo.', 'error')
+      }
+    } finally {
+      generandoCert.value = false
+    }
+    return
+  }
+
+  if (!analisisCompletadoId.value) return
 
   const ok = await ui.showConfirm({
     title: 'Generar Certificado de Sólidos',
@@ -379,10 +447,8 @@ async function generarCertificado() {
   const result = await store.generarCertificadoRecInterno(analisisCompletadoId.value, descripcionPDF.value)
   if (result) {
     certificadoGenerado.value = true
-    ui.toast('Certificado de sólidos generado. Abriendo certificado de Ley de Plata...', 'success')
+    ui.toast('Certificado de sólidos generado.', 'success')
     setTimeout(() => {
-      const url = router.resolve(`/laboratorio/ley/${formCip.value}?material=Ag&find=1&gen=1`)
-      window.open(url.href, '_blank')
       router.push('/laboratorio')
     }, 1500)
   }

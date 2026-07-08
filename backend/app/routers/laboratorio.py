@@ -46,7 +46,7 @@ from app.services.pruebas import calcular_ley_planta
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi import UploadFile as FastAPIFile
 from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 router = APIRouter(prefix="/laboratorio", tags=["Laboratorio"])
 
@@ -196,11 +196,18 @@ async def subir_certificado_ley(
 @router.post("/ley/{analisis_id}/generar-certificado", response_model=AnalisisLeyOut)
 def generar_certificado_ley_interno(
     analisis_id: int,
-    descripcion: str | None = Query(None, description="Descripción para el PDF (e.g. PROCESO)"),
+    descripcion: str | None = Query(None, description="Descripción para el PDF (e.g. LOTE)"),
+    para_dest: str | None = Query("COMERCIAL", description="Destinatario: COMERCIAL o PLANTA"),
     current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
     db: Session = Depends(get_db),
 ):
-    svc.generar_y_guardar_certificado_interno(db, analisis_id, "ley", descripcion_pdf=descripcion)
+    svc.generar_y_guardar_certificado_interno(
+        db,
+        analisis_id,
+        "ley",
+        descripcion_pdf=descripcion,
+        para_dest=para_dest or "COMERCIAL",
+    )
     db.commit()
     return svc._ley_out(db.query(AnalisisLey).get(analisis_id))
 
@@ -252,6 +259,28 @@ def enviar_recuperacion_interna(
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get(
+    "/recuperacion/{analisis_id}",
+    response_model=AnalisisRecuperacionOut,
+    summary="Obtiene un análisis de recuperación por ID, incluyendo detalles (muestras)",
+)
+def obtener_recuperacion(
+    analisis_id: int,
+    current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    a = (
+        db.query(AnalisisRecuperacion)
+        .options(joinedload(AnalisisRecuperacion.detalles))
+        .filter(AnalisisRecuperacion.id == analisis_id)
+        .filter(~AnalisisRecuperacion.eliminado)
+        .first()
+    )
+    if not a:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+    return a
 
 
 @router.patch(

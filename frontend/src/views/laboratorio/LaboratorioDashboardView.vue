@@ -252,6 +252,17 @@
                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarLey(fila.cip)">Registrar</button>
                     <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="generarCertLey(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
+                    <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem;opacity:0.7" @click="generarCertLey(fila)" title="Regenerar certificado (e.g. tras agregar ley Ag)">↺ Regen.</button>
+                    <button
+                      v-if="fila.estado === 'COMPLETADO'"
+                      class="btn-secondary"
+                      style="font-size:0.75rem;padding:0.3rem 0.75rem;color:#60a5fa;border-color:rgba(96,165,250,0.4)"
+                      @click="irARegistrarPlata(fila)"
+                      :disabled="fila.tieneAg"
+                      :title="fila.tieneAg ? 'La Ley de Plata ya ha sido agregada' : 'Agregar ley de plata a este análisis'"
+                    >
+                      + Ag
+                    </button>
                   </td>
                 </tr>
               </template>
@@ -437,6 +448,7 @@ function mapearCIP(c: CIPAnalisisOut) {
     const vigente = c.analisis_ley.find(x => x.vigente)
     const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
     const a = vigente ?? ultimo
+    const tieneAg = c.analisis_ley.some(x => x.material === 'Ag' && x.vigente && x.estado === 'COMPLETADO')
     return [{
       id: a?.id,
       cip: c.cip,
@@ -447,6 +459,7 @@ function mapearCIP(c: CIPAnalisisOut) {
       ozTc:     (a?.ley_final   ?? null) ,
       grTm:    (a?.ley_gr_tm   ?? null) ,
       certificadoUrl: a?.certificado_url ?? null,
+      tieneAg: tieneAg,
     }]
   } else {
     // Solidos o Solucion
@@ -523,7 +536,12 @@ function getRecuperacion(lote: LoteLabOut): string {
 
 function fmt(d?: string | null | Date) {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  // ISO date-only strings ("2026-07-06") are parsed as UTC midnight by JS,
+  // which in Peru (UTC-5) would show as the previous day. Fix: treat as local.
+  const dt = (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    ? new Date(d + 'T00:00:00')
+    : new Date(d)
+  return dt.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function badgeClass(estado: string) {
@@ -554,6 +572,32 @@ function irADetalleLote(ip: string) {
 function irANuevoReconocimiento(subtipo: 'solidos' | 'solucion') {
   if (subtipo === 'solidos') router.push(`/laboratorio/solidos/_nuevo`)
   else router.push(`/laboratorio/solucion/_nuevo`)
+}
+
+function irARegistrarPlata(fila: any) {
+  const cip = fila.cip
+  const query = new URLSearchParams()
+
+  // Buscar si ya existe un análisis SOLIDOS para este CIP
+  const cipObj = store.cips.find(c => c.cip === cip)
+  const solidosExistente = cipObj?.analisis_recuperacion.find(
+    (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
+  )
+
+  if (solidosExistente) {
+    // Navegar al análisis SOLIDOS existente
+    query.set('id', solidosExistente.id.toString())
+    query.set('fromAg', '1')
+    const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+    window.open(url.href, '_blank')
+    return
+  }
+
+  // Crear nuevo análisis SOLIDOS
+  query.set('direct', '1')
+  query.set('fromAg', '1')
+  const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+  window.open(url.href, '_blank')
 }
 
 // ── Generar Certificados Individuales ─────────────────────────────────────────
