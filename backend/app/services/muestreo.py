@@ -93,15 +93,17 @@ def registrar_muestreo(
     return nuevo_muestreo
 
 
-def generar_base_cip(lote_id: int) -> str:
+def generar_base_cip(lote_id: int, salt: int = 0) -> str:
     """
-    Genera un código base de 6 dígitos + 1 letra de control usando LCG.
-    Ej: lote_id=1 -> '058598D'
+    Genera un código base de 7 caracteres para un lote:
+    6 dígitos + 1 letra de control. (Ej: 058598D)
+    Al pasar un 'salt', se altera el resultado para que CIPs del mismo lote
+    tengan bases totalmente diferentes.
     """
     control_chars = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
     # Lógica LCG
-    numero = (lote_id * 9301 + 49297) % 1_000_000
+    numero = (lote_id * 9301 + 49297 + (salt * 1337)) % 1_000_000
     base = f"{numero:06d}"  # Rellena con ceros a la izquierda si es necesario
 
     # Cálculo del dígito de control
@@ -118,14 +120,14 @@ def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 5) -> list
 
     cips_existentes = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).count()
 
-    # 1. Generamos la base única y ofuscada para TODO el lote
-    base_ofuscada = generar_base_cip(lote.id)
-
     nuevos_cips = []
 
-    # 2. Asignamos los sufijos para las bolsas de laboratorio
+    # Asignamos los sufijos para las bolsas de laboratorio
     for i in range(cantidad):
         correlativo = cips_existentes + i + 1
+
+        # Generamos la base única y ofuscada para cada CIP, usando el correlativo como salt
+        base_ofuscada = generar_base_cip(lote.id, salt=correlativo)
 
         # Resultado final: Ej. CIP-058598D-A1
         codigo_final = f"CIP-{base_ofuscada}-A{correlativo}"
