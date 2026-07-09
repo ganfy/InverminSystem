@@ -211,18 +211,20 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         h2o_porc = None
         tms = None
 
-        muestreo = (
-            db.query(Muestreo)
-            .filter(Muestreo.lote_id == lote.id)
-            .order_by(Muestreo.creado_en.desc())
-            .first()
-        )
+        muestreos = db.query(Muestreo).filter(Muestreo.lote_id == lote.id).all()
 
-        if muestreo and muestreo.peso_humedo and muestreo.peso_seco:
-            ph = float(muestreo.peso_humedo)
-            ps = float(muestreo.peso_seco)
-            if ph > 0:
-                h2o_porc = round(((ph - ps) / ph) * 100, 2)
+        if muestreos:
+            total_h2o = 0.0
+            valid_count = 0
+            for m in muestreos:
+                ph = float(m.peso_humedo) if m.peso_humedo else 0.0
+                ps = float(m.peso_seco) if m.peso_seco else 0.0
+                if ph > 0 and ps > 0 and ps < ph:
+                    total_h2o += ((ph - ps) / ph) * 100
+                    valid_count += 1
+
+            if valid_count > 0:
+                h2o_porc = round(total_h2o / valid_count, 2)
                 tms = round(tmh * (1 - (h2o_porc / 100)), 3)
                 kpis.tms_stock += tms
 

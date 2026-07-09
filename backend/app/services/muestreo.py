@@ -11,7 +11,7 @@ from app.models.models import (
 )
 from app.schemas.muestreo import MuestreoCreate
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 
 def calcular_humedad(peso_humedo: Decimal, peso_seco: Decimal) -> Decimal:
@@ -91,6 +91,74 @@ def registrar_muestreo(
     db.refresh(nuevo_muestreo)
 
     return nuevo_muestreo
+
+
+def registrar_muestreo_batch(
+    db: Session, ip_lote: str, usuario_id: int, datos_list: list[MuestreoCreate]
+) -> list[Muestreo]:
+    """Registra múltiples intentos de muestreo en una sola transacción."""
+    lote = (
+        db.query(Lote)
+        .options(joinedload(Lote.pesajes))
+        .filter(Lote.ip == ip_lote, Lote.eliminado == False)  # noqa: E712
+        .first()
+    )
+    if not lote:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Lote con IP {ip_lote} no encontrado."
+        )
+
+    pesaje = lote.pesajes[0] if lote.pesajes else None
+    if not pesaje or not pesaje.peso_neto:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El lote no tiene un peso neto válido en balanza.",
+        )
+
+    nuevos = []
+    intentos_existentes = {m.intento for m in lote.muestreos}
+
+    for datos in datos_list:
+        if datos.intento in intentos_existentes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El intento {datos.intento} ya está registrado para este lote.",
+            )
+        intentos_existentes.add(datos.intento)
+
+        if datos.peso_seco >= datos.peso_humedo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El peso seco debe ser estrictamente menor al peso húmedo.",
+            )
+
+        humedad = calcular_humedad(datos.peso_humedo, datos.peso_seco)
+        if humedad <= 0 or humedad > 50:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Humedad fuera de rango permitido (0-50%). Valor calculado: {humedad:.2f}%",
+            )
+
+        tms = calcular_tms(pesaje.peso_neto, humedad)
+
+        nuevo_muestreo = Muestreo(
+            lote_id=lote.id,
+            intento=datos.intento,
+            peso_humedo=datos.peso_humedo,
+            peso_seco=datos.peso_seco,
+            tms_calculado=tms,
+            observaciones=datos.observaciones,
+            creado_en=datos.fecha_muestreo or datetime.now(),
+            creado_por=usuario_id,
+        )
+        db.add(nuevo_muestreo)
+        nuevos.append(nuevo_muestreo)
+
+    db.commit()
+    for n in nuevos:
+        db.refresh(n)
+
+    return nuevos
 
 
 def generar_base_cip(lote_id: int, salt: int = 0) -> str:

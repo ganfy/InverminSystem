@@ -104,13 +104,38 @@ def _calc_fino_recuperable(tms: Decimal, rec_liq: Decimal, oz_promedio: Decimal)
 # ── Helpers de datos ───────────────────────────────────────────────────────────
 
 
-def _ultimo_muestreo(db: Session, lote_id: int) -> Muestreo | None:
-    return (
-        db.query(Muestreo)
-        .filter(Muestreo.lote_id == lote_id)
-        .order_by(Muestreo.intento.desc())
-        .first()
-    )
+def _datos_muestreo_promedio(db: Session, lote_id: int) -> tuple[Decimal, Decimal] | None:
+    """
+    Retorna (humedad_promedio, tms_promedio) calculados en base a todos los ensayos válidos.
+    Se requiere el peso_neto (TMH) de la balanza para calcular el TMS.
+    """
+    muestreos = db.query(Muestreo).filter(Muestreo.lote_id == lote_id).all()
+    if not muestreos:
+        return None
+
+    pesaje = db.query(Pesaje).filter(Pesaje.lote_id == lote_id).first()
+    if not pesaje or not pesaje.peso_neto:
+        return None
+
+    total_h2o = 0.0
+    valid_count = 0
+    for m in muestreos:
+        ph = float(m.peso_humedo) if m.peso_humedo else 0.0
+        ps = float(m.peso_seco) if m.peso_seco else 0.0
+        if ph > 0 and ps > 0 and ps < ph:
+            total_h2o += ((ph - ps) / ph) * 100
+            valid_count += 1
+
+    if valid_count > 0:
+        h2o_porc = round(total_h2o / valid_count, 2)
+        humedad_dec = Decimal(str(h2o_porc))
+
+        tmh = float(pesaje.peso_neto)
+        tms_val = round(tmh * (1 - (h2o_porc / 100)), 3)
+        tms_dec = Decimal(str(tms_val))
+        return (humedad_dec, tms_dec)
+
+    return None
 
 
 def _pesaje_principal(db: Session, lote_id: int) -> Pesaje | None:
@@ -271,21 +296,20 @@ def _calcular_lote(
     params: ParametrosComerciales | None = lote.sesion.provacop.parametros
 
     # ── TMS / TMH ─────────────────────────────────────────────────────────────
-    muestreo = _ultimo_muestreo(db, lote.id)
+    datos_muestreo = _datos_muestreo_promedio(db, lote.id)
     pesaje = _pesaje_principal(db, lote.id)
 
-    if not muestreo or not muestreo.tms_calculado:
+    if not datos_muestreo:
         alertas.append(
             AlertaLote(
-                tipo="SIN_MUESTREO", mensaje=f"{lote.ip}: sin muestreo registrado", critico=True
+                tipo="SIN_MUESTREO",
+                mensaje=f"{lote.ip}: sin muestreo registrado o datos incompletos",
+                critico=True,
             )
         )
         return {}, alertas
 
-    tms = Decimal(str(muestreo.tms_calculado))
-    humedad = (
-        Decimal(str(muestreo.porcentaje_humedad)) if muestreo.porcentaje_humedad else Decimal("0")
-    )
+    humedad, tms = datos_muestreo
     tmh = (
         (tms / (1 - humedad / 100)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
         if humedad < 100
@@ -978,7 +1002,7 @@ def lotes_disponibles_para_liquidar(
 
         fecha_rec = _fecha_recepcion(lote)
         dias = (date.today() - fecha_rec).days if fecha_rec else 0
-        muestreo = _ultimo_muestreo(db, lote.id)
+        datos_muestreo = _datos_muestreo_promedio(db, lote.id)
         pesaje = _pesaje_principal(db, lote.id)
 
         # ── Ley y recuperación ──────────────────────────────────────
@@ -1031,7 +1055,7 @@ def lotes_disponibles_para_liquidar(
         # rec_liq = _determinar_rec_liq(ley_comercial, params, db, lote.id)
         rec = _rec_planta(db, lote.id)
         porcentaje_rec = float(rec) if rec else None
-        listo = all(x is not None for x in [ley_comercial, porcentaje_rec, muestreo])
+        listo = all(x is not None for x in [ley_comercial, porcentaje_rec, datos_muestreo])
 
         resultado.append(
             {
@@ -1039,9 +1063,7 @@ def lotes_disponibles_para_liquidar(
                 "tipo_material": lote.tipo_material,
                 "fecha_recepcion": fecha_rec,
                 "dias_almacen": dias,
-                "tms": float(muestreo.tms_calculado)
-                if muestreo and muestreo.tms_calculado
-                else None,
+                "tms": float(datos_muestreo[1]) if datos_muestreo else None,
                 "tmh": float(pesaje.peso_neto) if pesaje and pesaje.peso_neto else None,
                 "sacos": pesaje.sacos if pesaje else None,
                 "volado": lote.volado,

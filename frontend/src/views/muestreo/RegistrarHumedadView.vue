@@ -18,7 +18,7 @@
 
       <div class="form-card">
         <div class="input-group">
-          <label>PESO HÚMEDO (g)</label>
+          <label>PESO HÚMEDO (g) - GLOBAL</label>
           <div class="input-wrapper">
             <input
               v-model="pesoHumedo"
@@ -30,11 +30,11 @@
           </div>
         </div>
 
-        <div class="input-group">
-          <label>PESO SECO (g)</label>
+        <div v-for="(peso, index) in pesosSecos" :key="index" class="input-group">
+          <label>PESO SECO ENSAYO {{ intentoActual + index }} (g)</label>
           <div class="input-wrapper">
             <input
-              v-model="pesoSeco"
+              v-model="pesosSecos[index]"
               type="number"
               inputmode="decimal"
               placeholder="0"
@@ -43,7 +43,15 @@
           </div>
         </div>
 
-        <div class="input-group">
+        <button 
+          v-if="intentoActual + pesosSecos.length <= maxIntentos" 
+          class="btn-secondary btn-sm add-btn" 
+          @click="addEnsayo"
+        >
+          + Añadir Ensayo
+        </button>
+
+        <div class="input-group" style="margin-top: 1rem;">
           <label>OBSERVACIONES (Opcional)</label>
           <div class="input-wrapper">
             <textarea
@@ -56,22 +64,62 @@
         </div>
 
         <div class="result-box">
-          <label>% HUMEDAD</label>
+          <label>% HUMEDAD PROMEDIO</label>
           <div class="result-value">
-            {{ porcentajeHumedad > 0 ? porcentajeHumedad.toFixed(2) : '0.00' }}%
+            {{ porcentajeHumedadPromedio > 0 ? porcentajeHumedadPromedio.toFixed(2) : '0.00' }}%
           </div>
-          <div class="intentos-badge">{{ intentoActual }}/{{ maxIntentos }} intentos</div>
+          <div class="intentos-badge">Ingresando {{ pesosSecos.length }} ensayos (Máx {{ maxIntentos }})</div>
         </div>
       </div>
 
       <div class="actions-footer">
-        <button class="btn-primary ready btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="() => guardar(false)">
-          {{ store.guardando ? 'Guardando...' : 'Guardar y Salir' }}
+        <button class="btn-primary ready btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="confirmarGuardado">
+          Guardar Ensayos
         </button>
+      </div>
 
-        <button v-if="intentoActual < maxIntentos" class="btn-secondary btn-tablet-xl" :disabled="!puedeGuardar || store.guardando" @click="() => guardar(true)">
-          Guardar y Añadir Ensayo
-        </button>
+      <!-- Modal de Confirmación -->
+      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+        <div class="modal">
+          <div class="modal-header">
+            <h2>Confirmar Ensayos</h2>
+            <button class="btn-cerrar" @click="showModal = false">×</button>
+          </div>
+          <div class="modal-body">
+            <p style="color:var(--color-text-muted); margin-bottom: 1rem;">
+              Se guardarán los siguientes ensayos para el lote <strong>{{ ipLote }}</strong>:
+            </p>
+            
+            <table class="modal-table">
+              <thead>
+                <tr>
+                  <th>Ensayo</th>
+                  <th>P. Húmedo</th>
+                  <th>P. Seco</th>
+                  <th>Humedad</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(seco, idx) in ensayosValidos" :key="idx">
+                  <td>{{ intentoActual + idx }}</td>
+                  <td>{{ pesoHumedo }}g</td>
+                  <td>{{ seco }}g</td>
+                  <td>{{ store.calcularHumedad(pesoHumedo!, seco).toFixed(2) }}%</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="modal-promedio">
+              <strong>Promedio Total:</strong> <span class="gold">{{ porcentajeHumedadPromedio.toFixed(2) }}%</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" @click="showModal = false">Cancelar</button>
+            <button class="btn-primary" @click="guardarBatch" :disabled="store.guardando">
+              {{ store.guardando ? 'Guardando...' : 'Confirmar Guardado' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 </template>
@@ -90,22 +138,27 @@ const ui = useUiStore()
 const ipLote = route.params.ip as string
 
 const pesoHumedo = ref<number | null>(200)
-const pesoSeco = ref<number | null>(null)
+const pesosSecos = ref<(number | null)[]>([null])
 const observaciones = ref<string>('')
 const intentoActual = ref(1)
 const maxIntentos = 3
+const showModal = ref(false)
 
-const porcentajeHumedad = computed(() => {
-  if (!pesoHumedo.value || !pesoSeco.value) return 0
-  return store.calcularHumedad(pesoHumedo.value, pesoSeco.value)
+const ensayosValidos = computed(() => {
+  return pesosSecos.value.filter(s => s !== null && s > 0 && pesoHumedo.value !== null && s < pesoHumedo.value) as number[]
+})
+
+const porcentajeHumedadPromedio = computed(() => {
+  if (ensayosValidos.value.length === 0 || !pesoHumedo.value) return 0
+  let totalHumedad = 0
+  ensayosValidos.value.forEach(seco => {
+    totalHumedad += store.calcularHumedad(pesoHumedo.value!, seco)
+  })
+  return totalHumedad / ensayosValidos.value.length
 })
 
 const puedeGuardar = computed(() => {
-  return (
-    pesoHumedo.value !== null &&
-    pesoSeco.value !== null &&
-    pesoSeco.value < pesoHumedo.value
-  )
+  return ensayosValidos.value.length > 0 && ensayosValidos.value.length === pesosSecos.value.length
 })
 
 onMounted(async () => {
@@ -118,29 +171,34 @@ onMounted(async () => {
   }
 })
 
-const guardar = async (esRemuestreo = false) => {
-  if (!puedeGuardar.value) return
+const addEnsayo = (e?: Event) => {
+  if (e) e.preventDefault();
+  if (intentoActual.value + pesosSecos.value.length <= maxIntentos) {
+    pesosSecos.value.push(null)
+  }
+}
 
-  const exito = await store.registrarHumedad(ipLote, {
-    intento: intentoActual.value,
+const confirmarGuardado = () => {
+  if (!puedeGuardar.value) return
+  showModal.value = true
+}
+
+const guardarBatch = async () => {
+  if (!puedeGuardar.value || !pesoHumedo.value) return
+
+  const datosList = ensayosValidos.value.map((seco, index) => ({
+    intento: intentoActual.value + index,
     peso_humedo: pesoHumedo.value!,
-    peso_seco: pesoSeco.value!,
+    peso_seco: seco,
     observaciones: observaciones.value.trim() || null,
-  })
+  }))
+
+  const exito = await store.registrarHumedadBatch(ipLote, datosList)
 
   if (exito) {
-    if (esRemuestreo && intentoActual.value < maxIntentos) {
-      // Flujo: REMUESTREAR
-      pesoHumedo.value = 200
-      pesoSeco.value = null
-      observaciones.value = ''
-      intentoActual.value = await store.calcularProximoIntento(ipLote)
-      ui.toast(`Intento guardado. Proceda con el intento ${intentoActual.value}/${maxIntentos}`, 'success')
-    } else {
-      // Flujo: GUARDAR (o si ya llegó al límite de 3/3)
-      ui.toast('Muestreo guardado con éxito.', 'success')
-      router.push({ name: 'Muestreo' })
-    }
+    showModal.value = false
+    ui.toast('Ensayos guardados con éxito.', 'success')
+    router.push({ name: 'Muestreo' })
   }
 }
 
@@ -326,5 +384,55 @@ const volver = () => {
   outline: none;
   border-color: var(--color-gold);
   box-shadow: 0 0 0 2px var(--color-gold-bg);
+}
+
+.add-btn {
+  align-self: flex-start;
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.add-btn:hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+  background: var(--color-bg-card);
+}
+
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--spacing-md) 0;
+  font-family: var(--font-mono);
+}
+
+.modal-table th, .modal-table td {
+  border: 1px solid var(--color-border);
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.modal-table th {
+  background: var(--color-bg-card);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+}
+
+.modal-table td {
+  font-size: var(--text-md);
+}
+
+.modal-promedio {
+  font-size: var(--text-xl);
+  text-align: right;
+  margin-top: var(--spacing-md);
+  padding-right: var(--spacing-sm);
 }
 </style>
