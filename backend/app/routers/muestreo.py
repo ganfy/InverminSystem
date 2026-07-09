@@ -39,6 +39,21 @@ def registrar_muestreo(
     )
 
 
+@router.post(
+    "/lotes/{ip_lote}/batch", response_model=list[MuestreoOut], status_code=status.HTTP_201_CREATED
+)
+def registrar_muestreo_batch(
+    ip_lote: str,
+    datos_list: list[MuestreoCreate],
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Registra múltiples intentos de determinación de humedad para un lote simultáneamente."""
+    return sample_service.registrar_muestreo_batch(
+        db=db, ip_lote=ip_lote, usuario_id=current_user.id, datos_list=datos_list
+    )
+
+
 # ==========================================
 # 2. SINCRONIZACIÓN BATCH (OFFLINE A ONLINE)
 # ==========================================

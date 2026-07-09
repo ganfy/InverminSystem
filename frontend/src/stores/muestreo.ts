@@ -123,6 +123,92 @@ export const useMuestreoStore = defineStore('muestreo', () => {
     }
 
     /**
+     * Registra múltiples ensayos de humedad simultáneamente
+     */
+    async function registrarHumedadBatch(ipLote: string, datosList: MuestreoCreate[]): Promise<boolean> {
+        // Validación de reglas de negocio para todos
+        for (const datos of datosList) {
+            const humedad = calcularHumedad(datos.peso_humedo, datos.peso_seco)
+            if (!validarHumedad(humedad)) {
+                ui.toast(`Humedad fuera de rango (${humedad}%) en el intento ${datos.intento}.`, 'error')
+                return false
+            }
+        }
+
+        guardando.value = true
+        try {
+            const fechaAhora = new Date().toISOString()
+
+            if (sync.online.value) {
+                // ONLINE: Mandar directo al backend
+                await muestreoApi.registrarMuestreoBatch(ipLote, datosList)
+                ui.toast(`Se guardaron ${datosList.length} intentos en el servidor`, 'success')
+            } else {
+                // OFFLINE: Guardar en IndexedDB
+                for (const datos of datosList) {
+                    const offlineId = `muestreo-off-${generateUUID()}`
+                    await encolarMuestreoOffline({
+                        offline_id: offlineId,
+                        ip: ipLote,
+                        datos: {
+                            ...datos,
+                            fecha_muestreo: fechaAhora,
+                            observaciones: datos.observaciones ?? null
+                        },
+                        synced: false,
+                        sync_error: null
+                    })
+                }
+                ui.toast(`Sin red: ${datosList.length} intentos guardados en la tablet`, 'warning')
+            }
+
+            // 1. Buscar el lote en memoria
+            const idxPendiente = lotesPendientes.value.findIndex(l => l.ip === ipLote)
+            let loteActualizado: LoteMuestreo | null = null
+            
+            const maxIntento = Math.max(...datosList.map(d => d.intento))
+
+            if (idxPendiente !== -1) {
+                // Estaba pendiente, lo movemos a completados
+                const lote = lotesPendientes.value[idxPendiente]
+                if (lote) {
+                    loteActualizado = lote
+                    loteActualizado.estado_muestreo = 'COMPLETADO'
+                    loteActualizado.fecha_muestreo = fechaAhora
+                    loteActualizado.cantidad_intentos_previos = maxIntento
+                    lotesPendientes.value.splice(idxPendiente, 1)
+                    lotesCompletados.value.unshift(loteActualizado)
+                }
+            } else {
+                // Ya estaba en completados (remuestreo)
+                const idxCompletado = lotesCompletados.value.findIndex(l => l.ip === ipLote)
+                if (idxCompletado !== -1) {
+                    const lote = lotesCompletados.value[idxCompletado]
+                    if (lote) {
+                        loteActualizado = lote
+                        loteActualizado.fecha_muestreo = fechaAhora
+                        loteActualizado.cantidad_intentos_previos = maxIntento
+                    }
+                }
+            }
+
+            // 2. Persistir este nuevo estado en IndexedDB
+            if (loteActualizado) {
+                const lotesLimpios = JSON.parse(JSON.stringify([...lotesPendientes.value, ...lotesCompletados.value]))
+                await guardarLotesMuestreoCache(lotesLimpios)
+            }
+
+            return true
+
+        } catch (e: any) {
+            ui.toast(e?.response?.data?.detail ?? 'Error al registrar múltiples humedades', 'error')
+            return false
+        } finally {
+            guardando.value = false
+        }
+    }
+
+    /**
      * Genera los códigos de barras CIP para el laboratorio.
      * Por seguridad, esto SOLO se puede hacer con conexión a internet.
      */
@@ -204,6 +290,7 @@ export const useMuestreoStore = defineStore('muestreo', () => {
         // Métodos
         calcularHumedad,
         registrarHumedad,
+        registrarHumedadBatch,
         generarCodigosCip,
         calcularProximoIntento,
         cargarLotes,

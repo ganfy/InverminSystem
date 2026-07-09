@@ -74,6 +74,14 @@ export const muestreoApi = {
     },
 
     /**
+     * Registra múltiples muestreos en lote estando online.
+     */
+    async registrarMuestreoBatch(ipLote: string, datosList: MuestreoCreate[]): Promise<MuestreoOut[]> {
+        const response = await api.post<MuestreoOut[]>(`/muestreo/lotes/${ipLote}/batch`, datosList)
+        return response.data
+    },
+
+    /**
      * Sincroniza un bloque de muestreos guardados offline.
      */
     async syncBatch(muestreos: MuestreoOfflineItem[]): Promise<SyncMuestreosResponse> {
