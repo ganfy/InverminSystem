@@ -62,6 +62,7 @@ class LotePruebaList(BaseModel):
     gasto_agno3: float | None = None
     estado: str  # PENDIENTE | EN PROCESO | COMPLETADO
     cip_asignado: str | None = None  # primer CIP de recuperación (si fue etiquetado)
+    cips_asignados: list[str] = []
     etiquetado: bool = False
     # Adiciones acumuladas (columnas extra en tabla)
     adicion_nacn: float | None = None
@@ -71,6 +72,7 @@ class LotePruebaList(BaseModel):
     motivo_descarte: str | None = None
     # Sub-tipos ya enviados al laboratorio (tienen análisis PENDIENTE o COMPLETADO vigente)
     sub_tipos_enviados: list[str] = []
+    sub_tipos_enviados_por_cip: dict[str, list[str]] = {}
 
     @field_validator("fecha_recepcion", "fecha_ingreso", "fecha_salida", mode="before")
     @classmethod

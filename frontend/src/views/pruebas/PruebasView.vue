@@ -155,9 +155,11 @@
             </td>
             <!-- CIP de recuperación -->
             <td>
-              <span v-if="prueba.cip_asignado" class="td-mono" style="color:var(--color-gold);font-size:0.8rem">
-                {{ prueba.cip_asignado }}
-              </span>
+              <div v-if="prueba.cips_asignados?.length">
+                <div v-for="cip in prueba.cips_asignados" :key="cip" class="td-mono" style="color:var(--color-gold);font-size:0.8rem">
+                  {{ cip }}
+                </div>
+              </div>
               <span v-else class="badge-estado pendiente" style="font-size:0.65rem">Sin CIP</span>
             </td>
             <td>
@@ -278,20 +280,22 @@
     <div v-if="etiquetaModal" class="modal-overlay" @click.self="etiquetaModal = null">
       <div class="modal modal-md">
         <div class="modal-header">
-          <h2>Etiqueta CIP Recuperación</h2>
+          <h2>Etiquetas CIP Recuperación</h2>
           <button class="btn-cerrar" @click="etiquetaModal = null">×</button>
         </div>
-        <div class="modal-body" style="text-align:center">
+        <div class="modal-body" style="text-align:center; max-height: 60vh; overflow-y: auto;">
           <p class="field-label" style="margin-bottom:0.5rem">LOTE: {{ etiquetaModal.ip }}</p>
-          <div class="etiqueta-cip">
-            <span class="etiqueta-title">INVERMIN PAITITI S.A.C. - RECUPERACIÓN</span>
-            <svg id="barcode-prueba" class="barcode-container"></svg>
-            <span class="etiqueta-codigo">{{ etiquetaModal.cip }}</span>
+          <div style="display:flex; flex-direction:column; gap:1.5rem; align-items:center;">
+            <div v-for="(cip, i) in etiquetaModal.cips" :key="cip" class="etiqueta-cip" style="width: fit-content;">
+              <span class="etiqueta-title">INVERMIN PAITITI S.A.C. - RECUPERACIÓN</span>
+              <svg :id="'barcode-prueba-' + i" class="barcode-container"></svg>
+              <span class="etiqueta-codigo">{{ cip }}</span>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary" @click="etiquetaModal = null">Cerrar</button>
-          <button class="btn-primary" @click="imprimirEtiqueta(etiquetaModal)">Imprimir</button>
+          <button class="btn-primary" @click="imprimirEtiqueta(etiquetaModal)">Imprimir Todas</button>
         </div>
       </div>
     </div>
@@ -404,9 +408,16 @@
           <button class="btn-cerrar" @click="modalEnviarLab = null">×</button>
         </div>
         <div class="modal-body">
-          <div style="background:rgba(184,151,75,0.06);border:1px solid rgba(184,151,75,0.2);border-radius:6px;padding:0.55rem 0.85rem;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:0.5rem 1.25rem;font-size:0.82rem">
+          <div style="background:rgba(184,151,75,0.06);border:1px solid rgba(184,151,75,0.2);border-radius:6px;padding:0.55rem 0.85rem;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:0.5rem 1.25rem;font-size:0.82rem; align-items:center;">
             <span style="color:var(--color-text-muted)">Lote IP: <strong style="font-family:var(--font-mono);color:var(--color-gold)">{{ modalEnviarLab.ip }}</strong></span>
-            <span style="color:var(--color-text-muted)">CIP Recuperación: <strong style="font-family:var(--font-mono);color:var(--color-gold)">{{ modalEnviarLab.cip_asignado }}</strong></span>
+            
+            <span style="color:var(--color-text-muted); display:flex; align-items:center; gap:0.5rem;">
+              CIP Recuperación: 
+              <select v-if="modalEnviarLab.cips_asignados?.length > 1" v-model="envioCip" class="input-moderno" style="font-family:var(--font-mono);color:var(--color-gold); padding:0.1rem 0.5rem; height:auto; min-width:140px; font-size:0.8rem;">
+                <option v-for="cip in modalEnviarLab.cips_asignados" :key="cip" :value="cip">{{ cip }}</option>
+              </select>
+              <strong v-else style="font-family:var(--font-mono);color:var(--color-gold)">{{ modalEnviarLab.cips_asignados?.[0] || '---' }}</strong>
+            </span>
           </div>
           <p style="font-size:0.84rem;color:var(--color-text-muted);margin-bottom:1rem">
             Seleccione qué análisis debe realizar el laboratorio Paititi sobre el CIP asignado.
@@ -416,22 +427,22 @@
 
             <!-- Info de lo ya enviado -->
             <div
-              v-if="modalEnviarLab.sub_tipos_enviados.length"
+              v-if="yaEnviadosCipActual.length"
               style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.25);border-radius:6px;padding:0.55rem 0.8rem;font-size:0.78rem;color:#a5b4fc"
             >
               Ya en laboratorio:
-              <strong>{{ modalEnviarLab.sub_tipos_enviados.join(' + ') }}</strong>
+              <strong>{{ yaEnviadosCipActual.join(' + ') }}</strong>
             </div>
 
             <!-- Opción: Ambos (solo disponible si ninguno fue enviado) -->
             <label
               class="lab-opcion"
-              :class="{ activo: envioModo === 'ambos', deshabilitado: modalEnviarLab.sub_tipos_enviados.length > 0 }"
+              :class="{ activo: envioModo === 'ambos', deshabilitado: yaEnviadosCipActual.length > 0 }"
             >
               <input
                 type="radio" name="subtipo" value="ambos" v-model="envioModo"
                 style="margin-right:0.5rem"
-                :disabled="modalEnviarLab.sub_tipos_enviados.length > 0"
+                :disabled="yaEnviadosCipActual.length > 0"
               />
               <div>
                 <div style="font-weight:700;font-size:0.85rem">Sólidos + Solución (completo)</div>
@@ -442,12 +453,12 @@
             <!-- Opción: Solo Sólidos -->
             <label
               class="lab-opcion"
-              :class="{ activo: envioModo === 'solidos', deshabilitado: modalEnviarLab.sub_tipos_enviados.includes('SOLIDOS') }"
+              :class="{ activo: envioModo === 'solidos', deshabilitado: yaEnviadosCipActual.includes('SOLIDOS') }"
             >
               <input
                 type="radio" name="subtipo" value="solidos" v-model="envioModo"
                 style="margin-right:0.5rem"
-                :disabled="modalEnviarLab.sub_tipos_enviados.includes('SOLIDOS')"
+                :disabled="yaEnviadosCipActual.includes('SOLIDOS')"
               />
               <div style="display:flex;align-items:center;gap:0.5rem">
                 <div>
@@ -464,12 +475,12 @@
             <!-- Opción: Solo Solución -->
             <label
               class="lab-opcion"
-              :class="{ activo: envioModo === 'solucion', deshabilitado: modalEnviarLab.sub_tipos_enviados.includes('SOLUCION') }"
+              :class="{ activo: envioModo === 'solucion', deshabilitado: yaEnviadosCipActual.includes('SOLUCION') }"
             >
               <input
                 type="radio" name="subtipo" value="solucion" v-model="envioModo"
                 style="margin-right:0.5rem"
-                :disabled="modalEnviarLab.sub_tipos_enviados.includes('SOLUCION')"
+                :disabled="yaEnviadosCipActual.includes('SOLUCION')"
               />
               <div style="display:flex;align-items:center;gap:0.5rem">
                 <div>
@@ -520,7 +531,7 @@ const pruebas       = ref<LotePruebaList[]>([])
 const pruebasOffline = ref<PruebaQueueData[]>([])
 const cargando      = ref(false)
 const etiquetando   = ref<string | null>(null)   // IP en proceso de etiquetado
-const etiquetaModal = ref<{ ip: string; cip: string } | null>(null)
+const etiquetaModal = ref<{ ip: string; cips: string[] } | null>(null)
 
 const ipsSeleccionados = ref<string[]>([])
 const filtroEstado   = ref('Todos')
@@ -536,6 +547,12 @@ const descartando     = ref(false)
 const modalEnviarLab = ref<LotePruebaList | null>(null)
 const enviandoLab    = ref<string | null>(null)
 const envioModo      = ref<'ambos' | 'solidos' | 'solucion'>('ambos')
+const envioCip       = ref<string>('')
+
+const yaEnviadosCipActual = computed(() => {
+  if (!modalEnviarLab.value || !envioCip.value) return []
+  return modalEnviarLab.value.sub_tipos_enviados_por_cip?.[envioCip.value] || []
+})
 
 // Sub-tipos seleccionados por el usuario en el modo actual
 const envioSubTipos = computed(() => {
@@ -546,8 +563,22 @@ const envioSubTipos = computed(() => {
 
 // Sub-tipos efectivos a enviar = seleccionados menos los ya enviados
 const envioSubTiposEfectivos = computed(() => {
-  const yaEnviados = modalEnviarLab.value?.sub_tipos_enviados ?? []
+  const yaEnviados = yaEnviadosCipActual.value
   return envioSubTipos.value.filter(t => !yaEnviados.includes(t))
+})
+
+watch([modalEnviarLab, envioCip], () => {
+  if (!modalEnviarLab.value || !envioCip.value) return
+  const yaEnviados = yaEnviadosCipActual.value
+  if (!yaEnviados.includes('SOLIDOS') && !yaEnviados.includes('SOLUCION')) {
+    envioModo.value = 'ambos'
+  } else if (!yaEnviados.includes('SOLIDOS')) {
+    envioModo.value = 'solidos'
+  } else if (!yaEnviados.includes('SOLUCION')) {
+    envioModo.value = 'solucion'
+  } else {
+    envioModo.value = 'ambos'
+  }
 })
 
 // ── Adición modal ─────────────────────────────────────────────────────────────
@@ -583,14 +614,16 @@ watch(etiquetaModal, async (val) => {
   if (!val) return
   await nextTick()
   try {
-    JsBarcode(`#barcode-prueba`, val.cip, {
-      format: 'CODE128',
-      displayValue: false,
-      width: 2,
-      height: 45,
-      margin: 0,
-      background: 'transparent',
-      lineColor: '#000000',
+    val.cips.forEach((cip, i) => {
+      JsBarcode(`#barcode-prueba-${i}`, cip, {
+        format: 'CODE128',
+        displayValue: false,
+        width: 2,
+        height: 45,
+        margin: 0,
+        background: 'transparent',
+        lineColor: '#000000',
+      })
     })
   } catch (e) {
     console.error('Error dibujando barcode prueba:', e)
@@ -778,11 +811,15 @@ async function etiquetar(ip: string) {
   try {
     const resultado = await pruebasApi.etiquetar(ip)
     ui.toast(`CIP ${resultado.cip} generado para ${ip}`, 'success')
-    // Actualizar la lista localmente
+    // Refrescar los datos para obtener todos los cips_asignados
+    await cargarDatos()
+    // Mostrar modal de etiqueta con los CIPs de la prueba
     const p = pruebas.value.find(x => x.ip === ip)
-    if (p) { p.cip_asignado = resultado.cip; p.etiquetado = true }
-    // Mostrar modal de etiqueta
-    etiquetaModal.value = { ip, cip: resultado.cip }
+    if (p && p.cips_asignados?.length) {
+      etiquetaModal.value = { ip, cips: p.cips_asignados }
+    } else {
+      etiquetaModal.value = { ip, cips: [resultado.cip] }
+    }
   } catch (e: any) {
     ui.toast(e?.response?.data?.detail ?? 'Error al etiquetar', 'error')
   } finally {
@@ -791,39 +828,31 @@ async function etiquetar(ip: string) {
 }
 
 function verEtiqueta(prueba: LotePruebaList) {
-  if (prueba.cip_asignado) {
-    etiquetaModal.value = { ip: prueba.ip, cip: prueba.cip_asignado }
+  if (prueba.cips_asignados?.length) {
+    etiquetaModal.value = { ip: prueba.ip, cips: prueba.cips_asignados }
+  } else if (prueba.cip_asignado) {
+    etiquetaModal.value = { ip: prueba.ip, cips: [prueba.cip_asignado] }
   }
 }
 
 // ── Enviar a Laboratorio ──────────────────────────────────────────────────────
 function abrirModalEnviarLab(prueba: LotePruebaList) {
   modalEnviarLab.value = prueba
-  const yaEnviados = prueba.sub_tipos_enviados
-  // Pre-seleccionar el modo con lo que falta
-  if (!yaEnviados.includes('SOLIDOS') && !yaEnviados.includes('SOLUCION')) {
-    envioModo.value = 'ambos'     // nada enviado → ofrecer ambos
-  } else if (!yaEnviados.includes('SOLIDOS')) {
-    envioModo.value = 'solidos'   // falta sólidos
-  } else if (!yaEnviados.includes('SOLUCION')) {
-    envioModo.value = 'solucion'  // falta solución
-  } else {
-    envioModo.value = 'ambos'     // ambos enviados (no debería abrir)
-  }
+  envioCip.value = prueba.cips_asignados?.[0] ?? ''
 }
 
 async function confirmarEnviarLab() {
-  if (!modalEnviarLab.value) return
+  if (!modalEnviarLab.value || !envioCip.value) return
   const ip = modalEnviarLab.value.ip
   const subTiposAEnviar = envioSubTiposEfectivos.value
   if (!subTiposAEnviar.length) {
-    ui.toast('Todos los análisis ya fueron enviados al laboratorio', 'info')
+    ui.toast('Todos los análisis ya fueron enviados al laboratorio para este CIP', 'info')
     modalEnviarLab.value = null
     return
   }
   enviandoLab.value = ip
   try {
-    await pruebasApi.enviarALaboratorio(ip, subTiposAEnviar, modalEnviarLab.value.cip_asignado)
+    await pruebasApi.enviarALaboratorio(ip, subTiposAEnviar, envioCip.value)
     const labels = subTiposAEnviar.join(' + ')
     ui.toast(`✓ Enviado a laboratorio: ${labels} para ${ip}`, 'success')
     modalEnviarLab.value = null
@@ -880,25 +909,35 @@ async function confirmarAdicion() {
   }
 }
 
-function imprimirEtiqueta(e: { ip: string; cip: string }) {
-  const svgEl = document.querySelector<SVGElement>('#barcode-prueba')
-  const svgHtml = svgEl ? svgEl.outerHTML : ''
-
+function imprimirEtiqueta(e: { ip: string; cips: string[] }) {
   const css = `
-    body { font-family: monospace; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; }
-    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:220px; }
+    body { font-family: monospace; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:100vh; margin:0; padding:20px; box-sizing:border-box;}
+    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:220px; page-break-after: always; margin: 10px auto; display: block;}
+    .et:last-child { page-break-after: auto; }
     .et-title { font-size:0.65rem; font-weight:900; letter-spacing:.1em; display:block; margin-bottom:4px; }
     .et-sub { font-size:0.55rem; border-bottom:1px solid #000; padding-bottom:4px; display:block; width:100%; text-align:center; margin-bottom:8px; }
     svg { width:100%; height:45px; margin:6px 0; }
     .et-code { font-size:1.6rem; font-weight:900; margin-top:8px; display:block; letter-spacing:0.05em; }
+    @media print {
+      body { display: block; justify-content: unset; align-items: unset; min-height: unset; padding:0;}
+      .et { margin: 0; border: none; padding: 0; border-radius:0; }
+    }
   `
-  const html = `<!DOCTYPE html><html><head><style>${css}</style></head><body>
+
+  const htmlEtiquetas = e.cips.map((cip, i) => {
+    const svgEl = document.querySelector<SVGElement>(`#barcode-prueba-${i}`)
+    const svgHtml = svgEl ? svgEl.outerHTML : ''
+    return `
     <div class="et">
       <span class="et-title">INVERMIN PAITITI S.A.C.</span>
       <span class="et-sub">RECUPERACIÓN</span>
       ${svgHtml}
-      <span class="et-code">${e.cip}</span>
-    </div>
+      <span class="et-code">${cip}</span>
+    </div>`
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><style>${css}</style></head><body>
+    ${htmlEtiquetas}
     <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))<\/script>
   </body></html>`
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })

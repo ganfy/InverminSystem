@@ -28,6 +28,7 @@ export interface LotePruebaList {
     estado: 'PENDIENTE' | 'EN PROCESO' | 'COMPLETADO'
     // Etiquetado (nuevo)
     cip_asignado: string | null
+    cips_asignados: string[]
     etiquetado: boolean
     // Adiciones acumuladas
     adicion_nacn: number | null
@@ -37,6 +38,7 @@ export interface LotePruebaList {
     motivo_descarte: string | null
     // Sub-tipos ya enviados al laboratorio (tienen análisis vigente)
     sub_tipos_enviados: string[]
+    sub_tipos_enviados_por_cip: Record<string, string[]>
 }
 
 export interface EtiquetadoPruebaOut {

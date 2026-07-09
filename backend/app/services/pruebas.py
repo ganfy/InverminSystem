@@ -147,8 +147,30 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
             if fecha_ingreso:
                 estado = "COMPLETADO" if ahora >= fecha_salida else "EN PROCESO"
 
-            cip_asignado = cips_rec[n].codigo_cip if n < len(cips_rec) else None
-            sub_tipos_enviados = _get_sub_tipos_enviados(db, cip_asignado)
+            # Mapeo robusto de CIPs (1 o 2 CIPs dependiendo de cuándo se generó)
+            cip_asignado = prueba.cip
+            cips_asignados = []
+
+            if cip_asignado:
+                # Encontrar el índice de este CIP principal en la lista cips_rec
+                idx = next((i for i, c in enumerate(cips_rec) if c.codigo_cip == cip_asignado), -1)
+                if idx != -1:
+                    cips_asignados.append(cips_rec[idx].codigo_cip)
+                    # Revisar si el siguiente CIP también es de esta prueba
+                    if idx + 1 < len(cips_rec):
+                        next_cip = cips_rec[idx + 1].codigo_cip
+                        # Si hay una siguiente prueba, verificamos que next_cip no sea SU cip principal
+                        next_test_cip = pruebas[n + 1].cip if n + 1 < len(pruebas) else None
+                        if next_test_cip != next_cip:
+                            cips_asignados.append(next_cip)
+
+            sub_tipos_enviados = []
+            if cip_asignado:
+                sub_tipos_enviados = _get_sub_tipos_enviados(db, cip_asignado)
+
+            sub_tipos_enviados_por_cip = {}
+            for c in cips_asignados:
+                sub_tipos_enviados_por_cip[c] = _get_sub_tipos_enviados(db, c)
 
             lista.append(
                 LotePruebaList(
@@ -164,7 +186,8 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                     else None,
                     estado=estado,
                     cip_asignado=cip_asignado,
-                    etiquetado=cip_asignado is not None,
+                    cips_asignados=cips_asignados,
+                    etiquetado=bool(cips_asignados),
                     adicion_nacn=float(prueba.adicion_nacn)
                     if prueba.adicion_nacn is not None
                     else None,
@@ -174,6 +197,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                     descartado=bool(prueba.descartado),
                     motivo_descarte=prueba.motivo_descarte,
                     sub_tipos_enviados=sub_tipos_enviados,
+                    sub_tipos_enviados_por_cip=sub_tipos_enviados_por_cip,
                 )
             )
 
@@ -301,32 +325,45 @@ def etiquetar_prueba(
         raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
 
     total_cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).count()
-    correlativo = total_cips + 1
-    base = generar_base_cip(lote.id)
 
     # Sufijo diferenciado por tipo
     sufijo = "R" if tipo == TipoMuestra.RECUPERACION_INTERNO else "E"
-    codigo_cip = f"CIP-{base}-{sufijo}{correlativo}"
 
-    nuevo_cip = MapeoCIP(
+    # Generamos 2 CIPs por si necesitan volver a analizar
+    correlativo1 = total_cips + 1
+    base1 = generar_base_cip(lote.id, salt=correlativo1)
+    codigo_cip1 = f"CIP-{base1}-{sufijo}{correlativo1}"
+
+    correlativo2 = total_cips + 2
+    base2 = generar_base_cip(lote.id, salt=correlativo2)
+    codigo_cip2 = f"CIP-{base2}-{sufijo}{correlativo2}"
+
+    nuevo_cip1 = MapeoCIP(
         lote_id=lote.id,
-        codigo_cip=codigo_cip,
+        codigo_cip=codigo_cip1,
         laboratorio=None,
         tipo_muestra=tipo,
         fecha_envio=None,
     )
-    db.add(nuevo_cip)
+    nuevo_cip2 = MapeoCIP(
+        lote_id=lote.id,
+        codigo_cip=codigo_cip2,
+        laboratorio=None,
+        tipo_muestra=tipo,
+        fecha_envio=None,
+    )
+    db.add_all([nuevo_cip1, nuevo_cip2])
 
-    prueba.cip = codigo_cip
+    prueba.cip = codigo_cip1
     prueba.modificado_por = usuario_id
 
     db.flush()
 
     return EtiquetadoPruebaOut(
         ip=ip_lote,
-        cip=codigo_cip,
+        cip=codigo_cip1,
         tipo=tipo,
-        mensaje=f"CIP de recuperación ({tipo}) generado",
+        mensaje=f"CIPs de recuperación ({tipo}) generados: {codigo_cip1} y {codigo_cip2}",
     )
 
 
