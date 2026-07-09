@@ -41,6 +41,6 @@ export const usuariosApi = {
     return api.patch(`/admin/usuarios/${id}/desactivar`).then(() => undefined)
   },
   resetPassword(id: number, password: string): Promise<void> {
-    return api.patch(`/admin/usuarios/${id}/reset-password`, { nueva_password: password }).then(() => undefined)
+    return api.patch(`/admin/usuarios/${id}/reset-password`, { password_nuevo: password }).then(() => undefined)
   },
 }

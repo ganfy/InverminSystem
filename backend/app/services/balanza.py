@@ -641,5 +641,5 @@ def listar_provacop_activos(
             acopiador_ruc=acop.ruc,
             es_propio=pa.proveedor_id == pa.acopiador_id,
         )
-        for pa, prov, acop in q.order_by(proveedor_alias.razon_social).limit(20)
+        for pa, prov, acop in q.order_by(proveedor_alias.razon_social).all()
     ]
