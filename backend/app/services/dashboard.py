@@ -98,6 +98,7 @@ def _make_alerta(
     ip: str,
     proveedor: str,
     acopiador: str,
+    cips: list[str] = None,
 ) -> AlertaItem:
     return AlertaItem(
         tipo=tipo,
@@ -108,6 +109,7 @@ def _make_alerta(
         horas_retraso=round(delta.total_seconds() / 3600, 1),
         descripcion=desc,
         fecha_ref=fecha,
+        cips=cips or [],
     )
 
 
@@ -688,6 +690,15 @@ def obtener_alertas(db: Session) -> AlertasResponse:
             if pid not in prueba_fecha or dt_p > prueba_fecha[pid]:
                 prueba_fecha[pid] = dt_p
 
+    # Mapeo CIPs
+    cips_db = (
+        db.query(MapeoCIP.lote_id, MapeoCIP.codigo_cip).filter(MapeoCIP.lote_id.in_(ids)).all()
+    )
+    cips_por_lote = defaultdict(list)
+    for lid, cod in cips_db:
+        if cod:
+            cips_por_lote[lid].append(cod)
+
     # ── 3. Evaluación de Alertas (Cascada - Cuello de Botella) ──
     umb_muestreo = timedelta(hours=cfg.horas_pesado_muestreo)
     umb_ley = timedelta(hours=cfg.horas_muestreo_ley)
@@ -696,6 +707,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
 
     for lote in lotes:
         ip, prov, acop = lote.ip, *_nombres(lote)
+        lote_cips = cips_por_lote.get(lote.id, [])
 
         fp = pesaje_fecha.get(lote.id)
         fm = muestreo_fecha.get(lote.id)
@@ -716,6 +728,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         ip,
                         prov,
                         acop,
+                        lote_cips,
                     )
                 )
 
@@ -733,6 +746,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         ip,
                         prov,
                         acop,
+                        lote_cips,
                     )
                 )
 
@@ -749,6 +763,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         ip,
                         prov,
                         acop,
+                        lote_cips,
                     )
                 )
 
@@ -766,6 +781,7 @@ def obtener_alertas(db: Session) -> AlertasResponse:
                         ip,
                         prov,
                         acop,
+                        lote_cips,
                     )
                 )
 

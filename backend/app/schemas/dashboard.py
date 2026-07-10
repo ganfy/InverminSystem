@@ -88,6 +88,7 @@ class AlertaItem(BaseModel):
     horas_retraso: float
     descripcion: str
     fecha_ref: datetime
+    cips: list[str] = []
 
 
 class AlertasConfig(BaseModel):

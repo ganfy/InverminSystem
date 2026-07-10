@@ -122,12 +122,16 @@ def leer_hoja_ruc(excel_path: Path) -> list[dict]:
                 ruc_valido = False
 
                 if ruc_raw:
-                    # Convertir notacion cientifica (e.g. "2.0601620147E10" -> "20601620147")
+                    # Convertir notacion cientifica y extraer digitos
                     try:
-                        ruc_limpio = str(int(float(ruc_raw)))
-                        ruc_valido = bool(re.fullmatch(r"\d{8,11}", ruc_limpio))
+                        if "E" in ruc_raw.upper():
+                            ruc_limpio = str(int(float(ruc_raw)))
+                        else:
+                            # Quitar cualquier caracter que no sea digito
+                            ruc_limpio = re.sub(r"[^\d]", "", ruc_raw)
+                        ruc_valido = bool(ruc_limpio)
                     except ValueError:
-                        ruc_limpio = ruc_raw  # Mantener como string si no es numérico
+                        ruc_limpio = ruc_raw  # Mantener como string si falla
 
                 def to_float(val):
                     try:
