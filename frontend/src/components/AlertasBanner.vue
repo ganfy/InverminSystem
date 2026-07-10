@@ -18,11 +18,17 @@
         :class="`ab-item--${alerta.severidad.toLowerCase()}`"
       >
         <div class="ab-item-meta">
-          <span class="ab-item-ip">{{ alerta.ip }}</span>
+          <template v-if="modulo !== 'LABORATORIO'">
+            <span class="ab-item-ip">{{ alerta.ip }}</span>
+          </template>
+          <template v-else>
+            <span class="ab-item-ip" v-if="alerta.cips && alerta.cips.length">CIP: {{ alerta.cips.join(', ') }}</span>
+            <span class="ab-item-ip" style="opacity: 0.6" v-else>CIP: ---</span>
+          </template>
           <span class="ab-item-tipo">{{ TIPO_LABEL[alerta.tipo] ?? alerta.tipo }}</span>
           <span class="ab-item-horas">{{ alerta.horas_retraso }}h de retraso</span>
         </div>
-        <div class="ab-item-proveedor">{{ alerta.proveedor }}<span v-if="alerta.acopiador"> · {{ alerta.acopiador }}</span></div>
+        <div class="ab-item-proveedor" v-if="modulo !== 'LABORATORIO'">{{ alerta.proveedor }}<span v-if="alerta.acopiador"> · {{ alerta.acopiador }}</span></div>
 
         <!-- Campo de observación -->
         <div v-if="conObservaciones" class="ab-obs-wrap">
