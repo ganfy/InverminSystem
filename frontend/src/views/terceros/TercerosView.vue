@@ -86,7 +86,12 @@
               :class="{ inactivo: !t.activo }"
             >
               <td class="col-nombre">
-                <span class="nombre-text">{{ t.razon_social }}</span>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                  <span class="nombre-text">{{ t.razon_social }}</span>
+                  <span v-if="t.pendiente_parametros" class="badge-warning" style="align-self:flex-start; font-size:var(--text-xs); display:flex; align-items:center; gap:0.25rem; background-color: var(--color-warning-subtle); color: var(--color-warning-text); border: 1px solid var(--color-warning); padding: 0.1rem 0.3rem; border-radius: 4px; font-weight: 500;">
+                    <AlertTriangle :size="12" /> Faltan parámetros
+                  </span>
+                </div>
               </td>
               <td class="col-mono">{{ t.ruc ?? '-' }}</td>
               <td class="col-ref">{{ t.referencia ?? '-' }}</td>
@@ -165,6 +170,7 @@ import {
   Ban,
   CheckCircle,
   Users,
+  AlertTriangle,
 } from 'lucide-vue-next'
 // ── Stores ────────────────────────────────────────────────────────────────────
 const store = useTercerosStore()

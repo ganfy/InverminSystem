@@ -30,5 +30,7 @@ export interface DatosExtraidos {
     guia_remision: string | null
     guia_transporte: string | null
     peso_declarado_tm: number | null
+    procedencia: string | null
+    sacos_camion: number | null  // Sacos declarados en guía (referencia)
     documentos_detectados: string[]
 }

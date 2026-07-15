@@ -67,6 +67,7 @@ export interface LoteOfflineData {
     ip: string              // IP del bloque reservado
     numero_lote: number
     tipo_material: string
+    observaciones: string | null  // Solo para tipo 'Otro'
     pesaje: PesajeOfflineData
     creado_en: string
     numero_ticket: string
@@ -82,6 +83,7 @@ export interface SesionOfflineData {
     razon_social: string | null
     guia_remision: string | null
     guia_transporte: string | null
+    sacos_camion: number | null  // Total sacos del camión (no granel)
     estado: 'EN_PROCESO' | 'COMPLETO'
     creado_en: string
     lotes: LoteOfflineData[]

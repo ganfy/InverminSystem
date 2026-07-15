@@ -10,6 +10,7 @@ from app.schemas.entidades import (
     CambiarAcopiadorPayload,
     ParametrosRespuesta,
     ProvacopDropdown,
+    RegistroRapidoPayload,
     TerceroCrear,
     TerceroEditar,
     TerceroLista,
@@ -44,6 +45,22 @@ def crear_tercero(
     """
     try:
         return svc.crear_tercero(db, datos, usuario_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+@router.post("/registro-rapido", status_code=status.HTTP_201_CREATED)
+def registro_rapido(
+    datos: RegistroRapidoPayload,
+    current_user=Depends(check_permiso("BALANZA", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Registro rápido desde balanza. Crea proveedor/acopiador y retorna provacop_id.
+    """
+    try:
+        provacop_id = svc.registro_rapido(db, datos, usuario_id=current_user.id)
+        return {"provacop_id": provacop_id}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 

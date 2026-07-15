@@ -53,27 +53,29 @@
         <!-- Acopiador autocomplete -->
         <div class="campo-fila">
           <label class="campo-label">ACOPIADOR:</label>
-          <div class="autocomplete-wrap">
-            <input
-              class="field-input"
-              :class="{ 'field-disabled': !provSeleccionado }"
-              v-model="busqAcop"
-              :disabled="!provSeleccionado"
-              placeholder="Seleccione proveedor primero"
-              @input="onInputAcop"
-              @focus="dropAcop = true"
-              @blur="cerrarDropAcop"
-              autocomplete="off"
-            />
-            <div v-if="dropAcop && acopsFiltrados.length > 0" class="ac-dropdown">
-              <div
-                v-for="a in acopsFiltrados"
-                :key="a.provacop_id"
-                class="ac-item"
-                @mousedown.prevent="seleccionarAcop(a)"
-              >
-                <span>{{ a.acopiador_razon_social }}</span>
-                <span v-if="a.es_propio" class="badge-propio">Auto-acopio</span>
+          <div style="display:flex; gap: 0.5rem; width: 100%; align-items: center;">
+            <div class="autocomplete-wrap" style="flex:1;">
+              <input
+                class="field-input"
+                :class="{ 'field-disabled': !provSeleccionado }"
+                v-model="busqAcop"
+                :disabled="!provSeleccionado"
+                placeholder="Seleccione proveedor primero"
+                @input="onInputAcop"
+                @focus="dropAcop = true"
+                @blur="cerrarDropAcop"
+                autocomplete="off"
+              />
+              <div v-if="dropAcop && acopsFiltrados.length > 0" class="ac-dropdown">
+                <div
+                  v-for="a in acopsFiltrados"
+                  :key="a.provacop_id"
+                  class="ac-item"
+                  @mousedown.prevent="seleccionarAcop(a)"
+                >
+                  <span>{{ a.acopiador_razon_social }}</span>
+                  <span v-if="a.es_propio" class="badge-propio">Auto-acopio</span>
+                </div>
               </div>
             </div>
           </div>
@@ -105,8 +107,8 @@
           />
         </div>
         <div class="campo-fila">
-          <label class="campo-label">CARRETA:</label>
-          <input class="field-input" v-model="form.carreta" placeholder="N° carreta" />
+          <label class="campo-label">PLACA CARRETA:</label>
+          <input class="field-input" v-model="form.carreta" placeholder="ABC-123" style="text-transform:uppercase" />
         </div>
         <div class="campo-fila campo-fila-wide">
           <label class="campo-label">CONDUCTOR:</label>
@@ -117,8 +119,8 @@
           <input class="field-input" v-model="form.transportista" placeholder="Empresa / nombre" />
         </div>
         <div class="campo-fila campo-fila-wide">
-          <label class="campo-label">RAZÓN SOCIAL:</label>
-          <input class="field-input" v-model="form.razon_social" placeholder="Razón social transportista" />
+          <label class="campo-label">RAZÓN SOCIAL PROVEEDOR:</label>
+          <input class="field-input" v-model="form.razon_social" placeholder="Razón social del proveedor" />
         </div>
         <div class="campo-fila">
           <label class="campo-label">G. REMISIÓN:</label>
@@ -159,7 +161,7 @@ import { balanzaApi } from '@/api/balanza'
 import type { ProvAcopDropdown } from '@/api/balanza'
 import type { TipoDocumento } from '@/types/balanza'
 import DocumentosPanel from '@/components/balanza/DocumentosPanel.vue'
-import { ArrowRight } from 'lucide-vue-next'
+import { ArrowRight, ArrowLeft } from 'lucide-vue-next'
 
 const router = useRouter()
 const store  = useBalanzaStore()
@@ -248,7 +250,6 @@ const form = reactive({
   razon_social:    '',
   guia_remision:   '',
   guia_transporte: '',
-  procedencia:     '',
 })
 
 /** Normaliza una placa extraída: la pone en mayúsculas, elimina caracteres no válidos
@@ -264,13 +265,14 @@ function normalizarPlacaExtraida(placa: string): string {
 
 /** Aplica datos extraídos del DocumentosPanel al formulario */
 function aplicarDatosExtraidos(datos: Partial<Record<string, string | null>>) {
-  if (datos.placa)          form.placa          = normalizarPlacaExtraida(datos.placa)
-  if (datos.carreta)        form.carreta        = datos.carreta
-  if (datos.conductor)      form.conductor      = datos.conductor
-  if (datos.transportista)  form.transportista  = datos.transportista
-  if (datos.razon_social)   form.razon_social   = datos.razon_social
-  if (datos.guia_remision)  form.guia_remision  = datos.guia_remision
+  if (datos.placa)           form.placa           = normalizarPlacaExtraida(datos.placa)
+  if (datos.carreta)         form.carreta         = normalizarPlacaExtraida(datos.carreta)  // Placa del semirremolque
+  if (datos.conductor)       form.conductor       = datos.conductor
+  if (datos.transportista)   form.transportista   = datos.transportista
+  if (datos.razon_social)    form.razon_social    = datos.razon_social
+  if (datos.guia_remision)   form.guia_remision   = datos.guia_remision
   if (datos.guia_transporte) form.guia_transporte = datos.guia_transporte
+  // procedencia y sacos_camion son de referencia, no se llenan en el form
 
 // ── Auto-seleccionar proveedor por RUC o razón social ──────────────────────
   // Solo intentar si aún no hay proveedor seleccionado manualmente

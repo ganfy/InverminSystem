@@ -639,11 +639,17 @@ def registrar_analisis_recuperacion(
     if datos.laboratorio:
         mapeo.laboratorio = datos.laboratorio or "Paititi"
 
+    ley_cabeza = datos.ley_cabeza
+    if ley_cabeza is None and mapeo.lote_id:
+        from app.services.pruebas import calcular_ley_planta as _calc_ley
+
+        ley_cabeza = _calc_ley(db, mapeo.lote_id)
+
     nuevo = AnalisisRecuperacion(
         lote_id=mapeo.lote_id,
         cip=datos.cip,
         laboratorio=datos.laboratorio,
-        ley_cabeza=datos.ley_cabeza,
+        ley_cabeza=ley_cabeza,
         ley_cola=datos.ley_cola,
         ley_liquido=datos.ley_liquido,
         estado=EstadoRecuperacion.COMPLETADO,
@@ -1021,6 +1027,12 @@ def completar_recuperacion(
     a.estado = EstadoRecuperacion.COMPLETADO
     a.fecha_analisis = datos.fecha_analisis
     a.modificado_por = usuario_id
+
+    if a.ley_cabeza is None and a.lote_id:
+        from app.services.pruebas import calcular_ley_planta as _calc_ley
+
+        a.ley_cabeza = _calc_ley(db, a.lote_id)
+
     db.flush()
 
     # ── Generar Análisis de Ley de Plata (Ag) Automáticamente ──────────

@@ -156,11 +156,13 @@
           </div>
         </div>
 
-        <div v-if="datosExtraidos.peso_declarado_tm" class="peso-info">
+        <div v-if="datosExtraidos.peso_declarado_tm || datosExtraidos.sacos_camion" class="peso-info">
           <Brackets :size="18" class="peso-icono" />
           <span>
-            Peso declarado en documentos:
-            <strong>{{ datosExtraidos.peso_declarado_tm }} TM</strong>
+            Guía declara:
+            <strong v-if="datosExtraidos.peso_declarado_tm">{{ datosExtraidos.peso_declarado_tm }} TM</strong>
+            <span v-if="datosExtraidos.peso_declarado_tm && datosExtraidos.sacos_camion"> &mdash; </span>
+            <strong v-if="datosExtraidos.sacos_camion">{{ datosExtraidos.sacos_camion }} sacos</strong>
             <em class="peso-hint"> (referencia - el peso válido es el del ticket de balanza)</em>
           </span>
         </div>
@@ -253,14 +255,16 @@
     const d = datosExtraidos.value
     if (!d) return []
     return [
-      { key: 'placa',          label: 'Placa',           valor: d.placa },
-      { key: 'carreta',        label: 'Carreta',          valor: d.carreta },
-      { key: 'conductor',      label: 'Conductor',        valor: d.conductor },
-      { key: 'transportista',  label: 'Transportista',    valor: d.transportista },
-      { key: 'razon_social',   label: 'Razón Social',     valor: d.razon_social },
-      { key: 'ruc_proveedor',  label: 'RUC Proveedor',    valor: d.ruc_proveedor },
-      { key: 'guia_remision',  label: 'Guía Remisión',    valor: d.guia_remision },
-      { key: 'guia_transporte',label: 'Guía Transporte',  valor: d.guia_transporte },
+      { key: 'placa',          label: 'Placa',                  valor: d.placa },
+      { key: 'carreta',        label: 'Placa Carreta',          valor: d.carreta },
+      { key: 'conductor',      label: 'Conductor',              valor: d.conductor },
+      { key: 'transportista',  label: 'Transportista',          valor: d.transportista },
+      { key: 'razon_social',   label: 'Razón Social Proveedor', valor: d.razon_social },
+      { key: 'ruc_proveedor',  label: 'RUC Proveedor',          valor: d.ruc_proveedor },
+      { key: 'procedencia',    label: 'Procedencia',            valor: d.procedencia },
+      { key: 'guia_remision',  label: 'Guía Remisión',          valor: d.guia_remision },
+      { key: 'guia_transporte',label: 'Guía Transporte',        valor: d.guia_transporte },
+      { key: 'sacos_camion',   label: 'Sacos (guía)',           valor: d.sacos_camion != null ? String(d.sacos_camion) : null },
     ].filter(c => c.valor)   // mostrar solo los que se encontraron
   })
 
@@ -426,6 +430,7 @@
       if (resultado.ruc_proveedor)   campos.ruc_proveedor   = resultado.ruc_proveedor
       if (resultado.guia_remision)   campos.guia_remision   = resultado.guia_remision
       if (resultado.guia_transporte) campos.guia_transporte = resultado.guia_transporte
+      if (resultado.procedencia)     campos.procedencia     = resultado.procedencia
       emit('aplicar', campos)
 
       const n = Object.keys(campos).length

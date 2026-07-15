@@ -71,6 +71,7 @@ def _serializar_lote(lote: Lote) -> LoteDetalle:
         ip=lote.ip,
         numero_lote=lote.numero_lote,
         tipo_material=lote.tipo_material,
+        observaciones=lote.observaciones,
         estado=lote.estado,
         volado=bool(lote.volado or False),
         peso_neto=_peso_neto(pesaje.peso_inicial, pesaje.peso_final) if pesaje else None,
@@ -326,7 +327,8 @@ def agregar_lote(
 ) -> LoteDetalle:
     """
     Agrega un lote con pesaje a una sesión activa (RF-BAL-002).
-    Genera IP secuencial y calcula peso_neto automáticamente.
+    Para tipo_material='Otro': no genera IP secuencial, usa IP ficticia 'OT-' + ticket_id.
+    Para otros tipos: genera IP secuencial y calcula peso_neto automáticamente.
     """
     sesion = db.query(SesionDescarga).filter(SesionDescarga.id == sesion_id).first()
     if not sesion:
@@ -339,14 +341,17 @@ def agregar_lote(
     ) + 1
 
     ahora = _ahora()
-    ip = generar_ip(db)
+    es_otro = datos.tipo_material == "Otro"
+    # Para 'Otro': la IP se asignará después del flush del pesaje (OT-{pesaje.id})
+    ip_placeholder = generar_ip(db) if not es_otro else f"OT-{numero_lote:04d}"
     p = datos.pesaje
 
     lote = Lote(
         sesion_id=sesion_id,
-        ip=ip,
+        ip=ip_placeholder,
         numero_lote=numero_lote,
         tipo_material=datos.tipo_material,
+        observaciones=datos.observaciones if es_otro else None,
         estado=EstadoLote.RECEPCIONADO,
         volado=False,
         habilitado_ruma=False,
@@ -377,6 +382,9 @@ def agregar_lote(
 
     # Número de ticket: "TK-XXXXX" con padding 5 dígitos, basado en el PK
     pesaje.numero_ticket = f"TK-{pesaje.id:05d}"
+    # Para 'Otro': fijar la IP usando el ID del pesaje (evita duplicados)
+    if es_otro:
+        lote.ip = f"OT-{pesaje.id:05d}"
     db.flush()
 
     lote_cargado = db.query(Lote).options(joinedload(Lote.pesajes)).filter(Lote.id == lote.id).one()

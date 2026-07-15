@@ -60,6 +60,7 @@ class LoteOffline(BaseModel):
     ip: str  # IP del bloque reservado, ej: "IP-0051"
     numero_lote: int
     tipo_material: str
+    observaciones: str | None = None  # Solo para tipo 'Otro'
     pesaje: PesajeOffline
     creado_en: datetime | None = None
     numero_ticket: str | None = None

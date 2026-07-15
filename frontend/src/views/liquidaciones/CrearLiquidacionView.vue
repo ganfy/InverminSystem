@@ -39,10 +39,15 @@
               <label class="field-label">PROVEEDOR / ACOPIADOR</label>
               <select class="field-input field-select" v-model="provacopId" @change="onProvacopChange">
                 <option value="">Seleccionar…</option>
-                <option v-for="p in provacops" :key="p.id" :value="p.id">
+                <option v-for="p in provacops" :key="p.id" :value="p.id" :class="{'text-warning': p.pendiente_parametros}">
                   {{ p.proveedor }} – {{ p.acopiador }}
+                  {{ p.pendiente_parametros ? ' (Sin parámetros)' : '' }}
                 </option>
               </select>
+            </div>
+            <div v-if="provacopSeleccionado?.pendiente_parametros" class="alert-warning" style="grid-column: 1 / -1; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--color-warning); background: var(--color-warning-subtle); color: var(--color-warning-text); border-radius: 6px;">
+              <AlertTriangle :size="18" />
+              <span>Esta relación proveedor-acopiador no tiene parámetros comerciales. No se podrá liquidar hasta que se configuren en la pantalla de Terceros.</span>
             </div>
             <div class="field">
               <label class="field-label">PRECIO SPOT ORO (USD/Oz Troy)</label>
@@ -411,10 +416,11 @@
   const fechaLiq         = ref(new Date().toISOString().slice(0, 10))
   const lotesSeleccionados = ref<string[]>([])
   const errorPaso1       = ref('')
-  const provacops        = ref<{ id: number; proveedor: string; acopiador: string }[]>([])
+  const provacops        = ref<{ id: number; proveedor: string; acopiador: string; pendiente_parametros?: boolean }[]>([])
   const guardandoBorrador = ref(false)
 
   // ── Computed ───────────────────────────────────────────────────────
+  const provacopSeleccionado = computed(() => provacops.value.find(p => p.id === provacopId.value))
   const tituloPaso = computed(() => ['Selección de lotes', 'Revisión de valores', 'Confirmar'][paso.value - 1])
 
   const todosSeleccionados = computed(() =>
@@ -428,6 +434,7 @@
 
   const puedeCalcular = computed(() =>
     provacopId.value !== '' &&
+    !provacopSeleccionado.value?.pendiente_parametros &&
     (spotUsd.value ?? 0) > 0 &&
     lotesSeleccionados.value.length > 0
   )

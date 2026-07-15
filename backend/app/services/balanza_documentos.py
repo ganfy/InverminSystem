@@ -417,20 +417,73 @@ def _extraer_de_grr(texto: str) -> dict:
       - Placa:          "Número de placa: C9P908"
       - Conductor:      "Principal: MENDOZA CAJAMARCA... - DOCUMENTO NACIONAL..."
       - Peso bruto TM:  "Peso Bruto total de la carga: 9.5"
+      - Razón social remitente (proveedor): sección "Datos del Remitente"
+      - Procedencia: "Referencia de la Entidad" o "Punto de partida"
+      - Sacos: "Cantidad" en unidades enteras junto a peso
     """
     r: dict = {}
 
     # ── Número de guía ────────────────────────────────────────────────────────
     # "N° EG07 - 00000306"  o  "N° EGO7 - 00000306" (OCR confunde 0/O en la serie)
-    # Aceptar letras Y dígitos mezclados con [A-Z0-9] en toda la serie
     m = re.search(r"N[°oO\u00ba]\s*([A-Z][A-Z0-9]{2,8})\s*[-–]\s*(\d{4,10})", texto, re.IGNORECASE)
     if m:
         r["guia_remision"] = _normalizar_guia(m.group(1), m.group(2))
 
-    # ── Transportista ─────────────────────────────────────────────────────────
-    # Aparece en "Datos del transportista:" seguido de NOMBRE - REGISTRO ÚNICO...
+    # ── Razón social del REMITENTE (proveedor de la carga) ────────────────────
+    # El OCR del PDF puede producir saltos de línea variables; probamos varias estrategias.
+
+    # Estrategia 1: línea inmediatamente después de "Datos del Remitente"
     m = re.search(
-        r"[Dd]atos del transportista[:\s]*\n([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\-]+?)\s*[-–]\s*REGISTRO\s*[ÚU]NICO",
+        r"[Dd]atos del [Rr]emitente[^\n]*\n+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n",
+        texto,
+    )
+    if m:
+        rs = re.sub(r"\s+", " ", m.group(1)).strip()
+        if len(rs) > 4:
+            r["razon_social"] = rs
+
+    # Estrategia 2: línea precedida de RUC de empresa (20XXXXXXXXX) fuera de sección transportista
+    # Busca "20XXXXXXXXX\nNOMBRE EMPRESA" o "NOMBRE EMPRESA\n20XXXXXXXXX"
+    if not r.get("razon_social"):
+        # Buscar todos los RUC externos (empresas proveedoras)
+        ruc_invermin = "20601910587"
+        ruc_hits = list(re.finditer(r"\b(20\d{9})\b", texto))
+        for ruc_m in ruc_hits:
+            if ruc_m.group(1) == ruc_invermin:
+                continue
+            # Mirar la línea siguiente al RUC
+            pos_fin = ruc_m.end()
+            resto = texto[pos_fin : pos_fin + 200]
+            linea_sig = re.match(r"[\s\n]*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n", resto)
+            if linea_sig:
+                rs = re.sub(r"\s+", " ", linea_sig.group(1)).strip()
+                if len(rs) > 4 and "TRANSPORTISTA" not in rs.upper():
+                    r["razon_social"] = rs
+                    break
+            # Mirar la línea anterior al RUC
+            antes = texto[max(0, ruc_m.start() - 200) : ruc_m.start()]
+            linea_ant = re.search(r"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n\s*$", antes)
+            if linea_ant:
+                rs = re.sub(r"\s+", " ", linea_ant.group(1)).strip()
+                if len(rs) > 4 and "TRANSPORTISTA" not in rs.upper():
+                    r["razon_social"] = rs
+                    break
+
+    # Estrategia 3: patrón "Remitente:" o "REMITENTE:" seguido del nombre en misma o siguiente línea
+    if not r.get("razon_social"):
+        m = re.search(
+            r"[Rr]emitente[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)(?:\n|$)",
+            texto,
+        )
+        if m:
+            rs = re.sub(r"\s+", " ", m.group(1)).strip()
+            if len(rs) > 4:
+                r["razon_social"] = rs
+
+    # ── Transportista ─────────────────────────────────────────────────────────
+    # "Datos del transportista:" → NOMBRE - REGISTRO ÚNICO...
+    m = re.search(
+        r"[Dd]atos del [Tt]ransportista[^\n]*\n+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\-]+?)\s*[-–]\s*REGISTRO\s*[ÚU]NICO",
         texto,
         re.IGNORECASE,
     )
@@ -445,6 +498,18 @@ def _extraer_de_grr(texto: str) -> dict:
     if m:
         r["placa"] = _normalizar_placa(m.group(1).strip())
 
+    # ── Semirremolque / Carreta ───────────────────────────────────────────────
+    # "N° de placa: (semirremolque)" o "Carreta: C9P-908"
+    m = re.search(
+        r"[Ss]ecundario:\s*[Nn]umero de placa[:\s]+([A-Z0-9]{2,3}[\s\-]?[A-Z0-9]{3,4})",
+        texto,
+        re.IGNORECASE,
+    )
+    if m:
+        placa_carreta = _normalizar_placa(m.group(1).strip())
+        if placa_carreta not in ("-", "0", ""):
+            r["carreta"] = placa_carreta
+
     # ── Conductor ─────────────────────────────────────────────────────────────
     # "Principal:   MENDOZA CAJAMARCA PERCY MARTIN - DOCUMENTO NACIONAL..."
     m = re.search(
@@ -456,7 +521,6 @@ def _extraer_de_grr(texto: str) -> dict:
         r["conductor"] = re.sub(r"\s+", " ", m.group(1)).strip()
 
     # ── Peso bruto declarado (TM) ─────────────────────────────────────────────
-    # "Peso Bruto total de la carga: 9.5"
     m = re.search(r"Peso Bruto total de la carga[:\s]+([\d]+(?:[.,]\d+)?)", texto, re.IGNORECASE)
     if m:
         try:
@@ -464,16 +528,54 @@ def _extraer_de_grr(texto: str) -> dict:
         except ValueError:
             pass
 
+    # ── Sacos declarados ──────────────────────────────────────────────────────
+    # GRR puede traer "Cantidad: 120 Sacos" o simplemente la unidad en tabla de bultos
+    m = re.search(
+        r"[Cc]antidad[:\s]+(\d+)\s*[Ss]acos?",
+        texto,
+    )
+    if m:
+        try:
+            r["sacos_camion"] = int(m.group(1))
+        except ValueError:
+            pass
+    if not r.get("sacos_camion"):
+        # Alternativa: "120  Sacos  9.5 TM"
+        m = re.search(r"(\d+)\s+[Ss]acos?", texto)
+        if m:
+            try:
+                r["sacos_camion"] = int(m.group(1))
+            except ValueError:
+                pass
+
+    # ── Procedencia: "Referencia de la Entidad" o "Punto de partida" ──────────
+    # Primero intentar "Referencia de la Entidad" (campo más específico)
+    m = re.search(
+        r"[Rr]eferencia de la [Ee]ntidad[:\s]+(.+)",
+        texto,
+    )
+    if m:
+        val = re.sub(r"\s+", " ", m.group(1)).strip()
+        if val:
+            r["procedencia"] = val
+
+    # Fallback: "Punto de partida" o "Punto de Partida"
+    if not r.get("procedencia"):
+        m = re.search(
+            r"[Pp]unto de [Pp]artida[:\s]+(.+)",
+            texto,
+        )
+        if m:
+            val = re.sub(r"\s+", " ", m.group(1)).strip()
+            if val:
+                r["procedencia"] = val
+
     # ── RUC del proveedor (fallback si no hay ticket) ─────────────────────────
-    # En la GRR el RUC del encabezado suele corromperse por OCR.
-    # Buscamos el RUC en la línea de "Datos del Destinatario" como ancla
-    # y tomamos el RUC que NO sea de INVERMIN (20601910587)
     todos_ruc = re.findall(r"\b((?:10|20)\d{9})\b", texto)
-    ruc = "20601910587"
-    externos = [r for r in todos_ruc if r != ruc]
+    ruc_invermin = "20601910587"
+    externos = [rv for rv in todos_ruc if rv != ruc_invermin]
     if externos:
-        # El primer RUC externo de 20xxxxxxxx es el proveedor (persona jurídica)
-        proveedores = [r for r in externos if r.startswith("20")]
+        proveedores = [rv for rv in externos if rv.startswith("20")]
         if proveedores:
             r["ruc_proveedor"] = proveedores[0]
 
@@ -483,7 +585,7 @@ def _extraer_de_grr(texto: str) -> dict:
 def _extraer_de_grt(texto: str) -> dict:
     """
     GRT (Guía de Remisión Transportista) - escaneada, OCR variable.
-    Extrae guia_transporte y confirma placa/conductor como fallback.
+    Extrae guia_transporte, placa, conductor y razón social del transportista.
 
     Ejemplo real: "0002  N° 0004072"
     """
@@ -505,6 +607,16 @@ def _extraer_de_grt(texto: str) -> dict:
     )
     if m:
         r["placa_grt"] = _normalizar_placa(m.group(1).strip())
+
+    # Razón social del transportista (sección "Datos del Transportista" en GRT)
+    m = re.search(
+        r"[Rr]az[oó]n\s+[Ss]ocial[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]+?)\n",
+        texto,
+    )
+    if m:
+        rs = re.sub(r"\s+", " ", m.group(1)).strip()
+        if len(rs) > 4:
+            r["razon_social_transportista"] = rs
 
     return r
 
@@ -575,6 +687,8 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
         "guia_remision": None,
         "guia_transporte": None,
         "peso_declarado_tm": None,
+        "procedencia": None,  # Referencia de la entidad o Punto de partida
+        "sacos_camion": None,  # Total de sacos declarados en guía (referencia)
         "documentos_detectados": [],
     }
 
@@ -631,16 +745,20 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
         datos = _extraer_de_grr(texto)
         for k in (
             "placa",
+            "carreta",
             "conductor",
             "transportista",
             "ruc_proveedor",
             "guia_remision",
             "peso_declarado_tm",
+            "procedencia",
+            "sacos_camion",
+            "razon_social",  # Razón social del remitente (proveedor)
         ):
             if datos.get(k) and not resultado[k]:
                 resultado[k] = datos[k]
 
-    # 3. GRT - solo guia_transporte y placa como último recurso
+    # 3. GRT - solo guia_transporte, placa y transportista como último recurso
     for texto, tipo in bloques:
         if tipo != "GUIA_TRANSPORTE":
             continue
@@ -649,6 +767,8 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
             resultado["guia_transporte"] = datos["guia_transporte"]
         if datos.get("placa_grt") and not resultado["placa"]:
             resultado["placa"] = datos["placa_grt"]
+        if datos.get("razon_social_transportista") and not resultado["transportista"]:
+            resultado["transportista"] = datos["razon_social_transportista"]
 
     # ── Validación mínima ──────────────────────────────────────────────────────
     campos_clave = [resultado["placa"], resultado["conductor"], resultado["guia_remision"]]
