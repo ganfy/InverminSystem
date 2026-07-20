@@ -341,8 +341,8 @@ def agregar_lote(
     ) + 1
 
     ahora = _ahora()
-    es_otro = datos.tipo_material == "Otro"
-    # Para 'Otro': la IP se asignará después del flush del pesaje (OT-{pesaje.id})
+    es_otro = datos.tipo_material not in ["Mineral", "Llampo", "M.Llampo"]
+    # Para no minerales: la IP se asignará después del flush del pesaje (OT-{pesaje.id})
     ip_placeholder = generar_ip(db) if not es_otro else f"OT-{numero_lote:04d}"
     p = datos.pesaje
 

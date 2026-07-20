@@ -1,0 +1,87 @@
+=== BLOQUE 1 | TIPO: GUIA_REMISION ===
+EMPRESA MINERA SAYMED E.1.R.L. RUC Ne20606562480
+OPAC GUA DE REMISION ELECTRONICA
+Soper es Zh REMITENTE
+ay N° EGO7 - 00000245
+a= eo
+Pe ee Fecha y hora de emision :06/07/2026 01:19 PM
+Fecha de entrega de Bienes al transportista:06/07/2026 Punto de Partida ---- SECTOR LULIPATA NRO. SN --- CONCESION MINERA: CERRO
+VERDE BL, C.U. 080003504 - PHARA - SANDIA - PUNO
+Motivo de Traslado : Venta sujeta a confirmacion del comprador Punto de llegada OTR. LAS TERRAZAS KM. 2 OTR. QUEBRADA EL TOTORAL
+(KILOMETRO 616 CARRETERA PANAMERICANA) - CHALA -
+CARAVELI - AREQUIPA
+: ._ INVERMIN PAITITI SOCIEDAD ANONIMA CERRADA - INVERMIN PAITITI S.A.C. - REGISTRO UNICO DE CONTRIBUYENTES N° 20601910587
+Datos del Destinatario :
+Bienes por transportar:
+Bien a Cédigo . af :
+N° | normalizado cae de) producto Petiier Codigo Descripcién Detallada Jhlees ee Cantidad
+ien SUNAT arancelaria GTIN medida
+a
+Unidad de Medida del Peso Bruto: TNE
+Peso Bruto total de la carga: 14
+Datos del traslado:
+Modalidad de Traslado:Publico Indicador de retorno de vehiculo con envases 0 embalajes vacios: NO
+Indicador de transbordo programado:NO
+Indicador de traslado en vehiculos de categoria M1 o L:NO Indicador para registrar vehiculos y conductores del transportista: NO
+Datos del transportista:
+TRANSPORT RICHY S.A.C. - REGISTRO UNICO DE CONTRIBUYENTES N° 20612686913
+Numero de registro del MTC15150941CNG
+Observaciones : CONCESION MINERA: CERRO VERDE BL - PHARA - SANDIA - PUNO CODIGO UNICO: 080003504
+MARCA VEHICULO: INTERNATIONAL
+Esta es una representacion impresa sin valor tributario de la Guia de Remision Electronica generada en el sistema de la SUNAT. Puede verificarla utilizando su clave SOL
+
+==================================================
+=== BLOQUE 2 | TIPO: GUIA_TRANSPORTE ===
+Tels eA Da TRANSPORT RICHY S.A.C. RUC N°20612686913
+Se ert a GUIA DE REMISION ELECTRONICA
+1 Saito TRANSPORTISTA
+ete a ns : N° EGO3 - 00000217
+Th bey 1 “Te
+Pesce Numero de Registro MTC: 15150941CNG
+re "ol as a7
+Mater
+Fecha y hora de emision: 06/07/2026 02:29 PM
+Fecha de inicio de Traslado: 06/07/2026 Punto de Partida: ---- SECTOR LULIPATA NRO. SN --- CONCESION MINERA:
+CERRO VERDE BL, C.U. 080003504 - PHARA - SANDIA - PUNO
+Punto de Ilegada: OTR. LAS TERRAZAS KM. 2 OTR. QUEBRADA EL TOTORAL
+(KILOMETRO 616 CARRETERA PANAMERICANA) - CHALA -
+CARAVELI - AREQUIPA
+Datos del remitente: EMPRESA MINERA SAYMED E.1.R.L. - REGISTRO UNICO DE CONTRIBUYENTES N° 20606562480
+Datos del destinatario: INVERMIN PAITIT| SOCIEDAD ANONIMA CERRADA - INVERMIN PAITITI S.A.C. - REGISTRO UNICO DE CONTRIBUYENTES N° 20601910587
+Documentos Relacionados:
+Guia de Remisién Remitente N° EG07 - 245 - RUC N° 20606562480
+Bienes por Transportar:
+Unidad de Medida del Peso Bruto: TNE
+Peso Bruto total de la carga: 14
+Datos del traslado:
+Indicador de transbordo programado: NO
+Indicador de retorno de vehiculo vacio: SI Indicador de retorno de vehiculo con envases 0 embalajes vacios: NO
+Indicador de Transporte subcontratado: NO Indicador del pagador del flete: Remitente
+Datos de los vehiculos:
+Principal: Numero de placa: ASC736
+Numero de TUCE o Certificado de Habilitaci6n Vehicular: 15M24031128E
+Entidad emisora de autorizacién especial: MTC - Numero de autorizacién especial:15150941CNG
+Secundario 1: Numero de placa: BKP978
+Numero de TUCE o Certificado de Habilitaci6n Vehicular: 15M24031255E
+Entidad emisora de autorizacién especial: MTC - Numero de autorizacién especial:15150941CNG
+Datos de los conductores:
+Principal: CHAMBI APAZA FRANCISCO - DOCUMENTO NACIONAL DE IDENTIDAD N° 48858048
+Numero de licencia de conducir: Q48858048
+Datos de pagador de flete: EMPRESA MINERA SAYMED E.1.R.L. - REGISTRO UNICO DE CONTRIBUYENTES N° 20606562480
+Observaciones : MARCA INTERNATIONAL PLACA ASC/736 BKP/978 MINERAL AURIFERO EN BRUTO SIN PROCESAR 174 SACOS PESO 14.000 TNE APROX
+Esta es una representacion impresa sin valor tributario de la Guia de Remision Electronica generada en el sistema de la SUNAT. Puede verificarla utilizando su clave SOL
+
+==================================================
+=== RESULTADO FINAL ===
+placa: ASC-736
+carreta: BKP-978
+conductor: CHAMBI APAZA FRANCISCO
+transportista: TRANSPORT RICHY S.A.C.
+razon_social: EMPRESA MINERA SAYMED E.I.R.L.
+ruc_proveedor: 20612686913
+guia_remision: EG07-00000245
+guia_transporte: EG03-00000217
+peso_declarado_tm: 14.0
+procedencia: ---- SECTOR LULIPATA NRO. SN --- CONCESION MINERA: CERRO
+sacos_camion: None
+documentos_detectados: ['GUIA_REMISION', 'GUIA_TRANSPORTE']

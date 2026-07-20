@@ -47,10 +47,6 @@
           <input class="field-input" v-model="form.cip" :disabled="!modoNuevo" style="color:var(--color-gold);font-family:var(--font-mono)" placeholder="Ingrese código..." />
         </div>
         <div class="field">
-          <label class="field-label">MATERIAL:</label>
-          <input class="field-input" :value="materialInfo" disabled />
-        </div>
-        <div class="field">
           <label class="field-label">MINERAL (Au/Ag):</label>
           <select class="field-select field-input field-sm" v-model="form.material" @change="onMaterialChange">
             <option value="Au">Au — Oro</option>
@@ -89,16 +85,8 @@
           </select>
         </div>
         <div class="field">
-          <label class="field-label">PUNTO:</label>
-          <select class="field-select field-sm field-input" v-model="punto">
-            <option value="CABEZA">Cabeza</option>
-            <option value="COLA">Cola</option>
-            <option value="LIQUIDO">Líquido</option>
-          </select>
-        </div>
-        <div class="field">
           <label class="field-label">SOLICITUD:</label>
-          <input class="field-input" :value="'Análisis de sólidos por ' + form.material" disabled />
+          <input class="field-input" v-model="solicitudTexto" />
         </div>
         <div class="field">
           <label class="field-label">TIPO DE ANÁLISIS:</label>
@@ -271,14 +259,17 @@ const form = ref({
   fecha_analisis: new Date().toISOString().split('T')[0],
 })
 
+const solicitudTexto = ref('Análisis de sólidos por Au')
+
+
 // ── Constante Newmont ─────────────────────────────────────────────────────────
 const FACTOR         = 34.2857
 const FACTOR_NEWMONT = 34.285   // constante del laboratorio
 
 // ── Campos de triple sampling (Au) ───────────────────────────────────────────
-const pFino1   = ref<number | null>(null)
+const pFino1   = ref<number | null>(15)
 const auFino1  = ref<number | null>(null)
-const pFino2   = ref<number | null>(null)
+const pFino2   = ref<number | null>(15)
 const auFino2  = ref<number | null>(null)
 const pGrueso  = ref<number | null>(null)
 const auGrueso = ref<number | null>(null)
@@ -338,6 +329,7 @@ function recalc() {
 
 function onMaterialChange() {
   errCalc.value = ''
+  solicitudTexto.value = 'Análisis de sólidos por ' + form.value.material
   // Reset campos del otro material
   if (form.value.material === 'Ag') {
     leyAgOzTc.value = null
@@ -512,7 +504,7 @@ async function generarCertificado() {
 
 .muestras-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1rem;
 }
 

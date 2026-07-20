@@ -100,7 +100,10 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
 def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
     lotes_db = (
         db.query(Lote)
-        .filter(Lote.eliminado == False)  # noqa: E712
+        .filter(
+            Lote.eliminado == False,  # noqa: E712
+            Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]),
+        )
         .order_by(Lote.id.desc())
         .all()
     )

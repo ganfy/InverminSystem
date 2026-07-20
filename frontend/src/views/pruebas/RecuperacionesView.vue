@@ -35,96 +35,80 @@
     </div>
 
     <!-- Tabla -->
-    <div v-else class="tabla-wrapper">
-      <table class="tabla">
-        <thead>
-          <tr>
-            <th>IP</th>
-            <th>PROVEEDOR</th>
-            <th>FECHA</th>
-            <th class="th-group th-au">LEY COLA Au</th>
-            <th class="th-group th-ag">LEY COLA Ag</th>
-            <th class="th-group th-liq">SOLUCIÓN Au</th>
-            <th class="th-group th-liq">SOLUCIÓN Ag</th>
-            <th class="th-group th-rec">% RECUP</th>
-            <th>ACCIONES</th>
-          </tr>
-          <tr class="thead-units">
-            <th colspan="3"></th>
-            <th><span class="u-primary gold">g/TM</span><span class="u-sep">/</span><span class="u-secondary">oz/TC</span></th>
-            <th><span class="u-primary blue">g/TM</span><span class="u-sep">/</span><span class="u-secondary">oz/TC</span></th>
-            <th><span class="u-primary">g/m³</span><span class="u-sep">/</span><span class="u-secondary">oz/TC</span></th>
-            <th><span class="u-primary blue">g/m³</span><span class="u-sep">/</span><span class="u-secondary">oz/TC</span></th>
-            <th></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="filtrados.length === 0">
-            <td colspan="9" class="estado-tabla sin-datos">
-              {{ busqueda ? 'Sin resultados para "' + busqueda + '"' : 'Sin recuperaciones registrados' }}
-            </td>
-          </tr>
-          <tr
-            v-for="item in filtrados"
-            :key="(item.ip ?? '') + (item.cip ?? '')"
-            :class="{ 'row-sin-rec': item.recuperacion == null }"
+    <!-- Grid de recuperaciones (Reemplaza tabla) -->
+    <div v-else class="rec-grid">
+      <div v-if="filtrados.length === 0" class="estado-tabla sin-datos" style="grid-column: 1 / -1">
+        {{ busqueda ? 'Sin resultados para "' + busqueda + '"' : 'Sin recuperaciones registrados' }}
+      </div>
+      
+      <div
+        v-for="item in filtrados"
+        :key="(item.ip ?? '') + (item.cip ?? '')"
+        class="rec-card"
+        :class="{ 'card-sin-rec': item.recuperacion == null }"
+      >
+        <!-- Card Header -->
+        <div class="rc-header">
+          <div class="rc-ip-prov">
+            <span class="rc-ip">{{ item.ip }}</span>
+            <span class="rc-prov">{{ item.proveedor }}</span>
+          </div>
+          <div class="rc-badges">
+            <span class="rc-fecha">{{ fmt(item.fecha_analisis) }}</span>
+            <span
+              v-if="item.recuperacion != null"
+              class="rec-badge"
+              :class="recClass(item.recuperacion)"
+            >
+              {{ Number(item.recuperacion).toFixed(1) }}%
+            </span>
+            <span v-else class="rc-no-rec">—</span>
+          </div>
+        </div>
+
+        <!-- Card Body -->
+        <div class="rc-body">
+          <div class="rc-col">
+            <!-- Au -->
+            <div class="rc-item">
+              <span class="rc-lbl">LEY COLA Au</span>
+              <span class="rc-val gold">{{ fmtD(item.ley_cola_au_gr_tm) ?? '—' }} <small>g/TM</small></span>
+              <span class="rc-subval">{{ fmtD(item.ley_cola_au_oz_tc) ?? '—' }} <small>oz/TC</small></span>
+            </div>
+            <div class="rc-item">
+              <span class="rc-lbl">SOLUCIÓN Au</span>
+              <span class="rc-val">{{ fmtD(item.solucion_au_g_m3) ?? '—' }} <small>g/m³</small></span>
+              <span class="rc-subval">{{ item.solucion_au_g_m3 != null ? fmtD(item.solucion_au_g_m3 / 34.2857) : '—' }} <small>oz/TC</small></span>
+            </div>
+          </div>
+          <div class="rc-col">
+            <!-- Ag -->
+            <div class="rc-item">
+              <span class="rc-lbl">LEY COLA Ag</span>
+              <span class="rc-val blue">{{ fmtD(item.ley_cola_ag_gr_tm) ?? '—' }} <small>g/TM</small></span>
+              <span class="rc-subval">{{ item.ley_cola_ag_gr_tm != null ? fmtD(item.ley_cola_ag_gr_tm / 34.2857) : '—' }} <small>oz/TC</small></span>
+            </div>
+            <div class="rc-item">
+              <span class="rc-lbl">SOLUCIÓN Ag</span>
+              <span class="rc-val blue">{{ fmtD(item.solucion_ag_g_m3) ?? '—' }} <small>g/m³</small></span>
+              <span class="rc-subval">{{ item.solucion_ag_g_m3 != null ? fmtD(item.solucion_ag_g_m3 / 34.2857) : '—' }} <small>oz/TC</small></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card Footer (Acciones) -->
+        <div class="rc-footer" v-if="item.recuperacion != null && Number(item.recuperacion) < 70">
+          <button
+            class="btn-remuestreo"
+            :disabled="remuestreando === item.ip"
+            @click="mandarARemuestreo(item.ip)"
+            title="Recuperación baja — crear nueva prueba metalúrgica"
           >
-            <td class="td-mono" style="color:var(--color-gold)">{{ item.ip }}</td>
-            <td class="td-proveedor">{{ item.proveedor }}</td>
-            <td class="td-fecha">{{ fmt(item.fecha_analisis) }}</td>
-
-            <!-- Ley cola Au -->
-            <td class="td-dual">
-              <span class="val-primary gold">{{ fmtD(item.ley_cola_au_gr_tm) ?? '—' }}</span>
-              <span class="val-secondary">{{ fmtD(item.ley_cola_au_oz_tc) ?? '—' }}</span>
-            </td>
-
-            <!-- Ley cola Ag -->
-            <td class="td-dual">
-              <span class="val-primary blue">{{ fmtD(item.ley_cola_ag_gr_tm) ?? '—' }}</span>
-              <span class="val-secondary">{{ item.ley_cola_ag_gr_tm != null ? fmtD(item.ley_cola_ag_gr_tm / 34.2857) : '—' }}</span>
-            </td>
-
-            <!-- Solución Au g/m³ -->
-            <td class="td-dual">
-              <span class="val-primary">{{ fmtD(item.solucion_au_g_m3) ?? '—' }}</span>
-              <span class="val-secondary">{{ item.solucion_au_g_m3 != null ? fmtD(item.solucion_au_g_m3 / 34.2857) : '—' }}</span>
-            </td>
-
-            <!-- Solución Ag g/m³ -->
-            <td class="td-dual">
-              <span class="val-primary blue">{{ fmtD(item.solucion_ag_g_m3) ?? '—' }}</span>
-              <span class="val-secondary">{{ item.solucion_ag_g_m3 != null ? fmtD(item.solucion_ag_g_m3 / 34.2857) : '—' }}</span>
-            </td>
-
-            <!-- % Recuperación -->
-            <td>
-              <span
-                v-if="item.recuperacion != null"
-                class="rec-badge"
-                :class="recClass(item.recuperacion)"
-              >
-                {{ Number(item.recuperacion).toFixed(1) }}%
-              </span>
-              <span v-else class="td-mono" style="color:var(--color-text-faint)">—</span>
-            </td>
-            <!-- Acciones -->
-            <td class="td-acciones">
-              <button
-                v-if="item.recuperacion != null && Number(item.recuperacion) < 70"
-                class="btn-remuestreo"
-                :disabled="remuestreando === item.ip"
-                @click="mandarARemuestreo(item.ip)"
-                title="Recuperación baja — crear nueva prueba metalúrgica"
-              >
-                <span v-if="remuestreando === item.ip" class="spinner" style="margin-right:0.3rem"></span>
-                Mandar a Remuestreo
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            <span v-if="remuestreando === item.ip" class="spinner" style="margin-right:0.3rem"></span>
+            Mandar a Remuestreo
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Leyenda recuperación -->
@@ -271,9 +255,115 @@ async function mandarARemuestreo(ip: string) {
 }
 .rec-alta  { background: rgba(34,197,94,0.15);  color: #4ade80; }
 .rec-media { background: rgba(234,179,8,0.15);   color: #fbbf24; }
-.rec-baja  { background: rgba(239,68,68,0.15);   color: #f87171; }
+.rec-baja { background: rgba(220, 38, 38, 0.1); color: var(--color-error); }
 
-.row-sin-rec { opacity: 0.65; }
+/* Rec Cards Grid (Compact) */
+.rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.rec-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.rec-card:hover {
+  border-color: var(--color-gold);
+  box-shadow: 0 2px 8px rgba(179,144,40,0.1);
+}
+.card-sin-rec {
+  opacity: 0.85;
+}
+.rc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px dashed var(--color-border);
+  padding-bottom: 0.5rem;
+}
+.rc-ip-prov {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.rc-ip {
+  font-family: var(--font-mono);
+  color: var(--color-gold);
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+.rc-prov {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+.rc-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+.rc-fecha {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+.rc-no-rec {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.rc-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.rc-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.rc-item {
+  display: flex;
+  flex-direction: column;
+}
+.rc-lbl {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.15rem;
+}
+.rc-val {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.rc-subval {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+.rc-val small, .rc-subval small {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-weight: normal;
+  opacity: 0.8;
+}
+.gold { color: var(--color-gold); }
+.blue { color: #38bdf8; }
+.rc-footer {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.03);
+}
 
 /* Leyenda */
 .rec-leyenda {

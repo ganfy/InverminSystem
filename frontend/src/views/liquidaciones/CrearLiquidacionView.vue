@@ -245,11 +245,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="lote in store.preview.lotes"
-                :key="lote.ip"
-                class="tabla-row"
-              >
+              <template v-for="lote in store.preview.lotes" :key="lote.ip">
+                <tr
+                  class="tabla-row"
+                  @click="toggleExpanded(lote.ip)"
+                  style="cursor: pointer;"
+                  title="Clic para ver detalle de Profit"
+                >
                 <td class="td-mono" style="color:var(--color-gold)">
                   {{ lote.ip }}
                   <span v-if="lote.usa_dirimencia" class="badge-dirimencia" title="Usó dirimencia">D</span>
@@ -272,6 +274,41 @@
                 <td v-if="hayAg" class="td-mono td-right col-ag total-ag-cel">${{ fmtNum(lote.valor_ag_usd, 2) }}</td>
                 <td class="td-mono td-right total-cel">${{ fmtNum(lote.total_usd, 2) }}</td>
               </tr>
+              <!-- Fila Desplegable de Profit -->
+              <tr v-if="expandedLots.includes(lote.ip)" class="fila-profit">
+                <td :colspan="hayAg ? 17 : 14" style="padding: 0;">
+                  <div class="profit-container">
+                    <div class="profit-header">DESGLOSE DE PROFIT ({{ lote.ip }})</div>
+                    <div class="profit-grid">
+                      <div class="profit-item">
+                        <span class="p-label">BRUTO (Au)</span>
+                        <span class="p-val font-mono">${{ fmtNum(Number(lote.precio_x_tms) * Number(lote.tms), 2) }}</span>
+                      </div>
+                      <div class="profit-item" v-if="hayAg">
+                        <span class="p-label">BRUTO (Ag)</span>
+                        <span class="p-val font-mono">${{ fmtNum(lote.valor_ag_usd, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
+                        <span class="p-label">BONO</span>
+                        <span class="p-val font-mono text-success">+${{ fmtNum(lote.bono, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
+                        <span class="p-label">MAQUILA</span>
+                        <span class="p-val font-mono text-danger">-${{ fmtNum(lote.maquila, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
+                        <span class="p-label">INSUMOS</span>
+                        <span class="p-val font-mono text-danger">-${{ fmtNum(lote.insumos_total, 2) }}</span>
+                      </div>
+                      <div class="profit-item profit-net">
+                        <span class="p-label">PROFIT NETO</span>
+                        <span class="p-val font-mono text-gold">${{ fmtNum(Number(lote.total_usd) + (hayAg ? Number(lote.valor_ag_usd) : 0), 2) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              </template>
               <!-- Fila total -->
               <tr class="fila-total">
                 <td colspan="4" style="text-align:right">TOTALES</td>
@@ -298,7 +335,7 @@
                 step="0.01" @input="pendienteRecalculo = true" />
             </div>
             <div class="pfield">
-              <span class="plbl">GASTO CONSUMO (INSUMOS LIQ)</span>
+              <span class="plbl">GASTO CONSUMO (INSUMOS PLANTA)</span>
               <input type="number" class="pinput" v-model.number="editOv.gasto_consumo"
                 step="0.01" @input="pendienteRecalculo = true" />
             </div>
@@ -312,7 +349,7 @@
           <!-- Por lote: % Rec Liq -->
           <div class="params-por-lote">
             <div v-for="lote in store.preview.lotes" :key="lote.ip" class="pfield">
-              <span class="plbl">{{ lote.ip }} — % REC LIQ</span>
+              <span class="plbl">% REC LIQ</span>
               <input type="number" class="pinput" v-model.number="editOv.rec_liq[lote.ip]"
                 step="0.1" min="0" max="100" @input="pendienteRecalculo = true" />
             </div>
@@ -418,6 +455,7 @@
   const errorPaso1       = ref('')
   const provacops        = ref<{ id: number; proveedor: string; acopiador: string; pendiente_parametros?: boolean }[]>([])
   const guardandoBorrador = ref(false)
+  const expandedLots      = ref<string[]>([])
 
   // ── Computed ───────────────────────────────────────────────────────
   const provacopSeleccionado = computed(() => provacops.value.find(p => p.id === provacopId.value))
@@ -491,6 +529,12 @@
     } else {
       lotesSeleccionados.value = store.lotesDisponibles.map(l => l.ip)
     }
+  }
+
+  function toggleExpanded(ip: string) {
+    const idx = expandedLots.value.indexOf(ip)
+    if (idx >= 0) expandedLots.value.splice(idx, 1)
+    else expandedLots.value.push(ip)
   }
 
   //Editar
@@ -612,6 +656,7 @@ async function recalcularConOverrides() {
     store.limpiarPreview()
     cargarProvacops()
     cargarPrecio()
+    expandedLots.value = []
   })
   </script>
 
@@ -767,7 +812,7 @@ async function recalcularConOverrides() {
   .spinner { animation:spin 0.8s linear infinite; display:inline-block; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  .col-r { text-align: right; }
+  th.col-r, td.col-r { text-align: right !important; }
   .alerta-dirim { background: rgba(179,144,40,0.12); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
 
   /* Columnas Ag (Plata) */
@@ -778,4 +823,41 @@ async function recalcularConOverrides() {
     font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 700;
     color: #94a3b8;
   }
+  
+  /* Profit desplegable */
+  .fila-profit > td {
+    background: rgba(179,144,40,0.03);
+    border-bottom: 2px solid var(--color-border);
+  }
+  .profit-container {
+    padding: 1rem 1.5rem;
+    border-left: 3px solid var(--color-gold);
+  }
+  .profit-header {
+    font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.1em;
+    color: var(--color-text-muted); margin-bottom: 0.75rem; font-weight: 700;
+  }
+  .profit-grid {
+    display: flex; gap: 2rem; flex-wrap: wrap; align-items: center;
+  }
+  .profit-item {
+    display: flex; flex-direction: column; gap: 0.25rem;
+  }
+  .profit-item .p-label {
+    font-size: var(--text-xs); color: var(--color-text-dim); font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .profit-item .p-val {
+    font-size: var(--text-md); font-weight: 600; color: var(--color-text);
+  }
+  .profit-net {
+    margin-left: auto;
+    padding-left: 2rem;
+    border-left: 1px solid var(--color-border);
+  }
+  .profit-net .p-val { font-size: var(--text-lg); }
+  
+  .font-mono { font-family: var(--font-mono); }
+  .text-success { color: var(--color-success) !important; }
+  .text-danger { color: var(--color-error) !important; }
+  .text-gold { color: var(--color-gold) !important; }
   </style>

@@ -250,6 +250,7 @@ const form = reactive({
   razon_social:    '',
   guia_remision:   '',
   guia_transporte: '',
+  procedencia:     '',
 })
 
 /** Normaliza una placa extraída: la pone en mayúsculas, elimina caracteres no válidos
@@ -272,7 +273,8 @@ function aplicarDatosExtraidos(datos: Partial<Record<string, string | null>>) {
   if (datos.razon_social)    form.razon_social    = datos.razon_social
   if (datos.guia_remision)   form.guia_remision   = datos.guia_remision
   if (datos.guia_transporte) form.guia_transporte = datos.guia_transporte
-  // procedencia y sacos_camion son de referencia, no se llenan en el form
+  if (datos.procedencia)     form.procedencia     = datos.procedencia
+  // sacos_camion es de referencia, no se llena en el form
 
 // ── Auto-seleccionar proveedor por RUC o razón social ──────────────────────
   // Solo intentar si aún no hay proveedor seleccionado manualmente
@@ -288,10 +290,15 @@ function aplicarDatosExtraidos(datos: Partial<Record<string, string | null>>) {
 
   // Si no hay RUC o no coincide, buscar por razón social (coincidencia parcial)
   if (!coincidencia && rsExtraida) {
-    coincidencia = provsUnicos.value.find(p =>
-      p.proveedor_razon_social.toLowerCase().includes(rsExtraida) ||
-      rsExtraida.includes(p.proveedor_razon_social.toLowerCase())
-    )
+    const normalizarTexto = (s: string) => {
+      return s.toLowerCase().replace(/[\.\,\s]/g, '').replace(/1/g, 'i').replace(/0/g, 'o')
+    }
+    const rsNorm = normalizarTexto(rsExtraida)
+    
+    coincidencia = provsUnicos.value.find(p => {
+      const pNorm = normalizarTexto(p.proveedor_razon_social)
+      return pNorm.includes(rsNorm) || rsNorm.includes(pNorm)
+    })
   }
 
   if (coincidencia) {
