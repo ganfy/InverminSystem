@@ -129,7 +129,11 @@ def _cargar_config_alertas(db: Session) -> AlertasConfig:
 
 
 def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
-    lotes_db = db.query(Lote).filter(~Lote.eliminado).all()
+    lotes_db = (
+        db.query(Lote)
+        .filter(~Lote.eliminado, Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]))
+        .all()
+    )
 
     # Pre-cargar sets en queries únicas (evita N+1)
     ids_con_cip: set[int] = {row[0] for row in db.query(MapeoCIP.lote_id).distinct().all()}
@@ -174,6 +178,12 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         .all()
     )
 
+    # Pre-cargar todas las Pruebas Metalurgicas activas (no descartadas)
+    pruebas_db = db.query(PruebaMetalurgica.lote_id).filter(~PruebaMetalurgica.descartado).all()
+    pruebas_por_lote = defaultdict(int)
+    for row in pruebas_db:
+        pruebas_por_lote[row[0]] += 1
+
     recs_por_lote = defaultdict(list)
     ids_con_recuperacion = set()
     for lote_id, estado, valor in recs_db:
@@ -183,15 +193,26 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     # ids con recuperación COMPLETADA y sin ninguna PENDIENTE
     ids_rec_completa: set[int] = set()
     ids_rec_pendiente: set[int] = set()
-    for lote_id, recs in recs_por_lote.items():
+
+    # Evaluar lotes con recuperaciones o pruebas
+    lotes_a_evaluar = set(recs_por_lote.keys()).union(set(pruebas_por_lote.keys()))
+
+    for lote_id in lotes_a_evaluar:
+        recs = recs_por_lote.get(lote_id, [])
+        num_pruebas = pruebas_por_lote.get(lote_id, 0)
+
         has_completado = any(
             r["estado"] in ("COMPLETADO", "CERT_COMERCIAL", "CERT_RECONOCIMIENTO") for r in recs
         )
-        has_pendiente = any(r["estado"] == "PENDIENTE" for r in recs)
-        if has_pendiente:
-            ids_rec_pendiente.add(lote_id)
-        if has_completado and not has_pendiente:
+        has_pendiente_en_lab = any(r["estado"] == "PENDIENTE" for r in recs)
+        has_prueba_activa = num_pruebas > len(recs)
+
+        if has_completado:
             ids_rec_completa.add(lote_id)
+
+            # Badge REMU solo si ya hay una rec completada y hay otra pendiente (remuestreo)
+            if has_pendiente_en_lab or has_prueba_activa:
+                ids_rec_pendiente.add(lote_id)
 
     kpis = DashboardKPIs()
     lotes_resumen = []

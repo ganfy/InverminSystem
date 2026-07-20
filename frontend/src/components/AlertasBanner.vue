@@ -25,7 +25,7 @@
             <span class="ab-item-ip" v-if="alerta.cips && alerta.cips.length">CIP: {{ alerta.cips.join(', ') }}</span>
             <span class="ab-item-ip" style="opacity: 0.6" v-else>CIP: ---</span>
           </template>
-          <span class="ab-item-tipo">{{ TIPO_LABEL[alerta.tipo] ?? alerta.tipo }}</span>
+          <span class="ab-item-tipo">{{ getTipoLabel(alerta, modulo) }}</span>
           <span class="ab-item-horas">{{ alerta.horas_retraso }}h de retraso</span>
         </div>
         <div class="ab-item-proveedor" v-if="modulo !== 'LABORATORIO'">{{ alerta.proveedor }}<span v-if="alerta.acopiador"> · {{ alerta.acopiador }}</span></div>
@@ -75,6 +75,14 @@ const TIPO_LABEL: Record<string, string> = {
 }
 
 const SEV_ORDER: Record<string, number> = { CRITICA: 3, ALTA: 2, MEDIA: 1 }
+
+function getTipoLabel(alerta: any, modulo: string) {
+  if (modulo === 'LABORATORIO') {
+    if (alerta.tipo === 'RETRASO_LEY') return 'Retraso en Newmont'
+    if (alerta.tipo === 'RETRASO_RECUPERACION') return 'Retraso en Sólidos / Absorciones Atómicas'
+  }
+  return TIPO_LABEL[alerta.tipo] ?? alerta.tipo
+}
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 const todasAlertas   = ref<any[]>([])

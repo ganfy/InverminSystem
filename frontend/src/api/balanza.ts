@@ -40,6 +40,7 @@ export interface PesajeDetalle {
 
 export interface LoteCrear {
   tipo_material: string
+  observaciones?: string | null  // Solo para tipo 'Otro'
   pesaje: PesajeCrear
 }
 
@@ -58,6 +59,7 @@ export interface LoteDetalle {
   ip: string
   numero_lote: number
   tipo_material: string | null
+  observaciones: string | null  // Solo para tipo 'Otro'
   estado: string
   volado: boolean
   peso_neto: number | null
@@ -78,6 +80,7 @@ export interface SesionCrear {
   razon_social?: string | null
   guia_remision?: string | null
   guia_transporte?: string | null
+  sacos_camion?: number | null  // Total sacos del camión (no granel)
 }
 
 export interface SesionEditar {
@@ -89,6 +92,7 @@ export interface SesionEditar {
   razon_social?: string | null
   guia_remision?: string | null
   guia_transporte?: string | null
+  sacos_camion?: number | null  // Total sacos del camión (no granel)
 }
 
 export interface SesionLista {
@@ -122,6 +126,7 @@ export interface SesionDetalle {
   razon_social: string | null
   guia_remision: string | null
   guia_transporte: string | null
+  sacos_camion: number | null  // Total sacos del camión (no granel)
   estado: string
   fecha_ingreso: string
   lotes: LoteDetalle[]

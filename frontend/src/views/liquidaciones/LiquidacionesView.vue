@@ -223,19 +223,20 @@
               </button>
             </div>
 
-            <!-- Tabla lotes del grupo -->
-            <div class="tabla-wrapper" style="border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm)">
+            <!-- Tabla de lotes del grupo (Reemplaza grid) -->
+            <div class="tabla-wrapper">
               <table class="tabla">
                 <thead>
                   <tr>
                     <th>IP</th>
                     <th>MATERIAL</th>
+                    <th>RECEPCIÓN</th>
                     <th class="col-r">TMS</th>
                     <th class="col-r">LEY PLANTA</th>
                     <th class="col-r">LEY MINERO</th>
                     <th class="col-r">LEY COMERC.</th>
                     <th class="col-r">% REC</th>
-                    <th>ESTADO LEY</th>
+                    <th>ESTADO</th>
                     <th class="col-r">DÍAS</th>
                   </tr>
                 </thead>
@@ -244,27 +245,25 @@
                     v-for="lote in grupo.lotes"
                     :key="lote.ip"
                     class="tabla-row"
-                    :class="{ 'fila-volado': lote.volado, 'fila-alerta': lote.alerta_vencimiento && !lote.volado }"
+                    :class="{ 'fila-volado': lote.volado, 'fila-vencimiento': lote.alerta_vencimiento && !lote.volado }"
                   >
-                    <td class="td-mono td-gold">{{ lote.ip }}</td>
+                    <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
                     <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
+                    <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
                     <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
                     <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_planta, 4) }}</td>
                     <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
-                    <td class="col-r td-mono td-gold">{{ fmtNum(lote.ley_comercial, 4) }}</td>
+                    <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtNum(lote.ley_comercial, 4) }}</td>
                     <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
                     <td>
-                      <span v-if="lote.usa_dirimencia" class="chip chip-dirim">Dirimencia</span>
-                      <span v-else class="chip chip-ok">2 labs</span>
+                      <span v-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
+                      <span v-else-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
+                      <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D</span>
                     </td>
                     <td class="col-r">
-                      <span
-                        class="dias-badge"
-                        :class="{
-                          'dias-warn': lote.alerta_vencimiento && !lote.volado,
-                          'dias-peligro': lote.dias_almacen >= 30
-                        }"
-                      >{{ lote.dias_almacen }}d</span>
+                      <span class="dias-badge" :class="{'dias-warn':lote.alerta_vencimiento,'dias-danger':lote.dias_almacen>=30}">
+                        {{ lote.dias_almacen }}d
+                      </span>
                     </td>
                   </tr>
                 </tbody>
@@ -362,8 +361,18 @@ const lotesAgrupados = computed<GrupoProvacop[]>(() => {
     if (totalTms > 0) {
       g.ley_prom = g.lotes.reduce((s, l) => s + (l.ley_comercial ?? 0) * (l.tms ?? 0), 0) / totalTms
     }
+    g.lotes.sort((a, b) => {
+      // Sort lotes by IP descending (e.g. L-100 before L-99)
+      return b.ip.localeCompare(a.ip)
+    })
   }
-  return [...map.values()]
+  const grupos = [...map.values()]
+  grupos.sort((a, b) => {
+    const provCmp = (a.proveedor || '').localeCompare(b.proveedor || '')
+    if (provCmp !== 0) return provCmp
+    return (a.acopiador || '').localeCompare(b.acopiador || '')
+  })
+  return grupos
 })
 
 const cargarPrecioOro = async () => {
@@ -641,7 +650,7 @@ onMounted(async () => {
 .fila-volado { background: rgba(207,151,61,0.05) !important; }
 .fila-alerta { background: rgba(245,158,11,0.03) !important; }
 
-.col-r { text-align: right; }
+th.col-r, td.col-r { text-align: right !important; }
 .col-acciones { text-align: right; white-space: nowrap; }
 .td-mono    { font-family: var(--font-mono); }
 .td-gold    { color: var(--color-gold); }
@@ -712,4 +721,81 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .btn-con-icono { display: flex; align-items: center; gap: 0.4rem; }
+/* Lotes Cards Compact Layout */
+.lotes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--color-bg);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  border: 1px solid var(--color-border);
+  border-top: none;
+}
+.lote-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+.lote-card:hover {
+  border-color: var(--color-gold);
+  box-shadow: 0 2px 8px rgba(179,144,40,0.1);
+}
+.card-volado {
+  background: rgba(var(--color-gold-rgb), 0.03);
+  border-left: 3px solid var(--color-gold);
+}
+.card-alerta {
+  background: rgba(220, 38, 38, 0.03);
+  border-left: 3px solid var(--color-error);
+}
+.lc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed var(--color-border);
+  padding-bottom: 0.5rem;
+}
+.lc-ip {
+  font-family: var(--font-mono);
+  color: var(--color-gold);
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+.lc-body {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.lc-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.lc-full {
+  grid-column: span 3;
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255,255,255,0.03);
+}
+.lc-lbl {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.lc-val {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--color-text);
+}
+.text-gold { color: var(--color-gold); }
+.text-muted { color: var(--color-text-muted); }
 </style>

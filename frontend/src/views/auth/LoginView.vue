@@ -69,7 +69,11 @@ async function handleLogin() {
     await authStore.login(username.value, password.value)
     router.push('/')
   } catch (e: any) {
-    error.value = e?.response?.data?.detail ?? 'Error al iniciar sesión'
+    if (e?.response?.status === 401) {
+      error.value = 'Usuario o Contraseña Incorrectos'
+    } else {
+      error.value = e?.response?.data?.detail ?? 'Error al iniciar sesión'
+    }
   } finally {
     loading.value = false
   }

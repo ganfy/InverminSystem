@@ -106,6 +106,7 @@ class TerceroLista(BaseModel):
     referencia: str | None = None
     activo: bool
     acopiador: str | None = None
+    pendiente_parametros: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -202,9 +203,19 @@ class CambiarAcopiadorPayload(BaseModel):
     acopiador_id: int
 
 
+class RegistroRapidoPayload(BaseModel):
+    """Payload para registro rápido en balanza."""
+
+    proveedor_id: int | None = None
+    proveedor_razon_social: str | None = None
+    proveedor_ruc: str | None = None
+    acopiador_razon_social: str | None = None
+
+
 class ProvacopDropdown(BaseModel):
     id: int
     proveedor: str
     acopiador: str
+    pendiente_parametros: bool = False
 
     model_config = ConfigDict(from_attributes=True)

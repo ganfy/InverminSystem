@@ -275,6 +275,7 @@ def _sync_lote(
             ip=data.ip,
             numero_lote=data.numero_lote,
             tipo_material=data.tipo_material,
+            observaciones=data.observaciones,
             estado=EstadoLote.RECEPCIONADO,
             volado=False,
             habilitado_ruma=False,

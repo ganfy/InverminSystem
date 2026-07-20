@@ -24,10 +24,21 @@
             <option value="Mineral">Mineral</option>
             <option value="Llampo">Llampo</option>
             <option value="M.Llampo">M.Llampo</option>
+            <option value="Otro">Otro</option>
           </select>
           <span v-else class="header-valor">{{ tipoMaterial || '-' }}</span>
         </div>
-        <div v-if="sesion?.estado === 'EN_PROCESO'" class="header-campo">
+        <!-- Para tipo 'Otro': mostrar campo Observaciones en lugar de Sacos -->
+        <div v-if="sesion?.estado === 'EN_PROCESO' && tipoMaterial === 'Otro'" class="header-campo header-campo-obs">
+          <span class="header-label">OBSERVACIONES:</span>
+          <input
+            class="field-input"
+            v-model="observacionesOtro"
+            placeholder="Descripción de la carga..."
+            style="min-width: 180px;"
+          />
+        </div>
+        <div v-else-if="sesion?.estado === 'EN_PROCESO'" class="header-campo">
           <span class="header-label">N° SACOS:</span>
           <input
             class="field-input header-sacos"
@@ -104,8 +115,8 @@
               <span class="transp-val">{{ sesion?.placa ?? '-' }}</span>
             </div>
             <div class="transp-fila">
-              <span class="transp-label">CARRETA:</span>
-              <span class="transp-val">{{ sesion?.carreta || '-' }}</span>
+              <span class="transp-label">PLACA CARRETA:</span>
+              <span class="transp-val td-mono">{{ sesion?.carreta || '-' }}</span>
             </div>
             <div class="transp-fila transp-full">
               <span class="transp-label">CONDUCTOR:</span>
@@ -116,7 +127,7 @@
               <span class="transp-val">{{ sesion?.transportista || '-' }}</span>
             </div>
             <div class="transp-fila transp-full">
-              <span class="transp-label">RAZÓN SOCIAL:</span>
+              <span class="transp-label">RAZÓN SOCIAL PROV.:</span>
               <span class="transp-val">{{ sesion?.razon_social || '-' }}</span>
             </div>
             <div class="transp-fila">
@@ -126,6 +137,10 @@
             <div class="transp-fila">
               <span class="transp-label">G. TRANSP:</span>
               <span class="transp-val td-mono">{{ sesion?.guia_transporte || '-' }}</span>
+            </div>
+            <div v-if="totalSacos > 0" class="transp-fila">
+              <span class="transp-label">SACOS TOTAL:</span>
+              <span class="transp-val">{{ totalSacos }}</span>
             </div>
           </div>
         </div>
@@ -230,6 +245,7 @@
           :lote="lote"
           :is-admin="authStore.user?.rol === 'Admin'"
           :is-online="online"
+          :modo-otro="lote.tipo_material === 'Otro'"
           @editar="abrirEditarLote"
           @eliminar="abrirEliminar"
           @ver-ticket="store.verTicket"
@@ -399,6 +415,16 @@ watch(peso, (nuevoPeso) => {
 // ── Tipo material - global para todos los lotes ────────────
 const tipoMaterial = ref('')
 
+// ── Observaciones para tipo 'Otro' ─────────────────────────
+const observacionesOtro = ref('')
+
+// ── Total de sacos (suma de lotes activos) ──────────────────
+const totalSacos = computed(() =>
+  sesion.value?.lotes
+    .filter(l => !l.eliminado && l.pesaje?.sacos)
+    .reduce((acc, l) => acc + (l.pesaje?.sacos ?? 0), 0) ?? 0
+)
+
 // ── Sacos / Granel ─────────────────────────────────────────
 const sacos  = ref<number | null>(null)
 const granel = ref(false)
@@ -532,6 +558,7 @@ async function registrarLote() {
     sesionIdRaw.value.startsWith('offline-') ? sesionIdRaw.value : sesionIdNum.value,
     {
       tipo_material: tipoMaterial.value,
+      observaciones: tipoMaterial.value === 'Otro' ? (observacionesOtro.value || null) : null,
       pesaje: {
         peso_inicial: convertirParaBD(loteForm.peso_inicial, 'BALANZA')!,
         peso_final:   convertirParaBD(loteForm.peso_final, 'BALANZA')!,
@@ -550,6 +577,8 @@ async function registrarLote() {
     loteForm.justificacion_manual = ''
     isManualBruto.value = false
     isManualTara.value = false
+    // Limpiar observaciones para tipo Otro después de registrar
+    if (tipoMaterial.value === 'Otro') observacionesOtro.value = ''
     preFillBruto()
   }
 }

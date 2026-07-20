@@ -19,6 +19,7 @@ from app.models.models import (
 )
 from app.schemas.entidades import (
     ParametrosSchema,
+    RegistroRapidoPayload,
     TerceroCrear,
     TerceroEditar,
     TipoAcopiador,
@@ -225,12 +226,16 @@ def listar_terceros(
     Un proveedor con 2 acopiadores aparece 2 veces.
     """
     query = (
-        db.query(Entidad, ProveedorAcopiador)
+        db.query(Entidad, ProveedorAcopiador, ParametrosComerciales)
         .join(EntidadRol, EntidadRol.entidad_id == Entidad.id)
         .join(Rol, Rol.id == EntidadRol.rol_id)
         .join(
             ProveedorAcopiador,
             ProveedorAcopiador.proveedor_id == Entidad.id,
+        )
+        .outerjoin(
+            ParametrosComerciales,
+            ParametrosComerciales.provacop_id == ProveedorAcopiador.id,
         )
         .filter(Rol.codigo == RolEntidad.PROVEEDOR)
     )
@@ -240,7 +245,7 @@ def listar_terceros(
     filas = query.order_by(Entidad.razon_social).all()
 
     resultado = []
-    for entidad, provacop in filas:
+    for entidad, provacop, parametros in filas:
         acopiador_nombre = provacop.acopiador.razon_social if provacop.acopiador else None
         resultado.append(
             {
@@ -251,6 +256,7 @@ def listar_terceros(
                 "referencia": entidad.referencia,
                 "activo": entidad.activo,
                 "acopiador": acopiador_nombre,
+                "pendiente_parametros": parametros is None,
             }
         )
     return resultado
@@ -592,6 +598,66 @@ def listar_provacops(db: Session, con_lotes: bool = False) -> list[dict]:
             "id": pa.id,
             "proveedor": pa.proveedor.razon_social if pa.proveedor else "—",
             "acopiador": pa.acopiador.razon_social if pa.acopiador else "—",
+            "pendiente_parametros": not bool(pa.parametros),
         }
         for pa in rows
     ]
+
+
+def registro_rapido(
+    db: Session,
+    datos: RegistroRapidoPayload,
+    usuario_id: int,
+) -> int:
+    """Registro rápido desde balanza."""
+    # 1. Proveedor
+    proveedor = None
+    if datos.proveedor_id:
+        proveedor = db.query(Entidad).filter_by(id=datos.proveedor_id).first()
+        if not proveedor:
+            raise ValueError("Proveedor no encontrado.")
+    else:
+        if not datos.proveedor_razon_social or not datos.proveedor_ruc:
+            raise ValueError("Faltan datos del proveedor.")
+        proveedor = db.query(Entidad).filter_by(ruc=datos.proveedor_ruc).first()
+        if not proveedor:
+            proveedor = Entidad(
+                ruc=datos.proveedor_ruc,
+                razon_social=datos.proveedor_razon_social,
+                tipo=TipoEntidad.EMPRESA,
+                creado_por=usuario_id,
+            )
+            db.add(proveedor)
+            db.flush()
+    _asignar_rol(db, proveedor, RolEntidad.PROVEEDOR)
+
+    # 2. Acopiador
+    acopiador = None
+    if datos.acopiador_razon_social:
+        acopiador = db.query(Entidad).filter_by(razon_social=datos.acopiador_razon_social).first()
+        if not acopiador:
+            acopiador = Entidad(
+                razon_social=datos.acopiador_razon_social,
+                tipo=TipoEntidad.EMPRESA,
+                creado_por=usuario_id,
+            )
+            db.add(acopiador)
+            db.flush()
+        _asignar_rol(db, acopiador, RolEntidad.ACOPIADOR)
+    else:
+        # Auto-acopio
+        acopiador = proveedor
+        _asignar_rol(db, proveedor, RolEntidad.ACOPIADOR)
+
+    # 3. ProveedorAcopiador
+    provacop = (
+        db.query(ProveedorAcopiador)
+        .filter_by(proveedor_id=proveedor.id, acopiador_id=acopiador.id)
+        .first()
+    )
+    if not provacop:
+        provacop = ProveedorAcopiador(proveedor_id=proveedor.id, acopiador_id=acopiador.id)
+        db.add(provacop)
+        db.flush()
+
+    return provacop.id

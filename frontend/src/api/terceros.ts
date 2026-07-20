@@ -53,6 +53,14 @@ export interface TerceroLista {
   referencia: string | null
   activo: boolean
   acopiador: string | null
+  pendiente_parametros: boolean
+}
+
+export interface RegistroRapidoPayload {
+  proveedor_id?: number | null
+  proveedor_razon_social?: string | null
+  proveedor_ruc?: string | null
+  acopiador_razon_social?: string | null
 }
 
 export interface TerceroRespuesta {
@@ -140,6 +148,10 @@ const terceros = {
 
   buscarPorRuc(ruc: string): Promise<TerceroRespuesta | null> {
     return api.get(`/terceros/buscar-ruc/${ruc}`).then(r => r.data)
+  },
+
+  registroRapido(datos: RegistroRapidoPayload): Promise<{ provacop_id: number }> {
+    return api.post('/terceros/registro-rapido', datos).then(r => r.data)
   },
 }
 

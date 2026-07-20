@@ -599,6 +599,7 @@ def listar_lotes_disponibles(db: Session) -> list[LoteDisponibleOut]:
             Lote.habilitado_ruma == True,  # noqa: E712
             Lote.ruma_id.is_(None),
             ~Lote.eliminado,
+            Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]),
         )
         .all()
     )

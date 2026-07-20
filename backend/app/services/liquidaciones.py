@@ -329,7 +329,7 @@ def _calcular_lote(
 
     riesgo = Decimal(str(params.riesgo_comercial)) if params.riesgo_comercial else Decimal("0")
     maquila_base = Decimal(str(params.maquila)) if params.maquila else Decimal("0")
-    is_llampo = lote.tipo_material and lote.tipo_material.strip().lower() in ["llampo", "m.llampo"]
+    is_llampo = lote.tipo_material and lote.tipo_material.strip().lower() == "llampo"
 
     gasto_acopio_base = (
         params.gasto_acopio_llampo
@@ -981,6 +981,7 @@ def lotes_disponibles_para_liquidar(
             Lote.sesion.has(provacop_id=provacop_id),
             Lote.eliminado == False,  # noqa: E712
             Lote.estado == EstadoLote.RECEPCIONADO,
+            Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]),
         )
         .order_by(Lote.id.desc())
         .all()

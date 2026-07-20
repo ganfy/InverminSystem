@@ -1,7 +1,9 @@
 <template>
     <div class="lote-card" :class="{ 'lote-en-proceso': !lote.pesaje?.peso_final }">
       <div class="lote-card-header">
-        <span class="lote-ip">{{ lote.ip }} | Lote {{ lote.numero_lote }}</span>
+        <!-- Modo Otro: sin IP/lote, solo tipo -->
+        <span v-if="modoOtro" class="lote-ip">Ticket • {{ lote.pesaje?.numero_ticket ?? lote.ip }}</span>
+        <span v-else class="lote-ip">{{ lote.ip }} | Lote {{ lote.numero_lote }}</span>
         <div class="lote-acciones">
           <button
             v-if="isAdmin || lote.id === -1"
@@ -35,13 +37,20 @@
           <span class="lote-dato-label">NETO:</span>
           <span class="lote-dato-val neto-val">{{ lote.peso_neto != null ? formatPesoPorModulo(lote.peso_neto, 'BALANZA', 3) : '…' }}</span>
         </div>
-        <div v-if="lote.pesaje?.sacos" class="lote-fila">
-          <span class="lote-dato-label">SACOS:</span>
-          <span class="lote-dato-val">{{ lote.pesaje.sacos }}</span>
+        <!-- Para tipo Otro: observaciones en lugar de sacos/granel -->
+        <div v-if="modoOtro && lote.observaciones" class="lote-fila">
+          <span class="lote-dato-label">OBS.:</span>
+          <span class="lote-dato-val" style="font-style: italic; opacity: 0.85;">{{ lote.observaciones }}</span>
         </div>
-        <div v-if="lote.pesaje?.granel" class="lote-fila">
-          <span class="badge-propio">Granel</span>
-        </div>
+        <template v-else>
+          <div v-if="lote.pesaje?.sacos" class="lote-fila">
+            <span class="lote-dato-label">SACOS:</span>
+            <span class="lote-dato-val">{{ lote.pesaje.sacos }}</span>
+          </div>
+          <div v-if="lote.pesaje?.granel" class="lote-fila">
+            <span class="badge-propio">Granel</span>
+          </div>
+        </template>
       </div>
       <div class="lote-card-footer">
         <button class="btn-secondary btn-sm" @click="$emit('verTicket', lote)" title="Ver ticket antes de imprimir"><Eye :size="14" style="margin-right: 4px;" /> Ver ticket</button>
@@ -59,6 +68,7 @@
     lote: LoteDetalle
     isAdmin: boolean
     isOnline: boolean
+    modoOtro?: boolean  // true para tipo 'Otro': oculta IP/Lote, muestra observaciones
   }>()
 
   defineEmits(['editar', 'eliminar', 'verTicket', 'imprimirTicket'])

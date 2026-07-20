@@ -414,7 +414,7 @@ async function generarCertificado() {
     try {
       if (!store.cips.length) await store.cargarCips()
       const cipObj = store.cips.find(c => c.cip === formCip.value)
-      const analisisLey = cipObj?.analisis_ley.find(a => a.material === 'Au' && a.estado === 'COMPLETADO' && a.vigente)
+      const analisisLey = cipObj?.analisis_ley.find(a => a.material === 'Au' && a.vigente)
       
       if (analisisLey) {
         const result = await store.generarCertificadoLeyInterno(analisisLey.id)

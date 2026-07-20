@@ -361,7 +361,8 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
     sesion_id = Column(Integer, ForeignKey("sesiones_descarga.id"), nullable=False)
     ip = Column(String(20), unique=True, nullable=False)
     numero_lote = Column(Integer, nullable=False)
-    tipo_material = Column(String(20))  # Mineral | Llampo | M.Llampo
+    tipo_material = Column(String(20))  # Mineral | Llampo | M.Llampo | Otro
+    observaciones = Column(String(500))  # Texto libre para tipo Otro
     ruma_id = Column(Integer, ForeignKey("rumas.id"))
     estado = Column(String(30), nullable=False, default=EstadoLote.RECEPCIONADO)
     # Flags de negocio
@@ -422,10 +423,10 @@ class Pesaje(Base, AuditMixin):
     id = Column(Integer, primary_key=True, autoincrement=True)
     lote_id = Column("lote_id", Integer, ForeignKey("lotes.id"), nullable=False)
     sacos = Column(Integer)
-    peso_inicial = Column(Numeric(10, 2), nullable=False)  # TM
-    peso_final = Column(Numeric(10, 2), nullable=False)  # TM
+    peso_inicial = Column(Numeric(10, 3), nullable=False)  # TM
+    peso_final = Column(Numeric(10, 3), nullable=False)  # TM
     peso_neto = Column(
-        Numeric(10, 2),
+        Numeric(10, 3),
         Computed("peso_inicial - peso_final", persisted=True),
         nullable=False,
     )  # TO DO: calcular en servicio y guardar aquí, porque no es solo peso_final - peso_inicial (puede haber ajustes manuales por tara, humedad, etc.)

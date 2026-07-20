@@ -13,7 +13,7 @@ from pydantic import BaseModel, field_validator, model_validator
 # ENUMS / LITERALES
 # =============================================================================
 
-TIPOS_MATERIAL = ("Mineral", "Llampo", "M.Llampo")
+TIPOS_MATERIAL = ("Mineral", "Llampo", "M.Llampo", "Otro")
 ESTADOS_SESION = ("EN_PROCESO", "COMPLETO", "PAUSADO")
 ESTADOS_LOTE_ELIMINABLES = ("RECEPCIONADO", "LIQUIDADO", "FACTURADO")
 
@@ -90,6 +90,7 @@ class LoteCrear(BaseModel):
     """Datos para agregar un lote a una sesión existente."""
 
     tipo_material: str = "Mineral"
+    observaciones: str | None = None  # Solo para tipo='Otro'
     pesaje: PesajeCrear
 
     @field_validator("tipo_material")
@@ -138,6 +139,7 @@ class LoteResumen(BaseModel):
     ip: str
     numero_lote: int
     tipo_material: str | None = None
+    observaciones: str | None = None  # Solo para tipo='Otro'
     estado: str
     volado: bool
     peso_neto: Decimal | None = None
@@ -173,6 +175,7 @@ class SesionCrear(BaseModel):
     razon_social: str | None = None
     guia_remision: str | None = None
     guia_transporte: str | None = None
+    sacos_camion: int | None = None  # Total de sacos del camión (no granel)
 
     @field_validator("placa")
     @classmethod
@@ -316,4 +319,8 @@ class DatosExtraidos(BaseModel):
     guia_remision: str | None = None
     guia_transporte: str | None = None
     peso_declarado_tm: float | None = None
+    procedencia: str | None = None  # Referencia de la entidad o Punto de partida de la guía
+    sacos_camion: int | None = (
+        None  # Total de sacos declarados en guía (referencia, no persiste en BD)
+    )
     documentos_detectados: list[str] = []

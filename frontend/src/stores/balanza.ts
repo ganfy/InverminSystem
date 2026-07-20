@@ -65,6 +65,7 @@ function loteOfflineADetalle(lote: LoteOfflineData): LoteDetalle {
     ip: lote.ip,
     numero_lote: lote.numero_lote,
     tipo_material: lote.tipo_material,
+    observaciones: lote.observaciones ?? null,
     estado: 'RECEPCIONADO',
     volado: false,
     eliminado: false,
@@ -94,6 +95,7 @@ function loteOnlineADetalle(lote: LoteOnlineData): LoteDetalle {
     ip: lote.ip,
     numero_lote: lote.numero_lote,
     tipo_material: lote.tipo_material,
+    observaciones: null,
     estado: 'RECEPCIONADO',
     volado: false,
     eliminado: false,
@@ -131,16 +133,21 @@ function _fmtFecha(iso: string | null | undefined): string {
 }
 
 function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
-  const obs = [
-    lote.ip,
-    `LOTE-${lote.numero_lote}`,
-    lote.pesaje?.granel
-      ? 'GRANEL'
-      : (lote.pesaje?.sacos ? `${lote.pesaje.sacos} SACOS` : ''),
-  ].filter(Boolean).join(' | ')
+  const esOtro = lote.tipo_material === 'Otro'
 
-  const acopHtml = (!s.es_propio && s.acopiador_razon_social)
-    ? `<tr><td class="lbl">Acopiador</td><td class="sep">:</td><td>${s.acopiador_razon_social}</td></tr>`
+  // Observaciones: para 'Otro' usar texto libre, para mineral/llampo generar IP|LOTE|cantidad
+  const obs = esOtro
+    ? (lote.observaciones || '-')
+    : [
+        lote.ip,
+        `LOTE-${lote.numero_lote}`,
+        lote.pesaje?.granel
+          ? 'GRANEL'
+          : (lote.pesaje?.sacos ? `${lote.pesaje.sacos} SACOS` : ''),
+      ].filter(Boolean).join(' | ')
+
+  const sacosCamionHtml = s.sacos_camion
+    ? `<tr><td class="lbl">Sacos Camión</td><td class="sep">:</td><td>${s.sacos_camion}</td></tr>`
     : ''
 
   return `<div class="ticket-page">
@@ -157,10 +164,11 @@ function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
   <tr><td class="lbl">Conductor</td><td class="sep">:</td><td>${s.conductor || '-'}</td></tr>
   <tr><td class="lbl">Transportista</td><td class="sep">:</td><td>${s.transportista || '-'}</td></tr>
   <tr><td class="lbl">Razon Social Rte.</td><td class="sep">:</td><td>${s.razon_social || s.proveedor_razon_social || '-'}</td></tr>
-  ${acopHtml}
+  <tr><td class="lbl">Procedencia</td><td class="sep">:</td><td>-</td></tr>
   <tr><td class="lbl">Producto</td><td class="sep">:</td><td>${lote.tipo_material?.toUpperCase() ?? '-'}</td></tr>
   <tr><td class="lbl">Documento</td><td class="sep">:</td><td>${s.guia_remision || s.guia_transporte || '-'}</td></tr>
   <tr><td class="lbl">Observaciones</td><td class="sep">:</td><td>${obs}</td></tr>
+  ${sacosCamionHtml}
 </table>
 <div class="hr"></div>
 <table class="seccion"><tr>
@@ -494,6 +502,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
       razon_social: datos.razon_social ?? null,
       guia_remision: datos.guia_remision ?? null,
       guia_transporte: datos.guia_transporte ?? null,
+      sacos_camion: datos.sacos_camion ?? null,
       estado: 'EN_PROCESO',
       creado_en: ahora,
       lotes: [],
@@ -519,6 +528,7 @@ export const useBalanzaStore = defineStore('balanza', () => {
       razon_social: datos.razon_social ?? null,
       guia_remision: datos.guia_remision ?? null,
       guia_transporte: datos.guia_transporte ?? null,
+      sacos_camion: datos.sacos_camion ?? null,
       estado: 'EN_PROCESO',
       fecha_ingreso: ahora,
       lotes: [],
@@ -706,7 +716,8 @@ export const useBalanzaStore = defineStore('balanza', () => {
       ip,
       numero_lote: numeroLote,
       tipo_material: datos.tipo_material,
-      numero_ticket: numeroTicket,    // ← NUEVO
+      observaciones: datos.observaciones ?? null,  // Para tipo 'Otro'
+      numero_ticket: numeroTicket,
       pesaje: {
         peso_inicial: datos.pesaje.peso_inicial,
         peso_final: datos.pesaje.peso_final,

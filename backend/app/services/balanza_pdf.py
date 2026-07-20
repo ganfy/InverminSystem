@@ -60,11 +60,10 @@ class _TicketData:
     razon_social: str  # empresa propietaria del mineral (con RUC entre [])
     proveedor_razon_social: str
     proveedor_ruc: str
-    acopiador_razon_social: str
-    mostrar_acopiador: bool
     tipo_material: str  # PRODUCTO
     documento: str  # guia_remision preferida, fallback guia_transporte
     observaciones: str  # "IP-3173 LOTE-1 GRANEL PERCY MENDOZA"
+    procedencia: str  # Procedencia (referencia de la entidad o punto de partida)
     fecha_inicio: str  # del pesaje: "18/02/2026  13:40:09"
     fecha_fin: str
     peso_bruto: str  # peso_inicial del pesaje
@@ -113,24 +112,31 @@ def _build_ticket_data(lote: Lote) -> _TicketData:
     sesion: SesionDescarga = lote.sesion
     provacop: ProveedorAcopiador = sesion.provacop
     proveedor = provacop.proveedor
-    acopiador = provacop.acopiador
-    es_propio = provacop.proveedor_id == provacop.acopiador_id
     pesaje = lote.pesajes[0] if lote.pesajes else None
 
     # Documento: guia de remisión primero, si no guia de transporte
     documento = _val(sesion.guia_remision or sesion.guia_transporte)
 
-    # Observaciones: "IP-3173 LOTE-1 GRANEL" (o "20 SACOS")
-    if pesaje and pesaje.granel:
-        cantidad = "GRANEL"
-    elif pesaje and pesaje.sacos:
-        cantidad = f"{pesaje.sacos} SACOS"
+    # Observaciones: depende del tipo de material
+    es_otro = lote.tipo_material == "Otro"
+    if es_otro:
+        # Para 'Otro': usar el texto libre de observaciones del lote
+        observaciones = _val(lote.observaciones, "-")
     else:
-        cantidad = ""
-    obs_parts = [f"{lote.ip}", f"LOTE-{lote.numero_lote}"]
-    if cantidad:
-        obs_parts.append(cantidad)
-    observaciones = " ".join(obs_parts)
+        # Para mineral/llampo: generar la cadena IP + LOTE + cantidad
+        if pesaje and pesaje.granel:
+            cantidad = "GRANEL"
+        elif pesaje and pesaje.sacos:
+            cantidad = f"{pesaje.sacos} SACOS"
+        else:
+            cantidad = ""
+        obs_parts = [f"{lote.ip}", f"LOTE-{lote.numero_lote}"]
+        if cantidad:
+            obs_parts.append(cantidad)
+        observaciones = " ".join(obs_parts)
+
+    # Procedencia: campo de la sesión (extraído de guíay o de entidad.referencia)
+    procedencia = _val(getattr(sesion, "procedencia", None) or proveedor.referencia)
 
     return _TicketData(
         numero_ticket=str(pesaje.id) if pesaje else "-",
@@ -141,11 +147,10 @@ def _build_ticket_data(lote: Lote) -> _TicketData:
         razon_social=_val(sesion.razon_social),
         proveedor_razon_social=_val(proveedor.razon_social),
         proveedor_ruc=_val(proveedor.ruc),
-        acopiador_razon_social=_val(acopiador.razon_social),
-        mostrar_acopiador=not es_propio,
         tipo_material=_val(lote.tipo_material, "-").upper(),
         documento=documento,
         observaciones=observaciones,
+        procedencia=procedencia,
         fecha_inicio=_fecha_fmt(pesaje.fecha_inicio if pesaje else None),
         fecha_fin=_fecha_fmt(pesaje.fecha_fin if pesaje else None),
         peso_bruto=_fmt(pesaje.peso_inicial if pesaje else None),
@@ -161,18 +166,6 @@ def _build_ticket_data(lote: Lote) -> _TicketData:
 
 def _render_template(data: _TicketData, config: dict[str, str]) -> str:
     template = _TEMPLATE_PATH.read_text(encoding="utf-8")
-
-    # Bloque acopiador condicional
-    marker_if = "{% if acopiador_html %}"
-    marker_end = "{% endif %}"
-    if not data.mostrar_acopiador:
-        start = template.find(marker_if)
-        end = template.find(marker_end, start) + len(marker_end)
-        if start != -1 and end > len(marker_end):
-            template = template[:start] + template[end:]
-    else:
-        template = template.replace(marker_if + "\n", "")
-        template = template.replace(marker_end + "\n", "")
 
     replacements = {
         # Empresa
@@ -190,7 +183,7 @@ def _render_template(data: _TicketData, config: dict[str, str]) -> str:
         "{{ tipo_material }}": data.tipo_material,
         "{{ documento }}": data.documento,
         "{{ observaciones }}": data.observaciones,
-        "{{ acopiador_razon_social }}": data.acopiador_razon_social,
+        "{{ procedencia }}": data.procedencia,
         # Pesos y fechas
         "{{ fecha_inicio }}": data.fecha_inicio,
         "{{ fecha_fin }}": data.fecha_fin,

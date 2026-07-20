@@ -235,8 +235,11 @@ def obtener_lotes_para_muestreo(db: Session):
     lotes_db = (
         db.query(Lote)
         .join(Lote.sesion)
-        # .outerjoin(Lote.prueba_metalurgica) # Opcional, ya que hacemos la consulta abajo
-        .filter(SesionDescarga.estado == EstadoSesion.COMPLETO)
+        .filter(
+            SesionDescarga.estado == EstadoSesion.COMPLETO,
+            ~Lote.eliminado,
+            Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]),
+        )
         .all()
     )
 

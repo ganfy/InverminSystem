@@ -269,38 +269,40 @@ def _es_ticket_invermin(texto: str) -> bool:
 
 def _es_grr(texto: str) -> bool:
     """
-    Guía de Remisión Electrónica SUNAT (GRR / GURE).
-    Palabras clave que aparecen siempre en estos documentos.
+    Detecta GRR Electrónica SUNAT (emitida por el REMITENTE).
     """
     t = texto.upper()
-    return (
-        sum(
-            1
-            for k in [
-                "GUIA DE REMISION ELECTRONICA",
-                "GUIA DE REMISIÓN ELECTRÓNICA",
-                "REMITENTE",
-                "DATOS DEL DESTINATARIO",
-                "DATOS DEL TRANSPORTISTA",
-                "NUMERO DE PLACA",
-            ]
-            if k in t
-        )
-        >= 3
-    )
+    # Una GRR verdadera dice REMITENTE arriba y tiene DATOS DEL TRANSPORTISTA
+    if "DATOS DE LOS VEH" in t or "DATOS DE LOS CONDUCTORES" in t:
+        return False  # Si tiene datos de vehículos/conductores en plural, es GRT
+
+    keywords = [
+        "GUIA DE REMISION",
+        "GUÍA DE REMISIÓN",
+        "DATOS DEL DESTINATARIO",
+        "DATOS DEL TRANSPORTISTA",
+        "PUNTO DE PARTIDA",
+        "BIENES POR TRANSPORTAR",
+        "PESO BRUTO TOTAL",
+    ]
+    return sum(1 for k in keywords if k in t) >= 3
 
 
 def _es_grt(texto: str) -> bool:
-    """Guía de Remisión - Transportista (papel, escaneado)."""
+    """
+    Detecta GRT Electrónica SUNAT (emitida por el TRANSPORTISTA).
+    """
     t = texto.upper()
-
-    return (
-        "TRANSPORTISTA"
-        or "TRANSPORTE" in t
-        and ("RMTC" in t or "N° DE R.U.C" in t or "PUNTO DE PARTIDA" in t)
-        and "REMITENTE" not in t  # distinguir de GRR
-        and "DECLARACION" not in t  # distinguir de declaración jurada de transporte
-    )
+    keywords = [
+        "GUIA DE REMISION",
+        "GUÍA DE REMISIÓN",
+        "DATOS DE LOS VEHICULOS",
+        "DATOS DE LOS VEHÍCULOS",
+        "DATOS DE LOS CONDUCTORES",
+        "NUMERO DE REGISTRO MTC",
+        "NÚMERO DE REGISTRO MTC",
+    ]
+    return sum(1 for k in keywords if k in t) >= 2
 
 
 def _es_licencia(texto: str) -> bool:
@@ -417,20 +419,94 @@ def _extraer_de_grr(texto: str) -> dict:
       - Placa:          "Número de placa: C9P908"
       - Conductor:      "Principal: MENDOZA CAJAMARCA... - DOCUMENTO NACIONAL..."
       - Peso bruto TM:  "Peso Bruto total de la carga: 9.5"
+      - Razón social remitente (proveedor): sección "Datos del Remitente"
+      - Procedencia: "Referencia de la Entidad" o "Punto de partida"
+      - Sacos: "Cantidad" en unidades enteras junto a peso
     """
     r: dict = {}
 
     # ── Número de guía ────────────────────────────────────────────────────────
     # "N° EG07 - 00000306"  o  "N° EGO7 - 00000306" (OCR confunde 0/O en la serie)
-    # Aceptar letras Y dígitos mezclados con [A-Z0-9] en toda la serie
     m = re.search(r"N[°oO\u00ba]\s*([A-Z][A-Z0-9]{2,8})\s*[-–]\s*(\d{4,10})", texto, re.IGNORECASE)
     if m:
         r["guia_remision"] = _normalizar_guia(m.group(1), m.group(2))
 
-    # ── Transportista ─────────────────────────────────────────────────────────
-    # Aparece en "Datos del transportista:" seguido de NOMBRE - REGISTRO ÚNICO...
+    # ── Razón social del REMITENTE (proveedor de la carga) ────────────────────
+    # Estrategia 0: cabecera del documento — primera línea en mayúsculas que
+    # no sea INVERMIN ni el título de la guía. La GRR de SAYMED pone el nombre
+    # del emisor (proveedor) como encabezado principal antes de las secciones.
+    if not r.get("razon_social"):
+        ruc_invermin = "20601910587"
+        for linea in texto.splitlines():
+            linea = linea.strip()
+            if not linea or len(linea) < 5:
+                continue
+            l_upper = linea.upper()
+            # Ignorar líneas basura o de INVERMIN
+            if "INVERMIN" in l_upper or "ESTA ES UNA" in l_upper:
+                continue
+            # Debe parecer una razón social: mayúsculas, al menos 2 palabras,
+            # contiene E.I.R.L., S.A.C., S.A., E.I.R.L, EMPRESA, MINERA, etc.
+            if re.search(
+                r"\b(E\.I\.R\.L|S\.A\.C|S\.A\.|EMPRESA|MINERA|TRANSPORT|CONSORCIO|COMERCIAL|SOCIEDAD)\b",
+                l_upper,
+            ):
+                rs = re.sub(r"\s+", " ", linea).strip()
+                if len(rs) > 4:
+                    r["razon_social"] = rs
+                    break
+    # Estrategia 1: línea inmediatamente después de "Datos del Remitente"
     m = re.search(
-        r"[Dd]atos del transportista[:\s]*\n([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\-]+?)\s*[-–]\s*REGISTRO\s*[ÚU]NICO",
+        r"[Dd]atos del [Rr]emitente[^\n]*\n+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n",
+        texto,
+    )
+    if m:
+        rs = re.sub(r"\s+", " ", m.group(1)).strip()
+        if len(rs) > 4:
+            r["razon_social"] = rs
+
+    # Estrategia 2: línea precedida de RUC de empresa (20XXXXXXXXX) fuera de sección transportista
+    # Busca "20XXXXXXXXX\nNOMBRE EMPRESA" o "NOMBRE EMPRESA\n20XXXXXXXXX"
+    if not r.get("razon_social"):
+        # Buscar todos los RUC externos (empresas proveedoras)
+        ruc_invermin = "20601910587"
+        ruc_hits = list(re.finditer(r"\b(20\d{9})\b", texto))
+        for ruc_m in ruc_hits:
+            if ruc_m.group(1) == ruc_invermin:
+                continue
+            # Mirar la línea siguiente al RUC
+            pos_fin = ruc_m.end()
+            resto = texto[pos_fin : pos_fin + 200]
+            linea_sig = re.match(r"[\s\n]*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n", resto)
+            if linea_sig:
+                rs = re.sub(r"\s+", " ", linea_sig.group(1)).strip()
+                if len(rs) > 4 and "TRANSPORTISTA" not in rs.upper():
+                    r["razon_social"] = rs
+                    break
+            # Mirar la línea anterior al RUC
+            antes = texto[max(0, ruc_m.start() - 200) : ruc_m.start()]
+            linea_ant = re.search(r"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n\s*$", antes)
+            if linea_ant:
+                rs = re.sub(r"\s+", " ", linea_ant.group(1)).strip()
+                if len(rs) > 4 and "TRANSPORTISTA" not in rs.upper():
+                    r["razon_social"] = rs
+                    break
+
+    # Estrategia 3: patrón "Remitente:" o "REMITENTE:" seguido del nombre en misma o siguiente línea
+    if not r.get("razon_social"):
+        m = re.search(
+            r"[Rr]emitente[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)(?:\n|$)",
+            texto,
+        )
+        if m:
+            rs = re.sub(r"\s+", " ", m.group(1)).strip()
+            if len(rs) > 4:
+                r["razon_social"] = rs
+
+    # ── Transportista ─────────────────────────────────────────────────────────
+    # "Datos del transportista:" → NOMBRE - REGISTRO ÚNICO...
+    m = re.search(
+        r"[Dd]atos del [Tt]ransportista[^\n]*\n+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\-]+?)\s*[-–]\s*REGISTRO\s*[ÚU]NICO",
         texto,
         re.IGNORECASE,
     )
@@ -445,6 +521,18 @@ def _extraer_de_grr(texto: str) -> dict:
     if m:
         r["placa"] = _normalizar_placa(m.group(1).strip())
 
+    # ── Semirremolque / Carreta ───────────────────────────────────────────────
+    # "N° de placa: (semirremolque)" o "Carreta: C9P-908"
+    m = re.search(
+        r"[Ss]ecundario:\s*[Nn]umero de placa[:\s]+([A-Z0-9]{2,3}[\s\-]?[A-Z0-9]{3,4})",
+        texto,
+        re.IGNORECASE,
+    )
+    if m:
+        placa_carreta = _normalizar_placa(m.group(1).strip())
+        if placa_carreta not in ("-", "0", ""):
+            r["carreta"] = placa_carreta
+
     # ── Conductor ─────────────────────────────────────────────────────────────
     # "Principal:   MENDOZA CAJAMARCA PERCY MARTIN - DOCUMENTO NACIONAL..."
     m = re.search(
@@ -456,7 +544,6 @@ def _extraer_de_grr(texto: str) -> dict:
         r["conductor"] = re.sub(r"\s+", " ", m.group(1)).strip()
 
     # ── Peso bruto declarado (TM) ─────────────────────────────────────────────
-    # "Peso Bruto total de la carga: 9.5"
     m = re.search(r"Peso Bruto total de la carga[:\s]+([\d]+(?:[.,]\d+)?)", texto, re.IGNORECASE)
     if m:
         try:
@@ -464,47 +551,146 @@ def _extraer_de_grr(texto: str) -> dict:
         except ValueError:
             pass
 
+    # ── Sacos declarados ──────────────────────────────────────────────────────
+    # GRR puede traer "Cantidad: 120 Sacos" o simplemente la unidad en tabla de bultos
+    m = re.search(
+        r"[Cc]antidad[:\s]+(\d+)\s*[Ss]acos?",
+        texto,
+    )
+    if m:
+        try:
+            r["sacos_camion"] = int(m.group(1))
+        except ValueError:
+            pass
+    if not r.get("sacos_camion"):
+        # Alternativa: "120  Sacos  9.5 TM"
+        m = re.search(r"(\d+)\s+[Ss]acos?", texto)
+        if m:
+            try:
+                r["sacos_camion"] = int(m.group(1))
+            except ValueError:
+                pass
+
+    # ── Procedencia: "Referencia de la Entidad" o "Punto de partida" ──────────
+    # Primero intentar "Referencia de la Entidad" (campo más específico)
+    m = re.search(
+        r"[Rr]eferencia de la [Ee]ntidad[:\s]+(.+)",
+        texto,
+    )
+    if m:
+        val = re.sub(r"\s+", " ", m.group(1)).strip()
+        if val:
+            r["procedencia"] = val
+
+    # Fallback: "Punto de partida" o "Punto de Partida"
+    if not r.get("procedencia"):
+        m = re.search(
+            r"[Pp]unto de [Pp]artida[:\s]+(.+)",
+            texto,
+        )
+        if m:
+            val = re.sub(r"\s+", " ", m.group(1)).strip()
+            if val:
+                r["procedencia"] = val
+
     # ── RUC del proveedor (fallback si no hay ticket) ─────────────────────────
-    # En la GRR el RUC del encabezado suele corromperse por OCR.
-    # Buscamos el RUC en la línea de "Datos del Destinatario" como ancla
-    # y tomamos el RUC que NO sea de INVERMIN (20601910587)
     todos_ruc = re.findall(r"\b((?:10|20)\d{9})\b", texto)
-    ruc = "20601910587"
-    externos = [r for r in todos_ruc if r != ruc]
+    ruc_invermin = "20601910587"
+    externos = [rv for rv in todos_ruc if rv != ruc_invermin]
     if externos:
-        # El primer RUC externo de 20xxxxxxxx es el proveedor (persona jurídica)
-        proveedores = [r for r in externos if r.startswith("20")]
+        proveedores = [rv for rv in externos if rv.startswith("20")]
         if proveedores:
             r["ruc_proveedor"] = proveedores[0]
 
     return r
 
 
+# REEMPLAZAR la función completa _extraer_de_grt:
 def _extraer_de_grt(texto: str) -> dict:
     """
-    GRT (Guía de Remisión Transportista) - escaneada, OCR variable.
-    Extrae guia_transporte y confirma placa/conductor como fallback.
-
-    Ejemplo real: "0002  N° 0004072"
+    Extrae de la GRT Electrónica SUNAT (TRANSPORTISTA).
+    Cubre también GRT física escaneada como fallback.
     """
     r: dict = {}
 
-    # Guía de transporte: "0002  N° 0004072"
-    # Formato: SERIE(4 dígitos) + correlativo
-    m = re.search(r"\b(\d{4})\s+N[°oO]?\s*(\d{4,8})\b", texto)
+    # ── Guía de transporte ────────────────────────────────────────────────────
+    # GRT electrónica: "N° EG03 - 00000217"
+    m = re.search(r"N[°oO\u00ba]\s*([A-Z][A-Z0-9]{2,8})\s*[-–]\s*(\d{4,10})", texto, re.IGNORECASE)
     if m:
-        serie = m.group(1).zfill(4)
-        num = str(int(m.group(2)))
-        r["guia_transporte"] = f"{serie}-{num}"
+        r["guia_transporte"] = _normalizar_guia(m.group(1), m.group(2))
 
-    # Placa desde GRT: "Unidad de Transporte ... ISUZU C9P 908"
+    # Fallback GRT física: "0002  N° 0004072"
+    if not r.get("guia_transporte"):
+        m = re.search(r"\b(\d{4})\s+N[°oO]?\s*(\d{4,8})\b", texto)
+        if m:
+            r["guia_transporte"] = f"{m.group(1).zfill(4)}-{int(m.group(2))}"
+
+    # ── Placa principal ───────────────────────────────────────────────────────
+    # GRT electrónica: "Principal:  Número de placa:  ASC736"
     m = re.search(
-        r"[Uu]nidad de [Tt]ransporte[^\n]+?([A-Z0-9]{2,3}[\s\-]?[A-Z0-9]{3,4})\s*$",
+        r"[Pp]rincipal[:\s]+N[uú]mero de placa[:\s]+([A-Z0-9]{2,3}[\s\-]?[A-Z0-9]{3,4})",
         texto,
-        re.MULTILINE,
+        re.IGNORECASE,
     )
     if m:
-        r["placa_grt"] = _normalizar_placa(m.group(1).strip())
+        r["placa"] = _normalizar_placa(m.group(1).strip())
+
+    # Fallback GRT física
+    if not r.get("placa"):
+        m = re.search(
+            r"[Uu]nidad de [Tt]ransporte[^\n]+?([A-Z0-9]{2,3}[\s\-]?[A-Z0-9]{3,4})\s*$",
+            texto,
+            re.MULTILINE,
+        )
+        if m:
+            r["placa"] = _normalizar_placa(m.group(1).strip())
+
+    # ── Carreta (vehículo secundario) ─────────────────────────────────────────
+    # GRT electrónica: "Secundario 1:  Número de placa:  BKP978"
+    m = re.search(
+        r"[Ss]ecundario\s*\d*[:\s]+N[uú]mero de placa[:\s]+([A-Z0-9]{2,3}[\s\-]?[A-Z0-9]{3,4})",
+        texto,
+        re.IGNORECASE,
+    )
+    if m:
+        placa_carreta = _normalizar_placa(m.group(1).strip())
+        if placa_carreta not in ("-", "0", ""):
+            r["carreta"] = placa_carreta
+
+    # ── Conductor ─────────────────────────────────────────────────────────────
+    # GRT electrónica: "Principal:  CHAMBI APAZA FRANCISCO - DOCUMENTO NACIONAL..."
+    m = re.search(
+        r"[Pp]rincipal[:\s]+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?)\s*[-–]\s*DOCUMENTO\s*NACIONAL",
+        texto,
+        re.IGNORECASE,
+    )
+    if m:
+        r["conductor"] = re.sub(r"\s+", " ", m.group(1)).strip()
+
+    # ── Transportista (razón social del emisor de la GRT) ─────────────────────
+    # GRT electrónica: primera línea significativa = "TRANSPORT RICHY S.A.C."
+    for linea in texto.splitlines():
+        linea = linea.strip()
+        if not linea or len(linea) < 5:
+            continue
+        l_upper = linea.upper()
+        if "INVERMIN" in l_upper or "ESTA ES UNA" in l_upper:
+            continue
+        if re.search(
+            r"\b(E\.I\.R\.L|S\.A\.C|S\.A\.|EMPRESA|MINERA|TRANSPORT|CONSORCIO|COMERCIAL)\b", l_upper
+        ):
+            rs = re.sub(r"\s+", " ", linea).strip()
+            if len(rs) > 4:
+                r["razon_social_transportista"] = rs
+                break
+
+    # ── Peso bruto (referencia) ───────────────────────────────────────────────
+    m = re.search(r"Peso Bruto total de la carga[:\s]+([\d]+(?:[.,]\d+)?)", texto, re.IGNORECASE)
+    if m:
+        try:
+            r["peso_declarado_tm"] = float(m.group(1).replace(",", "."))
+        except ValueError:
+            pass
 
     return r
 
@@ -575,6 +761,8 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
         "guia_remision": None,
         "guia_transporte": None,
         "peso_declarado_tm": None,
+        "procedencia": None,  # Referencia de la entidad o Punto de partida
+        "sacos_camion": None,  # Total de sacos declarados en guía (referencia)
         "documentos_detectados": [],
     }
 
@@ -596,6 +784,16 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
                 bloques.append((texto, "LICENCIA_CONDUCIR"))
             else:
                 bloques.append((texto, "OTRO"))
+
+    # DEBUG OCR DUMP
+    try:
+        with open("debug_ocr.txt", "w", encoding="utf-8") as f:
+            for i, (texto, tipo) in enumerate(bloques):
+                f.write(f"=== BLOQUE {i+1} | TIPO: {tipo} ===\n")
+                f.write(texto)
+                f.write("\n" + "=" * 50 + "\n")
+    except Exception as e:
+        print(f"No se pudo guardar debug_ocr.txt: {e}")
 
     if not bloques:
         raise ValueError(
@@ -631,27 +829,70 @@ def _procesar_archivos(pares: list[tuple[Path, str]]) -> dict:
         datos = _extraer_de_grr(texto)
         for k in (
             "placa",
+            "carreta",
             "conductor",
             "transportista",
             "ruc_proveedor",
             "guia_remision",
             "peso_declarado_tm",
+            "procedencia",
+            "sacos_camion",
+            "razon_social",  # Razón social del remitente (proveedor)
         ):
             if datos.get(k) and not resultado[k]:
                 resultado[k] = datos[k]
 
-    # 3. GRT - solo guia_transporte y placa como último recurso
+    # 3. GRT - solo guia_transporte, placa y transportista como último recurso
     for texto, tipo in bloques:
         if tipo != "GUIA_TRANSPORTE":
             continue
         datos = _extraer_de_grt(texto)
-        if datos.get("guia_transporte") and not resultado["guia_transporte"]:
-            resultado["guia_transporte"] = datos["guia_transporte"]
-        if datos.get("placa_grt") and not resultado["placa"]:
-            resultado["placa"] = datos["placa_grt"]
+        for k in (
+            "guia_transporte",
+            "placa",
+            "carreta",
+            "conductor",
+            "peso_declarado_tm",
+        ):
+            if datos.get(k) and not resultado[k]:
+                resultado[k] = datos[k]
+
+        if datos.get("razon_social_transportista") and not resultado["transportista"]:
+            resultado["transportista"] = datos["razon_social_transportista"]
+
+    # ── Limpieza final de campos ───────────────────────────────────────────────
+    if resultado.get("razon_social"):
+        rs = resultado["razon_social"]
+        # Cortar "RUC" o similares al final
+        rs = re.split(r"(?i)\s+RUC\b", rs)[0].strip()
+        # Eliminar prefijos como "RAZON SOCIAL PROVEEDOR: "
+        rs = re.sub(r"(?i)^(RAZ[OÓ]N\s+SOCIAL(\s+PROVEEDOR)?|REMITENTE)[:\s]+", "", rs).strip()
+        # Corregir errores OCR comunes
+        rs = rs.replace("E.1.R.L", "E.I.R.L").replace("E.L.R.L", "E.I.R.L")
+        resultado["razon_social"] = rs
+
+    if resultado.get("transportista"):
+        tr = resultado["transportista"]
+        tr = re.split(r"(?i)\s+RUC\b", tr)[0].strip()
+        # Eliminar artefactos iniciales que a veces salen en la cabecera antes del nombre
+        tr = re.sub(r"(?i)^(Tels\s+eA\s+Da\s+|DATOS\s+DEL\s+TRANSPORTISTA[:\s]+)", "", tr).strip()
+        # Corregir errores OCR comunes
+        tr = tr.replace("S.A.C", "S.A.C.").replace("S.A.C..", "S.A.C.")
+        tr = tr.replace("E.1.R.L", "E.I.R.L").replace("E.L.R.L", "E.I.R.L")
+        resultado["transportista"] = tr
 
     # ── Validación mínima ──────────────────────────────────────────────────────
     campos_clave = [resultado["placa"], resultado["conductor"], resultado["guia_remision"]]
+
+    # DEBUG FINAL RESULTS
+    try:
+        with open("debug_ocr.txt", "a", encoding="utf-8") as f:
+            f.write("=== RESULTADO FINAL ===\n")
+            for k, v in resultado.items():
+                f.write(f"{k}: {v}\n")
+    except Exception:
+        pass
+
     if not any(campos_clave):
         raise ValueError(
             "No se encontraron datos reconocibles en los documentos. "
