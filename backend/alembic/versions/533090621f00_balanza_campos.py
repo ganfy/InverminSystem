@@ -36,15 +36,19 @@ def upgrade() -> None:
         type_=sa.String(length=50),
         existing_nullable=True,
     )
-    op.add_column(
-        "pesajes",
-        sa.Column(
-            "peso_neto",
-            sa.Numeric(precision=10, scale=2),
-            sa.Computed("peso_inicial - peso_final", persisted=True),
-            nullable=False,
-        ),
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [c["name"] for c in inspector.get_columns("pesajes")]
+    if "peso_neto" not in columns:
+        op.add_column(
+            "pesajes",
+            sa.Column(
+                "peso_neto",
+                sa.Numeric(precision=10, scale=2),
+                sa.Computed("peso_inicial - peso_final", persisted=True),
+                nullable=False,
+            ),
+        )
     op.alter_column(
         "pruebas_metalurgicas",
         "cip",
@@ -65,7 +69,11 @@ def downgrade() -> None:
         type_=sa.VARCHAR(length=20),
         existing_nullable=True,
     )
-    op.drop_column("pesajes", "peso_neto")
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [c["name"] for c in inspector.get_columns("pesajes")]
+    if "peso_neto" in columns:
+        op.drop_column("pesajes", "peso_neto")
     op.alter_column(
         "analisis_recuperacion",
         "cip",
