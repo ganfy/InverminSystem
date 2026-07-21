@@ -519,7 +519,16 @@ import { useUiStore } from '@/stores/ui'
 import AlertasBanner from '@/components/AlertasBanner.vue'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
-import { obtenerPruebasPendientes, type PruebaQueueData } from '@/composables/useOfflineQueue'
+import {
+    obtenerPruebasPendientes,
+    type PruebaQueueData,
+    guardarPruebasListaCache,
+    obtenerPruebasListaCache,
+    encolarCipPruebaOffline,
+    contarCipsPruebasPorLote,
+} from '@/composables/useOfflineQueue'
+import { generarParCipsRecuperacion } from '@/utils/cipGenerator'
+import { generateUUID } from '@/utils/uuid'
 import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
@@ -642,13 +651,19 @@ async function cargarDatos() {
   if (cargando.value) return
   cargando.value = true
   try {
-    const data = await pruebasApi.obtenerListaPruebas()
-    pruebas.value = Array.isArray(data) ? data : []
+    if (online.value) {
+      // ONLINE: descargar del servidor y guardar en cache local
+      const data = await pruebasApi.obtenerListaPruebas()
+      const lista = Array.isArray(data) ? data : []
+      await guardarPruebasListaCache(lista)
+    }
   } catch (err: any) {
-    console.error('Error cargando pruebas:', err)
+    console.warn('[PruebasView] No se pudo actualizar lista del servidor. Usando caché local.', err)
     if (online.value && err?.response?.status !== 403) ui.toast('Error al conectar con el servidor', 'error')
-    pruebas.value = []
   } finally {
+    // SIEMPRE leer de IndexedDB para pintar la UI (garantiza consistencia offline)
+    const local = await obtenerPruebasListaCache<LotePruebaList>()
+    pruebas.value = local
     cargando.value = false
   }
 }
@@ -803,10 +818,57 @@ function irARegistrar(ip: string) {
 }
 
 async function etiquetar(ip: string) {
+  const prueba = pruebas.value.find(p => p.ip === ip)
+
   if (!online.value) {
-    ui.toast('Se requiere conexión para generar la etiqueta CIP', 'warning')
+    // Offline: generar CIPs localmente
+    if (!prueba?.lote_id) {
+      ui.toast(
+        'Sin conexión y sin datos del lote en cache. Carga la lista una vez con red para poder etiquetar offline.',
+        'error'
+      )
+      return
+    }
+    if (prueba.etiquetado) {
+      ui.toast('Este lote ya tiene CIPs de recuperación asignados.', 'warning')
+      return
+    }
+    etiquetando.value = ip
+    try {
+      // Contador independiente: cuántos CIPs de recuperación hay en la cola local
+      const totalRec = await contarCipsPruebasPorLote(ip)
+      const { cip1, cip2, correlativo1, correlativo2 } = generarParCipsRecuperacion(
+        prueba.lote_id,
+        totalRec,
+        'RecuperacionInterno'
+      )
+
+      await encolarCipPruebaOffline({
+        offline_id: `cip-prb-${generateUUID()}`,
+        ip,
+        lote_id: prueba.lote_id,
+        codigo_cip1: cip1,
+        codigo_cip2: cip2,
+        correlativo1,
+        correlativo2,
+        sufijo: 'R',
+        tipo: 'RecuperacionInterno',
+        synced: false,
+        sync_error: null,
+      })
+
+      ui.toast(`Sin red: CIPs generados localmente (${cip1}). Se registrarán al reconectar.`, 'warning')
+      // Mostrar modal con los CIPs generados para poder imprimir de inmediato
+      etiquetaModal.value = { ip, cips: [cip1, cip2] }
+    } catch (e: any) {
+      ui.toast(e?.message ?? 'Error al generar CIPs offline', 'error')
+    } finally {
+      etiquetando.value = null
+    }
     return
   }
+
+  // ONLINE: comportamiento original
   etiquetando.value = ip
   try {
     const resultado = await pruebasApi.etiquetar(ip)

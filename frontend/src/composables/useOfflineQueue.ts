@@ -20,7 +20,7 @@ import type { LoteMuestreo } from '@/api/muestreo'
 import type { TipoAnalisis, OrigenDatos } from '@/types/laboratorio'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 9
+const DB_VERSION = 12
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -180,6 +180,36 @@ export interface AnalisisRecuperacionOfflineItem {
     error?: string
 }
 
+// ── Tipo para CIPs generados offline (Muestreo Ciego) ────────────────────────
+
+export interface CipOfflineData {
+    offline_id: string       // UUID local
+    ip: string               // IP del lote (ej: "IP-0042")
+    lote_id: number          // ID numérico del lote — necesario para el algoritmo
+    codigo_cip: string       // CIP calculado localmente (ej: "CIP-058598D-A1")
+    correlativo: number      // Posición: cuántos CIPs ya existían + 1
+    laboratorio: string      // 'Paititi' si correlativo <= 2, 'Por definir' en adelante
+    tipo_muestra: string     // 'Laboratorio'
+    synced: boolean
+    sync_error: string | null
+}
+
+// ── Tipo para pares CIP de recuperación offline (Pruebas Metalurgicas) ──────────
+
+export interface CipPruebaOfflineData {
+    offline_id: string        // UUID local
+    ip: string                // IP del lote
+    lote_id: number           // ID numérico del lote
+    codigo_cip1: string       // CIP principal (se asignará a prueba.cip al sincronizar)
+    codigo_cip2: string       // CIP secundario (para repetición)
+    correlativo1: number      // Correlativo independiente de CIPs de recuperación
+    correlativo2: number
+    sufijo: string            // 'R' | 'E'
+    tipo: 'RecuperacionInterno' | 'RecuperacionExterno'
+    synced: boolean
+    sync_error: string | null
+}
+
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -231,6 +261,18 @@ async function openDB(): Promise<IDBDatabase> {
             if (oldVersion < 9) {
                 db.createObjectStore('cips_lab_cache', { keyPath: 'cip' })
                 db.createObjectStore('analisis_rec_q', { keyPath: 'offline_id' })
+            }
+            if (oldVersion < 10) {
+                // Cola de CIPs de muestreo generados offline
+                db.createObjectStore('cips_muestreo_q', { keyPath: 'offline_id' })
+            }
+            if (oldVersion < 11) {
+                // Cache offline-first de la lista de pruebas metalúrgicas
+                db.createObjectStore('pruebas_lista_cache', { keyPath: 'ip' })
+            }
+            if (oldVersion < 12) {
+                // Cola de pares CIP de recuperación generados offline en Pruebas Met.
+                db.createObjectStore('cips_pruebas_q', { keyPath: 'offline_id' })
             }
         }
 
@@ -422,21 +464,27 @@ export async function limpiarSynced(): Promise<number> {
 
 export async function contarPendientes(): Promise<number> {
     try {
-        const [sesiones, lotes, fin, pruebas, analisisLab, analisisRec] = await Promise.all([
+        const [sesiones, lotes, fin, muestreos, pruebas, analisisLab, analisisRec, cips, cipsPruebas] = await Promise.all([
             getAll<SesionOfflineData>('sesiones_q').catch(() => []),
             getAll<LoteOnlineData>('lotes_online_q').catch(() => []),
             getAll<FinalizacionPendiente>('finalizaciones_q').catch(() => []),
+            getAll<MuestreoQueueData>('muestreos_q').catch(() => []),
             getAll<PruebaQueueData>('pruebas_q').catch(() => []),
             getAll<AnalisisLeyOfflineItem>('analisis_lab_q').catch(() => []),
             getAll<AnalisisRecuperacionOfflineItem>('analisis_rec_q').catch(() => []),
+            getAll<CipOfflineData>('cips_muestreo_q').catch(() => []),
+            getAll<CipPruebaOfflineData>('cips_pruebas_q').catch(() => []),
         ])
         return (
             sesiones.filter(s => !s.synced).length +
             lotes.filter(l => !l.synced).length +
             fin.length +
+            muestreos.filter(m => !m.synced).length +
             pruebas.filter(p => !p.synced).length +
             analisisLab.filter(a => !a.synced).length +
-            analisisRec.filter(a => !a.synced).length
+            analisisRec.filter(a => !a.synced).length +
+            cips.filter(c => !c.synced).length +
+            cipsPruebas.filter(c => !c.synced).length
         )
     } catch {
         return 0
@@ -861,4 +909,108 @@ export async function limpiarAnalisisRecuperacionSynced(): Promise<void> {
         }
         req.onerror = () => rej(req.error)
     })
+}
+
+
+// ==========================================
+// MÓDULO: CIPs DE MUESTREO OFFLINE
+// ==========================================
+
+export async function encolarCipOffline(cip: CipOfflineData): Promise<void> {
+    await put('cips_muestreo_q', cip)
+}
+
+export async function obtenerCipsPendientes(): Promise<CipOfflineData[]> {
+    const todos = await getAll<CipOfflineData>('cips_muestreo_q')
+    return todos.filter(c => !c.synced)
+}
+
+/** Devuelve todos los CIPs (synced o no) para un IP de lote concreto. */
+export async function obtenerCipsPorLote(ip: string): Promise<CipOfflineData[]> {
+    const todos = await getAll<CipOfflineData>('cips_muestreo_q')
+    return todos.filter(c => c.ip === ip)
+}
+
+export async function marcarCipSynced(offline_id: string): Promise<void> {
+    const cip = await get<CipOfflineData>('cips_muestreo_q', offline_id)
+    if (!cip) return
+    await put('cips_muestreo_q', { ...cip, synced: true, sync_error: null })
+}
+
+export async function marcarCipError(offline_id: string, error: string): Promise<void> {
+    const cip = await get<CipOfflineData>('cips_muestreo_q', offline_id)
+    if (!cip) return
+    await put('cips_muestreo_q', { ...cip, sync_error: error })
+}
+
+export async function limpiarCipsSynced(): Promise<void> {
+    const todos = await getAll<CipOfflineData>('cips_muestreo_q')
+    for (const c of todos.filter(x => x.synced)) {
+        await del('cips_muestreo_q', c.offline_id)
+    }
+}
+
+
+// ==========================================
+// MÓDULO: CACHE OFFLINE-FIRST PRUEBAS
+// ==========================================
+
+export async function guardarPruebasListaCache(pruebas: object[]): Promise<void> {
+    const db = await openDB()
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('pruebas_lista_cache', 'readwrite')
+        const store = tx.objectStore('pruebas_lista_cache')
+        store.clear()
+        for (const p of pruebas) store.put(p)
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+    })
+}
+
+export async function obtenerPruebasListaCache<T = unknown>(): Promise<T[]> {
+    return getAll<T>('pruebas_lista_cache')
+}
+
+
+// ==========================================
+// MÓDULO: CIPs DE RECUPERACIÓN OFFLINE (Pruebas Metalúrgicas)
+// ==========================================
+
+export async function encolarCipPruebaOffline(cip: CipPruebaOfflineData): Promise<void> {
+    await put('cips_pruebas_q', cip)
+}
+
+export async function obtenerCipsPruebasPendientes(): Promise<CipPruebaOfflineData[]> {
+    const todos = await getAll<CipPruebaOfflineData>('cips_pruebas_q')
+    return todos.filter(c => !c.synced)
+}
+
+/**
+ * Cuenta cuántos CIPs de recuperación (synced o no) existen en la cola para un lote.
+ * Usado para calcular el correlativo al generar nuevos CIPs offline.
+ * Los correlativoss son independientes: R1, R2, R3... sin mezclar con los A de muestreo.
+ */
+export async function contarCipsPruebasPorLote(ip: string): Promise<number> {
+    const todos = await getAll<CipPruebaOfflineData>('cips_pruebas_q')
+    // Cada entrada representa un par (cip1 + cip2), por lo tanto son 2 CIPs
+    return todos.filter(c => c.ip === ip).length * 2
+}
+
+export async function marcarCipPruebaSynced(offline_id: string): Promise<void> {
+    const cip = await get<CipPruebaOfflineData>('cips_pruebas_q', offline_id)
+    if (!cip) return
+    await put('cips_pruebas_q', { ...cip, synced: true, sync_error: null })
+}
+
+export async function marcarCipPruebaError(offline_id: string, error: string): Promise<void> {
+    const cip = await get<CipPruebaOfflineData>('cips_pruebas_q', offline_id)
+    if (!cip) return
+    await put('cips_pruebas_q', { ...cip, sync_error: error })
+}
+
+export async function limpiarCipsPruebasSynced(): Promise<void> {
+    const todos = await getAll<CipPruebaOfflineData>('cips_pruebas_q')
+    for (const c of todos.filter(x => x.synced)) {
+        await del('cips_pruebas_q', c.offline_id)
+    }
 }

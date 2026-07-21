@@ -134,6 +134,7 @@
 
   onMounted(async () => {
     if (modoLote.value) return  // en modo lote no precargamos datos
+    if (!online.value) return   // offline: form vacío es correcto (prueba nueva sin datos previos)
     cargandoDatos.value = true
     try {
       const datosGuardados = await pruebasApi.obtenerDetallePrueba(ipActual)
