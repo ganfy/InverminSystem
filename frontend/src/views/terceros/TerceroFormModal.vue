@@ -447,6 +447,7 @@ import {
 const props = defineProps<{
   visible:   boolean
   terceroId: number | null  // null = crear, number = editar
+  provacopId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -575,7 +576,7 @@ watch(() => props.visible, async (v) => {
   if (props.terceroId !== null) {
     // Modo edición - cargar datos del tercero
     try {
-      const t = await store.obtener(props.terceroId)
+      const t = await store.obtener(props.terceroId, props.provacopId)
       terceroOriginal.value = t
       form.value = {
         razon_social:   t.razon_social,
@@ -746,6 +747,7 @@ async function guardar() {
         email:        form.value.email      || null,
         ocultar_insumos: form.value.ocultar_insumos,
         parametros:   soloLecturaParams.value ? undefined : limpiarParams(form.value.params),
+        provacop_id:  props.provacopId ?? undefined,
       })
       ui.toast(`${resultado.razon_social} actualizado`, 'success')
     } else {

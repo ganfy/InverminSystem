@@ -117,12 +117,13 @@ def listar_provacops(
 @router.get("/{entidad_id}", response_model=TerceroRespuesta)
 def obtener_tercero(
     entidad_id: int,
+    provacop_id: int | None = Query(None, description="ID de la relación proveedor-acopiador"),
     current_user=Depends(check_permiso("TERCEROS", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """Detalle completo de un tercero - pantalla de edición."""
     try:
-        return svc.obtener_tercero(db, entidad_id)
+        return svc.obtener_tercero(db, entidad_id, provacop_id=provacop_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 

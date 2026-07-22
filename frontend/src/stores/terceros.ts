@@ -42,8 +42,8 @@ export const useTercerosStore = defineStore('terceros', () => {
     }
   }
 
-  async function obtener(id: number): Promise<TerceroRespuesta> {
-    return tercerosApi.obtener(id)
+  async function obtener(id: number, provacopId?: number | null): Promise<TerceroRespuesta> {
+    return tercerosApi.obtener(id, provacopId)
   }
 
   async function crear(datos: TerceroCrearPayload): Promise<TerceroRespuesta> {
