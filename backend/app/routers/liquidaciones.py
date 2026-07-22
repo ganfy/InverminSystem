@@ -28,6 +28,7 @@ from app.services.liquidaciones_au import obtener_ultimo_valor_oro_pm
 from app.services.liquidaciones_pdf import guardar_pdf_liquidacion
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/liquidaciones", tags=["Liquidaciones"])
@@ -293,3 +294,28 @@ def detalle(
     if not result:
         raise HTTPException(status_code=404, detail="Liquidacion no encontrada")
     return result
+
+
+class ExportarPLRequest(BaseModel):
+    clave: str = Field(..., min_length=4)
+
+
+@router.post("/exportar-pl")
+def exportar_pl(
+    req: ExportarPLRequest,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    try:
+        from app.services.liquidaciones import generar_excel_pl
+        from fastapi.responses import StreamingResponse
+
+        out = generar_excel_pl(db, req.clave)
+
+        return StreamingResponse(
+            out,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="Liquidaciones_PL.xlsx"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e

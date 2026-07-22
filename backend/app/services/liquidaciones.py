@@ -20,9 +20,14 @@ REGLA VOLADO (de notas de liquidacion):
 
 from __future__ import annotations
 
+import io
+import os
+import tempfile
 from datetime import date, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any
+
+import msoffcrypto
 
 # pyrefly: ignore [missing-import]
 from app.models.enums import EstadoLiquidacion, EstadoLote, TipoAnalisis
@@ -36,6 +41,7 @@ from app.models.models import (
     ParametrosComerciales,
     Pesaje,
     ProveedorAcopiador,
+    PruebaMetalurgica,
     SesionDescarga,
 )
 from app.schemas.liquidaciones import (
@@ -51,6 +57,8 @@ from app.schemas.liquidaciones import (
 )
 from app.services.config_calculo import get_constantes
 from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
 from sqlalchemy.orm import Session, joinedload
 
 FACTOR = Decimal("1.1023")
@@ -480,6 +488,53 @@ def _calcular_lote(
                     )
         # ley_ag_gr_tm se expone siempre que exista análisis (para mostrar en UI aunque no se pague)
 
+    # ── Profits Operativos ────────────────────────────────────────────────────
+    constantes = get_constantes(db)
+    costo_fijo_planta = constantes.costo_fijo_planta_maquila or Decimal("80")
+
+    # Prueba Metalurgica para insumos (Soda y Cianuro)
+    pm = (
+        db.query(PruebaMetalurgica)
+        .filter(PruebaMetalurgica.lote_id == lote.id, PruebaMetalurgica.descartado.is_(False))
+        .order_by(PruebaMetalurgica.id.desc())
+        .first()
+    )
+    soda_w = Decimal(str(pm.adicion_naoh)) if pm and pm.adicion_naoh else Decimal("3.0")
+    cianuro_x = Decimal(str(pm.adicion_nacn)) if pm and pm.adicion_nacn else Decimal("3.0")
+
+    # Evaluacion de proveedor para formula de consumo
+    proveedor_nombre = (
+        lote.sesion.provacop.acopiador.razon_social if lote.sesion.provacop.acopiador else ""
+    ).upper()
+    if not proveedor_nombre and lote.sesion.provacop.proveedor:
+        proveedor_nombre = lote.sesion.provacop.proveedor.razon_social.upper()
+
+    es_untuca = "UNTUCA" in proveedor_nombre
+
+    cond_untuca = ((soda_w - 3) * Decimal("2.5") + (cianuro_x - 3) * Decimal("3.1")) > 0
+    cond_normal = ((soda_w - 3) * Decimal("1.5") + (cianuro_x - 3) * Decimal("3.1")) > 0
+
+    if es_untuca:
+        descuento_consumo = (
+            ((soda_w - 3) * Decimal("1.5") + (cianuro_x - 3) * Decimal("3.1"))
+            if cond_untuca
+            else Decimal("0")
+        )
+    else:
+        descuento_consumo = (
+            ((soda_w - 3) * Decimal("1.5") + (cianuro_x - 3) * Decimal("3.1"))
+            if cond_normal
+            else Decimal("0")
+        )
+
+    profit_maquila = (maquila - bono) * FACTOR - costo_fijo_planta
+    profit_rec = (rec_planta_val - rec_liq) * (spot_usd - riesgo) * ley_planta * FACTOR / 100
+    profit_consumo = (gasto_acopio * FACTOR - Decimal("70")) + FACTOR * (
+        gasto_consumo - descuento_consumo
+    )
+    profit_leyes = (ley_planta - oz_promedio) * (spot_usd - riesgo) * rec_planta_val * FACTOR / 100
+    profit_total = profit_maquila + profit_rec + profit_consumo + profit_leyes
+
     # ── Alertas no criticas ───────────────────────────────────────────────────
     if lote.volado:
         dias = (date.today() - fecha_rec).days if fecha_rec else 0
@@ -533,6 +588,12 @@ def _calcular_lote(
         "spot_ag_usd": spot_ag_usd if aplica_ag else None,
         "valor_ag_usd": valor_ag_usd if aplica_ag else None,
         "aplica_ag": aplica_ag,
+        # Profits
+        "profit_maquila": profit_maquila,
+        "profit_rec": profit_rec,
+        "profit_consumo": profit_consumo,
+        "profit_leyes": profit_leyes,
+        "profit_total": profit_total,
         # campos para el modelo LiquidacionLote
         "tms_snapshot": tms,
         "tmh_snapshot": tmh,
@@ -1153,3 +1214,177 @@ def editar_params_lote(
 
     db.flush()
     return ll
+
+
+def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
+    """Genera un Excel con el historial de Lotes liquidados (PL) con contrasena."""
+    q = (
+        db.query(LiquidacionLote)
+        .options(
+            joinedload(LiquidacionLote.lote).joinedload(Lote.sesion),
+            joinedload(LiquidacionLote.lote).joinedload(Lote.ruma),
+            joinedload(LiquidacionLote.liquidacion)
+            .joinedload(Liquidacion.provacop)
+            .joinedload(ProveedorAcopiador.proveedor),
+            joinedload(LiquidacionLote.liquidacion)
+            .joinedload(Liquidacion.provacop)
+            .joinedload(ProveedorAcopiador.acopiador),
+        )
+        .order_by(LiquidacionLote.liquidacion_id.desc(), LiquidacionLote.lote_id.desc())
+    )
+    llotes = q.all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Liquidaciones"
+
+    headers = [
+        "Lote (IP)",
+        "Fecha Recep.",
+        "Proveedor",
+        "Acopiador",
+        "Material",
+        "Placa",
+        "Conductor",
+        "Transportista",
+        "Guia Remision",
+        "Guia Transporte",
+        "Sacos",
+        "TMH (Peso Neto)",
+        "% H2O",
+        "TMS",
+        "Ley Final (Oz/TC)",
+        "Ley gr/TM",
+        "% Recup",
+        "Ruma",
+        "Campana",
+        "Estado Lote",
+        "N° Liquidacion",
+        "Estado Liq.",
+        "Spot USD",
+        "Total USD",
+        "Fino Rec.",
+        "Ley Comercial",
+        "Utilidad Maquila (USD)",
+        "Utilidad Recup. (USD)",
+        "Utilidad Consumo (USD)",
+        "Utilidad Fijo (USD)",
+        "Utilidad Total Operativa (USD)",
+    ]
+
+    gold_fill = PatternFill("solid", fgColor="1C1A09")
+    gold_font = Font(bold=True, color="C9A227")
+    center = Alignment(horizontal="center")
+
+    for i, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.fill = gold_fill
+        c.font = gold_font
+        c.alignment = center
+
+    for row_idx, ll in enumerate(llotes, 2):
+        liq = ll.liquidacion
+        lote = ll.lote
+        sesion = lote.sesion if lote else None
+        ruma = lote.ruma if lote else None
+
+        prov = (
+            liq.provacop.proveedor.razon_social if liq.provacop and liq.provacop.proveedor else ""
+        )
+        acop = (
+            liq.provacop.acopiador.razon_social if liq.provacop and liq.provacop.acopiador else ""
+        )
+
+        try:
+            calc_dict, _ = _calcular_lote(
+                db,
+                lote,
+                spot_usd=ll.spot_usd_snapshot or Decimal("0"),
+                bono=ll.bono or Decimal("0"),
+                rec_liq_override=ll.porcentaje_rec_liquido,
+                gasto_acopio_override=ll.gasto_acopio_liquidacion,
+                gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
+                - (ll.gasto_acopio_liquidacion or Decimal("0")),
+            )
+            p_maquila = float(calc_dict.get("profit_maquila") or 0)
+            p_rec = float(calc_dict.get("profit_rec") or 0)
+            p_consumo = float(calc_dict.get("profit_consumo") or 0)
+            p_leyes = float(calc_dict.get("profit_leyes") or 0)
+            p_total = float(calc_dict.get("profit_total") or 0)
+        except Exception:
+            p_maquila = p_rec = p_consumo = p_leyes = p_total = 0.0
+
+        ley_final = (
+            next(
+                (
+                    a.ley_final
+                    for a in lote.analisis_ley
+                    if a.vigente and a.tipo_analisis == "comercial"
+                ),
+                0,
+            )
+            if lote
+            else 0
+        )
+        ley_gr_tm = (
+            next(
+                (
+                    a.ley_gr_tm
+                    for a in lote.analisis_ley
+                    if a.vigente and a.tipo_analisis == "comercial"
+                ),
+                0,
+            )
+            if lote
+            else 0
+        )
+
+        row_data = [
+            lote.ip if lote else "",
+            ll.fecha_recepcion_lote.strftime("%Y-%m-%d") if ll.fecha_recepcion_lote else "",
+            prov,
+            acop,
+            lote.tipo_material if lote else "",
+            sesion.placa if sesion else "",
+            sesion.conductor if sesion else "",
+            sesion.transportista if sesion else "",
+            sesion.guia_remision if sesion else "",
+            sesion.guia_transporte if sesion else "",
+            ll.sacos_snapshot,
+            float(ll.tmh_snapshot or 0),
+            float(ll.humedad_snapshot or 0),
+            float(ll.tms_snapshot or 0),
+            float(ley_final or 0),
+            float(ley_gr_tm or 0),
+            float(ll.porcentaje_rec_liquido or 0),
+            ruma.codigo if ruma else "",
+            ruma.campana if ruma else "",
+            lote.estado if lote else "",
+            liq.numero_liquidacion or str(liq.id),
+            liq.estado,
+            float(ll.spot_usd_snapshot or 0),
+            float(ll.total_usd or 0),
+            float(ll.fino_recuperable or 0),
+            float(ll.oz_tc_comercial or 0),
+            p_maquila,
+            p_rec,
+            p_consumo,
+            p_leyes,
+            p_total,
+        ]
+
+        for col_idx, val in enumerate(row_data, 1):
+            ws.cell(row=row_idx, column=col_idx, value=val)
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+        wb.save(tmp.name)
+        tmp_path = tmp.name
+
+    out = io.BytesIO()
+    with open(tmp_path, "rb") as f:
+        office_file = msoffcrypto.OfficeFile(f)
+        office_file.encrypt(clave, out)
+
+    os.remove(tmp_path)
+    out.seek(0)
+    return out

@@ -501,6 +501,7 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   factor_oz_tc: 'Factor de Conversión (Oz/TC → Gr/TM)',
   blank_correction_ag: 'Corrección en Blanco de Plata (Ag)',
   umbral_volado_oz_tc: 'Umbral de Ley para Lote Volado',
+  costo_fijo_planta_maquila: 'Costo Fijo Planta para Maquila',
 
   // Muestreo
   MUESTREO_MAX_INTENTOS: 'Intentos Máximos de Muestreo',
@@ -537,6 +538,7 @@ const UNIDADES: Record<string, string> = {
   factor_oz_tc: 'Gr/TM',
   blank_correction_ag: 'mg',
   umbral_volado_oz_tc: 'Oz/TC',
+  costo_fijo_planta_maquila: 'USD/TM',
   MUESTREO_HUMEDAD_MAX_PCT: '%',
   MUESTREO_MALLA_MIN_PCT: '%',
   MUESTREO_MALLA_MAX_PCT: '%',
@@ -568,7 +570,7 @@ const PARAM_CATEGORIES = [
     id: 'calculo',
     name: 'Constantes de Cálculo Metalúrgico',
     icon: Database,
-    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc']
+    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila']
   },
   {
     id: 'muestreo',

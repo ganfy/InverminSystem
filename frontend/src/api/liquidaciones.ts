@@ -234,3 +234,13 @@ export function editarParamsLote(liquidacionId: number, ip: string, body: Liquid
 export function emitirLiquidacion(id: number) {
     return api.post<LiquidacionDetalleOut>(`/liquidaciones/${id}/emitir`)
 }
+
+export async function exportarPL(clave: string) : Promise<void> {
+    const response = await api.post('/liquidaciones/exportar-pl', { clave }, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Liquidaciones_PL.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+}

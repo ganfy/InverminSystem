@@ -278,7 +278,7 @@
               <tr v-if="expandedLots.includes(lote.ip)" class="fila-profit">
                 <td :colspan="hayAg ? 17 : 14" style="padding: 0;">
                   <div class="profit-container">
-                    <div class="profit-header">DESGLOSE DE PROFIT ({{ lote.ip }})</div>
+                    <div class="profit-header">DESGLOSE DE PROFIT</div>
                     <div class="profit-grid">
                       <div class="profit-item">
                         <span class="p-label">BRUTO (Au)</span>
@@ -301,8 +301,32 @@
                         <span class="p-val font-mono text-danger">-${{ fmtNum(lote.insumos_total, 2) }}</span>
                       </div>
                       <div class="profit-item profit-net">
-                        <span class="p-label">PROFIT NETO</span>
+                        <span class="p-label">TOTAL PAGO AL MINERO</span>
                         <span class="p-val font-mono text-gold">${{ fmtNum(Number(lote.total_usd) + (hayAg ? Number(lote.valor_ag_usd) : 0), 2) }}</span>
+                      </div>
+                    </div>
+
+                    <div class="profit-header" style="margin-top: 1rem;">PROFITS OPERATIVOS</div>
+                    <div class="profit-grid" style="margin-top: 0.5rem;">
+                      <div class="profit-item">
+                        <span class="p-label">MAQUILA</span>
+                        <span class="p-val font-mono" :class="lote.profit_maquila >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_maquila >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_maquila, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
+                        <span class="p-label">RECUPERACIÓN</span>
+                        <span class="p-val font-mono" :class="lote.profit_rec >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_rec >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_rec, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
+                        <span class="p-label">CONSUMO</span>
+                        <span class="p-val font-mono" :class="lote.profit_consumo >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_consumo >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_consumo, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
+                        <span class="p-label">LEYES</span>
+                        <span class="p-val font-mono" :class="lote.profit_leyes >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_leyes >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_leyes, 2) }}</span>
+                      </div>
+                      <div class="profit-item profit-net">
+                        <span class="p-label">TOTAL OPERATIVO</span>
+                        <span class="p-val font-mono text-gold">${{ fmtNum(lote.profit_total, 2) }}</span>
                       </div>
                     </div>
                   </div>
