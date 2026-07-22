@@ -325,34 +325,57 @@
 
         <!-- Panel editable — solo Admin/Gerencia -->
         <div v-if="puedeEditarParams" class="params-panel">
-          <p class="seccion-titulo">PARÁMETROS DE CÁLCULO</p>
+          <p class="seccion-titulo">PARÁMETROS DE CÁLCULO POR LOTE</p>
 
-          <!-- Globales (aplican a todos los lotes) -->
-          <div class="params-globales">
-            <div class="pfield">
-              <span class="plbl">GASTO ACOPIO</span>
-              <input type="number" class="pinput" v-model.number="editOv.gasto_acopio"
-                step="0.01" @input="pendienteRecalculo = true" />
-            </div>
-            <div class="pfield">
-              <span class="plbl">GASTO CONSUMO (INSUMOS PLANTA)</span>
-              <input type="number" class="pinput" v-model.number="editOv.gasto_consumo"
-                step="0.01" @input="pendienteRecalculo = true" />
-            </div>
-            <div class="pfield">
-              <span class="plbl">BONO</span>
-              <input type="number" class="pinput" v-model.number="editOv.bono"
-                step="0.01" @input="pendienteRecalculo = true" />
-            </div>
-          </div>
-
-          <!-- Por lote: % Rec Liq -->
-          <div class="params-por-lote">
-            <div v-for="lote in store.preview.lotes" :key="lote.ip" class="pfield">
-              <span class="plbl">% REC LIQ</span>
-              <input type="number" class="pinput" v-model.number="editOv.rec_liq[lote.ip]"
-                step="0.1" min="0" max="100" @input="pendienteRecalculo = true" />
-            </div>
+          <div class="tabla-wrapper">
+            <table class="tabla tabla-params">
+              <thead>
+                <tr>
+                  <th>LOTE</th>
+                  <th class="col-r">GASTO ACOPIO</th>
+                  <th class="col-r">GASTO CONSUMO</th>
+                  <th class="col-r">BONO</th>
+                  <th class="col-r">% REC LIQ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="lote in store.preview.lotes" :key="lote.ip" class="tabla-row">
+                  <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                  <td class="col-r">
+                    <input
+                      type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.gasto_acopio[lote.ip]"
+                      step="0.01" placeholder="—"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-r">
+                    <input
+                      type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.gasto_consumo[lote.ip]"
+                      step="0.01" placeholder="—"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-r">
+                    <input
+                      type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.bono[lote.ip]"
+                      step="0.01" placeholder="0"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-r">
+                    <input
+                      type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.rec_liq[lote.ip]"
+                      step="0.1" min="0" max="100" placeholder="—"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <button v-if="pendienteRecalculo" class="btn-primary"
@@ -538,19 +561,17 @@
   }
 
   //Editar
-  const editOv = ref<EditOverrides>({ gasto_acopio: null, gasto_consumo: null, bono: 0, rec_liq: {} })
+  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {} })
 const pendienteRecalculo = ref(false)
 
 function initEditOverrides() {
   const lotes = store.preview?.lotes ?? []
   if (!lotes.length) return
-  const l0 = lotes[0]
-  if (!l0) return
-  editOv.value.gasto_acopio  = Number(l0.insumos_acopio)  || null
-  editOv.value.gasto_consumo = Number(l0.insumos_consumo) || null
-  editOv.value.bono          = Number(l0.bono)            || 0
   for (const l of lotes) {
-    editOv.value.rec_liq[l.ip] = Number(l.pct_rec_liq) || null
+    editOv.value.gasto_acopio[l.ip]  = Number(l.insumos_acopio)  || null
+    editOv.value.gasto_consumo[l.ip] = Number(l.insumos_consumo) || null
+    editOv.value.bono[l.ip]          = Number(l.bono)            || null
+    editOv.value.rec_liq[l.ip]       = Number(l.pct_rec_liq)     || null
   }
   pendienteRecalculo.value = false
 }
@@ -563,10 +584,10 @@ async function recalcularConOverrides() {
     fecha_liquidacion: fechaLiq.value,
     lotes: lotesSeleccionados.value.map(ip => ({
       ip,
-      bono: editOv.value.bono ?? 0,
+      bono: editOv.value.bono[ip] ?? null,
       rec_liq_override: editOv.value.rec_liq[ip] ?? null,
-      gasto_acopio_override: editOv.value.gasto_acopio,
-      gasto_consumo_override: editOv.value.gasto_consumo,
+      gasto_acopio_override: editOv.value.gasto_acopio[ip] ?? null,
+      gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
     })),
   })
   pendienteRecalculo.value = false
@@ -623,10 +644,10 @@ async function recalcularConOverrides() {
       provacop_id: provacopId.value as number,
       lotes: lotesSeleccionados.value.map(ip => ({
         ip,
-        bono: editOv.value.bono ?? 0,
+        bono: editOv.value.bono[ip] ?? null,
         rec_liq_override: editOv.value.rec_liq[ip] ?? null,
-        gasto_acopio_override: editOv.value.gasto_acopio,
-        gasto_consumo_override: editOv.value.gasto_consumo,
+        gasto_acopio_override: editOv.value.gasto_acopio[ip] ?? null,
+        gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
       })),
       spot_usd: spotUsd.value,
       spot_ag_usd: spotAgUsd.value ?? null,
@@ -814,6 +835,17 @@ async function recalcularConOverrides() {
 
   th.col-r, td.col-r { text-align: right !important; }
   .alerta-dirim { background: rgba(179,144,40,0.12); color: var(--color-gold); border: 1px solid rgba(179,144,40,0.3); }
+
+  /* Tabla de parámetros por lote */
+  .tabla-params th, .tabla-params td { padding: 0.4rem 0.65rem; }
+  .tabla-params td.col-r { vertical-align: middle; }
+  .pinput-sm {
+    width: 90px; padding: 0.3rem 0.45rem; font-size: var(--text-sm);
+    background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); color: var(--color-text);
+    font-family: var(--font-mono); text-align: right;
+  }
+  .pinput-sm:focus { outline: none; border-color: var(--color-gold); }
 
   /* Columnas Ag (Plata) */
   .col-ag { color: var(--color-text-muted); }

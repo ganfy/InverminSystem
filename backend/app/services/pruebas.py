@@ -128,6 +128,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
         if not pruebas:
             lista.append(
                 LotePruebaList(
+                    lote_id=lote.id,
                     ip=lote.ip,
                     fecha_recepcion=fecha_recepcion,
                     fecha_ingreso=None,
@@ -177,6 +178,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
 
             lista.append(
                 LotePruebaList(
+                    lote_id=lote.id,
                     ip=lote.ip,
                     fecha_recepcion=fecha_recepcion,
                     fecha_ingreso=fecha_ingreso,
@@ -327,7 +329,20 @@ def etiquetar_prueba(
     if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=48):
         raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
 
-    total_cips = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).count()
+    # Contador independiente: solo CIPs de recuperación (no incluye los de muestreo/laboratorio)
+    total_cips = (
+        db.query(MapeoCIP)
+        .filter(
+            MapeoCIP.lote_id == lote.id,
+            MapeoCIP.tipo_muestra.in_(
+                [
+                    TipoMuestra.RECUPERACION_INTERNO,
+                    TipoMuestra.RECUPERACION_EXTERNO,
+                ]
+            ),
+        )
+        .count()
+    )
 
     # Sufijo diferenciado por tipo
     sufijo = "R" if tipo == TipoMuestra.RECUPERACION_INTERNO else "E"

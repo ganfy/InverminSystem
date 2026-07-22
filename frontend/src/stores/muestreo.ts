@@ -4,11 +4,14 @@ import { muestreoApi, type LoteMuestreo, type MapeoCIPOut, type MuestreoCreate }
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
 import { generateUUID } from '@/utils/uuid'
+import { generarCodigoCip, laboratorioParaCip } from '@/utils/cipGenerator'
 import {
     encolarMuestreoOffline,
-    obtenerMuestreosPendientes ,
+    obtenerMuestreosPendientes,
     guardarLotesMuestreoCache,
     obtenerLotesMuestreoCache,
+    encolarCipOffline,
+    obtenerCipsPorLote,
 } from '@/composables/useOfflineQueue'
 
 export const useMuestreoStore = defineStore('muestreo', () => {
@@ -210,14 +213,82 @@ export const useMuestreoStore = defineStore('muestreo', () => {
 
     /**
      * Genera los códigos de barras CIP para el laboratorio.
-     * Por seguridad, esto SOLO se puede hacer con conexión a internet.
+     * - ONLINE: los solicita al servidor (comportamiento original).
+     * - OFFLINE: los genera localmente con el mismo algoritmo que el backend
+     *            y los encola en IndexedDB para sync posterior.
+     *
+     * Requiere que el lote esté en cache (lote_id disponible).
+     * Si el lote no está en cache y se está offline, bloquea con mensaje claro.
      */
     async function generarCodigosCip(ipLote: string, cantidadBolsas: number = 2): Promise<any[] | null> {
+        const todosLotes = [...lotesPendientes.value, ...lotesCompletados.value]
+        const lote = todosLotes.find(l => l.ip === ipLote)
+
         if (!sync.online.value) {
-            ui.toast('Necesitas conexión a internet para generar los códigos confidenciales CIP.', 'error')
-            return null
+            // Offline: necesitamos lote_id para el algoritmo
+            if (!lote?.lote_id) {
+                ui.toast(
+                    'Sin conexión y sin datos del lote en cache. Carga la lista una vez con red para poder etiquetar offline.',
+                    'error'
+                )
+                return null
+            }
+
+            guardando.value = true
+            try {
+                // Cuántos CIPs ya existen para este lote en la cola offline
+                const cipsExistentes = await obtenerCipsPorLote(ipLote)
+                const resultados: any[] = []
+
+                for (let i = 0; i < cantidadBolsas; i++) {
+                    const correlativo = cipsExistentes.length + i + 1
+                    const codigo = generarCodigoCip(lote.lote_id, correlativo)
+                    const laboratorio = laboratorioParaCip(correlativo)
+
+                    await encolarCipOffline({
+                        offline_id: `cip-off-${generateUUID()}`,
+                        ip: ipLote,
+                        lote_id: lote.lote_id,
+                        codigo_cip: codigo,
+                        correlativo,
+                        laboratorio,
+                        tipo_muestra: 'Laboratorio',
+                        synced: false,
+                        sync_error: null,
+                    })
+
+                    resultados.push({
+                        id: -(correlativo),           // ID negativo = generado offline
+                        lote_id: lote.lote_id,
+                        codigo_cip: codigo,
+                        laboratorio,
+                        tipo_muestra: 'Laboratorio',
+                        tiene_analisis_ley: false,
+                        tiene_analisis_recuperacion: false,
+                    })
+                }
+
+                // Actualizar lote.etiquetado en memoria para que el UI refleje el cambio
+                lote.etiquetado = true
+                // Guardar lotes actualizados en cache
+                const lotesLimpios = JSON.parse(JSON.stringify([...lotesPendientes.value, ...lotesCompletados.value]))
+                await guardarLotesMuestreoCache(lotesLimpios)
+
+                ui.toast(
+                    `Sin red: ${cantidadBolsas} CIP(s) generados localmente. Se registrarán al reconectar.`,
+                    'warning'
+                )
+                return resultados
+
+            } catch (e: any) {
+                ui.toast(e?.message ?? 'Error al generar CIPs offline', 'error')
+                return null
+            } finally {
+                guardando.value = false
+            }
         }
 
+        // ONLINE: generar en el servidor (comportamiento original)
         guardando.value = true
         try {
             const cips = await muestreoApi.generarCips(ipLote, cantidadBolsas)

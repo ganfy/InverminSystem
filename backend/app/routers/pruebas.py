@@ -16,6 +16,9 @@ from app.schemas.pruebas import (
     PruebaMetalurgicaOut,
     PruebaRecuperacionItem,
     RecuperacionItem,
+    SyncCipPruebaResult,
+    SyncCipsPruebasRequest,
+    SyncCipsPruebasResponse,
     SyncPruebasRequest,
     SyncPruebasResponse,
 )
@@ -58,6 +61,134 @@ def sync_pruebas(
     db: Session = Depends(get_db),
 ):
     return pruebas_service.sync_batch(db, payload.pruebas, current_user.id)
+
+
+@router.post("/sync-cips", response_model=SyncCipsPruebasResponse)
+def sync_cips_pruebas_offline(
+    payload: SyncCipsPruebasRequest,
+    current_user=Depends(check_permiso("PRUEBAS_MET", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Registra en BD los CIPs de recuperación generados offline.
+
+    Idempotente: si el codigo_cip ya existe, retorna su server_id sin duplicar.
+    Seguridad: valida que los códigos coincidan con el algoritmo del servidor
+    usando el contador independiente de CIPs de recuperación.
+    """
+    from app.models.enums import TipoMuestra
+    from app.models.models import Lote, PruebaMetalurgica
+    from app.services.muestreo import generar_base_cip
+
+    sufijos = {
+        TipoMuestra.RECUPERACION_INTERNO: "R",
+        TipoMuestra.RECUPERACION_EXTERNO: "E",
+    }
+
+    resultados = []
+    for item in payload.cips:
+        try:
+            lote = db.query(Lote).filter(Lote.ip == item.ip).first()
+            if not lote:
+                resultados.append(
+                    SyncCipPruebaResult(
+                        offline_id=item.offline_id,
+                        error=f"Lote {item.ip} no encontrado",
+                    )
+                )
+                continue
+
+            sufijo = sufijos.get(item.tipo, "R")
+
+            # Validar CIP1
+            base1_esperada = generar_base_cip(lote.id, salt=item.correlativo1)
+            cip1_esperado = f"CIP-{base1_esperada}-{sufijo}{item.correlativo1}"
+            if item.codigo_cip1 != cip1_esperado:
+                resultados.append(
+                    SyncCipPruebaResult(
+                        offline_id=item.offline_id,
+                        error="CIP1 inválido: no coincide con el algoritmo del servidor",
+                    )
+                )
+                continue
+
+            # Validar CIP2
+            base2_esperada = generar_base_cip(lote.id, salt=item.correlativo2)
+            cip2_esperado = f"CIP-{base2_esperada}-{sufijo}{item.correlativo2}"
+            if item.codigo_cip2 != cip2_esperado:
+                resultados.append(
+                    SyncCipPruebaResult(
+                        offline_id=item.offline_id,
+                        error="CIP2 inválido: no coincide con el algoritmo del servidor",
+                    )
+                )
+                continue
+
+            # Idempotencia CIP1
+            existente1 = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == item.codigo_cip1).first()
+            if existente1:
+                server_id1 = existente1.id
+            else:
+                nuevo1 = MapeoCIP(
+                    lote_id=lote.id,
+                    codigo_cip=item.codigo_cip1,
+                    laboratorio=None,
+                    tipo_muestra=item.tipo,
+                    fecha_envio=None,
+                )
+                db.add(nuevo1)
+                db.flush()
+                server_id1 = nuevo1.id
+
+            # Idempotencia CIP2
+            existente2 = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == item.codigo_cip2).first()
+            if existente2:
+                server_id2 = existente2.id
+            else:
+                nuevo2 = MapeoCIP(
+                    lote_id=lote.id,
+                    codigo_cip=item.codigo_cip2,
+                    laboratorio=None,
+                    tipo_muestra=item.tipo,
+                    fecha_envio=None,
+                )
+                db.add(nuevo2)
+                db.flush()
+                server_id2 = nuevo2.id
+
+            # Asignar CIP1 a la prueba si aun no tiene
+            prueba = (
+                db.query(PruebaMetalurgica)
+                .filter(
+                    PruebaMetalurgica.lote_id == lote.id,
+                    PruebaMetalurgica.cip.is_(None),
+                )
+                .order_by(PruebaMetalurgica.id.desc())
+                .first()
+            )
+            if prueba:
+                prueba.cip = item.codigo_cip1
+                prueba.modificado_por = current_user.id
+
+            db.commit()
+            resultados.append(
+                SyncCipPruebaResult(
+                    offline_id=item.offline_id,
+                    server_id_cip1=server_id1,
+                    server_id_cip2=server_id2,
+                )
+            )
+
+        except Exception as e:
+            db.rollback()
+            resultados.append(
+                SyncCipPruebaResult(
+                    offline_id=item.offline_id,
+                    error=f"Error interno: {str(e)}",
+                )
+            )
+
+    return SyncCipsPruebasResponse(resultados=resultados)
 
 
 @router.get(

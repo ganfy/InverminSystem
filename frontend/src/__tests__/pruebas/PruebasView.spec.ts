@@ -28,6 +28,10 @@ vi.mock('@/api/pruebas', () => ({
 
 vi.mock('@/composables/useOfflineQueue', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/composables/useOfflineQueue')>()
+
+    // El cache refleja lo que el API devolvería (simula ciclo offline-first)
+    let _pruebasCache: any[] = []
+
     return {
         ...actual,
         obtenerPruebasPendientes: vi.fn(() => Promise.resolve([])),
@@ -35,7 +39,16 @@ vi.mock('@/composables/useOfflineQueue', async (importOriginal) => {
         marcarPruebaError: vi.fn(),
         limpiarPruebasSynced: vi.fn(),
         contarPendientes: vi.fn(() => Promise.resolve(0)),
-        ipsDisponibles: vi.fn(() => Promise.resolve(100))
+        ipsDisponibles: vi.fn(() => Promise.resolve(100)),
+        // Offline-first cache: save → later read
+        guardarPruebasListaCache: vi.fn((lista: any[]) => {
+            _pruebasCache = lista
+            return Promise.resolve()
+        }),
+        obtenerPruebasListaCache: vi.fn(() => Promise.resolve(_pruebasCache)),
+        // CIPs de recuperación offline
+        encolarCipPruebaOffline: vi.fn(() => Promise.resolve()),
+        contarCipsPruebasPorLote: vi.fn(() => Promise.resolve(0)),
     }
 })
 

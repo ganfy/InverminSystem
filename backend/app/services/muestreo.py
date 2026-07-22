@@ -275,6 +275,7 @@ def obtener_lotes_para_muestreo(db: Session):
 
         resultado.append(
             {
+                "lote_id": lote.id,
                 "ip": lote.ip,
                 "fecha_recepcion": lote.creado_en.isoformat() if lote.creado_en else None,
                 "fecha_muestreo": fecha_ultimo_muestreo,

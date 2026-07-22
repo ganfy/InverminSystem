@@ -55,6 +55,14 @@ import {
     marcarAnalisisRecuperacionSynced,
     marcarAnalisisRecuperacionError,
     limpiarAnalisisRecuperacionSynced,
+    obtenerCipsPendientes,
+    marcarCipSynced,
+    marcarCipError,
+    limpiarCipsSynced,
+    obtenerCipsPruebasPendientes,
+    marcarCipPruebaSynced,
+    marcarCipPruebaError,
+    limpiarCipsPruebasSynced,
 } from '@/composables/useOfflineQueue'
 import { laboratorioApi } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
@@ -322,6 +330,65 @@ async function sincronizarPruebas(): Promise<void> {
     }
 }
 
+async function sincronizarCips(): Promise<void> {
+    const pendientes = await obtenerCipsPendientes()
+    if (pendientes.length === 0) return
+
+    try {
+        const payload = pendientes.map(c => ({
+            offline_id: c.offline_id,
+            ip: c.ip,
+            codigo_cip: c.codigo_cip,
+            correlativo: c.correlativo,
+            laboratorio: c.laboratorio,
+            tipo_muestra: c.tipo_muestra,
+        }))
+
+        const resp = await muestreoApi.syncCips(payload)
+
+        for (const resultado of resp.resultados) {
+            if (resultado.error) {
+                await marcarCipError(resultado.offline_id, resultado.error)
+            } else {
+                await marcarCipSynced(resultado.offline_id)
+            }
+        }
+        await limpiarCipsSynced()
+    } catch (err) {
+        console.error('[useSync] Error sincronizando CIPs offline:', err)
+    }
+}
+
+async function sincronizarCipsPruebas(): Promise<void> {
+    const pendientes = await obtenerCipsPruebasPendientes()
+    if (pendientes.length === 0) return
+
+    try {
+        const payload = pendientes.map(c => ({
+            offline_id: c.offline_id,
+            ip: c.ip,
+            codigo_cip1: c.codigo_cip1,
+            codigo_cip2: c.codigo_cip2,
+            correlativo1: c.correlativo1,
+            correlativo2: c.correlativo2,
+            tipo: c.tipo,
+        }))
+
+        const resp = await pruebasApi.syncCipsPruebas(payload)
+
+        for (const resultado of resp.resultados) {
+            if (resultado.error) {
+                await marcarCipPruebaError(resultado.offline_id, resultado.error)
+            } else {
+                await marcarCipPruebaSynced(resultado.offline_id)
+            }
+        }
+        await limpiarCipsPruebasSynced()
+    } catch (err) {
+        console.error('[useSync] Error sincronizando CIPs de pruebas:', err)
+    }
+}
+
 async function sincronizarLaboratorio(): Promise<void> {
     const pendientesLey = await obtenerAnalisisLeyPendientes()
     const pendientesRec = await obtenerAnalisisRecuperacionPendientes()
@@ -474,6 +541,8 @@ async function sincronizar(): Promise<void> {
         await sincronizarFinalizaciones()
         await sincronizarMuestreos()
         await sincronizarPruebas()
+        await sincronizarCips()
+        await sincronizarCipsPruebas()
         await sincronizarLaboratorio()
 
         ultimoSync.value = new Date().toLocaleString('es-PE')

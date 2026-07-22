@@ -45,7 +45,25 @@ export interface SyncMuestreosResponse {
     }>
 }
 
+export interface SyncCipItem {
+    offline_id: string
+    ip: string
+    codigo_cip: string
+    correlativo: number
+    laboratorio: string
+    tipo_muestra: string
+}
+
+export interface SyncCipsResponse {
+    resultados: Array<{
+        offline_id: string
+        server_id: number | null
+        error: string | null
+    }>
+}
+
 export interface LoteMuestreo {
+    lote_id: number
     ip: string
     fecha_recepcion: string | null
     fecha_muestreo: string | null
@@ -124,6 +142,15 @@ export const muestreoApi = {
 
     async listarLaboratorios(): Promise<string[]> {
         const response = await api.get<string[]>('/muestreo/labs')
+        return response.data
+    },
+
+    /**
+     * Sincroniza los CIPs generados offline al reconectar.
+     * Idempotente: el servidor no duplica si el código ya existe.
+     */
+    async syncCips(cips: SyncCipItem[]): Promise<SyncCipsResponse> {
+        const response = await api.post<SyncCipsResponse>('/muestreo/sync-cips', { cips })
         return response.data
     },
 }

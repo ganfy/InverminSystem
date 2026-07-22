@@ -19,6 +19,7 @@ export interface PruebaMetalurgicaOut extends PruebaMetalurgicaCreate {
 }
 
 export interface LotePruebaList {
+    lote_id: number
     ip: string
     fecha_recepcion: string | null
     fecha_ingreso: string | null
@@ -75,6 +76,25 @@ export interface PruebaOfflineItem {
     offline_id: string
     ip: string
     datos: PruebaMetalurgicaCreate
+}
+
+export interface SyncCipPruebaPayload {
+    offline_id: string
+    ip: string
+    codigo_cip1: string
+    codigo_cip2: string
+    correlativo1: number
+    correlativo2: number
+    tipo: 'RecuperacionInterno' | 'RecuperacionExterno'
+}
+
+export interface SyncCipsPruebasResponse {
+    resultados: Array<{
+        offline_id: string
+        server_id_cip1: number | null
+        server_id_cip2: number | null
+        error: string | null
+    }>
 }
 
 export const pruebasApi = {
@@ -150,6 +170,12 @@ export const pruebasApi = {
         const payload: any = { sub_tipos: subTipos }
         if (cip) payload.cip = cip
         const { data } = await api.post(`/pruebas/${ip}/enviar-laboratorio`, payload)
+        return data
+    },
+
+    /** Sincroniza los pares CIP de recuperación generados offline al reconectar. */
+    async syncCipsPruebas(cips: SyncCipPruebaPayload[]): Promise<SyncCipsPruebasResponse> {
+        const { data } = await api.post<SyncCipsPruebasResponse>('/pruebas/sync-cips', { cips })
         return data
     },
 }

@@ -17,7 +17,8 @@
         <div v-else-if="error === 'offline'" class="aviso-offline">
           <span class="aviso-icono"><WifiOff :size="24" class="aviso-icono" /></span>
           <p class="aviso-texto">
-            <strong>Sin conexión.</strong> No se pueden consultar ni generar códigos seguros en modo offline.
+            <strong>Sin conexión y sin datos en cache.</strong>
+            Abre el modal una vez con red para poder etiquetar offline.
           </p>
         </div>
 
@@ -26,6 +27,11 @@
         </div>
 
         <div v-else class="etiquetas-wrapper">
+          <!-- Banner informativo cuando los CIPs son offline -->
+          <div v-if="!sync.online.value" class="aviso-offline aviso-offline--sm" style="margin-bottom:1rem">
+            <WifiOff :size="14" style="vertical-align:middle;margin-right:4px" />
+            <span style="font-size:0.78rem">Sin red &mdash; CIPs generados localmente. Se sincronizar&aacute;n al reconectar.</span>
+          </div>
           <p class="instruccion">
             Muestras generadas: <strong>{{ codigosExistentes.length }}</strong> de un máximo de {{ MAX_CIPS }}.
           </p>
@@ -128,12 +134,56 @@ onMounted(async () => {
 })
 
 const inicializarEtiquetas = async () => {
+  // ── MODO OFFLINE ──────────────────────────────────────────────────────────
   if (!sync.online.value) {
-    error.value = 'offline'
-    cargando.value = false
+    cargando.value = true
+    error.value = null
+    mensajeCarga.value = 'Buscando etiquetas locales...'
+    try {
+      // 1. Leer CIPs ya encolados para este lote
+      const { obtenerCipsPorLote } = await import('@/composables/useOfflineQueue')
+      const cipsCola = await obtenerCipsPorLote(props.ipLote)
+
+      if (cipsCola.length > 0) {
+        // Ya hay CIPs locales generados → mostrarlos directamente
+        codigosExistentes.value = cipsCola.map(c => ({
+          id: -(c.correlativo),          // ID negativo = offline
+          lote_id: c.lote_id,
+          codigo_cip: c.codigo_cip,
+          laboratorio: c.laboratorio,
+          tipo_muestra: c.tipo_muestra,
+          tiene_analisis_ley: false,
+          tiene_analisis_recuperacion: false,
+        } as any))
+        cargando.value = false
+        await dibujarCodigosBarras()
+        return
+      }
+
+      // 2. No hay en cola → generar nuevos localmente
+      mensajeCarga.value = 'Generando etiquetas offline...'
+      const { MUESTREO_CIPS_IMPRIMIR } = { MUESTREO_CIPS_IMPRIMIR: '3' }  // default sin servidor
+      const cantidadAImprimir = parseInt(MUESTREO_CIPS_IMPRIMIR, 10) || 3
+
+      const nuevos = await store.generarCodigosCip(props.ipLote, cantidadAImprimir)
+      if (nuevos && nuevos.length > 0) {
+        codigosExistentes.value = nuevos
+        emit('etiquetado')
+        cargando.value = false
+        await dibujarCodigosBarras()
+      } else {
+        // Lote no está en cache — bloqueo justo
+        error.value = 'offline'
+        cargando.value = false
+      }
+    } catch (e: any) {
+      error.value = 'offline'
+      cargando.value = false
+    }
     return
   }
 
+  // ── MODO ONLINE ───────────────────────────────────────────────────────────
   try {
   cargando.value = true
   error.value = null

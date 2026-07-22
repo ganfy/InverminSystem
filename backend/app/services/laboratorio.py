@@ -1623,19 +1623,22 @@ def calcular_ley_comercial(
     factor = Decimal("1")
     detalle_pasos = []
 
-    # Regla 1: descuento si ley < límite comercial
-    if params.lim_ley_comercial and params.dscto_ley_comercial:
+    # Regla 1: descuento si ley < límite comercial (condición completa colapsada)
+    if (
+        params.lim_ley_comercial
+        and params.dscto_ley_comercial
+        and ley < Decimal(str(params.lim_ley_comercial))
+    ):
         lim = Decimal(str(params.lim_ley_comercial))
         dscto = Decimal(str(params.dscto_ley_comercial))
-        if ley < lim:
-            descuento = dscto
-            ley = ley - dscto
-            detalle_pasos.append(
-                f"Ley {float(ley_planta):.4f} < limite {float(lim):.3f}: "
-                f"descuento {float(dscto):.4f} → {float(ley):.4f}"
-            )
+        descuento = dscto
+        ley = ley - dscto
+        detalle_pasos.append(
+            f"Ley {float(ley_planta):.4f} < limite {float(lim):.3f}: "
+            f"descuento {float(dscto):.4f} → {float(ley):.4f}"
+        )
 
-    # Regla 2: factor porcentual aplicado a ley_planta (sin clamping de rango)
+    # Regla 2: factor porcentual (exclusivo con Regla 1; entra si no se aplicó descuento)
     elif params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
         ley_antes = ley

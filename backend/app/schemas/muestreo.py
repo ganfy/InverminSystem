@@ -75,3 +75,29 @@ class SyncResult(BaseModel):
 
 class SyncMuestreosResponse(BaseModel):
     resultados: list[SyncResult]
+
+
+# ==========================================
+# SYNC CIPs OFFLINE
+# ==========================================
+class SyncCipItem(BaseModel):
+    offline_id: str
+    ip: str
+    codigo_cip: str
+    correlativo: int
+    laboratorio: str
+    tipo_muestra: str = "Laboratorio"
+
+
+class SyncCipsRequest(BaseModel):
+    cips: list[SyncCipItem]
+
+
+class SyncCipResult(BaseModel):
+    offline_id: str
+    server_id: int | None = None
+    error: str | None = None
+
+
+class SyncCipsResponse(BaseModel):
+    resultados: list[SyncCipResult]

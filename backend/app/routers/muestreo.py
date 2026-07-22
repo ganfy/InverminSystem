@@ -10,6 +10,9 @@ from app.schemas.muestreo import (
     MapeoCIPOut,
     MuestreoCreate,
     MuestreoOut,
+    SyncCipResult,
+    SyncCipsRequest,
+    SyncCipsResponse,
     SyncMuestreosRequest,
     SyncMuestreosResponse,
     SyncResult,
@@ -88,8 +91,79 @@ def sync_muestreos_offline(
 
 
 # ==========================================
-# 3. GENERACIÓN DE CÓDIGOS (CIP)
+# 2b. SINCRONIZACIÓN DE CIPs OFFLINE
 # ==========================================
+@router.post("/sync-cips", response_model=SyncCipsResponse)
+def sync_cips_offline(
+    payload: SyncCipsRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """
+    Registra en BD los CIPs generados offline por la tablet.
+
+    Idempotente: si el codigo_cip ya existe en mapeo_cip, retorna el server_id
+    del registro existente sin crear duplicado ni retornar error.
+
+    Seguridad: valida que el codigo_cip recibido sea igual al que el algoritmo
+    del servidor hubiera generado para ese lote+correlativo (anti-manipulación).
+    """
+    from datetime import date
+
+    from app.services.muestreo import generar_base_cip
+
+    resultados = []
+    for item in payload.cips:
+        try:
+            lote = db.query(Lote).filter(Lote.ip == item.ip).first()
+            if not lote:
+                resultados.append(
+                    SyncCipResult(
+                        offline_id=item.offline_id,
+                        error=f"Lote {item.ip} no encontrado",
+                    )
+                )
+                continue
+
+            # Idempotencia: si ya existe este código exacto, retornar el existente
+            existente = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == item.codigo_cip).first()
+            if existente:
+                resultados.append(SyncCipResult(offline_id=item.offline_id, server_id=existente.id))
+                continue
+
+            # Seguridad: verificar que el CIP fue generado con el algoritmo correcto
+            base_esperada = generar_base_cip(lote.id, salt=item.correlativo)
+            codigo_esperado = f"CIP-{base_esperada}-A{item.correlativo}"
+            if item.codigo_cip != codigo_esperado:
+                resultados.append(
+                    SyncCipResult(
+                        offline_id=item.offline_id,
+                        error="CIP inválido: no coincide con el algoritmo del servidor",
+                    )
+                )
+                continue
+
+            nuevo = MapeoCIP(
+                lote_id=lote.id,
+                codigo_cip=item.codigo_cip,
+                laboratorio=item.laboratorio,
+                tipo_muestra=item.tipo_muestra,
+                fecha_envio=date.today(),
+            )
+            db.add(nuevo)
+            db.commit()
+            db.refresh(nuevo)
+            resultados.append(SyncCipResult(offline_id=item.offline_id, server_id=nuevo.id))
+
+        except Exception as e:
+            db.rollback()
+            resultados.append(
+                SyncCipResult(offline_id=item.offline_id, error=f"Error interno: {str(e)}")
+            )
+
+    return SyncCipsResponse(resultados=resultados)
+
+
 @router.post(
     "/lotes/{ip_lote}/etiquetas",
     response_model=list[MapeoCIPOut],

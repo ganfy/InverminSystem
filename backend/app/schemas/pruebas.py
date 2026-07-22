@@ -54,6 +54,7 @@ class PruebaMetalurgicaOut(PruebaMetalurgicaBase):
 
 
 class LotePruebaList(BaseModel):
+    lote_id: int = 0  # ID numérico del lote — necesario para generar CIPs offline
     ip: str
     fecha_recepcion: datetime | None = None
     fecha_ingreso: datetime | None = None
@@ -190,3 +191,31 @@ class SyncPruebasRequest(BaseModel):
 
 class SyncPruebasResponse(BaseModel):
     resultados: list[SyncResult]
+
+
+# ── Sync de CIPs de Recuperación offline ─────────────────────────────────────
+
+
+class SyncCipPruebaItem(BaseModel):
+    offline_id: str
+    ip: str  # IP del lote
+    codigo_cip1: str  # CIP principal (se asigna a prueba.cip)
+    codigo_cip2: str  # CIP secundario (para repetición)
+    correlativo1: int  # Correlativo de CIP1 (base para validación)
+    correlativo2: int  # Correlativo de CIP2
+    tipo: TipoMuestra = TipoMuestra.RECUPERACION_INTERNO
+
+
+class SyncCipsPruebasRequest(BaseModel):
+    cips: list[SyncCipPruebaItem]
+
+
+class SyncCipPruebaResult(BaseModel):
+    offline_id: str
+    server_id_cip1: int | None = None
+    server_id_cip2: int | None = None
+    error: str | None = None
+
+
+class SyncCipsPruebasResponse(BaseModel):
+    resultados: list[SyncCipPruebaResult]
