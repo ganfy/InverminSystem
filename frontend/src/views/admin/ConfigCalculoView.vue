@@ -216,6 +216,7 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   tamano_bloque_ip: 'Tamaño del Bloque de IPs (Balanza Offline)',
   proximo_ticket: 'Ticket Inicial del Próximo Bloque (Balanza Offline)',
   tamano_bloque_ticket: 'Tamaño del Bloque de Tickets (Balanza Offline)',
+  costo_fijo_planta_maquila: 'Costo Fijo Planta para Maquila',
 }
 
 const UNIDADES: Record<string, string> = {
@@ -226,6 +227,7 @@ const UNIDADES: Record<string, string> = {
   proximo_ticket: '#',
   tamano_bloque_ip: 'IPs',
   tamano_bloque_ticket: 'tickets',
+  costo_fijo_planta_maquila: 'USD/TM',
 }
 
 // Claves críticas que requieren advertencia especial al editar

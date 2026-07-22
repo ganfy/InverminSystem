@@ -13,9 +13,9 @@
         </div>
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
-        <button class="btn-secondary btn-con-icono" @click="router.push('/reportes')">
-          <Download :size="16" /> Exportar PL
-        </button>
+          <button class="btn-secondary btn-con-icono" @click="handleExportarPL">
+            <Download :size="16" /> Exportar PL
+          </button>
         <button class="btn-primary btn-con-icono" @click="router.push('/liquidaciones/nueva')">
           <Plus :size="16" /> Nueva Liquidación
         </button>
@@ -287,7 +287,7 @@ import { useLiquidacionesStore } from '@/stores/liquidaciones'
 import { useUiStore } from '@/stores/ui'
 import api from '@/api/axios'
 import type { LoteDisponible, LiquidacionResumenOut } from '@/api/liquidaciones'
-import { obtenerPrecioOro } from '@/api/liquidaciones'
+import { obtenerPrecioOro, exportarPL } from '@/api/liquidaciones'
 
 const router = useRouter()
 const store  = useLiquidacionesStore()
@@ -495,6 +495,29 @@ onMounted(async () => {
     store.cargarKPIs(),
   ])
 })
+
+async function handleExportarPL() {
+  const clave = await ui.showPrompt({
+    title: 'Exportar PL',
+    message: 'Ingrese una contraseña segura para cifrar el archivo Excel (mínimo 4 caracteres).',
+    inputType: 'password'
+  })
+  
+  if (!clave) return
+  
+  if (clave.length < 4) {
+    ui.toast('La contraseña debe tener al menos 4 caracteres', 'error')
+    return
+  }
+  
+  try {
+    await exportarPL(clave)
+    ui.toast('Archivo descargado con éxito', 'success')
+  } catch (err: any) {
+    console.error(err)
+    ui.toast(err?.response?.data?.detail || 'Error al exportar', 'error')
+  }
+}
 </script>
 
 <style scoped>

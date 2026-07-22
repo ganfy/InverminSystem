@@ -25,6 +25,7 @@ DEFAULTS: dict[str, str] = {
     "unidad_laboratorio": "KG",
     "unidad_liquidaciones": "TMC",
     "unidad_default": "TM",
+    "costo_fijo_planta_maquila": "80",
     # Muestreo
     "MUESTREO_MAX_INTENTOS": "3",
     "MUESTREO_HUMEDAD_MAX_PCT": "50",
@@ -66,6 +67,7 @@ DESCRIPCIONES: dict[str, str] = {
     "unidad_laboratorio": "Unidad de peso para el módulo de Laboratorio (TM, TMC, KG)",
     "unidad_liquidaciones": "Unidad de peso para el módulo de Liquidaciones (TM, TMC, KG)",
     "unidad_default": "Unidad de peso por defecto en el sistema (TM, TMC, KG)",
+    "costo_fijo_planta_maquila": "Costo base operativo de la planta por TM para el cálculo de profit de maquila",
     "MUESTREO_MAX_INTENTOS": "Máximo de intentos de muestreo permitidos por lote",
     "MUESTREO_HUMEDAD_MAX_PCT": "Porcentaje de humedad máximo antes de generar un error",
     "MUESTREO_MALLA_MIN_PCT": "Porcentaje de malla mínimo aceptable para muestreo",
@@ -99,11 +101,17 @@ class ConstantesCalculo:
     factor_oz_tc: Decimal
     umbral_volado_oz_tc: Decimal
     blank_correction_ag: Decimal
+    costo_fijo_planta_maquila: Decimal
 
 
 def get_constantes(db: Session) -> ConstantesCalculo:
     """Carga las constantes de cálculo desde BD. Usa fallback si no existen."""
-    keys = ["factor_oz_tc", "umbral_volado_oz_tc", "blank_correction_ag"]
+    keys = [
+        "factor_oz_tc",
+        "umbral_volado_oz_tc",
+        "blank_correction_ag",
+        "costo_fijo_planta_maquila",
+    ]
     rows = (
         db.query(Configuracion.clave, Configuracion.valor)
         .filter(Configuracion.clave.in_(keys))
@@ -114,6 +122,7 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         factor_oz_tc=Decimal(cfg["factor_oz_tc"]),
         umbral_volado_oz_tc=Decimal(cfg["umbral_volado_oz_tc"]),
         blank_correction_ag=Decimal(cfg["blank_correction_ag"]),
+        costo_fijo_planta_maquila=Decimal(cfg["costo_fijo_planta_maquila"]),
     )
 
 

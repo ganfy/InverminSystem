@@ -102,6 +102,13 @@ class LoteFinancieroOut(BaseModel):
     total_usd: Decimal
     fino_recuperable: Decimal  # Oz troy compradas
 
+    # Profits Operativos (Calculados dinámicamente)
+    profit_maquila: Decimal | None = None
+    profit_rec: Decimal | None = None
+    profit_consumo: Decimal | None = None
+    profit_leyes: Decimal | None = None
+    profit_total: Decimal | None = None
+
     usa_dirimencia: bool
     alertas: list[AlertaLote]
 
