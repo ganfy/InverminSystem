@@ -97,6 +97,7 @@ export interface TerceroEditarPayload {
   email?: string | null
   ocultar_insumos?: boolean
   parametros?: Partial<ParametrosComerciales> | null
+  provacop_id?: number
 }
 
 // ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -112,8 +113,9 @@ const terceros = {
     return api.post('/terceros', datos).then(r => r.data)
   },
 
-  obtener(id: number): Promise<TerceroRespuesta> {
-    return api.get(`/terceros/${id}`).then(r => r.data)
+  obtener(id: number, provacopId?: number | null): Promise<TerceroRespuesta> {
+    const params = provacopId ? { provacop_id: provacopId } : {}
+    return api.get(`/terceros/${id}`, { params }).then(r => r.data)
   },
 
   editar(id: number, datos: TerceroEditarPayload): Promise<TerceroRespuesta> {

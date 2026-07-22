@@ -10,7 +10,7 @@ import shutil
 import tempfile
 import uuid
 from datetime import UTC, date, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from app.models.enums import EstadoRecuperacion, OrigenDatos, TipoAnalisis, TipoMuestra
@@ -1632,7 +1632,7 @@ def calcular_ley_comercial(
         lim = Decimal(str(params.lim_ley_comercial))
         dscto = Decimal(str(params.dscto_ley_comercial))
         descuento = dscto
-        ley = ley - dscto
+        ley = (ley - dscto).quantize(q, rounding=ROUND_DOWN)
         detalle_pasos.append(
             f"Ley {float(ley_planta):.4f} < limite {float(lim):.3f}: "
             f"descuento {float(dscto):.4f} → {float(ley):.4f}"
@@ -1642,7 +1642,7 @@ def calcular_ley_comercial(
     elif params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
         ley_antes = ley
-        ley = (ley * factor).quantize(q, rounding=ROUND_HALF_UP)
+        ley = (ley * factor).quantize(q, rounding=ROUND_DOWN)
         detalle_pasos.append(
             f"Factor {float(factor):.3f}: {float(ley_antes):.3f} x {float(factor):.3f} = {float(ley):.3f}"
         )

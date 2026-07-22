@@ -111,7 +111,7 @@
                     v-if="puedeEditar"
                     class="btn-accion"
                     title="Editar"
-                    @click="abrirEditar(t.id)"
+                    @click="abrirEditar(t)"
                   ><Edit3 :size="16" /></button>
 
                   <!-- Activar / Desactivar -->
@@ -144,6 +144,7 @@
     <TerceroFormModal
       :visible="modalVisible"
       :tercero-id="terceroEditandoId"
+      :provacop-id="provacopEditandoId"
       @cerrar="cerrarModal"
       @guardado="onGuardado"
     />
@@ -188,6 +189,7 @@ const filtroActivo        = ref<boolean | undefined>(true) // por defecto: activ
 const busqueda            = ref('')
 const modalVisible        = ref(false)
 const terceroEditandoId   = ref<number | null>(null)
+const provacopEditandoId  = ref<number | null>(null)
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const listaFiltrada = computed<TerceroLista[]>(() => {
@@ -212,11 +214,13 @@ async function cargar() {
 
 function abrirCrear() {
   terceroEditandoId.value = null
+  provacopEditandoId.value = null
   modalVisible.value      = true
 }
 
-function abrirEditar(id: number) {
-  terceroEditandoId.value = id
+function abrirEditar(t: TerceroLista) {
+  terceroEditandoId.value = t.id
+  provacopEditandoId.value = t.provacop_id
   modalVisible.value      = true
 }
 

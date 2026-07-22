@@ -262,11 +262,16 @@ def listar_terceros(
     return resultado
 
 
-def obtener_tercero(db: Session, entidad_id: int) -> dict:
+def obtener_tercero(db: Session, entidad_id: int, provacop_id: int | None = None) -> dict:
     entidad = db.query(Entidad).filter_by(id=entidad_id).first()
     if not entidad:
         raise ValueError(f"Tercero {entidad_id} no encontrado")
-    provacop = _get_provacop_de_entidad(db, entidad_id)
+
+    if provacop_id:
+        provacop = db.query(ProveedorAcopiador).filter_by(id=provacop_id).first()
+    else:
+        provacop = _get_provacop_de_entidad(db, entidad_id)
+
     return _serializar_tercero(entidad, provacop, db)
 
 
@@ -374,8 +379,12 @@ def editar_tercero(
         entidad.ocultar_insumos = datos.ocultar_insumos
     entidad.modificado_por = usuario_id
 
-    if datos.parametros:
+    if datos.provacop_id:
+        provacop = db.query(ProveedorAcopiador).filter_by(id=datos.provacop_id).first()
+    else:
         provacop = _get_provacop_de_entidad(db, entidad_id)
+
+    if datos.parametros:
         if not provacop:
             raise ValueError("Este tercero no tiene relación comercial configurada")
         _actualizar_parametros(db, provacop, datos.parametros, usuario_id)
@@ -383,7 +392,6 @@ def editar_tercero(
     db.commit()
     db.refresh(entidad)
 
-    provacop = _get_provacop_de_entidad(db, entidad_id)
     return _serializar_tercero(entidad, provacop, db)
 
 

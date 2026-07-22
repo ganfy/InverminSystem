@@ -195,6 +195,7 @@ class TerceroEditar(BaseModel):
     email: EmailStr | None = None
     ocultar_insumos: bool | None = None
     parametros: ParametrosSchema | None = None
+    provacop_id: int | None = None
 
 
 class CambiarAcopiadorPayload(BaseModel):
