@@ -513,7 +513,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import AlertasBanner from '@/components/AlertasBanner.vue'
@@ -534,7 +534,8 @@ import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()
 const ui      = useUiStore()
-const { pendientes, online, ultimoSync } = useSync()
+const sync    = useSync()
+const { pendientes, online, ultimoSync } = sync
 
 const pruebas       = ref<LotePruebaList[]>([])
 const pruebasOffline = ref<PruebaQueueData[]>([])
@@ -636,6 +637,13 @@ watch(etiquetaModal, async (val) => {
     })
   } catch (e) {
     console.error('Error dibujando barcode prueba:', e)
+  }
+})
+
+watch(() => sync.sincronizando.value, async (isSyncing, wasSyncing) => {
+  if (wasSyncing && !isSyncing && sync.online.value) {
+    // Sincronización terminada, refrescar los datos del backend
+    await cargarDatos()
   }
 })
 
@@ -858,6 +866,21 @@ async function etiquetar(ip: string) {
       })
 
       ui.toast(`Sin red: CIPs generados localmente (${cip1}). Se registrarán al reconectar.`, 'warning')
+
+      // Actualizar la fila en memoria para que el botón cambie a "Ver Etiqueta"
+      const idx = pruebas.value.findIndex(p => p.ip === ip)
+      if (idx !== -1) {
+        pruebas.value[idx] = {
+          ...pruebas.value[idx],
+          cip_asignado: cip1,
+          cips_asignados: [cip1, cip2],
+          etiquetado: true,
+        }
+        // También actualizar el cache local sin proxies reactivos (evita DataCloneError)
+        const pruebasLimpias = JSON.parse(JSON.stringify(pruebas.value))
+        await guardarPruebasListaCache(pruebasLimpias)
+      }
+
       // Mostrar modal con los CIPs generados para poder imprimir de inmediato
       etiquetaModal.value = { ip, cips: [cip1, cip2] }
     } catch (e: any) {

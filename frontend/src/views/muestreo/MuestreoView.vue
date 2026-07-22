@@ -100,9 +100,11 @@
   </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMuestreoStore } from '@/stores/muestreo'
+import { useUiStore } from '@/stores/ui'
+import { useSync } from '@/composables/useSync'
 import AlertasBanner from '@/components/AlertasBanner.vue'
 import ModalDetallesMuestreo from './ModalDetallesMuestreo.vue'
 import ModalEtiquetas from './ModalEtiquetas.vue'
@@ -111,12 +113,19 @@ import {
   WifiOff,
   AlertTriangle,
   Plus,
+  X,
+  Search,
+  Beaker,
+  Tag,
+  RefreshCw,
   FlaskConical,
 } from 'lucide-vue-next'
 
 
 const router = useRouter()
 const store = useMuestreoStore()
+const ui = useUiStore()
+const sync = useSync()
 
 const featureControlTiemposPrueba = ref(true) // Esto debería venir de una configuración o store centralizada de features
 const lotesPendientesEtiquetado = computed(() => {
@@ -158,6 +167,13 @@ const lotesMostrar = computed(() => {
 
 onMounted(async () => {
   await store.cargarLotes()
+})
+
+watch(() => sync.sincronizando.value, async (isSyncing, wasSyncing) => {
+  if (wasSyncing && !isSyncing && sync.online.value) {
+    // Sincronización terminada, refrescar los datos del backend
+    await store.cargarLotes()
+  }
 })
 
 function formatearFecha(isoString?: string | null): string {

@@ -5,8 +5,10 @@ import api from './axios'
 
 export interface LotePreviewInput {
     ip: string
-    bono?: number
+    bono?: number | null
     rec_liq_override?: number | null
+    gasto_acopio_override?: number | null
+    gasto_consumo_override?: number | null
 }
 
 export interface LiquidacionPreviewRequest {
@@ -157,12 +159,13 @@ export interface LiquidacionLoteParamsUpdate {
 }
 
 // ── Edición de Parámetros de Lote ──────────────────────────────────────────────
+/** Todos los overrides son por IP para permitir configuración independiente por lote */
 export interface EditOverrides {
-    gasto_acopio: number | null
-    gasto_consumo: number | null
-    bono: number
+    gasto_acopio: Record<string, number | null>
+    gasto_consumo: Record<string, number | null>
+    bono: Record<string, number | null>
     rec_liq: Record<string, number | null>
-  }
+}
 
 // ── API calls ──────────────────────────────────────────────────────────────────
 /**

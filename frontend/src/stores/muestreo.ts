@@ -268,6 +268,12 @@ export const useMuestreoStore = defineStore('muestreo', () => {
                     })
                 }
 
+                // Actualizar lote.etiquetado en memoria para que el UI refleje el cambio
+                lote.etiquetado = true
+                // Guardar lotes actualizados en cache
+                const lotesLimpios = JSON.parse(JSON.stringify([...lotesPendientes.value, ...lotesCompletados.value]))
+                await guardarLotesMuestreoCache(lotesLimpios)
+
                 ui.toast(
                     `Sin red: ${cantidadBolsas} CIP(s) generados localmente. Se registrarán al reconectar.`,
                     'warning'
