@@ -356,9 +356,10 @@
   const rol               = computed(() => auth.user?.rol ?? '')
   const puedeCambiarEstado = computed(() => ['Admin', 'Gerencia', 'Comercial'].includes(rol.value))
 
-  const puedeEditarParams = computed(() =>
-    ['Admin', 'Gerencia'].includes(auth.user?.rol ?? '')
-  )
+  const puedeEditarParams = computed(() => {
+  if (!auth.user) return false
+  return ['Admin', 'Gerencia', 'JefeComercial'].includes(auth.user.rol)
+})
 
   const totalTms = computed(() =>
     (store.detalle?.lotes ?? []).reduce((acc, l) => acc + Number(l.tms), 0)

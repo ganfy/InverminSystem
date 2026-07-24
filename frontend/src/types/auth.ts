@@ -23,6 +23,7 @@ export interface UsuarioMe {
 export type RolSistema =
   | 'Admin'
   | 'Gerencia'
+  | 'JefeComercial'
   | 'Comercial'
   | 'Laboratorista'
   | 'OperadorBalanza'

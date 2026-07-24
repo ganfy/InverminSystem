@@ -344,9 +344,18 @@
                     <Field label="Fecha creación" :val="data.ruma.fecha_creacion ?? '—'"      mono />
                   </div>
                 </template>
-                <div v-else class="empty-state-row">
-                  <Clock :size="12" />
-                  <span>Pendiente de asignación a ruma</span>
+                <div v-else class="empty-state-row" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <Clock :size="12" />
+                    <span>Pendiente de asignación a ruma</span>
+                  </div>
+                  <button 
+                    class="btn-secondary btn-sm" 
+                    @click="habilitarManualmente(data.ip)"
+                    :disabled="data.habilitado_ruma || habilitandoRuma"
+                  >
+                    {{ data.habilitado_ruma ? 'Habilitado para Ruma' : 'Habilitar manualmente' }}
+                  </button>
                 </div>
               </div>
             </section>
@@ -485,6 +494,8 @@ import {
   Pencil, AlertTriangle, Check, History, X, User, Clock, Trash2, AlertCircle
 } from 'lucide-vue-next'
 import { dashboardApi, type TrazabilidadLoteResponse } from '@/api/dashboard'
+import { useUiStore } from '@/stores/ui'
+import { habilitarLote } from '@/api/rumas'
 import type { AccionRegistro } from '@/api/dashboard'
 
 
@@ -571,6 +582,7 @@ defineEmits<{ close: [] }>()
 // ── State ──────────────────────────────────────────────────────────────
 const data    = ref<TrazabilidadLoteResponse | null>(null)
 const loading = ref(false)
+const habilitandoRuma = ref(false)
 const error   = ref<string | null>(null)
 
 // Secciones abiertas por defecto según qué tiene datos
@@ -600,12 +612,31 @@ async function fetchData(ip: string) {
     open_sections.muestreo = (data.value.muestreos.length > 0)
     open_sections.prueba   = !!data.value.prueba_metalurgica
     open_sections.rec      = (data.value.analisis_recuperacion.length > 0)
-    open_sections.ruma     = !!data.value.ruma
+    open_sections.ruma     = !!data.value.ruma || data.value.habilitado_ruma
     open_sections.liq      = !!data.value.liquidacion
   } catch (e: any) {
     error.value = e?.response?.data?.detail ?? 'Error al cargar la trazabilidad'
   } finally {
     loading.value = false
+  }
+}
+
+async function habilitarManualmente(loteIp: string) {
+  if (habilitandoRuma.value) return
+  
+  const motivo = window.prompt('Motivo para habilitar este lote manualmente (opcional):')
+  if (motivo === null) return // Cancelado por el usuario
+  
+  habilitandoRuma.value = true
+  try {
+    await habilitarLote(loteIp, motivo)
+    useUiStore().toast('Lote habilitado para ruma exitosamente', 'success')
+    // Recargar datos para reflejar el cambio
+    await fetchData(loteIp)
+  } catch (e: any) {
+    useUiStore().toast(e?.response?.data?.detail ?? 'Error al habilitar el lote', 'error')
+  } finally {
+    habilitandoRuma.value = false
   }
 }
 

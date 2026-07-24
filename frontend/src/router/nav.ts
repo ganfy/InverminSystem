@@ -25,29 +25,29 @@ export interface NavItem {
 export const NAV_CONFIG: NavSection[] = [
   {
     section: 'DASHBOARD',
-    roles: ['Admin', 'Gerencia', 'Comercial'],
+    roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'],
     items: [
       { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     ],
   },
   {
     section: 'OPERACIONES',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza', 'Laboratorista', 'TecnicoMuestreo', 'Metalurgista'],
+    roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza', 'Laboratorista', 'TecnicoMuestreo', 'Metalurgista'],
     items: [
-      { label: 'Balanza', path: '/balanza', icon: Weight, roles: ['Admin', 'Gerencia', 'Comercial', 'OperadorBalanza'] },
-      { label: 'Muestreo',            path: '/muestreo',   icon: FlaskConical, roles: ['Admin', 'Gerencia', 'Comercial', 'TecnicoMuestreo'] },
-      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'Metalurgista'] },
-      { label: 'Laboratorio',         path: '/laboratorio',icon: Microscope, roles: ['Admin', 'Gerencia', 'Comercial', 'Laboratorista'] },
-      { label: 'Liquidaciones',       path: '/liquidaciones', icon: FileText, roles: ['Admin', 'Gerencia', 'Comercial'] },
-      { label: 'Facturación',         path: '/facturacion',icon: Receipt, roles: ['Admin', 'Gerencia', 'Comercial'] },
-      { label: 'Rumas',               path: '/rumas',      icon: Boxes, roles: ['Admin', 'Gerencia', 'Comercial'] },
+      { label: 'Balanza', path: '/balanza', icon: Weight, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza'] },
+      { label: 'Muestreo',            path: '/muestreo',   icon: FlaskConical, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'TecnicoMuestreo'] },
+      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Metalurgista'] },
+      { label: 'Laboratorio',         path: '/laboratorio',icon: Microscope, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] },
+      { label: 'Liquidaciones',       path: '/liquidaciones', icon: FileText, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
+      { label: 'Facturación',         path: '/facturacion',icon: Receipt, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
+      { label: 'Rumas',               path: '/rumas',      icon: Boxes, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
     ],
   },
   {
     section: 'GESTIÓN',
-    roles: ['Admin', 'Gerencia', 'Comercial'],
+    roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'],
     items: [
-      { label: 'Terceros',                path: '/terceros',               icon: Users,       roles: ['Admin', 'Gerencia', 'Comercial'] },
+      { label: 'Terceros',                path: '/terceros',               icon: Users,       roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
       { label: 'Campañas',                path: '/administracion/campanas', icon: Flag,        roles: ['Admin', 'Gerencia'] },
       { label: 'Administración',          path: '/administracion',          icon: ShieldCheck, roles: ['Admin'] },
     ],

@@ -495,7 +495,7 @@ def _calcular_lote(
     # Prueba Metalurgica para insumos (Soda y Cianuro)
     pm = (
         db.query(PruebaMetalurgica)
-        .filter(PruebaMetalurgica.lote_id == lote.id, PruebaMetalurgica.descartado.is_(False))
+        .filter(PruebaMetalurgica.lote_id == lote.id, ~PruebaMetalurgica.descartado)
         .order_by(PruebaMetalurgica.id.desc())
         .first()
     )
