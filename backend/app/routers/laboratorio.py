@@ -17,7 +17,7 @@ Flujo de recuperación interna:
 
 import io
 import os
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from app.core.database import get_db
@@ -576,7 +576,9 @@ def guardar_certificado_ley(
                 params = None
             calc = svc.calcular_ley_comercial(ley_planta, params)
             ley_comercial_val = Decimal(str(calc["ley_comercial"]))
-            ley_gr_tm_val = (ley_comercial_val * Decimal("34.2857")).quantize(Decimal("0.001"))
+            ley_gr_tm_val = (ley_comercial_val * Decimal("34.2857")).quantize(
+                Decimal("0.001"), rounding=ROUND_HALF_UP
+            )
             es_volado = calc["ley_comercial"] == 0.0
         else:
             ley_comercial_val = Decimal("0")

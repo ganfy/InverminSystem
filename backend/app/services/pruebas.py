@@ -1,6 +1,6 @@
 import logging
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from app.models.enums import TipoMuestra
 from app.models.models import (
@@ -96,12 +96,16 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
     q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
 
-    leyes = [Decimal(str(a.ley_final)).quantize(q_lab) for a in analisis if a.ley_final is not None]
+    leyes = [
+        Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+        for a in analisis
+        if a.ley_final is not None
+    ]
     if not leyes:
         return None
 
     total = sum(leyes)
-    return (total / len(leyes)).quantize(q_planta)
+    return (total / len(leyes)).quantize(q_planta, rounding=ROUND_HALF_UP)
 
 
 # ── Lista principal ───────────────────────────────────────────────────────────
@@ -596,13 +600,13 @@ def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
         # Conversiones de unidades
         cola_oz_tc: Decimal | None = rec.ley_cola
         cola_gr_tm = (
-            (cola_oz_tc * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"))
+            (cola_oz_tc * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
             if cola_oz_tc is not None
             else None
         )
         # ley_liquido en DB está en oz/TC → convertir a g/m³
         solucion_au = (
-            (rec.ley_liquido * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"))
+            (rec.ley_liquido * _OZ_TC_TO_GR_TM).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
             if rec.ley_liquido is not None
             else None
         )

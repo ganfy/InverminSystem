@@ -53,11 +53,15 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
-    return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.0001"))
+    return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(
+        Decimal("0.0001"), rounding=ROUND_HALF_UP
+    )
 
 
 def _calcular_ley_gr_tm(ley_final: Decimal, factor_oz_tc: Decimal) -> Decimal:
-    return (Decimal(str(ley_final)) * factor_oz_tc).quantize(Decimal("0.001"))
+    return (Decimal(str(ley_final)) * factor_oz_tc).quantize(
+        Decimal("0.001"), rounding=ROUND_HALF_UP
+    )
 
 
 def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
@@ -78,7 +82,7 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    return Decimal(str(a.ley_final)).quantize(q_lab)
+    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
 
 
 def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
@@ -99,11 +103,15 @@ def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    leyes = [Decimal(str(a.ley_final)).quantize(q_lab) for a in analisis if a.ley_final is not None]
+    leyes = [
+        Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+        for a in analisis
+        if a.ley_final is not None
+    ]
     if not leyes:
         return None
     total = sum(leyes)
-    return (total / len(leyes)).quantize(q_lab)
+    return (total / len(leyes)).quantize(q_lab, rounding=ROUND_HALF_UP)
 
 
 def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
@@ -124,11 +132,15 @@ def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    leyes = [Decimal(str(a.ley_final)).quantize(q_lab) for a in analisis if a.ley_final is not None]
+    leyes = [
+        Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+        for a in analisis
+        if a.ley_final is not None
+    ]
     if not leyes:
         return None
     total = sum(leyes)
-    return (total / len(leyes)).quantize(q_lab)
+    return (total / len(leyes)).quantize(q_lab, rounding=ROUND_HALF_UP)
 
 
 def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
@@ -149,7 +161,7 @@ def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    return Decimal(str(a.ley_final)).quantize(q_lab)
+    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
 
 
 def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
