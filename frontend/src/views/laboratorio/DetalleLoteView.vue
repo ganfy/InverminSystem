@@ -493,7 +493,7 @@
               <button class="btn-secondary" @click="modalLeyMinero = false">Cancelar</button>
               <button
                 class="btn-primary"
-                :disabled="!formLeyMinero.fecha_analisis || formLeyMinero.ley_fino == null || formLeyMinero.ley_grueso == null || guardandoLeyMinero"
+                :disabled="!puedeGuardarLeyMinero"
                 @click="guardarLeyMinero"
               >
                 <span v-if="guardandoLeyMinero" class="spinner" style="margin-right:0.4rem"></span>
@@ -1506,6 +1506,15 @@ function toggleModoFinal(val: boolean) {
   formLeyMinero.value.ley_fino = null
   formLeyMinero.value.ley_grueso = null
 }
+
+const puedeGuardarLeyMinero = computed(() => {
+  if (!formLeyMinero.value.fecha_analisis || guardandoLeyMinero.value) return false
+  if (formLeyMinero.value.modoFinal) {
+    return formLeyMinero.value.ley_final != null && !Number.isNaN(formLeyMinero.value.ley_final)
+  }
+  return formLeyMinero.value.ley_fino != null && !Number.isNaN(formLeyMinero.value.ley_fino) &&
+         formLeyMinero.value.ley_grueso != null && !Number.isNaN(formLeyMinero.value.ley_grueso)
+})
 async function extraerCertMinero(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -1543,13 +1552,14 @@ async function guardarLeyMinero() {
   let ley_grueso: number
 
   if (formLeyMinero.value.modoFinal) {
-    if (!formLeyMinero.value.ley_final) {
+    if (formLeyMinero.value.ley_final == null || Number.isNaN(formLeyMinero.value.ley_final)) {
       ui.toast('Ingrese la ley final', 'error'); return
     }
     ley_fino   = formLeyMinero.value.ley_final   // ley_final = ley_fino + 0
     ley_grueso = 0
   } else {
-    if (formLeyMinero.value.ley_fino == null || formLeyMinero.value.ley_grueso == null) {
+    if (formLeyMinero.value.ley_fino == null || Number.isNaN(formLeyMinero.value.ley_fino) ||
+        formLeyMinero.value.ley_grueso == null || Number.isNaN(formLeyMinero.value.ley_grueso)) {
       ui.toast('Ingrese ambas leyes (fino y grueso)', 'error'); return
     }
     ley_fino   = formLeyMinero.value.ley_fino
