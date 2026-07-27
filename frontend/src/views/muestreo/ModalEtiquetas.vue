@@ -124,7 +124,7 @@ const error = ref<string | null>(null)
 
 const auth = useAuthStore()
 const puedeAsignarLab = computed(() =>
-  ['Admin', 'Gerencia', 'Comercial'].includes(auth.user?.rol ?? '')
+  ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')
 )
 const labsDisponibles = ref<string[]>([])
 const labsPorCip = ref<Record<number, string>>({})

@@ -670,7 +670,7 @@ const auth     = useAuthStore()
 // ── Trazabilidad drawer ───────────────────────────────────────────────
 const drawerOpen       = ref(false)
 const ipTrazabilidad   = ref<string | null>(null)
-const ROLES_TRAZABILIDAD = ['Admin', 'Gerencia', 'Comercial']
+const ROLES_TRAZABILIDAD = ['Admin', 'Gerencia', 'Comercial', 'JefeComercial']
 const canViewTrazabilidad = computed(() => ROLES_TRAZABILIDAD.includes(auth.rol ?? ''))
 function abrirTrazabilidad(ip: string) {
   ipTrazabilidad.value = ip

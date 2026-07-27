@@ -23,7 +23,12 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/muestreo", tags=["Muestreo"])
 
-_ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
+_ROLES_COMERCIAL = {
+    RolSistema.ADMIN,
+    RolSistema.GERENCIA,
+    RolSistema.COMERCIAL,
+    RolSistema.JEFE_COMERCIAL,
+}
 
 
 # ==========================================

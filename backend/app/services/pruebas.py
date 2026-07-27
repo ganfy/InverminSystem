@@ -91,7 +91,13 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
         return None
 
     total = sum(a.ley_final for a in analisis if a.ley_final is not None)
-    return (total / len(analisis)).quantize(Decimal("0.001"))
+
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes = get_constantes(db)
+    q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
+
+    return (total / len(analisis)).quantize(q_planta)
 
 
 # ── Lista principal ───────────────────────────────────────────────────────────

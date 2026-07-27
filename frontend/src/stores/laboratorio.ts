@@ -32,14 +32,14 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
 
     const puedeVerIP = computed(() => {
         const r = auth.user?.rol ?? ''
-        return ['Admin', 'Gerencia', 'Comercial'].includes(r)
+        return ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(r)
     })
 
     const esLaboratorista = computed(() => auth.user?.rol === 'Laboratorista')
 
     const puedeImportarCert = computed(() => {
         const r = auth.user?.rol ?? ''
-        return ['Admin', 'Gerencia', 'Comercial'].includes(r)
+        return ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(r)
     })
 
     // ── Carga ─────────────────────────────────────────────────────────────────

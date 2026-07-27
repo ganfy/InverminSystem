@@ -379,15 +379,21 @@ def _calcular_lote(
     # ley_planta para snapshot: ley paititi base (o dirimencia como fallback)
     ley_planta = ley_paititi_raw if ley_paititi_raw is not None else ley_dirim_raw
 
+    # ── Configuraciones y Rounding ──────────────────────────────────────────
+    constantes = get_constantes(db)
+    from app.services.config_calculo import get_quantize_decimal
+
+    q_comercial = get_quantize_decimal(constantes.decimales_ley_comercial)
+    q_final = get_quantize_decimal(constantes.decimales_ley_final)
+
     # ── Ley Comercial (parámetros aplicados a ley paititi) ───────────────────
-    lc_result = calcular_ley_comercial(ley_planta, params)
+    lc_result = calcular_ley_comercial(ley_planta, params, q_comercial=q_comercial)
     oz_tc_comercial = max(
         Decimal("0"),
-        Decimal(str(lc_result["ley_comercial"])).quantize(Decimal("0.001"), rounding=ROUND_DOWN),
+        Decimal(str(lc_result["ley_comercial"])).quantize(q_comercial, rounding=ROUND_DOWN),
     )
 
     # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
-    constantes = get_constantes(db)
     if not lote.volado and oz_tc_comercial < constantes.umbral_volado_oz_tc:
         lote.volado = True  # se persiste al commit de crear_liquidacion
     if lote.volado:
@@ -412,20 +418,18 @@ def _calcular_lote(
     #   - dirimencia > ley_minero → se usa ley_minero (cap)
     #   - dirimencia < ley_paititi → se usa ley_paititi (piso)
     if ley_dirim_raw is not None and oz_tc_minero:
-        lc_dir = calcular_ley_comercial(ley_dirim_raw, params)
+        lc_dir = calcular_ley_comercial(ley_dirim_raw, params, q_comercial=q_comercial)
         oz_tc_dirimencia = max(
             Decimal("0"),
-            Decimal(str(lc_dir["ley_comercial"])).quantize(Decimal("0.001"), rounding=ROUND_DOWN),
+            Decimal(str(lc_dir["ley_comercial"])).quantize(q_comercial, rounding=ROUND_DOWN),
         )
         ley_low = min(oz_tc_comercial, oz_tc_minero)
         ley_high = max(oz_tc_comercial, oz_tc_minero)
         oz_promedio = max(ley_low, min(ley_high, oz_tc_dirimencia)).quantize(
-            Decimal("0.001"), rounding=ROUND_DOWN
+            q_final, rounding=ROUND_DOWN
         )
     elif oz_tc_minero:
-        oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(
-            Decimal("0.001"), rounding=ROUND_DOWN
-        )
+        oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(q_final, rounding=ROUND_DOWN)
     else:
         oz_promedio = oz_tc_comercial
 
@@ -495,7 +499,7 @@ def _calcular_lote(
     # Prueba Metalurgica para insumos (Soda y Cianuro)
     pm = (
         db.query(PruebaMetalurgica)
-        .filter(PruebaMetalurgica.lote_id == lote.id, PruebaMetalurgica.descartado.is_(False))
+        .filter(PruebaMetalurgica.lote_id == lote.id, ~PruebaMetalurgica.descartado)
         .order_by(PruebaMetalurgica.id.desc())
         .first()
     )
@@ -1076,15 +1080,21 @@ def lotes_disponibles_para_liquidar(
         usa_dir = bool(lote.dirimencia)
 
         constantes = get_constantes(db)
+        from app.services.config_calculo import get_quantize_decimal
+
+        q_comercial = get_quantize_decimal(constantes.decimales_ley_comercial)
+        q_final = get_quantize_decimal(constantes.decimales_ley_final)
         params = lote.sesion.provacop.parametros if lote.sesion and lote.sesion.provacop else None
         ley_comercial = None
         ley_base = ley_paititi_r if ley_paititi_r is not None else ley_dirim_r
 
         if ley_base is not None:
-            lc = calcular_ley_comercial(ley_base, params, constantes.umbral_volado_oz_tc)
+            lc = calcular_ley_comercial(
+                ley_base, params, constantes.umbral_volado_oz_tc, q_comercial=q_comercial
+            )
             oz_com_paititi = Decimal(
                 str(max(0.0, float(lc["ley_comercial"])) if lc else 0)
-            ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+            ).quantize(q_comercial, rounding=ROUND_DOWN)
 
             # Auto-set volado basado en ley comercial paititi
             if not lote.volado and oz_com_paititi < constantes.umbral_volado_oz_tc:
@@ -1095,22 +1105,24 @@ def lotes_disponibles_para_liquidar(
                 ley_comercial = Decimal("0")
             elif ley_dirim_r is not None and oz_tc_minero_val:
                 # Dirimencia: clamp(dir, min(paititi,minero), max(paititi,minero))
-                lc_dir = calcular_ley_comercial(ley_dirim_r, params, constantes.umbral_volado_oz_tc)
+                lc_dir = calcular_ley_comercial(
+                    ley_dirim_r, params, constantes.umbral_volado_oz_tc, q_comercial=q_comercial
+                )
                 oz_dir = Decimal(
                     str(max(0.0, float(lc_dir["ley_comercial"])) if lc_dir else 0)
-                ).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+                ).quantize(q_comercial, rounding=ROUND_DOWN)
                 ley_low = min(oz_com_paititi, oz_tc_minero_val)
                 ley_high = max(oz_com_paititi, oz_tc_minero_val)
                 ley_comercial = max(ley_low, min(ley_high, oz_dir))
             elif oz_tc_minero_val:
                 ley_comercial = ((oz_com_paititi + oz_tc_minero_val) / 2).quantize(
-                    Decimal("0.001"), rounding=ROUND_DOWN
+                    q_final, rounding=ROUND_DOWN
                 )
             else:
                 ley_comercial = oz_com_paititi
 
         ley_comercial = (
-            Decimal(str(ley_comercial)).quantize(Decimal("0.001"), rounding=ROUND_DOWN)
+            Decimal(str(ley_comercial)).quantize(q_final, rounding=ROUND_DOWN)
             if ley_comercial is not None
             else None
         )

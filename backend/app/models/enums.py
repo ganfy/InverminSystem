@@ -239,6 +239,7 @@ class RolSistema(str, Enum):
 
     ADMIN = "Admin"
     GERENCIA = "Gerencia"
+    JEFE_COMERCIAL = "JefeComercial"
     COMERCIAL = "Comercial"
     LABORATORISTA = "Laboratorista"
     OPERADOR_BALANZA = "OperadorBalanza"

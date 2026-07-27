@@ -115,7 +115,7 @@ export const dashboardApi = {
         api.post('/dashboard/alertas/observacion', { tipo, ip, observacion }).then(r => r.data),
 
     getTrazabilidad: (ip: string) =>
-        api.get<TrazabilidadLoteResponse>(`/dashboard/lotes/${ip}/trazabilidad`).then(r => r.data),
+        api.get<TrazabilidadLoteResponse>(`/dashboard/lotes/${ip}/trazabilidad`, { params: { _t: new Date().getTime() } }).then(r => r.data),
 }
 
 // =============================================================================

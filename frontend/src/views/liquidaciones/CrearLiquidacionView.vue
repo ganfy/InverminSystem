@@ -489,7 +489,10 @@
   const store  = useLiquidacionesStore()
   const ui     = useUiStore()
   const auth   = useAuthStore()
-  const puedeEditarParams = computed(() => ['Admin', 'Gerencia'].includes(auth.user?.rol ?? ''))
+  const puedeEditarParams = computed(() => {
+    if (!auth.user) return false
+    return ['Admin', 'Gerencia', 'JefeComercial'].includes(auth.user.rol)
+  })
 
 
   // ── State ──────────────────────────────────────────────────────────

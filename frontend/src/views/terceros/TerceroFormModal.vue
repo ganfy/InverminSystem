@@ -498,7 +498,7 @@ function seleccionarTipo(tipo: TipoAcopiador) {
 // ── Permisos ─────────────────────────────────────────────────────────────────
 const soloLecturaParams = computed(() => {
   const rol = auth.user?.rol
-  return rol === 'Comercial'
+  return ['Comercial', 'JefeComercial'].includes(rol ?? '')
 })
 
 const agParamsIncompletos = computed(() => {

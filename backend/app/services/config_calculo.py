@@ -56,6 +56,11 @@ DEFAULTS: dict[str, str] = {
     "tamano_bloque_ip": "50",
     "proximo_ticket": "1",
     "tamano_bloque_ticket": "50",
+    # Decimales de Leyes
+    "decimales_ley_laboratorio": "3",
+    "decimales_ley_planta": "3",
+    "decimales_ley_comercial": "3",
+    "decimales_ley_final": "3",
 }
 
 DESCRIPCIONES: dict[str, str] = {
@@ -93,6 +98,10 @@ DESCRIPCIONES: dict[str, str] = {
     "tamano_bloque_ip": "Cantidad de IPs reservados por cada sync/login del frontend (cuántos lotes offline puede registrar por sesión sin conexión)",
     "proximo_ticket": "Número de ticket desde el que comenzará el próximo bloque reservado para balanza offline",
     "tamano_bloque_ticket": "Cantidad de tickets reservados por cada sync/login del frontend",
+    "decimales_ley_laboratorio": "Número de decimales para leyes reportadas por laboratorio (utilizado por comercial).",
+    "decimales_ley_planta": "Número de decimales para ley planta (promedio IP).",
+    "decimales_ley_comercial": "Número de decimales para ley comercial.",
+    "decimales_ley_final": "Número de decimales para ley final (incluye minero/dirimencia, redondeo hacia abajo).",
 }
 
 
@@ -102,6 +111,10 @@ class ConstantesCalculo:
     umbral_volado_oz_tc: Decimal
     blank_correction_ag: Decimal
     costo_fijo_planta_maquila: Decimal
+    decimales_ley_laboratorio: int
+    decimales_ley_planta: int
+    decimales_ley_comercial: int
+    decimales_ley_final: int
 
 
 def get_constantes(db: Session) -> ConstantesCalculo:
@@ -111,6 +124,10 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         "umbral_volado_oz_tc",
         "blank_correction_ag",
         "costo_fijo_planta_maquila",
+        "decimales_ley_laboratorio",
+        "decimales_ley_planta",
+        "decimales_ley_comercial",
+        "decimales_ley_final",
     ]
     rows = (
         db.query(Configuracion.clave, Configuracion.valor)
@@ -123,6 +140,10 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         umbral_volado_oz_tc=Decimal(cfg["umbral_volado_oz_tc"]),
         blank_correction_ag=Decimal(cfg["blank_correction_ag"]),
         costo_fijo_planta_maquila=Decimal(cfg["costo_fijo_planta_maquila"]),
+        decimales_ley_laboratorio=int(cfg["decimales_ley_laboratorio"]),
+        decimales_ley_planta=int(cfg["decimales_ley_planta"]),
+        decimales_ley_comercial=int(cfg["decimales_ley_comercial"]),
+        decimales_ley_final=int(cfg["decimales_ley_final"]),
     )
 
 
@@ -215,6 +236,15 @@ def actualizar_constante(db: Session, clave: str, valor: str) -> dict:
                     f"El IP {ip_candidato} ya está registrado en el año {anio_actual}. "
                     f"Elige un número mayor al último IP generado."
                 )
+    elif clave.startswith("decimales_ley_"):
+        try:
+            int_val = int(val)
+            if not (0 <= int_val <= 4):
+                raise ValueError()
+        except (ValueError, TypeError) as e:
+            raise ValueError(
+                f"El valor para '{clave}' debe ser un número entero entre 0 y 4."
+            ) from e
     else:
         # Por defecto, todas las demás son numéricas (constantes, alertas, metas, etc.)
         try:
@@ -259,3 +289,10 @@ def get_config_public_dict(db: Session) -> dict[str, str]:
     )
     en_db = {r.clave: r.valor for r in rows}
     return {clave: en_db.get(clave, DEFAULTS[clave]) for clave in claves_publicas}
+
+
+def get_quantize_decimal(decimals: int) -> Decimal:
+    """Retorna un Decimal para usar en quantize() basado en el número de decimales."""
+    if decimals <= 0:
+        return Decimal("1.")
+    return Decimal("10") ** -decimals
