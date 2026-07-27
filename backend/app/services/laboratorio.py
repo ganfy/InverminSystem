@@ -90,7 +90,11 @@ def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
     if not analisis:
         return None
     total = sum(a.ley_final for a in analisis if a.ley_final is not None)
-    return (total / len(analisis)).quantize(Decimal("0.0001"))
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes = get_constantes(db)
+    q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
+    return (total / len(analisis)).quantize(q_lab)
 
 
 def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
@@ -108,7 +112,11 @@ def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
     if not analisis:
         return None
     total = sum(a.ley_final for a in analisis if a.ley_final is not None)
-    return (total / len(analisis)).quantize(Decimal("0.0001"))
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes = get_constantes(db)
+    q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
+    return (total / len(analisis)).quantize(q_lab)
 
 
 def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:

@@ -238,10 +238,10 @@
                   <span v-if="excluidos.size > 0" class="badge-simulando" style="margin-left:0.4rem;font-size:0.6rem">SIM</span>
                 </span>
                 <span class="lc-valor mono" :class="{ gold: excluidos.size === 0 }">
-                  {{ leyPlantaSoloSimulada != null ? Number(leyPlantaSoloSimulada).toFixed(4) : '-' }} oz/TC
+                  {{ fmtOz(leyPlantaSoloSimulada) }} oz/TC
                   <span v-if="excluidos.size > 0 && leyComercialCalc?.ley_planta_solo != null"
                     style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.35rem">
-                    (antes: {{ Number(leyComercialCalc.ley_planta_solo).toFixed(4) }})
+                    (antes: {{ fmtOz(leyComercialCalc.ley_planta_solo) }})
                   </span>
                 </span>
               </div>
@@ -252,7 +252,7 @@
                   LEY EXTERNO
                   <span style="font-size:0.7rem;color:var(--color-text-faint)">(labs externos)</span>
                 </span>
-                <span class="lc-valor mono">{{ Number(leyComercialCalc.ley_externo).toFixed(4) }} oz/TC</span>
+                <span class="lc-valor mono">{{ fmtOz(leyComercialCalc.ley_externo) }} oz/TC</span>
               </div>
 
               <div v-if="leyComercialCalc?.ley_externo != null"
@@ -264,7 +264,7 @@
                   LEY COMERCIAL
                   <span style="font-size:0.7rem;color:var(--color-text-faint)">(a entregar)</span>
                 </span>
-                <span class="lc-valor mono gold">{{ leyComercialCalc.ley_comercial.toFixed(4) }} oz/TC</span>
+                <span class="lc-valor mono gold">{{ fmtOz(leyComercialCalc.ley_comercial) }} oz/TC</span>
               </div>
 
               <div class="lc-item" v-if="leyComercialCalc.descuento_aplicado">
@@ -279,7 +279,7 @@
               <!-- Ley Minero -->
               <div class="lc-item" v-if="leyComercialCalc?.ley_minero != null">
                 <span class="lc-label">LEY MINERO:</span>
-                <span class="lc-valor mono">{{ Number(leyComercialCalc.ley_minero).toFixed(4) }} oz/TC</span>
+                <span class="lc-valor mono">{{ fmtOz(leyComercialCalc.ley_minero) }} oz/TC</span>
               </div>
 
               <div v-if="leyComercialCalc?.ley_promedio != null"
@@ -294,11 +294,11 @@
                     (clamp dirimencia)
                   </span>
                   <span v-else style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.3rem">
-                    (comercial + minero) / 2
+                    (comercial + minero)
                   </span>
                 </span>
                 <span class="lc-valor mono" style="color:var(--color-gold);font-weight:700;font-size:1.05em">
-                  {{ Number(leyComercialCalc.ley_promedio).toFixed(4) }} oz/TC
+                  {{ fmtOz(leyComercialCalc.ley_promedio) }} oz/TC
                 </span>
               </div>
             </div>
@@ -1014,7 +1014,9 @@ const formAg = ref({
 // Helpers
 function fmtOz(v: number | string | null | undefined): string {
   if (v == null) return '-'
-  return Number(v).toFixed(4)   // oz/TC
+  const n = Number(v)
+  if (isNaN(n)) return '-'
+  return n.toString() // oz/TC
 }
 
 // Convierte oz/TC → g/TM (para ley_fino y ley_grueso que vienen en oz/TC)
