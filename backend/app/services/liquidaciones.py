@@ -168,7 +168,7 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    return Decimal(str(a.ley_final)).quantize(q_lab)
+    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
 
 
 def _ley_base_planta(db: Session, lote_id: int) -> Decimal | None:
@@ -196,7 +196,7 @@ def _ley_dirimencia_raw(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    return Decimal(str(a.ley_final)).quantize(q_lab)
+    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
 
 
 def _determinar_rec_liq(
@@ -388,7 +388,7 @@ def _calcular_lote(
     # ley_planta para snapshot: ley paititi base (o dirimencia como fallback)
     ley_planta = ley_paititi_raw if ley_paititi_raw is not None else ley_dirim_raw
     if ley_planta is not None:
-        ley_planta = Decimal(str(ley_planta)).quantize(q_planta)
+        ley_planta = Decimal(str(ley_planta)).quantize(q_planta, rounding=ROUND_HALF_UP)
 
     # ── Ley Comercial (parámetros aplicados a ley paititi) ───────────────────
     lc_result = calcular_ley_comercial(ley_planta, params, q_comercial=q_comercial)
