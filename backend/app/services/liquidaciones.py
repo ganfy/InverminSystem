@@ -162,7 +162,13 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
         .order_by(AnalisisLey.id.desc())
         .first()
     )
-    return Decimal(str(a.ley_final)) if a and a.ley_final else None
+    if not a or a.ley_final is None:
+        return None
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes = get_constantes(db)
+    q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
+    return Decimal(str(a.ley_final)).quantize(q_lab)
 
 
 def _ley_base_planta(db: Session, lote_id: int) -> Decimal | None:
@@ -184,7 +190,13 @@ def _ley_dirimencia_raw(db: Session, lote_id: int) -> Decimal | None:
         )
         .first()
     )
-    return Decimal(str(a.ley_final)) if a and a.ley_final else None
+    if not a or a.ley_final is None:
+        return None
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes = get_constantes(db)
+    q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
+    return Decimal(str(a.ley_final)).quantize(q_lab)
 
 
 def _determinar_rec_liq(

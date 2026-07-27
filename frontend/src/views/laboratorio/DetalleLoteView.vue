@@ -1049,7 +1049,7 @@ const leyPlantaSoloSimulada = computed<number | null>(() => {
       && a.tipo_analisis === 'planta' && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
-  const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
+  const prom = vigentes.reduce((acc, a) => acc + Number(Number(a.ley_final).toFixed(3)), 0) / vigentes.length
   return parseFloat(prom.toFixed(4))
 })
 
@@ -1075,7 +1075,7 @@ const leyPlantaSimulada = computed<number | null>(() => {
       && a.material !== 'Ag',
   )
   if (vigentes.length === 0) return null
-  const prom = vigentes.reduce((acc, a) => acc + Number(a.ley_final), 0) / vigentes.length
+  const prom = vigentes.reduce((acc, a) => acc + Number(Number(a.ley_final).toFixed(3)), 0) / vigentes.length
   return parseFloat(prom.toFixed(4))
 })
 
