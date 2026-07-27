@@ -17,7 +17,7 @@ Flujo de recuperación interna:
 
 import io
 import os
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 
 from app.core.database import get_db
@@ -445,14 +445,25 @@ def preview_ley_comercial(
     except AttributeError:
         params = None
 
-    result = svc.calcular_ley_comercial(ley_base, params)
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes = get_constantes(db)
+
+    q_comercial = get_quantize_decimal(constantes.decimales_ley_comercial)
+    q_final = get_quantize_decimal(constantes.decimales_ley_final)
+
+    result = svc.calcular_ley_comercial(
+        ley_base, params, umbral_volado=constantes.umbral_volado_oz_tc, q_comercial=q_comercial
+    )
 
     ley_solo_planta = svc._ley_solo_planta(db, lote.id)
     ley_externo = svc._ley_solo_externo(db, lote.id)
     ley_minero = svc._ley_minero(db, lote.id)
     ley_dirimencia = svc._ley_dirimencia(db, lote.id)
 
-    ley_comercial_dec = Decimal(str(result["ley_comercial"])).quantize(Decimal("0.001"))
+    ley_comercial_dec = Decimal(str(result["ley_comercial"])).quantize(
+        q_comercial, rounding=ROUND_DOWN
+    )
     ley_promedio: Decimal | None = None
 
     if ley_minero is not None:
@@ -460,12 +471,15 @@ def preview_ley_comercial(
             # Clamping
             ley_low = min(ley_comercial_dec, Decimal(str(ley_minero)))
             ley_high = max(ley_comercial_dec, Decimal(str(ley_minero)))
-            ley_promedio = max(min(ley_dirimencia, ley_high), ley_low)
+            ley_promedio = max(min(ley_dirimencia, ley_high), ley_low).quantize(
+                q_final, rounding=ROUND_DOWN
+            )
         else:
-            ley_promedio = (ley_comercial_dec + Decimal(str(ley_minero))) / 2
-
-        if ley_promedio is not None:
-            ley_promedio = ley_promedio.quantize(Decimal("0.001"))
+            ley_promedio = ((ley_comercial_dec + Decimal(str(ley_minero))) / 2).quantize(
+                q_final, rounding=ROUND_DOWN
+            )
+    else:
+        ley_promedio = ley_comercial_dec.quantize(q_final, rounding=ROUND_DOWN)
 
     result["ley_planta_solo"] = float(ley_solo_planta) if ley_solo_planta is not None else None
     result["ley_externo"] = float(ley_externo) if ley_externo is not None else None

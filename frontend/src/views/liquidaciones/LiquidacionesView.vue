@@ -251,9 +251,9 @@
                     <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
                     <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
                     <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
-                    <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_planta, 4) }}</td>
-                    <td class="col-r td-mono td-muted">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
-                    <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtNum(lote.ley_comercial, 4) }}</td>
+                    <td class="col-r td-mono td-muted">{{ fmtLey(lote.oz_tc_planta) }}</td>
+                    <td class="col-r td-mono td-muted">{{ fmtLey(lote.oz_tc_minero) }}</td>
+                    <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtLey(lote.ley_comercial) }}</td>
                     <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
                     <td>
                       <span v-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
@@ -472,6 +472,12 @@ async function cambiarEstadoRapido(liq: LiquidacionResumenOut, nuevoEstado: stri
 function fmtNum(v: number | null | undefined, d = 2) {
   if (v == null) return '—'
   return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d })
+}
+function fmtLey(v: number | string | null | undefined) {
+  if (v == null) return '—'
+  const n = Number(v)
+  if (isNaN(n)) return '—'
+  return n.toString()
 }
 function fmtDate(s: string | null | undefined) {
   if (!s) return '—'

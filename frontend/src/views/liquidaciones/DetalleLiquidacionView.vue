@@ -144,10 +144,10 @@
                   <td class="td-mono td-right">{{ fmtNum(lote.pct_humedad, 2) }}%</td>
                   <td class="td-mono td-right">{{ fmtNum(lote.tms, 3) }}</td>
                   <td class="td-center td-muted">{{ lote.sacos ?? '-' }}</td>
-                  <td class="td-mono td-right td-muted">{{ fmtNum(lote.oz_tc_planta, 4) }}</td>
-                  <td class="td-mono td-right td-muted">{{ fmtNum(lote.oz_tc_comercial, 4) }}</td>
-                  <td class="td-mono td-right td-muted">{{ fmtNum(lote.oz_tc_minero, 4) }}</td>
-                  <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtNum(lote.oz_tc_promedio, 4) }}</td>
+                  <td class="td-mono td-right td-muted">{{ fmtLey(lote.oz_tc_planta) }}</td>
+                  <td class="td-mono td-right td-muted">{{ fmtLey(lote.oz_tc_comercial) }}</td>
+                  <td class="td-mono td-right td-muted">{{ fmtLey(lote.oz_tc_minero) }}</td>
+                  <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtLey(lote.oz_tc_promedio) }}</td>
                   <td class="td-mono td-right">{{ fmtNum(lote.pct_rec_liq, 1) }}%</td>
                   <td class="td-mono td-right">${{ fmtNum(lote.maquila, 2) }}</td>
                   <td class="td-mono td-right td-muted">${{ fmtNum(lote.riesgo, 2) }}</td>
@@ -488,6 +488,12 @@ async function guardarEditParams() {
   function fmtNum(v: number | null | undefined, d = 2) {
     if (v == null) return '-'
     return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d })
+  }
+  function fmtLey(v: number | string | null | undefined) {
+    if (v == null) return '-'
+    const n = Number(v)
+    if (isNaN(n)) return '-'
+    return n.toString()
   }
   function fmtDate(s: string | null | undefined) {
     if (!s) return '-'

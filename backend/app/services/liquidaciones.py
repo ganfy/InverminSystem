@@ -167,20 +167,9 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
 
 def _ley_base_planta(db: Session, lote_id: int) -> Decimal | None:
     """Promedio de análisis planta/externo vigentes. No incluye dirimencia."""
-    analisis = (
-        db.query(AnalisisLey)
-        .filter(
-            AnalisisLey.lote_id == lote_id,
-            AnalisisLey.vigente == True,  # noqa: E712
-            AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
-            AnalisisLey.material == "Au",
-        )
-        .all()
-    )
-    if not analisis:
-        return None
-    total = sum(a.ley_final for a in analisis if a.ley_final is not None)
-    return (total / len(analisis)).quantize(Decimal("0.0001"))
+    from app.services.pruebas import calcular_ley_planta
+
+    return calcular_ley_planta(db, lote_id)
 
 
 def _ley_dirimencia_raw(db: Session, lote_id: int) -> Decimal | None:
@@ -376,15 +365,18 @@ def _calcular_lote(
         )
         return {}, alertas
 
-    # ley_planta para snapshot: ley paititi base (o dirimencia como fallback)
-    ley_planta = ley_paititi_raw if ley_paititi_raw is not None else ley_dirim_raw
-
     # ── Configuraciones y Rounding ──────────────────────────────────────────
     constantes = get_constantes(db)
     from app.services.config_calculo import get_quantize_decimal
 
+    q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
     q_comercial = get_quantize_decimal(constantes.decimales_ley_comercial)
     q_final = get_quantize_decimal(constantes.decimales_ley_final)
+
+    # ley_planta para snapshot: ley paititi base (o dirimencia como fallback)
+    ley_planta = ley_paititi_raw if ley_paititi_raw is not None else ley_dirim_raw
+    if ley_planta is not None:
+        ley_planta = Decimal(str(ley_planta)).quantize(q_planta)
 
     # ── Ley Comercial (parámetros aplicados a ley paititi) ───────────────────
     lc_result = calcular_ley_comercial(ley_planta, params, q_comercial=q_comercial)
@@ -431,7 +423,7 @@ def _calcular_lote(
     elif oz_tc_minero:
         oz_promedio = ((oz_tc_comercial + oz_tc_minero) / 2).quantize(q_final, rounding=ROUND_DOWN)
     else:
-        oz_promedio = oz_tc_comercial
+        oz_promedio = Decimal(str(oz_tc_comercial)).quantize(q_final, rounding=ROUND_DOWN)
 
     # ── Recuperacion ──────────────────────────────────────────────────────────
     if rec_liq_override is not None:
