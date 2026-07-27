@@ -154,7 +154,7 @@
                   <td class="td-mono td-right td-muted">${{ fmtNum(lote.insumos_total, 2) }}</td>
                   <td class="td-mono td-right td-muted">{{ lote.bono ? '$' + fmtNum(lote.bono, 2) : '-' }}</td>
                   <td class="td-mono td-right td-muted">{{ fmtNum(lote.factor, 4) }}</td>
-                  <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 4) }}</td>
+                  <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 2) }}</td>
                   <td class="td-mono td-right td-muted">{{ fmtNum(lote.fino_recuperable, 4) }}</td>
                   <!-- Ag (opcionales) -->
                   <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_gr_tm, 2) }}</td>
