@@ -50,7 +50,12 @@ from sqlalchemy.orm import Session, joinedload
 
 router = APIRouter(prefix="/laboratorio", tags=["Laboratorio"])
 
-_ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
+_ROLES_COMERCIAL = {
+    RolSistema.ADMIN,
+    RolSistema.GERENCIA,
+    RolSistema.COMERCIAL,
+    RolSistema.JEFE_COMERCIAL,
+}
 
 
 def _puede_ver_ip(current_user) -> bool:

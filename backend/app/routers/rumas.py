@@ -30,7 +30,12 @@ from sqlalchemy.orm import Session
 router = APIRouter(tags=["Rumas y Campañas"])
 
 _ROLES_GERENCIA = {RolSistema.ADMIN, RolSistema.GERENCIA}
-_ROLES_COMERCIAL = {RolSistema.ADMIN, RolSistema.GERENCIA, RolSistema.COMERCIAL}
+_ROLES_COMERCIAL = {
+    RolSistema.ADMIN,
+    RolSistema.GERENCIA,
+    RolSistema.COMERCIAL,
+    RolSistema.JEFE_COMERCIAL,
+}
 
 
 def _require(user: Usuario, roles: set[RolSistema]) -> None:

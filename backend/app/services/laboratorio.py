@@ -1592,7 +1592,10 @@ def sincronizar_batch(
 
 
 def calcular_ley_comercial(
-    ley_planta: Decimal, params, umbral_volado: Decimal | None = None
+    ley_planta: Decimal,
+    params,
+    umbral_volado: Decimal | None = None,
+    q_comercial: Decimal = Decimal("0.001"),
 ) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
@@ -1617,7 +1620,7 @@ def calcular_ley_comercial(
             "detalle": "Sin parametros comerciales configurados para este proveedor-acopiador",
         }
 
-    q = Decimal("0.001")
+    q = q_comercial
     ley = ley_planta
     descuento = Decimal("0")
     factor = Decimal("1")

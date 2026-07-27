@@ -217,6 +217,10 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   proximo_ticket: 'Ticket Inicial del Próximo Bloque (Balanza Offline)',
   tamano_bloque_ticket: 'Tamaño del Bloque de Tickets (Balanza Offline)',
   costo_fijo_planta_maquila: 'Costo Fijo Planta para Maquila',
+  decimales_ley_laboratorio: 'Decimales Ley Laboratorio',
+  decimales_ley_planta: 'Decimales Ley Planta',
+  decimales_ley_comercial: 'Decimales Ley Comercial',
+  decimales_ley_final: 'Decimales Ley Final',
 }
 
 const UNIDADES: Record<string, string> = {

@@ -502,6 +502,10 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   blank_correction_ag: 'Corrección en Blanco de Plata (Ag)',
   umbral_volado_oz_tc: 'Umbral de Ley para Lote Volado',
   costo_fijo_planta_maquila: 'Costo Fijo Planta para Maquila',
+  decimales_ley_laboratorio: 'Decimales Ley Laboratorio',
+  decimales_ley_planta: 'Decimales Ley Planta',
+  decimales_ley_comercial: 'Decimales Ley Comercial',
+  decimales_ley_final: 'Decimales Ley Final',
 
   // Muestreo
   MUESTREO_MAX_INTENTOS: 'Intentos Máximos de Muestreo',
@@ -570,7 +574,7 @@ const PARAM_CATEGORIES = [
     id: 'calculo',
     name: 'Constantes de Cálculo Metalúrgico',
     icon: Database,
-    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila']
+    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila', 'decimales_ley_laboratorio', 'decimales_ley_planta', 'decimales_ley_comercial', 'decimales_ley_final']
   },
   {
     id: 'muestreo',

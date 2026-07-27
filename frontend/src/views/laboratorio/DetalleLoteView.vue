@@ -1372,8 +1372,7 @@ const cipsExternosPendienteCert = computed(() => {
 
 const analisisRecuperacionList = computed(() => {
   if (!lote.value) return []
-  // Solo agrupar para Comercial
-  if (auth.user?.rol !== 'Comercial') return lote.value.analisis_recuperacion
+  if (!['Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')) return lote.value.analisis_recuperacion
 
   // Comercial view: agrupar por CIP para unificar SOLIDOS y SOLUCION
   const agrupados = new Map<string, any>()

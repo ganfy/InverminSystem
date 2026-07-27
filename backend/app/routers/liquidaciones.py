@@ -260,9 +260,14 @@ def editar_params_lote(
     db: Session = Depends(get_db),
 ):
     rol = current_user.rol.codigo if current_user.rol else None
-    if rol not in {RolSistema.ADMIN.value, RolSistema.GERENCIA.value}:
+    if rol not in {
+        RolSistema.ADMIN.value,
+        RolSistema.GERENCIA.value,
+        RolSistema.JEFE_COMERCIAL.value,
+    }:
         raise HTTPException(
-            status_code=403, detail="Solo Admin y Gerencia pueden editar parámetros"
+            status_code=403,
+            detail="Solo Admin, Gerencia y Jefe Comercial pueden editar parámetros",
         )
     try:
         svc.editar_params_lote(db, liquidacion_id, ip, body, current_user.id)

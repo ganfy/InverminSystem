@@ -84,7 +84,9 @@ def guardar_observacion(
 def get_trazabilidad(
     ip: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(require_roles("Admin", "Gerencia", "Comercial")),
+    current_user: Usuario = Depends(
+        require_roles("Admin", "Gerencia", "Comercial", "JefeComercial")
+    ),
 ):
     """Retorna el cuadro de trazabilidad administrativa completo de un lote."""
     return obtener_trazabilidad_lote(db, ip)

@@ -235,7 +235,7 @@
   const filtroMaterial = ref('')
 
   const puedeEditar = computed(() =>
-    ['Admin', 'Gerencia', 'Comercial'].includes(auth.user?.rol ?? '')
+    ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')
   )
 
   // IPs actualmente en la ruma (de la respuesta del servidor)

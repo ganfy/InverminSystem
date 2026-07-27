@@ -140,7 +140,7 @@
   const router = useRouter()
 
   const puedeEditar = computed(() =>
-    ['Admin', 'Gerencia', 'Comercial'].includes(auth.user?.rol ?? '')
+    ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')
   )
 
   function fmtNum(v: number | null | undefined, dec = 2) {

@@ -21,7 +21,9 @@ def _calcular_ley_gr_tm(ley_final: Decimal, factor_oz_tc: Decimal) -> Decimal:
     return (Decimal(str(ley_final)) * factor_oz_tc).quantize(Decimal("0.001"))
 
 
-def calcular_ley_comercial(ley_planta: Decimal, params, umbral_volado=None):
+def calcular_ley_comercial(
+    ley_planta: Decimal, params, umbral_volado=None, q_comercial=Decimal("0.001")
+):
     """Réplica de la función en laboratorio.py para tests aislados."""
     if params is None:
         return {
@@ -34,7 +36,7 @@ def calcular_ley_comercial(ley_planta: Decimal, params, umbral_volado=None):
             "detalle": "Sin parametros comerciales configurados",
         }
 
-    q = Decimal("0.001")
+    q = q_comercial
     ley = ley_planta
     descuento = Decimal("0")
     factor = Decimal("1")
@@ -391,3 +393,25 @@ class TestGeneracionCIP:
         cip2 = f"CIP-{base}-A2"
         assert cip1 != cip2
         assert "A2" in cip2
+
+
+class TestRolesComercial:
+    """Verifica que el rol JefeComercial esté presente en los conjuntos de roles comerciales."""
+
+    def test_jefe_comercial_in_roles(self):
+        import os
+
+        os.environ.setdefault("DB_SERVER", "localhost")
+        os.environ.setdefault("DB_NAME", "test_db")
+        os.environ.setdefault("DB_USER", "test_user")
+        os.environ.setdefault("DB_PASSWORD", "test_pass")
+        os.environ.setdefault("SECRET_KEY", "test_secret_key_for_unit_tests")
+
+        from app.models.enums import RolSistema
+        from app.routers.laboratorio import _ROLES_COMERCIAL as ROLES_LAB
+        from app.routers.muestreo import _ROLES_COMERCIAL as ROLES_MUESTREO
+        from app.routers.rumas import _ROLES_COMERCIAL as ROLES_RUMAS
+
+        assert RolSistema.JEFE_COMERCIAL in ROLES_LAB
+        assert RolSistema.JEFE_COMERCIAL in ROLES_MUESTREO
+        assert RolSistema.JEFE_COMERCIAL in ROLES_RUMAS

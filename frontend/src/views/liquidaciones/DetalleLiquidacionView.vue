@@ -354,7 +354,7 @@
   const id = Number(route.params.id)
 
   const rol               = computed(() => auth.user?.rol ?? '')
-  const puedeCambiarEstado = computed(() => ['Admin', 'Gerencia', 'Comercial'].includes(rol.value))
+  const puedeCambiarEstado = computed(() => ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(rol.value))
 
   const puedeEditarParams = computed(() => {
   if (!auth.user) return false
