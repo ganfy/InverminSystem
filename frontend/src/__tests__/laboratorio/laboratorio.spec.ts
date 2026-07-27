@@ -4,6 +4,7 @@ import { createTestingPinia } from '@pinia/testing'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import LaboratorioDashboardView from '@/views/laboratorio/LaboratorioDashboardView.vue'
+import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
 import { obtenerCipsLabCache, encolarAnalisisLey, encolarAnalisisRecuperacion } from '@/composables/useOfflineQueue'
 import { useSync } from '@/composables/useSync'
 import { useUiStore } from '@/stores/ui'
@@ -29,6 +30,19 @@ vi.mock('@/api/laboratorio', () => ({
         enviarRecuperacion: vi.fn(),
         detalleLote: vi.fn(),
         subirCertificadoRecuperacion: vi.fn(),
+        registrarLeyPorIP: vi.fn(),
+    },
+}))
+
+vi.mock('@/api/muestreo', () => ({
+    muestreoApi: {
+        listarLaboratorios: vi.fn().mockResolvedValue(['Paititi', 'Otro']),
+    },
+}))
+
+vi.mock('@/api/pruebas', () => ({
+    pruebasApi: {
+        listarLotePruebas: vi.fn().mockResolvedValue([]),
     },
 }))
 
@@ -313,5 +327,65 @@ describe('LaboratorioDashboardView - rol Comercial', () => {
 
         await flushPromises()
         expect(wrapper.text()).toContain('IP-0001')
+    })
+})
+
+// ============================================================
+// SUITE 9 - DetalleLoteView: Registrar Ley Minero (modo Solo Ley Final)
+// ============================================================
+describe('DetalleLoteView - Ley Minero modo Solo Ley Final', () => {
+    it('permite guardar la ley minero cuando se activa modo Solo Ley Final con ley_final sin exigir fino y grueso', async () => {
+        const loteConAnalisis = {
+            ...loteFake,
+            analisis_ley: [
+                {
+                    id: 10,
+                    cip: 'CIP-001',
+                    laboratorio: 'LAB INTERNO',
+                    tipo_analisis: 'planta',
+                    ley_cabeza: 0.5,
+                    vigente: true,
+                    material: 'Au',
+                },
+            ],
+        }
+        vi.mocked(laboratorioApi.detalleLote).mockResolvedValue(loteConAnalisis as any)
+        vi.mocked(laboratorioApi.registrarLeyPorIP).mockResolvedValue({} as any)
+
+        const wrapper = mount(DetalleLoteView, {
+            global: {
+                plugins: [
+                    createTestingPinia({
+                        stubActions: false,
+                        createSpy: vi.fn,
+                        initialState: {
+                            auth: { user: { rol: 'Comercial', nombre_completo: 'Comercial User' } },
+                            laboratorio: { lotes: [loteConAnalisis] },
+                        },
+                    }),
+                ],
+                stubs: { RouterLink: true, RouterView: true },
+            },
+        })
+
+        await flushPromises()
+        const botones = wrapper.findAll('button')
+        const btnLeyMinero = botones.find(b => b.text().includes('Registrar Ley Minero'))
+        expect(btnLeyMinero).toBeDefined()
+        await btnLeyMinero!.trigger('click')
+
+        const btnSoloFinal = wrapper.findAll('button').find(b => b.text().includes('Solo Ley Final'))
+        expect(btnSoloFinal).toBeDefined()
+        await btnSoloFinal!.trigger('click')
+
+        const inputFecha = wrapper.find('input[type="date"]')
+        await inputFecha.setValue('2026-07-27')
+
+        const inputsNumber = wrapper.findAll('input[type="number"]')
+        const inputLeyFinal = inputsNumber[inputsNumber.length - 1]
+        await inputLeyFinal.setValue(0.55)
+
+        const btnGuardar = wrapper.findAll('button').find(b => b.text().includes('Guardar Ley Minero'))
+        expect(btnGuardar?.attributes('disabled')).toBeUndefined()
     })
 })
