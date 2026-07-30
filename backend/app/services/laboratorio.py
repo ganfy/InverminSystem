@@ -10,7 +10,7 @@ import shutil
 import tempfile
 import uuid
 from datetime import UTC, date, datetime, timedelta
-from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from app.models.enums import EstadoRecuperacion, OrigenDatos, TipoAnalisis, TipoMuestra
@@ -82,7 +82,7 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=constantes.redondeo_ley_laboratorio)
 
 
 def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
@@ -104,14 +104,16 @@ def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
     leyes = [
-        Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+        Decimal(str(a.ley_final)).quantize(q_lab, rounding=constantes.redondeo_ley_laboratorio)
         for a in analisis
         if a.ley_final is not None
     ]
+    if not list(leyes) if hasattr(leyes, "__iter__") else not leyes:
+        pass
     if not leyes:
         return None
     total = sum(leyes)
-    return (total / len(leyes)).quantize(q_lab, rounding=ROUND_HALF_UP)
+    return (total / len(leyes)).quantize(q_lab, rounding=constantes.redondeo_ley_planta)
 
 
 def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
@@ -133,14 +135,16 @@ def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
     leyes = [
-        Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+        Decimal(str(a.ley_final)).quantize(q_lab, rounding=constantes.redondeo_ley_laboratorio)
         for a in analisis
         if a.ley_final is not None
     ]
+    if not list(leyes) if hasattr(leyes, "__iter__") else not leyes:
+        pass
     if not leyes:
         return None
     total = sum(leyes)
-    return (total / len(leyes)).quantize(q_lab, rounding=ROUND_HALF_UP)
+    return (total / len(leyes)).quantize(q_lab, rounding=constantes.redondeo_ley_planta)
 
 
 def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
@@ -161,7 +165,7 @@ def _ley_dirimencia(db: Session, lote_id: int) -> Decimal | None:
 
     constantes = get_constantes(db)
     q_lab = get_quantize_decimal(constantes.decimales_ley_laboratorio)
-    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+    return Decimal(str(a.ley_final)).quantize(q_lab, rounding=constantes.redondeo_ley_laboratorio)
 
 
 def _nombres_usuarios(db: Session, ids: set[int]) -> dict[int, str]:
@@ -1634,6 +1638,7 @@ def calcular_ley_comercial(
     params,
     umbral_volado: Decimal | None = None,
     q_comercial: Decimal = Decimal("0.001"),
+    rounding: str = ROUND_HALF_UP,
 ) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
@@ -1673,7 +1678,7 @@ def calcular_ley_comercial(
         lim = Decimal(str(params.lim_ley_comercial))
         dscto = Decimal(str(params.dscto_ley_comercial))
         descuento = dscto
-        ley = (ley - dscto).quantize(q, rounding=ROUND_DOWN)
+        ley = (ley - dscto).quantize(q, rounding=rounding)
         detalle_pasos.append(
             f"Ley {float(ley_planta):.4f} < limite {float(lim):.3f}: "
             f"descuento {float(dscto):.4f} → {float(ley):.4f}"
@@ -1683,7 +1688,7 @@ def calcular_ley_comercial(
     elif params.porcentaje_ley_comercial:
         factor = Decimal(str(params.porcentaje_ley_comercial))
         ley_antes = ley
-        ley = (ley * factor).quantize(q, rounding=ROUND_DOWN)
+        ley = (ley * factor).quantize(q, rounding=rounding)
         detalle_pasos.append(
             f"Factor {float(factor):.3f}: {float(ley_antes):.3f} x {float(factor):.3f} = {float(ley):.3f}"
         )

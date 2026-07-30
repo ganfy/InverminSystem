@@ -53,7 +53,19 @@
               <label class="field-label">Valor Actual</label>
               <div class="input-with-button">
                 <div class="input-wrapper">
+                  <select
+                    v-if="c.clave.startsWith('redondeo_ley_')"
+                    v-model="editsCalculo[c.clave]"
+                    class="field-input field-select select-valor"
+                    :class="{ modified: editsCalculo[c.clave] !== c.valor }"
+                  >
+                    <option value="normal">Normal / Matemático (.5 sube)</option>
+                    <option value="abajo">Hacia Abajo (Truncar)</option>
+                    <option value="arriba">Hacia Arriba</option>
+                    <option value="bancario">Bancario / Par (.5 par)</option>
+                  </select>
                   <input
+                    v-else
                     v-model="editsCalculo[c.clave]"
                     type="text"
                     class="field-input input-valor"
@@ -221,6 +233,10 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   decimales_ley_planta: 'Decimales Ley Planta',
   decimales_ley_comercial: 'Decimales Ley Comercial',
   decimales_ley_final: 'Decimales Ley Final',
+  redondeo_ley_laboratorio: 'Redondeo Ley Laboratorio',
+  redondeo_ley_planta: 'Redondeo Ley Planta',
+  redondeo_ley_comercial: 'Redondeo Ley Comercial',
+  redondeo_ley_final: 'Redondeo Ley Final',
 }
 
 const UNIDADES: Record<string, string> = {

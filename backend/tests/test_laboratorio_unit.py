@@ -415,3 +415,18 @@ class TestRolesComercial:
         assert RolSistema.JEFE_COMERCIAL in ROLES_LAB
         assert RolSistema.JEFE_COMERCIAL in ROLES_MUESTREO
         assert RolSistema.JEFE_COMERCIAL in ROLES_RUMAS
+
+
+class TestConfiguracionRedondeo:
+    """Verifica la configuración y conversión de modos de redondeo."""
+
+    def test_get_rounding_mode(self):
+        from decimal import ROUND_DOWN, ROUND_HALF_EVEN, ROUND_HALF_UP, ROUND_UP
+
+        from app.services.config_calculo import get_rounding_mode
+
+        assert get_rounding_mode("normal") == ROUND_HALF_UP
+        assert get_rounding_mode("abajo") == ROUND_DOWN
+        assert get_rounding_mode("arriba") == ROUND_UP
+        assert get_rounding_mode("bancario") == ROUND_HALF_EVEN
+        assert get_rounding_mode("cualquier_cosa") == ROUND_HALF_UP

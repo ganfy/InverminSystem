@@ -61,6 +61,11 @@ DEFAULTS: dict[str, str] = {
     "decimales_ley_planta": "3",
     "decimales_ley_comercial": "3",
     "decimales_ley_final": "3",
+    # Modo de Redondeo de Leyes (normal, abajo, arriba, bancario)
+    "redondeo_ley_laboratorio": "normal",
+    "redondeo_ley_planta": "normal",
+    "redondeo_ley_comercial": "abajo",
+    "redondeo_ley_final": "abajo",
 }
 
 DESCRIPCIONES: dict[str, str] = {
@@ -102,7 +107,25 @@ DESCRIPCIONES: dict[str, str] = {
     "decimales_ley_planta": "Número de decimales para ley planta (promedio IP).",
     "decimales_ley_comercial": "Número de decimales para ley comercial.",
     "decimales_ley_final": "Número de decimales para ley final (incluye minero/dirimencia, redondeo hacia abajo).",
+    "redondeo_ley_laboratorio": "Modo de redondeo para leyes individuales de laboratorio (normal, abajo, arriba, bancario).",
+    "redondeo_ley_planta": "Modo de redondeo para ley planta (normal, abajo, arriba, bancario).",
+    "redondeo_ley_comercial": "Modo de redondeo para ley comercial (normal, abajo, arriba, bancario).",
+    "redondeo_ley_final": "Modo de redondeo para ley promedio final (normal, abajo, arriba, bancario).",
 }
+
+
+def get_rounding_mode(modo: str) -> str:
+    """Retorna la constante decimal.ROUND_* para el modo de redondeo configurado."""
+    from decimal import ROUND_DOWN, ROUND_HALF_EVEN, ROUND_HALF_UP, ROUND_UP
+
+    m = str(modo).strip().lower()
+    if m == "abajo":
+        return ROUND_DOWN
+    elif m == "arriba":
+        return ROUND_UP
+    elif m == "bancario":
+        return ROUND_HALF_EVEN
+    return ROUND_HALF_UP  # "normal" por defecto
 
 
 @dataclass
@@ -115,6 +138,10 @@ class ConstantesCalculo:
     decimales_ley_planta: int
     decimales_ley_comercial: int
     decimales_ley_final: int
+    redondeo_ley_laboratorio: str
+    redondeo_ley_planta: str
+    redondeo_ley_comercial: str
+    redondeo_ley_final: str
 
 
 def get_constantes(db: Session) -> ConstantesCalculo:
@@ -128,6 +155,10 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         "decimales_ley_planta",
         "decimales_ley_comercial",
         "decimales_ley_final",
+        "redondeo_ley_laboratorio",
+        "redondeo_ley_planta",
+        "redondeo_ley_comercial",
+        "redondeo_ley_final",
     ]
     rows = (
         db.query(Configuracion.clave, Configuracion.valor)
@@ -144,6 +175,10 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         decimales_ley_planta=int(cfg["decimales_ley_planta"]),
         decimales_ley_comercial=int(cfg["decimales_ley_comercial"]),
         decimales_ley_final=int(cfg["decimales_ley_final"]),
+        redondeo_ley_laboratorio=get_rounding_mode(cfg["redondeo_ley_laboratorio"]),
+        redondeo_ley_planta=get_rounding_mode(cfg["redondeo_ley_planta"]),
+        redondeo_ley_comercial=get_rounding_mode(cfg["redondeo_ley_comercial"]),
+        redondeo_ley_final=get_rounding_mode(cfg["redondeo_ley_final"]),
     )
 
 
@@ -245,6 +280,12 @@ def actualizar_constante(db: Session, clave: str, valor: str) -> dict:
             raise ValueError(
                 f"El valor para '{clave}' debe ser un número entero entre 0 y 4."
             ) from e
+    elif clave.startswith("redondeo_ley_"):
+        if val.lower() not in ("normal", "abajo", "arriba", "bancario"):
+            raise ValueError(
+                f"Modo de redondeo '{val}' inválido. Debe ser: normal, abajo, arriba o bancario."
+            )
+        val = val.lower()
     else:
         # Por defecto, todas las demás son numéricas (constantes, alertas, metas, etc.)
         try:

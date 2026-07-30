@@ -239,7 +239,16 @@ def generar_certificado_ley_comercial_pdf(
         .first()
     )
 
-    calc = calcular_ley_comercial(ley_planta, params)
+    from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+    constantes_pdf = get_constantes(db)
+    q_com_pdf = get_quantize_decimal(constantes_pdf.decimales_ley_comercial)
+    calc = calcular_ley_comercial(
+        ley_planta,
+        params,
+        q_comercial=q_com_pdf,
+        rounding=constantes_pdf.redondeo_ley_comercial,
+    )
     ley_comercial = calc["ley_comercial"]
 
     # Verificar si hay ley de plata (Ag) vigente y si pasa el umbral de parámetros comerciales

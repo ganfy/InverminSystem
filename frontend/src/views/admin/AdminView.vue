@@ -195,6 +195,19 @@
                         <option value="KG">KG (Kilogramo)</option>
                       </select>
 
+                      <!-- Dropdown para Modos de Redondeo -->
+                      <select
+                        v-else-if="c.clave.startsWith('redondeo_ley_')"
+                        v-model="editsCalculo[c.clave]"
+                        class="field-input field-select select-valor"
+                        :class="{ modified: editsCalculo[c.clave] !== c.valor }"
+                      >
+                        <option value="normal">Normal / Matemático (.5 sube)</option>
+                        <option value="abajo">Hacia Abajo (Truncar)</option>
+                        <option value="arriba">Hacia Arriba</option>
+                        <option value="bancario">Bancario / Par (.5 par)</option>
+                      </select>
+
                       <!-- Textarea para listas JSON -->
                       <textarea
                         v-else-if="c.clave === 'labs_lista'"
@@ -506,6 +519,10 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   decimales_ley_planta: 'Decimales Ley Planta',
   decimales_ley_comercial: 'Decimales Ley Comercial',
   decimales_ley_final: 'Decimales Ley Final',
+  redondeo_ley_laboratorio: 'Redondeo Ley Laboratorio',
+  redondeo_ley_planta: 'Redondeo Ley Planta',
+  redondeo_ley_comercial: 'Redondeo Ley Comercial',
+  redondeo_ley_final: 'Redondeo Ley Final',
 
   // Muestreo
   MUESTREO_MAX_INTENTOS: 'Intentos Máximos de Muestreo',
@@ -574,7 +591,7 @@ const PARAM_CATEGORIES = [
     id: 'calculo',
     name: 'Constantes de Cálculo Metalúrgico',
     icon: Database,
-    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila', 'decimales_ley_laboratorio', 'decimales_ley_planta', 'decimales_ley_comercial', 'decimales_ley_final']
+    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila', 'decimales_ley_laboratorio', 'decimales_ley_planta', 'decimales_ley_comercial', 'decimales_ley_final', 'redondeo_ley_laboratorio', 'redondeo_ley_planta', 'redondeo_ley_comercial', 'redondeo_ley_final']
   },
   {
     id: 'muestreo',
