@@ -996,16 +996,17 @@ async function confirmarAdicion() {
 
 function imprimirEtiqueta(e: { ip: string; cips: string[] }) {
   const css = `
+    @page { size: auto; margin: 0mm; }
     body { font-family: monospace; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:100vh; margin:0; padding:20px; box-sizing:border-box;}
-    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:220px; page-break-after: always; margin: 10px auto; display: block;}
+    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:100%; max-width:100%; box-sizing:border-box; page-break-after: always; margin: 10px auto; display: block;}
     .et:last-child { page-break-after: auto; }
     .et-title { font-size:0.65rem; font-weight:900; letter-spacing:.1em; display:block; margin-bottom:4px; }
     .et-sub { font-size:0.55rem; border-bottom:1px solid #000; padding-bottom:4px; display:block; width:100%; text-align:center; margin-bottom:8px; }
-    svg { width:100%; height:45px; margin:6px 0; }
+    svg { width:95%; max-width:100%; height:45px; margin:6px 0; }
     .et-code { font-size:1.6rem; font-weight:900; margin-top:8px; display:block; letter-spacing:0.05em; }
     @media print {
-      body { display: block; justify-content: unset; align-items: unset; min-height: unset; padding:0;}
-      .et { margin: 0; border: none; padding: 0; border-radius:0; }
+      body { display: block; justify-content: unset; align-items: unset; min-height: unset; padding:0; margin:0;}
+      .et { margin: 0; border: none; padding: 3mm 2mm; border-radius:0; width: 100%; max-width: 100%; }
     }
   `
 

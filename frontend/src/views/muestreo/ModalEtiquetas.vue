@@ -286,33 +286,33 @@ const ejecutarImpresion = () => {
 
   // 2. Definimos el CSS exclusivo para esta nueva pestaña de impresión
   const printCss = `
-    @page { size: A4 portrait; margin: 15mm; }
+    @page { size: auto; margin: 0mm; }
     body { font-family: sans-serif; margin: 0; padding: 0; background: white; color: black; }
     #area-impresion {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 15mm 10mm;
+      display: flex;
+      flex-direction: column;
       width: 100%;
     }
     .etiqueta-print {
-      border: 1px dashed #666;
-      border-radius: 8px;
       width: 100%;
-      max-width: 82mm;
-      height: 58mm;
+      max-width: 100%;
       box-sizing: border-box;
-      padding: 5mm;
+      padding: 3mm 2mm;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       page-break-inside: avoid;
+      page-break-after: always;
     }
-    .etiqueta-title { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0.2rem; }
-    .etiqueta-subtitle { font-size: 0.55rem; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 0.2rem; width: 100%; text-align: center; }
-    .barcode-visual { width: 100%; height: 55px; margin: 0.25rem 0; }
+    .etiqueta-title { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0.15rem; }
+    .etiqueta-subtitle { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 0.15rem; width: 100%; text-align: center; margin-bottom: 0.2rem; }
+    .barcode-visual { width: 95%; max-width: 100%; height: 50px; margin: 0.25rem 0; }
     .no-print { display: none !important; }
-    .etiqueta-codigo { font-family: monospace; font-size: 1.1rem; font-weight: 900; letter-spacing: 0.05em; }
+    .etiqueta-codigo { font-family: monospace; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; margin-top: 0.15rem; }
+    @media print {
+      .etiqueta-print { border: none !important; border-radius: 0; }
+    }
   `;
 
   // 3. Construimos el documento HTML limpio (Igual que en balanza.ts)
