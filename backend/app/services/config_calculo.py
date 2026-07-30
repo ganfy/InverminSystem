@@ -57,8 +57,8 @@ DEFAULTS: dict[str, str] = {
     "proximo_ticket": "1",
     "tamano_bloque_ticket": "50",
     # Decimales de Leyes
-    "decimales_ley_laboratorio": "3",
-    "decimales_ley_planta": "3",
+    "decimales_ley_laboratorio": "5",
+    "decimales_ley_planta": "5",
     "decimales_ley_comercial": "3",
     "decimales_ley_final": "3",
     # Modo de Redondeo de Leyes (normal, abajo, arriba, bancario)
