@@ -284,18 +284,18 @@ const ozMenos = computed(() => {
       pFino1.value == null || pGrueso.value == null) return null
   const avgAu = (auFino1.value + auFino2.value) / 2
   return parseFloat(
-    (avgAu * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT).toFixed(4)
+    (avgAu * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT).toFixed(5)
   )
 })
 
 const ozMas = computed(() => {
   if (auGrueso.value == null) return null
-  return parseFloat((auGrueso.value / (200 * FACTOR_NEWMONT / 1000)).toFixed(4))
+  return parseFloat((auGrueso.value / (200 * FACTOR_NEWMONT / 1000)).toFixed(5))
 })
 
 const leyFinal = computed(() => {
   if (ozMenos.value == null || ozMas.value == null) return null
-  return parseFloat((ozMenos.value + ozMas.value).toFixed(4))
+  return parseFloat((ozMenos.value + ozMas.value).toFixed(5))
 })
 
 const leyGrTm = computed(() => {
@@ -307,7 +307,7 @@ const leyGrTm = computed(() => {
 const leyFino1Individual = computed(() => {
   if (auFino1.value == null || pFino1.value == null || pGrueso.value == null) return null
   return parseFloat(
-    (auFino1.value * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT).toFixed(4)
+    (auFino1.value * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT).toFixed(5)
   )
 })
 
@@ -315,7 +315,7 @@ const leyFino2Individual = computed(() => {
   // Usa pFino1 como referencia por consistencia con fórmula original del Excel
   if (auFino2.value == null || pFino1.value == null || pGrueso.value == null) return null
   return parseFloat(
-    (auFino2.value * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT).toFixed(4)
+    (auFino2.value * (200 - pGrueso.value) / (pFino1.value * 200) * 1000 / FACTOR_NEWMONT).toFixed(5)
   )
 })
 

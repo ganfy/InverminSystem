@@ -1016,7 +1016,7 @@ function fmtOz(v: number | string | null | undefined): string {
   if (v == null) return '-'
   const n = Number(v)
   if (isNaN(n)) return '-'
-  return n.toString() // oz/TC
+  return n.toFixed(4) // oz/TC visual (4 dec)
 }
 
 // Convierte oz/TC → g/TM (para ley_fino y ley_grueso que vienen en oz/TC)
@@ -1496,7 +1496,7 @@ watch(
   ([fino, grueso]) => {
     if (formLeyMinero.value.modoFinal) return
     if (fino != null && grueso != null)
-      formLeyMinero.value.ley_final = parseFloat((fino + grueso).toFixed(4))
+      formLeyMinero.value.ley_final = parseFloat((fino + grueso).toFixed(5))
     else
       formLeyMinero.value.ley_final = null
   },

@@ -54,7 +54,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
     return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(
-        Decimal("0.0001"), rounding=ROUND_HALF_UP
+        Decimal("0.00001"), rounding=ROUND_HALF_UP
     )
 
 
@@ -733,7 +733,7 @@ def registrar_analisis_recuperacion(
 
         constantes = get_constantes(db)
         ley_oz_tc = (datos.ley_cola_ag / constantes.factor_oz_tc).quantize(
-            Decimal("0.0001"), rounding=ROUND_HALF_UP
+            Decimal("0.00001"), rounding=ROUND_HALF_UP
         )
 
         nuevo_ag = AnalisisLey(
@@ -873,7 +873,7 @@ def _calcular_ley_reco_gr_tm(mineral_mg: Decimal, peso_g: Decimal) -> Decimal:
     if peso_g == 0:
         raise ValueError("El peso de la muestra no puede ser 0")
     return (Decimal(str(mineral_mg)) / Decimal(str(peso_g)) * 1000).quantize(
-        Decimal("0.0001"), rounding=ROUND_HALF_UP
+        Decimal("0.00001"), rounding=ROUND_HALF_UP
     )
 
 
@@ -881,7 +881,7 @@ def _promedio_decimal(*values) -> Decimal | None:
     vals = [Decimal(str(v)) for v in values if v is not None]
     if not vals:
         return None
-    return (sum(vals) / len(vals)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    return (sum(vals) / len(vals)).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
 
 
 def _procesar_muestras_reconocimiento(
@@ -955,7 +955,7 @@ def _procesar_muestras_reconocimiento(
     ley_cola_gr_tm = _promedio_decimal(*leyes_au_gr_tm)
     ley_cola_oz_tc = (
         (ley_cola_gr_tm / constantes.factor_oz_tc).quantize(
-            Decimal("0.0001"), rounding=ROUND_HALF_UP
+            Decimal("0.00001"), rounding=ROUND_HALF_UP
         )
         if ley_cola_gr_tm
         else None
@@ -1102,7 +1102,7 @@ def completar_recuperacion(
         # Calculamos Ag Oz/TC (ley_fino) a partir de Gr/TM
         constantes = get_constantes(db)
         ley_oz_tc = (ley_cola_ag / constantes.factor_oz_tc).quantize(
-            Decimal("0.0001"), rounding=ROUND_HALF_UP
+            Decimal("0.00001"), rounding=ROUND_HALF_UP
         )
 
         nuevo_ag = AnalisisLey(
@@ -1732,7 +1732,7 @@ def _calcular_ley_ag(
     ley_gr_tm = (neto * 1000 / Decimal(str(peso_muestra))).quantize(
         Decimal("0.001"), rounding=ROUND_HALF_UP
     )
-    ley_oz_tc = (ley_gr_tm / factor_oz_tc).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    ley_oz_tc = (ley_gr_tm / factor_oz_tc).quantize(Decimal("0.00001"), rounding=ROUND_HALF_UP)
     return ley_gr_tm, ley_oz_tc
 
 

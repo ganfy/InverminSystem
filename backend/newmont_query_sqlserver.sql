@@ -59,7 +59,7 @@ BEGIN TRANSACTION;
 
     -- CIP CIP-256004
     INSERT INTO analisis_ley (cip, laboratorio, tipo_analisis, material, vigente, ley_fino, ley_grueso, ley_final)
-    VALUES ('CIP-256004', 'PAITITI', 'planta', 'Au', 1, 0.1288, 0.1277, 0.2565);
+    VALUES ('CIP-256004', 'PAITITI', 'planta', 'Au', 1, 0.12879, 0.12770, 0.25649);
     SET @v_analisis_id = SCOPE_IDENTITY();
 
     INSERT INTO analisis_detalle (analisis_id, origen, peso, mineral_mg, ley, numero_ensayo)

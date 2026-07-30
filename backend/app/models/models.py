@@ -595,9 +595,9 @@ class AnalisisLey(AuditMixin, Base):
     laboratorio = Column(String(50), nullable=False)
     tipo_analisis = Column(String(20), nullable=False)  # sin default - siempre explícito
     material = Column(String(10), default="Au")
-    ley_fino = Column(Numeric(10, 4))
-    ley_grueso = Column(Numeric(10, 4))
-    ley_final = Column(Numeric(10, 4))
+    ley_fino = Column(Numeric(10, 5))
+    ley_grueso = Column(Numeric(10, 5))
+    ley_final = Column(Numeric(10, 5))
     # TO DO: calcular en service y guardar aquí ley_fino + ley_grueso
     ley_gr_tm = Column(Numeric(10, 3))  # Oz/TC × 34.2857, calculado en service
     origen_datos = Column(String(20), default=OrigenDatos.MANUAL)
@@ -638,7 +638,7 @@ class AnalisisDetalle(Base):
     recuperacion_id = Column(Integer, ForeignKey("analisis_recuperacion.id"))
     origen = Column(String(20), nullable=False)
     peso = Column(Numeric(10, 4))
-    ley = Column(Numeric(10, 4))
+    ley = Column(Numeric(10, 5))
     numero_ensayo = Column(Integer, default=1)
     mineral_mg = Column(Numeric(10, 4), nullable=True)  # Señal cruda en mg
 

@@ -104,9 +104,9 @@ BEGIN TRANSACTION;
     -- CIP CIP-256004
     UPDATE analisis_ley
     SET 
-        ley_fino = 0.1288, 
-        ley_grueso = 0.1277, 
-        ley_final = 0.2565, 
+        ley_fino = 0.12879, 
+        ley_grueso = 0.12770, 
+        ley_final = 0.25649, 
         ley_gr_tm = 8.794, 
         lote_id = (SELECT TOP 1 lote_id FROM mapeo_cip WHERE codigo_cip = 'CIP-256004'),
         fecha_analisis = ISNULL(fecha_analisis, GETDATE())

@@ -14,7 +14,7 @@ import pytest
 
 
 def _calcular_ley_final(fino: Decimal, grueso: Decimal) -> Decimal:
-    return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.0001"))
+    return (Decimal(str(fino)) + Decimal(str(grueso))).quantize(Decimal("0.00001"))
 
 
 def _calcular_ley_gr_tm(ley_final: Decimal, factor_oz_tc: Decimal) -> Decimal:
@@ -102,23 +102,27 @@ def _make_params(
 class TestCalcularLeyFinal:
     def test_suma_fino_grueso(self):
         result = _calcular_ley_final(Decimal("0.519"), Decimal("0.040"))
-        assert result == Decimal("0.5590")
+        assert result == Decimal("0.55900")
 
     def test_grueso_cero(self):
         result = _calcular_ley_final(Decimal("0.450"), Decimal("0"))
-        assert result == Decimal("0.4500")
+        assert result == Decimal("0.45000")
 
     def test_fino_cero(self):
         result = _calcular_ley_final(Decimal("0"), Decimal("0.100"))
-        assert result == Decimal("0.1000")
+        assert result == Decimal("0.10000")
 
     def test_precision_4_decimales(self):
         result = _calcular_ley_final(Decimal("0.1234"), Decimal("0.5678"))
-        assert result == Decimal("0.6912")
+        assert result == Decimal("0.69120")
+
+    def test_precision_5_decimales(self):
+        result = _calcular_ley_final(Decimal("0.12879"), Decimal("0.1277"))
+        assert result == Decimal("0.25649")
 
     def test_valores_altos(self):
         result = _calcular_ley_final(Decimal("5.000"), Decimal("3.000"))
-        assert result == Decimal("8.0000")
+        assert result == Decimal("8.00000")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
