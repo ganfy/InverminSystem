@@ -284,6 +284,7 @@
       :guardando="store.guardando"
       :provs-filtrados="editProvsFiltered"
       :acops-filtrados="editAcopsFiltered"
+      :sesion-id="sesionIdNum > 0 ? sesionIdNum : null"
       @close="cerrarEditarSesion"
       @save="guardarEditarSesion"
       @sel-prov="editSelProv"

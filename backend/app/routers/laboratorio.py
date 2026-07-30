@@ -17,7 +17,7 @@ Flujo de recuperación interna:
 
 import io
 import os
-from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from app.core.database import get_db
@@ -453,7 +453,11 @@ def preview_ley_comercial(
     q_final = get_quantize_decimal(constantes.decimales_ley_final)
 
     result = svc.calcular_ley_comercial(
-        ley_base, params, umbral_volado=constantes.umbral_volado_oz_tc, q_comercial=q_comercial
+        ley_base,
+        params,
+        umbral_volado=constantes.umbral_volado_oz_tc,
+        q_comercial=q_comercial,
+        rounding=constantes.redondeo_ley_comercial,
     )
 
     ley_solo_planta = svc._ley_solo_planta(db, lote.id)
@@ -462,7 +466,7 @@ def preview_ley_comercial(
     ley_dirimencia = svc._ley_dirimencia(db, lote.id)
 
     ley_comercial_dec = Decimal(str(result["ley_comercial"])).quantize(
-        q_comercial, rounding=ROUND_DOWN
+        q_comercial, rounding=constantes.redondeo_ley_comercial
     )
     ley_promedio: Decimal | None = None
 
@@ -472,14 +476,14 @@ def preview_ley_comercial(
             ley_low = min(ley_comercial_dec, Decimal(str(ley_minero)))
             ley_high = max(ley_comercial_dec, Decimal(str(ley_minero)))
             ley_promedio = max(min(ley_dirimencia, ley_high), ley_low).quantize(
-                q_final, rounding=ROUND_DOWN
+                q_final, rounding=constantes.redondeo_ley_final
             )
         else:
             ley_promedio = ((ley_comercial_dec + Decimal(str(ley_minero))) / 2).quantize(
-                q_final, rounding=ROUND_DOWN
+                q_final, rounding=constantes.redondeo_ley_final
             )
     else:
-        ley_promedio = ley_comercial_dec.quantize(q_final, rounding=ROUND_DOWN)
+        ley_promedio = ley_comercial_dec.quantize(q_final, rounding=constantes.redondeo_ley_final)
 
     result["ley_planta_solo"] = float(ley_solo_planta) if ley_solo_planta is not None else None
     result["ley_externo"] = float(ley_externo) if ley_externo is not None else None
@@ -574,7 +578,16 @@ def guardar_certificado_ley(
                 params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
             except AttributeError:
                 params = None
-            calc = svc.calcular_ley_comercial(ley_planta, params)
+            from app.services.config_calculo import get_constantes, get_quantize_decimal
+
+            constantes_cert = get_constantes(db)
+            q_com_cert = get_quantize_decimal(constantes_cert.decimales_ley_comercial)
+            calc = svc.calcular_ley_comercial(
+                ley_planta,
+                params,
+                q_comercial=q_com_cert,
+                rounding=constantes_cert.redondeo_ley_comercial,
+            )
             ley_comercial_val = Decimal(str(calc["ley_comercial"]))
             ley_gr_tm_val = (ley_comercial_val * Decimal("34.2857")).quantize(
                 Decimal("0.001"), rounding=ROUND_HALF_UP

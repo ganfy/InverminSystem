@@ -97,7 +97,7 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
     q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
 
     leyes = [
-        Decimal(str(a.ley_final)).quantize(q_lab, rounding=ROUND_HALF_UP)
+        Decimal(str(a.ley_final)).quantize(q_lab, rounding=constantes.redondeo_ley_laboratorio)
         for a in analisis
         if a.ley_final is not None
     ]
@@ -105,7 +105,7 @@ def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
         return None
 
     total = sum(leyes)
-    return (total / len(leyes)).quantize(q_planta, rounding=ROUND_HALF_UP)
+    return (total / len(leyes)).quantize(q_planta, rounding=constantes.redondeo_ley_planta)
 
 
 # ── Lista principal ───────────────────────────────────────────────────────────

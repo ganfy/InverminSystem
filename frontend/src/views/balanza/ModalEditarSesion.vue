@@ -88,6 +88,15 @@
             </div>
           </div>
         </div>
+
+        <!-- Documentos de sesión -->
+        <div class="modal-body" style="padding-top:0">
+          <DocumentosPanel
+            v-if="sesionId"
+            :sesion-id="sesionId"
+          />
+        </div>
+
         <div class="modal-footer">
           <button class="btn-secondary" @click="$emit('close')">Cancelar</button>
           <button class="btn-primary ready" :disabled="guardando" @click="$emit('save')">
@@ -100,11 +109,14 @@
 </template>
 
 <script setup lang="ts">
+  import DocumentosPanel from '@/components/balanza/DocumentosPanel.vue'
+
   const props = defineProps<{
     modalData: any;
     guardando: boolean;
     provsFiltrados: any[];
     acopsFiltrados: any[];
+    sesionId: number | null;
   }>()
 
   defineEmits(['close', 'save', 'selProv', 'selAcop'])
