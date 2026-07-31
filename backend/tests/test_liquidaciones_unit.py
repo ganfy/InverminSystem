@@ -302,3 +302,50 @@ class TestFlujoCompletoFormulas:
         )
         total = _calc_total(precio, dec("9.5"))
         assert total == dec("0")
+
+
+# ==============================================================================
+# Verificación de cálculos de profit según PL Paititi (Ejemplo IP-4123)
+# ==============================================================================
+
+
+class TestProfitCalculosPaititi:
+    """
+    Verifica concordancia de profit_rec y profit_leyes con PL Paititi
+    para el lote IP-4123 con los valores:
+      - spot_usd = 4066.20
+      - riesgo = 120
+      - rec_planta_val = 95.74
+      - rec_liq = 90
+      - ley_planta = 0.3760
+      - oz_promedio = 0.3530
+      - FACTOR = 1.1023
+    """
+
+    def test_profit_rec_ip_4123(self):
+        spot_usd = dec("4066.20")
+        riesgo = dec("120")
+        rec_planta_val = dec("95.74")
+        rec_liq = dec("90")
+        ley_planta = dec("0.3760")
+        factor = dec("1.1023")
+
+        profit_rec = (
+            (rec_planta_val - rec_liq) * (spot_usd - riesgo) * ley_planta * factor / dec("100")
+        )
+        profit_rec_rounded = profit_rec.quantize(Decimal("0.01"))
+        assert profit_rec_rounded == dec("93.88")
+
+    def test_profit_leyes_ip_4123(self):
+        spot_usd = dec("4066.20")
+        riesgo = dec("120")
+        rec_planta_val = dec("95.74")
+        ley_planta = dec("0.3760")
+        oz_promedio = dec("0.3530")
+        factor = dec("1.1023")
+
+        profit_leyes = (
+            (ley_planta - oz_promedio) * (spot_usd - riesgo) * rec_planta_val * factor / dec("100")
+        )
+        profit_leyes_rounded = profit_leyes.quantize(Decimal("0.01"))
+        assert profit_leyes_rounded == dec("95.79")

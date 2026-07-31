@@ -40,7 +40,7 @@ from app.schemas.laboratorio import (
     SyncLaboratorioResponse,
     SyncResultado,
 )
-from app.services.config_calculo import get_constantes
+from app.services.config_calculo import get_constantes, get_quantize_decimal
 from app.services.pruebas import calcular_ley_planta
 from fastapi import UploadFile
 from sqlalchemy.orm import Session, joinedload
@@ -681,18 +681,27 @@ def registrar_analisis_recuperacion(
     if datos.laboratorio:
         mapeo.laboratorio = datos.laboratorio or "Paititi"
 
+    constantes = get_constantes(db)
+    q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
+
     ley_cabeza = datos.ley_cabeza
     if ley_cabeza is None and mapeo.lote_id:
         from app.services.pruebas import calcular_ley_planta as _calc_ley
 
         ley_cabeza = _calc_ley(db, mapeo.lote_id)
 
+    ley_cola_val = (
+        Decimal(str(datos.ley_cola)).quantize(q_planta, rounding=constantes.redondeo_ley_planta)
+        if datos.ley_cola is not None
+        else None
+    )
+
     nuevo = AnalisisRecuperacion(
         lote_id=mapeo.lote_id,
         cip=datos.cip,
         laboratorio=datos.laboratorio,
         ley_cabeza=ley_cabeza,
-        ley_cola=datos.ley_cola,
+        ley_cola=ley_cola_val,
         ley_liquido=datos.ley_liquido,
         estado=EstadoRecuperacion.COMPLETADO,
         sub_tipo=datos.sub_tipo,
@@ -899,6 +908,7 @@ def _procesar_muestras_reconocimiento(
     ley_cola_oz_tc = promedio de avg(Au1,Au2) por muestra / 34.2857
     """
     constantes = get_constantes(db)
+    q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
     leyes_au_gr_tm: list[Decimal] = []
     leyes_ag_gr_tm: list[Decimal] = []
 
@@ -955,7 +965,7 @@ def _procesar_muestras_reconocimiento(
     ley_cola_gr_tm = _promedio_decimal(*leyes_au_gr_tm)
     ley_cola_oz_tc = (
         (ley_cola_gr_tm / constantes.factor_oz_tc).quantize(
-            Decimal("0.00001"), rounding=ROUND_HALF_UP
+            q_planta, rounding=constantes.redondeo_ley_planta
         )
         if ley_cola_gr_tm
         else None
@@ -1060,7 +1070,13 @@ def completar_recuperacion(
         # Para SOLUCION, ley_cola no aplica (solo ley_liquido) — no exigir
         if datos.ley_cola is None and a.sub_tipo != "SOLUCION":
             raise ValueError("Debe ingresar muestras o ley_cola directamente")
-        ley_cola = Decimal(str(datos.ley_cola)) if datos.ley_cola is not None else None
+        constantes = get_constantes(db)
+        q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
+        ley_cola = (
+            Decimal(str(datos.ley_cola)).quantize(q_planta, rounding=constantes.redondeo_ley_planta)
+            if datos.ley_cola is not None
+            else None
+        )
         ley_cola_ag = None
 
     a.ley_cola = ley_cola
