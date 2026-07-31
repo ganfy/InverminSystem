@@ -78,7 +78,7 @@ def _build_fila(ll: LiquidacionLote, ocultar_insumos: bool = False) -> str:
       <td>{_fmt_d(ll.maquila_aplicada, 2)}</td>
       <td>1.1023</td>
       <td>{insumos_str}</td>
-      <td>{_fmt_d(ll.precio_x_tms, 4)}</td>
+      <td>{_fmt_d(ll.precio_x_tms, 2)}</td>
       <td><b>{_fmt_d(ll.total_usd, 2)}</b></td>
     </tr>"""
 

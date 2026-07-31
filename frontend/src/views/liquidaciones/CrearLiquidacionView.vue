@@ -293,6 +293,10 @@
                         <span class="p-val font-mono text-success">+${{ fmtNum(lote.bono, 2) }}</span>
                       </div>
                       <div class="profit-item">
+                        <span class="p-label">RIESGO</span>
+                        <span class="p-val font-mono text-danger">-${{ fmtNum(lote.riesgo, 2) }}</span>
+                      </div>
+                      <div class="profit-item">
                         <span class="p-label">MAQUILA</span>
                         <span class="p-val font-mono text-danger">-${{ fmtNum(lote.maquila, 2) }}</span>
                       </div>
