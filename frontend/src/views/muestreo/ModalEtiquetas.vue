@@ -32,11 +32,34 @@
             <WifiOff :size="14" style="vertical-align:middle;margin-right:4px" />
             <span style="font-size:0.78rem">Sin red &mdash; CIPs generados localmente. Se sincronizar&aacute;n al reconectar.</span>
           </div>
-          <p class="instruccion">
-            Muestras generadas: <strong>{{ codigosExistentes.length }}</strong> de un máximo de {{ MAX_CIPS }}.
-          </p>
+          <div class="control-impresion no-print">
+            <p class="instruccion">
+              Muestras generadas: <strong>{{ codigosExistentes.length }}</strong> de un máximo de {{ MAX_CIPS }}.
+            </p>
+            <div class="formato-selector">
+              <span class="formato-label">Formato de Rollo:</span>
+              <div class="formato-toggle">
+                <button
+                  type="button"
+                  class="btn-toggle"
+                  :class="{ active: formatoRollo === '2col' }"
+                  @click="cambiarFormato('2col')"
+                >
+                  2 Columnas (2"×1" Doble)
+                </button>
+                <button
+                  type="button"
+                  class="btn-toggle"
+                  :class="{ active: formatoRollo === '1col' }"
+                  @click="cambiarFormato('1col')"
+                >
+                  1 Columna (4"×2" / Simple)
+                </button>
+              </div>
+            </div>
+          </div>
 
-          <div id="area-impresion" class="grid-etiquetas">
+          <div id="area-impresion" class="grid-etiquetas" :class="{ 'grid-etiquetas--1col': formatoRollo === '1col' }">
             <div v-for="cip in codigosExistentes" :key="cip.id" class="etiqueta-print">
               <span class="etiqueta-title">INVERMIN PAITITI S.A.C.</span>
               <span class="etiqueta-subtitle">MUESTRA ANÁLISIS</span>
@@ -121,6 +144,15 @@ const cargando = ref(true)
 const mensajeCarga = ref('Consultando historial de etiquetas...')
 const codigosExistentes = ref<MapeoCIPOut[]>([])
 const error = ref<string | null>(null)
+
+type FormatoRollo = '1col' | '2col'
+const formatoRollo = ref<FormatoRollo>(
+  (localStorage.getItem('invermin_formato_etiquetas') as FormatoRollo) || '2col'
+)
+const cambiarFormato = (formato: FormatoRollo) => {
+  formatoRollo.value = formato
+  localStorage.setItem('invermin_formato_etiquetas', formato)
+}
 
 const auth = useAuthStore()
 const puedeAsignarLab = computed(() =>
@@ -284,34 +316,48 @@ const ejecutarImpresion = () => {
   if (!areaImpresion) return;
   const contenidoHtml = areaImpresion.innerHTML;
 
+  const esDobleColumna = formatoRollo.value === '2col';
+
   // 2. Definimos el CSS exclusivo para esta nueva pestaña de impresión
   const printCss = `
-    @page { size: auto; margin: 0mm; }
+    @page { size: ${esDobleColumna ? '4in 1in portrait' : 'auto'}; margin: 0mm; }
     body { font-family: sans-serif; margin: 0; padding: 0; background: white; color: black; }
     #area-impresion {
       display: flex;
-      flex-direction: column;
+      flex-wrap: ${esDobleColumna ? 'wrap' : 'nowrap'};
+      flex-direction: ${esDobleColumna ? 'row' : 'column'};
       width: 100%;
     }
     .etiqueta-print {
-      width: 100%;
-      max-width: 100%;
+      width: ${esDobleColumna ? '50%' : '100%'};
+      max-width: ${esDobleColumna ? '50%' : '100%'};
+      height: ${esDobleColumna ? '25.4mm' : 'auto'};
+      max-height: ${esDobleColumna ? '25.4mm' : 'none'};
+      overflow: hidden;
       box-sizing: border-box;
-      padding: 3mm 2mm;
+      padding: ${esDobleColumna ? '1mm 1mm' : '3mm 2mm'};
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       page-break-inside: avoid;
-      page-break-after: always;
+      break-inside: avoid;
+      ${esDobleColumna ? '' : 'page-break-after: always; break-after: page;'}
     }
-    .etiqueta-title { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0.15rem; }
-    .etiqueta-subtitle { font-size: 0.6rem; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 0.15rem; width: 100%; text-align: center; margin-bottom: 0.2rem; }
-    .barcode-visual { width: 95%; max-width: 100%; height: 50px; margin: 0.25rem 0; }
+    ${esDobleColumna ? `
+    .etiqueta-print:nth-child(2n) {
+      page-break-after: always;
+      break-after: page;
+    }
+    ` : ''}
+    .etiqueta-title { font-size: ${esDobleColumna ? '0.5rem' : '0.7rem'}; font-weight: 900; letter-spacing: 0.05em; margin: 0; line-height: 1.15; }
+    .etiqueta-subtitle { font-size: ${esDobleColumna ? '0.42rem' : '0.6rem'}; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 1px; width: 100%; text-align: center; margin: 1px 0; line-height: 1.15; }
+    .barcode-visual { width: 95%; max-width: 100%; height: ${esDobleColumna ? '26px' : '50px'}; margin: 1px 0; }
     .no-print { display: none !important; }
-    .etiqueta-codigo { font-family: monospace; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; margin-top: 0.15rem; }
+    .etiqueta-codigo { font-family: monospace; font-size: ${esDobleColumna ? '0.85rem' : '1.2rem'}; font-weight: 900; letter-spacing: 0.03em; margin: 1px 0 0 0; line-height: 1.15; }
+    .etiqueta-lab { font-size: ${esDobleColumna ? '0.4rem' : '0.5rem'}; color: #555; margin: 0; line-height: 1.15; }
     @media print {
-      .etiqueta-print { border: none !important; border-radius: 0; }
+      .etiqueta-print { border: none !important; border-radius: 0; box-shadow: none !important; }
     }
   `;
 
@@ -401,5 +447,61 @@ async function cambiarLab(cip: MapeoCIPOut, lab: string) {
   flex-direction: column;
   gap: 0.2rem;
 }
+
+.control-impresion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+.formato-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--color-background-soft, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+}
+.formato-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.formato-toggle {
+  display: inline-flex;
+  background: var(--color-background-mute, rgba(0, 0, 0, 0.35));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  padding: 2px;
+}
+.btn-toggle {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-toggle:hover {
+  color: var(--color-text);
+}
+.btn-toggle.active {
+  background: var(--color-gold, #d4af37);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.grid-etiquetas--1col {
+  grid-template-columns: 1fr;
+  max-width: 340px;
+  margin: 0 auto;
+  width: 100%;
+}
+
 @media print { .no-print { display: none !important; } }
 </style>
