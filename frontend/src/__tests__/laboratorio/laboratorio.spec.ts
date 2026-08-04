@@ -6,6 +6,8 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import LaboratorioDashboardView from '@/views/laboratorio/LaboratorioDashboardView.vue'
 import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
+import RegistrarSolidosView from '@/views/laboratorio/RegistrarSolidosView.vue'
+import { useRoute } from 'vue-router'
 import { obtenerCipsLabCache, encolarAnalisisLey, encolarAnalisisRecuperacion } from '@/composables/useOfflineQueue'
 import { useSync } from '@/composables/useSync'
 import { useUiStore } from '@/stores/ui'
@@ -396,5 +398,59 @@ describe('DetalleLoteView - Ley Minero modo Solo Ley Final', () => {
 
         const btnGuardar = wrapper.findAll('button').find(b => b.text().includes('Guardar Ley Minero'))
         expect(btnGuardar?.attributes('disabled')).toBeUndefined()
+    })
+})
+
+// ============================================================
+// SUITE 11 - RegistrarSolidosView: Prellenado Newmont Au -> Ag
+// ============================================================
+describe('RegistrarSolidosView - prellenado desde Newmont Au', () => {
+    it('debe prellenar los campos Au 1 y Au 2 con los valores de fino 2 y fino 1 de Newmont Au al agregar Ag', async () => {
+        vi.mocked(useRoute).mockReturnValue({
+            params: { cip: 'CIP-000001-A1' },
+            query: { fromAg: '1', direct: '1' },
+        } as any)
+
+        const cipConAu = {
+            ...cipFake,
+            analisis_ley: [
+                {
+                    id: 1,
+                    material: 'Au',
+                    vigente: true,
+                    eliminado: false,
+                    ley_fino: 0.5,
+                    ley_grueso: 0.5,
+                    ley_final: 0.5,
+                    ley_gr_tm: 17.14,
+                    laboratorio: 'Lab',
+                    tipo_analisis: 'planta',
+                    detalles: [
+                        { id: 1, origen: 'FINO1', mineral_mg: 0.1111, peso: 15, ley: 0.5, numero_ensayo: 1 },
+                        { id: 2, origen: 'FINO2', mineral_mg: 0.2222, peso: 15, ley: 0.5, numero_ensayo: 1 },
+                    ],
+                },
+            ],
+        }
+
+        const wrapper = mount(RegistrarSolidosView, {
+            global: {
+                plugins: [
+                    createTestingPinia({
+                        stubActions: false,
+                        createSpy: vi.fn,
+                        initialState: {
+                            auth: { user: { rol: 'Laboratorista', nombre_completo: 'Test User' } },
+                            laboratorio: { cips: [cipConAu] },
+                        },
+                    }),
+                ],
+            },
+        })
+
+        await flushPromises()
+        const inputsNumber = wrapper.findAll('input[type="number"]')
+        expect((inputsNumber[1].element as HTMLInputElement).value).toBe('0.2222') // Au 1 prellenado con valor de fino 2
+        expect((inputsNumber[2].element as HTMLInputElement).value).toBe('0.1111') // Au 2 prellenado con valor de fino 1
     })
 })

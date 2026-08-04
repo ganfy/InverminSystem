@@ -37,6 +37,16 @@ export interface AnalisisLeyOut {
     eliminado: boolean
     eliminado_en?: string | null
     eliminado_por?: number | null
+    detalles?: AnalisisDetalleOut[]
+}
+
+export interface AnalisisDetalleOut {
+    id: number
+    origen: string // FINO1 | FINO2 | GRUESO | AU1 | AU2 | AU_AG
+    peso?: number | null
+    mineral_mg?: number | null
+    ley?: number | null
+    numero_ensayo: number
 }
 
 // ── Análisis de Recuperación ──────────────────────────────────────────────────

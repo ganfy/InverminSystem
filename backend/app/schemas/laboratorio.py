@@ -108,6 +108,7 @@ class AnalisisLeyOut(BaseModel):
     eliminado: bool = False
     eliminado_en: datetime | None = None
     eliminado_por: int | None = None
+    detalles: list[AnalisisDetalleOut] = []
 
     model_config = {"from_attributes": True}
 
