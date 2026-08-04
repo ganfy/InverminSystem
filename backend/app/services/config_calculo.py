@@ -46,6 +46,10 @@ DEFAULTS: dict[str, str] = {
     # Pruebas Metalúrgicas / SLA
     "sla_metalurgia_horas": "48",
     "sla_limite_plazo_horas": "72",
+    # Pruebas: modo de identificación de muestras
+    # "true"  → genera CIPs ofuscados (ej: CIP-058598D-R1) — comportamiento original
+    # "false" → usa el IP del lote con sufijo correlativo (ej: IP-0042-R1)
+    "pruebas_usa_cip": "true",
     # Alertas Dashboard
     "alerta_horas_pesado_muestreo": "24",
     "alerta_horas_muestreo_ley": "24",
@@ -94,6 +98,7 @@ DESCRIPCIONES: dict[str, str] = {
     "CAMPANA_META_ORO_FINO_DEFAULT": "Meta predeterminada de oro fino en gramos por campaña",
     "sla_metalurgia_horas": "Tiempo de espera en horas para considerar una prueba metalúrgica como retrasada",
     "sla_limite_plazo_horas": "Plazo máximo en horas para completar una prueba antes de alertar de incumplimiento",
+    "pruebas_usa_cip": "Modo de identificación de muestras en Pruebas Metalúrgicas. 'true': genera CIPs ofuscados (CIP-XXXXXX-R1). 'false': usa el IP del lote con sufijo correlativo (IP-0042-R1).",
     "alerta_horas_pesado_muestreo": "Horas máximas entre pesado en balanza y muestreo antes de generar alerta",
     "alerta_horas_muestreo_ley": "Horas máximas entre muestreo y resultado de ley antes de generar alerta",
     "alerta_horas_ley_recuperacion": "Horas máximas entre resultado de ley y recuperación antes de generar alerta",
@@ -286,6 +291,10 @@ def actualizar_constante(db: Session, clave: str, valor: str) -> dict:
                 f"Modo de redondeo '{val}' inválido. Debe ser: normal, abajo, arriba o bancario."
             )
         val = val.lower()
+    elif clave == "pruebas_usa_cip":
+        if val.lower() not in ("true", "false"):
+            raise ValueError("pruebas_usa_cip debe ser 'true' o 'false'.")
+        val = val.lower()
     else:
         # Por defecto, todas las demás son numéricas (constantes, alertas, metas, etc.)
         try:
@@ -322,6 +331,7 @@ def get_config_public_dict(db: Session) -> dict[str, str]:
         "empresa_direccion",
         "factor_oz_tc",
         "MUESTREO_CIPS_IMPRIMIR",
+        "pruebas_usa_cip",
     ]
     rows = (
         db.query(Configuracion.clave, Configuracion.valor)
@@ -330,6 +340,16 @@ def get_config_public_dict(db: Session) -> dict[str, str]:
     )
     en_db = {r.clave: r.valor for r in rows}
     return {clave: en_db.get(clave, DEFAULTS[clave]) for clave in claves_publicas}
+
+
+def get_pruebas_usa_cip(db: Session) -> bool:
+    """
+    Retorna True si el módulo de Pruebas debe generar CIPs ofuscados (comportamiento original).
+    Retorna False si debe usar el IP del lote con sufijo correlativo (ej: IP-0042-R1).
+    """
+    row = db.query(Configuracion).filter(Configuracion.clave == "pruebas_usa_cip").first()
+    valor = row.valor if row else DEFAULTS["pruebas_usa_cip"]
+    return str(valor).strip().lower() != "false"
 
 
 def get_quantize_decimal(decimals: int) -> Decimal:

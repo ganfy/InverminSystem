@@ -59,6 +59,7 @@ from app.services.config_calculo import get_constantes
 from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from sqlalchemy.orm import Session, joinedload
 
 FACTOR = Decimal("1.1023")
@@ -1284,36 +1285,54 @@ def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
 
     headers = [
         "Lote (IP)",
+        "Fecha Emision",
         "Fecha Recep.",
         "Proveedor",
+        "RUC",
         "Acopiador",
-        "Material",
-        "Placa",
-        "Conductor",
-        "Transportista",
-        "Guia Remision",
-        "Guia Transporte",
         "Sacos",
+        "Material",
         "TMH (Peso Neto)",
         "% H2O",
         "TMS",
-        "Ley Final (Oz/TC)",
+        "Ley Planta (Oz/TC)",
+        "Ley Comercial (Oz/TC)",
         "Ley gr/TM",
-        "% Recup",
+        "Ley Minero (Oz/TC)",
+        "Ley Promedio (Oz/TC)",
+        "% Rec Liq",
+        "% Rec Planta",
+        "Spot USD",
+        "Factor",
+        "Bono ($/TM)",
+        "Riesgo ($/TM)",
+        "Maquila ($/TM)",
+        "Gasto Acopio ($/TM)",
+        "Gasto Consumo ($/TM)",
+        "Insumos ($/TM)",
+        "Precio x TMS ($/TM)",
+        "Bruto Au (USD)",
+        "Ley Ag (Gr/TM)",
+        "Ley Ag (Oz/TC)",
+        "Bruto Ag (USD)",
+        "Profit Maquila ($/TM)",
+        "Profit Rec ($/TM)",
+        "Profit Consumo ($/TM)",
+        "Profit Leyes ($/TM)",
+        "Profit Total $/TM",
+        "Total USD",
+        "Total Pago al Minero (USD)",
+        "Fino Rec. (Oz)",
         "Ruma",
         "Campana",
         "Estado Lote",
         "N° Liquidacion",
         "Estado Liq.",
-        "Spot USD",
-        "Total USD",
-        "Fino Rec.",
-        "Ley Comercial",
-        "Utilidad Maquila (USD)",
-        "Utilidad Recup. (USD)",
-        "Utilidad Consumo (USD)",
-        "Utilidad Fijo (USD)",
-        "Utilidad Total Operativa (USD)",
+        "Placa",
+        "Conductor",
+        "Transportista",
+        "Guia Remision",
+        "Guia Transporte",
     ]
 
     gold_fill = PatternFill("solid", fgColor="1C1A09")
@@ -1333,10 +1352,19 @@ def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
         ruma = lote.ruma if lote else None
 
         prov = (
-            liq.provacop.proveedor.razon_social if liq.provacop and liq.provacop.proveedor else ""
+            str(liq.provacop.proveedor.razon_social)
+            if liq.provacop and liq.provacop.proveedor and liq.provacop.proveedor.razon_social
+            else ""
+        )
+        ruc = (
+            str(liq.provacop.proveedor.ruc)
+            if liq.provacop and liq.provacop.proveedor and liq.provacop.proveedor.ruc
+            else ""
         )
         acop = (
-            liq.provacop.acopiador.razon_social if liq.provacop and liq.provacop.acopiador else ""
+            str(liq.provacop.acopiador.razon_social)
+            if liq.provacop and liq.provacop.acopiador and liq.provacop.acopiador.razon_social
+            else ""
         )
 
         try:
@@ -1350,27 +1378,42 @@ def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
                 gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
                 - (ll.gasto_acopio_liquidacion or Decimal("0")),
             )
-            p_maquila = float(calc_dict.get("profit_maquila") or 0)
-            p_rec = float(calc_dict.get("profit_rec") or 0)
-            p_consumo = float(calc_dict.get("profit_consumo") or 0)
-            p_leyes = float(calc_dict.get("profit_leyes") or 0)
-            p_total = float(calc_dict.get("profit_total") or 0)
         except Exception:
-            p_maquila = p_rec = p_consumo = p_leyes = p_total = 0.0
+            calc_dict = {}
 
-        ley_final = (
-            next(
-                (
-                    a.ley_final
-                    for a in lote.analisis_ley
-                    if a.vigente and a.tipo_analisis == "comercial"
-                ),
-                0,
+        p_maquila = float(calc_dict.get("profit_maquila") or 0)
+        p_rec = float(calc_dict.get("profit_rec") or 0)
+        p_consumo = float(calc_dict.get("profit_consumo") or 0)
+        p_leyes = float(calc_dict.get("profit_leyes") or 0)
+        p_total = float(calc_dict.get("profit_total") or 0)
+
+        oz_tc_planta = float(calc_dict.get("oz_tc_planta") or 0)
+        if not oz_tc_planta and lote:
+            oz_tc_planta = float(
+                next(
+                    (
+                        a.ley_final
+                        for a in lote.analisis_ley
+                        if a.vigente and a.tipo_analisis == "planta"
+                    ),
+                    0,
+                )
             )
-            if lote
-            else 0
-        )
-        ley_gr_tm = (
+
+        oz_tc_comercial = float(ll.oz_tc_comercial or calc_dict.get("oz_tc_comercial") or 0)
+        if not oz_tc_comercial and lote:
+            oz_tc_comercial = float(
+                next(
+                    (
+                        a.ley_final
+                        for a in lote.analisis_ley
+                        if a.vigente and a.tipo_analisis == "comercial"
+                    ),
+                    0,
+                )
+            )
+
+        ley_gr_tm = float(
             next(
                 (
                     a.ley_gr_tm
@@ -1383,42 +1426,95 @@ def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
             else 0
         )
 
+        oz_tc_minero = float(calc_dict.get("oz_tc_minero") or 0)
+        oz_tc_promedio = float(calc_dict.get("oz_tc_promedio") or 0)
+        pct_rec_liq = float(ll.porcentaje_rec_liquido or calc_dict.get("pct_rec_liq") or 0)
+        pct_rec_planta = float(calc_dict.get("pct_rec_planta") or 0)
+        spot_usd = float(ll.spot_usd_snapshot or calc_dict.get("spot_usd") or 0)
+        factor = float(calc_dict.get("factor") or 1.1023)
+        bono = float(ll.bono or calc_dict.get("bono") or 0)
+        riesgo = float(calc_dict.get("riesgo") or 0)
+        maquila = float(ll.maquila_aplicada or calc_dict.get("maquila") or 0)
+        gasto_acopio = float(ll.gasto_acopio_liquidacion or calc_dict.get("insumos_acopio") or 0)
+        insumos_total = float(ll.insumos_liquidacion or calc_dict.get("insumos_total") or 0)
+        gasto_consumo_calc = calc_dict.get("insumos_consumo")
+        if gasto_consumo_calc is not None:
+            gasto_consumo = float(gasto_consumo_calc)
+        else:
+            gasto_consumo = float(insumos_total - gasto_acopio)
+
+        precio_x_tms = float(calc_dict.get("precio_x_tms") or 0)
+        tms = float(ll.tms_snapshot or 0)
+        bruto_au_usd = float(round(precio_x_tms * tms, 2))
+
+        # Plata (Ag)
+        ley_ag_gr_tm = float(calc_dict.get("ley_ag_gr_tm") or 0)
+        ley_ag_oz_tc = float(calc_dict.get("ley_ag_oz_tc") or 0)
+        bruto_ag_usd = float(calc_dict.get("valor_ag_usd") or 0)
+
+        total_usd = float(ll.total_usd or calc_dict.get("total_usd") or 0)
+        total_pago_minero = float(round(total_usd + bruto_ag_usd, 2))
+        fino_recuperable = float(ll.fino_recuperable or calc_dict.get("fino_recuperable") or 0)
+
         row_data = [
             lote.ip if lote else "",
+            liq.creado_en.strftime("%Y-%m-%d") if liq and liq.creado_en else "",
             ll.fecha_recepcion_lote.strftime("%Y-%m-%d") if ll.fecha_recepcion_lote else "",
             prov,
+            ruc,
             acop,
-            lote.tipo_material if lote else "",
-            sesion.placa if sesion else "",
-            sesion.conductor if sesion else "",
-            sesion.transportista if sesion else "",
-            sesion.guia_remision if sesion else "",
-            sesion.guia_transporte if sesion else "",
             ll.sacos_snapshot,
+            lote.tipo_material if lote else "",
             float(ll.tmh_snapshot or 0),
             float(ll.humedad_snapshot or 0),
-            float(ll.tms_snapshot or 0),
-            float(ley_final or 0),
-            float(ley_gr_tm or 0),
-            float(ll.porcentaje_rec_liquido or 0),
-            ruma.codigo if ruma else "",
-            ruma.campana if ruma else "",
-            lote.estado if lote else "",
-            liq.numero_liquidacion or str(liq.id),
-            liq.estado,
-            float(ll.spot_usd_snapshot or 0),
-            float(ll.total_usd or 0),
-            float(ll.fino_recuperable or 0),
-            float(ll.oz_tc_comercial or 0),
+            tms,
+            oz_tc_planta,
+            oz_tc_comercial,
+            ley_gr_tm,
+            oz_tc_minero,
+            oz_tc_promedio,
+            pct_rec_liq,
+            pct_rec_planta,
+            spot_usd,
+            factor,
+            bono,
+            riesgo,
+            maquila,
+            gasto_acopio,
+            gasto_consumo,
+            insumos_total,
+            precio_x_tms,
+            bruto_au_usd,
+            ley_ag_gr_tm,
+            ley_ag_oz_tc,
+            bruto_ag_usd,
             p_maquila,
             p_rec,
             p_consumo,
             p_leyes,
             p_total,
+            total_usd,
+            total_pago_minero,
+            fino_recuperable,
+            ruma.codigo if ruma else "",
+            ruma.campana if ruma else "",
+            lote.estado if lote else "",
+            liq.numero_liquidacion or str(liq.id),
+            liq.estado,
+            sesion.placa if sesion else "",
+            sesion.conductor if sesion else "",
+            sesion.transportista if sesion else "",
+            sesion.guia_remision if sesion else "",
+            sesion.guia_transporte if sesion else "",
         ]
 
         for col_idx, val in enumerate(row_data, 1):
             ws.cell(row=row_idx, column=col_idx, value=val)
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         wb.save(tmp.name)

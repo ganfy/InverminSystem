@@ -20,13 +20,37 @@ from app.schemas.pruebas import (
     SyncPruebasResponse,
     SyncResult,
 )
+from app.services.config_calculo import get_pruebas_usa_cip
 from app.services.muestreo import generar_base_cip
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 
-# ── Helper compartido ─────────────────────────────────────────────────────────
+# ── Helpers internos ─────────────────────────────────────────────────────────
+
+
+def _generar_codigo_recuperacion(
+    ip: str,
+    lote_id: int,
+    correlativo: int,
+    sufijo: str,
+    usa_cip: bool,
+) -> str:
+    """
+    Genera el código de identificación para una muestra de recuperación.
+
+    - usa_cip=True  → "CIP-{base}-{sufijo}{correlativo}" (ej: CIP-058598D-R1)
+    - usa_cip=False → "{ip}-{sufijo}{correlativo}"       (ej: IP-0042-R1)
+
+    El formato IP garantiza unicidad en mapeo_cip.codigo_cip porque
+    IP + correlativo siempre es único por lote.
+    """
+    if usa_cip:
+        base = generar_base_cip(lote_id, salt=correlativo)
+        return f"CIP-{base}-{sufijo}{correlativo}"
+    else:
+        return f"{ip}-{sufijo}{correlativo}"
 
 
 def _get_cips_recuperacion(db: Session, lote_id: int) -> list[MapeoCIP]:
@@ -361,14 +385,14 @@ def etiquetar_prueba(
     # Sufijo diferenciado por tipo
     sufijo = "R" if tipo == TipoMuestra.RECUPERACION_INTERNO else "E"
 
-    # Generamos 2 CIPs por si necesitan volver a analizar
-    correlativo1 = total_cips + 1
-    base1 = generar_base_cip(lote.id, salt=correlativo1)
-    codigo_cip1 = f"CIP-{base1}-{sufijo}{correlativo1}"
+    # Leer configuración de modo de identificación
+    usa_cip = get_pruebas_usa_cip(db)
 
+    # Generamos 2 códigos por si necesitan volver a analizar (contramuestra)
+    correlativo1 = total_cips + 1
     correlativo2 = total_cips + 2
-    base2 = generar_base_cip(lote.id, salt=correlativo2)
-    codigo_cip2 = f"CIP-{base2}-{sufijo}{correlativo2}"
+    codigo_cip1 = _generar_codigo_recuperacion(lote.ip, lote.id, correlativo1, sufijo, usa_cip)
+    codigo_cip2 = _generar_codigo_recuperacion(lote.ip, lote.id, correlativo2, sufijo, usa_cip)
 
     nuevo_cip1 = MapeoCIP(
         lote_id=lote.id,
@@ -391,11 +415,12 @@ def etiquetar_prueba(
 
     db.flush()
 
+    modo_label = "CIPs" if usa_cip else "identificadores"
     return EtiquetadoPruebaOut(
         ip=ip_lote,
         cip=codigo_cip1,
         tipo=tipo,
-        mensaje=f"CIPs de recuperación ({tipo}) generados: {codigo_cip1} y {codigo_cip2}",
+        mensaje=f"{modo_label} de recuperación ({tipo}) generados: {codigo_cip1} y {codigo_cip2}",
     )
 
 

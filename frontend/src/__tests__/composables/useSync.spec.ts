@@ -92,15 +92,15 @@ describe('useSync - Manager de Sincronización', () => {
             vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
             window.dispatchEvent(new Event('online'))
 
-            await flushPromises()
-            await delay(400)
-            await flushPromises()
+            await vi.waitFor(() => {
+                expect(syncManager.online.value).toBe(true)
+                expect(balanzaApi.syncBatch).toHaveBeenCalledTimes(1)
+            }, { timeout: 10000, interval: 50 })
 
-            expect(syncManager.online.value).toBe(true)
-            expect(balanzaApi.syncBatch).toHaveBeenCalledTimes(1)
-
-            const pendientesPostSync = await obtenerSesionesPendientes()
-            expect(pendientesPostSync).toHaveLength(0)
+            await vi.waitFor(async () => {
+                const pendientesPostSync = await obtenerSesionesPendientes()
+                expect(pendientesPostSync).toHaveLength(0)
+            }, { timeout: 10000, interval: 50 })
         })
     })
 
@@ -136,29 +136,22 @@ describe('useSync - Manager de Sincronización', () => {
                 .mockResolvedValueOnce({ resultados: [{ offline_id: 'off-colision', server_id: 999, error: null }] }) // El éxito (2do intento automático)
             wrapper = mount(TestComponent)
 
-            await flushPromises()
-            await delay(400)
-            await flushPromises()
+            await vi.waitFor(() => {
+                expect(mockUi.showConfirm).toHaveBeenCalled()
+            }, { timeout: 10000, interval: 50 })
 
-            // Comprobamos la llamada usando el Singleton
-            expect(mockUi.showConfirm).toHaveBeenCalled()
-
-            await delay(2100)
-            await flushPromises()
-            await delay(100)
-            await flushPromises()
-
-            const pendientesLocal = await obtenerSesionesPendientes()
-            const sesionReparada = pendientesLocal.find(s => s.offline_id === 'off-colision')
-
-            expect(sesionReparada?.lotes[0].ip).toBe('IP-0002')
+            await vi.waitFor(async () => {
+                const pendientesLocal = await obtenerSesionesPendientes()
+                const sesionReparada = pendientesLocal.find(s => s.offline_id === 'off-colision')
+                expect(sesionReparada?.lotes[0].ip).toBe('IP-0002')
+            }, { timeout: 10000, interval: 100 })
 
             // Comprobamos el toast usando el Singleton
             expect(mockUi.toast).toHaveBeenCalledWith(
                 expect.stringContaining('Se reasignó a IP-0002'),
                 'info'
             )
-        }, 10000)
+        }, 15000)
     })
 
     describe('Escenario 6: Sincronización de Muestreo Offline', () => {
@@ -189,16 +182,15 @@ describe('useSync - Manager de Sincronización', () => {
             window.dispatchEvent(new Event('online'))
 
             // 4. Damos tiempo a IndexedDB para procesar las promesas
-            await flushPromises()
-            await delay(100)
-            await flushPromises()
+            // 4. Damos tiempo a IndexedDB para procesar las promesas
+            await vi.waitFor(() => {
+                expect(syncSpy).toHaveBeenCalledTimes(1)
+            }, { timeout: 10000, interval: 50 })
 
-            // 5. Comprobamos que el Manager llamó a la API correctamente
-            expect(syncSpy).toHaveBeenCalledTimes(1)
-
-            // 6. Verificamos que la cola local quedó vacía (se sincronizó y se borró)
-            const pendientesPostSync = await obtenerMuestreosPendientes()
-            expect(pendientesPostSync).toHaveLength(0)
+            await vi.waitFor(async () => {
+                const pendientesPostSync = await obtenerMuestreosPendientes()
+                expect(pendientesPostSync).toHaveLength(0)
+            }, { timeout: 10000, interval: 50 })
 
             syncSpy.mockRestore()
         })

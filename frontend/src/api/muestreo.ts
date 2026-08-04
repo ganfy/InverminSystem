@@ -91,6 +91,11 @@ export const muestreoApi = {
         return response.data
     },
 
+    async listarMuestreosPorLote(ipLote: string): Promise<MuestreoOut[]> {
+        const response = await api.get<MuestreoOut[]>(`/muestreo/lotes/${ipLote}/muestreos`)
+        return response.data
+    },
+
     /**
      * Registra múltiples muestreos en lote estando online.
      */

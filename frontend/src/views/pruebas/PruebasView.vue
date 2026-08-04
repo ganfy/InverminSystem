@@ -527,7 +527,8 @@ import {
     encolarCipPruebaOffline,
     contarCipsPruebasPorLote,
 } from '@/composables/useOfflineQueue'
-import { generarParCipsRecuperacion } from '@/utils/cipGenerator'
+import { generarParCipsRecuperacion, generarParIpRecuperacion } from '@/utils/cipGenerator'
+import { CONFIG_PRUEBAS } from '@/utils/units'
 import { generateUUID } from '@/utils/uuid'
 import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
@@ -845,11 +846,12 @@ async function etiquetar(ip: string) {
     try {
       // Contador independiente: cuántos CIPs de recuperación hay en la cola local
       const totalRec = await contarCipsPruebasPorLote(ip)
-      const { cip1, cip2, correlativo1, correlativo2 } = generarParCipsRecuperacion(
-        prueba.lote_id,
-        totalRec,
-        'RecuperacionInterno'
-      )
+
+      // Respetar configuración de modo: CIP ofuscado vs IP con sufijo
+      const par = CONFIG_PRUEBAS.usa_cip
+        ? generarParCipsRecuperacion(prueba.lote_id, totalRec, 'RecuperacionInterno')
+        : generarParIpRecuperacion(ip, totalRec, 'RecuperacionInterno')
+      const { cip1, cip2, correlativo1, correlativo2 } = par
 
       await encolarCipPruebaOffline({
         offline_id: `cip-prb-${generateUUID()}`,
@@ -865,7 +867,7 @@ async function etiquetar(ip: string) {
         sync_error: null,
       })
 
-      ui.toast(`Sin red: CIPs generados localmente (${cip1}). Se registrarán al reconectar.`, 'warning')
+      ui.toast(`Sin red: identificadores generados localmente (${cip1}). Se registrarán al reconectar.`, 'warning')
 
       // Actualizar la fila en memoria para que el botón cambie a "Ver Etiqueta"
       const idx = pruebas.value.findIndex(p => p.ip === ip)

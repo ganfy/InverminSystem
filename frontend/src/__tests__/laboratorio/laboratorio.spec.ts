@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createTestingPinia } from '@pinia/testing'
@@ -46,10 +47,18 @@ vi.mock('@/api/pruebas', () => ({
     },
 }))
 
-vi.mock('@/composables/useSync', () => ({
-    useSync: vi.fn(() => ({ online: { value: true } })),
-    networkOnline: { value: true }
-}))
+vi.mock('@/composables/useSync', async () => {
+    const vue = await import('vue')
+    return {
+        useSync: vi.fn(() => ({
+            online: vue.ref(true),
+            pendientes: vue.ref(0),
+            ultimoSync: vue.ref(null),
+            sincronizar: vi.fn(),
+        })),
+        networkOnline: vue.ref(true)
+    }
+})
 
 vi.mock('@/composables/useOfflineQueue', () => ({
     encolarAnalisisLey: vi.fn(),
@@ -153,7 +162,7 @@ describe('laboratorioStore.registrarLey - online', () => {
     }
 
     beforeEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: true } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(true), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
         vi.mocked(laboratorioApi.registrarLey).mockResolvedValue({ id: 1, ...payload } as any)
     })
 
@@ -180,12 +189,12 @@ describe('laboratorioStore.registrarLey - online', () => {
 // ============================================================
 describe('laboratorioStore.registrarLey - offline', () => {
     beforeEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: false } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(false), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     afterEach(() => {
         // Restaurar estado online para que no afecte a otros tests
-        vi.mocked(useSync).mockReturnValue({ online: { value: true } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(true), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     it('encola el análisis en IndexedDB cuando no hay conexion', async () => {
@@ -251,11 +260,11 @@ describe('laboratorioStore.descartarLey', () => {
 // ============================================================
 describe('laboratorioStore.completarRecuperacion - offline', () => {
     beforeEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: false } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(false), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     afterEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: true } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(true), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     it('encola la recuperacion cuando no hay conexion', async () => {

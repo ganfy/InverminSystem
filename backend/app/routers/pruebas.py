@@ -23,6 +23,7 @@ from app.schemas.pruebas import (
     SyncPruebasResponse,
 )
 from app.services import pruebas as pruebas_service
+from app.services.config_calculo import get_pruebas_usa_cip
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -73,19 +74,22 @@ def sync_cips_pruebas_offline(
     Registra en BD los CIPs de recuperación generados offline.
 
     Idempotente: si el codigo_cip ya existe, retorna su server_id sin duplicar.
-    Seguridad: valida que los códigos coincidan con el algoritmo del servidor
-    usando el contador independiente de CIPs de recuperación.
+    Seguridad: valida que los códigos coincidan con el algoritmo del servidor.
+    - Modo CIP (pruebas_usa_cip=true): verifica contra generar_base_cip.
+    - Modo IP (pruebas_usa_cip=false): verifica formato {ip}-{sufijo}{correlativo}.
     """
-    from app.models.enums import TipoMuestra
     from app.models.models import Lote, PruebaMetalurgica
     from app.services.muestreo import generar_base_cip
 
+    resultados = []
     sufijos = {
         TipoMuestra.RECUPERACION_INTERNO: "R",
         TipoMuestra.RECUPERACION_EXTERNO: "E",
     }
 
-    resultados = []
+    # Leer configuración de modo de identificación una sola vez para todo el batch
+    usa_cip = get_pruebas_usa_cip(db)
+
     for item in payload.cips:
         try:
             lote = db.query(Lote).filter(Lote.ip == item.ip).first()
@@ -100,29 +104,50 @@ def sync_cips_pruebas_offline(
 
             sufijo = sufijos.get(item.tipo, "R")
 
-            # Validar CIP1
-            base1_esperada = generar_base_cip(lote.id, salt=item.correlativo1)
-            cip1_esperado = f"CIP-{base1_esperada}-{sufijo}{item.correlativo1}"
-            if item.codigo_cip1 != cip1_esperado:
-                resultados.append(
-                    SyncCipPruebaResult(
-                        offline_id=item.offline_id,
-                        error="CIP1 inválido: no coincide con el algoritmo del servidor",
+            if usa_cip:
+                # Modo CIP: validar que coincidan con el algoritmo del servidor
+                base1_esperada = generar_base_cip(lote.id, salt=item.correlativo1)
+                cip1_esperado = f"CIP-{base1_esperada}-{sufijo}{item.correlativo1}"
+                if item.codigo_cip1 != cip1_esperado:
+                    resultados.append(
+                        SyncCipPruebaResult(
+                            offline_id=item.offline_id,
+                            error="CIP1 inválido: no coincide con el algoritmo del servidor",
+                        )
                     )
-                )
-                continue
+                    continue
 
-            # Validar CIP2
-            base2_esperada = generar_base_cip(lote.id, salt=item.correlativo2)
-            cip2_esperado = f"CIP-{base2_esperada}-{sufijo}{item.correlativo2}"
-            if item.codigo_cip2 != cip2_esperado:
-                resultados.append(
-                    SyncCipPruebaResult(
-                        offline_id=item.offline_id,
-                        error="CIP2 inválido: no coincide con el algoritmo del servidor",
+                base2_esperada = generar_base_cip(lote.id, salt=item.correlativo2)
+                cip2_esperado = f"CIP-{base2_esperada}-{sufijo}{item.correlativo2}"
+                if item.codigo_cip2 != cip2_esperado:
+                    resultados.append(
+                        SyncCipPruebaResult(
+                            offline_id=item.offline_id,
+                            error="CIP2 inválido: no coincide con el algoritmo del servidor",
+                        )
                     )
-                )
-                continue
+                    continue
+            else:
+                # Modo IP: validar formato {ip}-{sufijo}{correlativo}
+                ip1_esperado = f"{item.ip}-{sufijo}{item.correlativo1}"
+                if item.codigo_cip1 != ip1_esperado:
+                    resultados.append(
+                        SyncCipPruebaResult(
+                            offline_id=item.offline_id,
+                            error="Código1 inválido: no coincide con el formato IP esperado",
+                        )
+                    )
+                    continue
+
+                ip2_esperado = f"{item.ip}-{sufijo}{item.correlativo2}"
+                if item.codigo_cip2 != ip2_esperado:
+                    resultados.append(
+                        SyncCipPruebaResult(
+                            offline_id=item.offline_id,
+                            error="Código2 inválido: no coincide con el formato IP esperado",
+                        )
+                    )
+                    continue
 
             # Idempotencia CIP1
             existente1 = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == item.codigo_cip1).first()
