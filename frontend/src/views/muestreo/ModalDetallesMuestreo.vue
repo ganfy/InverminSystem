@@ -60,8 +60,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import api from '@/api/axios'
-import type { MuestreoOut } from '@/api/muestreo'
+import { muestreoApi, type MuestreoOut } from '@/api/muestreo'
 import { useSync } from '@/composables/useSync'
 import {
   AlertTriangle,
@@ -84,8 +83,8 @@ onMounted(async () => {
   }
 
   try {
-    const response = await api.get<MuestreoOut[]>(`/muestreo/lotes/${props.ipLote}/muestreos`)
-    historial.value = response.data
+    const data = await muestreoApi.listarMuestreosPorLote(props.ipLote)
+    historial.value = data
   } catch (error) {
     console.error('Error al cargar historial', error)
   } finally {

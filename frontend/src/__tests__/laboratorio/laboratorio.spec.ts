@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createTestingPinia } from '@pinia/testing'
@@ -5,6 +6,8 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import LaboratorioDashboardView from '@/views/laboratorio/LaboratorioDashboardView.vue'
 import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
+import RegistrarSolidosView from '@/views/laboratorio/RegistrarSolidosView.vue'
+import { useRoute } from 'vue-router'
 import { obtenerCipsLabCache, encolarAnalisisLey, encolarAnalisisRecuperacion } from '@/composables/useOfflineQueue'
 import { useSync } from '@/composables/useSync'
 import { useUiStore } from '@/stores/ui'
@@ -46,10 +49,18 @@ vi.mock('@/api/pruebas', () => ({
     },
 }))
 
-vi.mock('@/composables/useSync', () => ({
-    useSync: vi.fn(() => ({ online: { value: true } })),
-    networkOnline: { value: true }
-}))
+vi.mock('@/composables/useSync', async () => {
+    const vue = await import('vue')
+    return {
+        useSync: vi.fn(() => ({
+            online: vue.ref(true),
+            pendientes: vue.ref(0),
+            ultimoSync: vue.ref(null),
+            sincronizar: vi.fn(),
+        })),
+        networkOnline: vue.ref(true)
+    }
+})
 
 vi.mock('@/composables/useOfflineQueue', () => ({
     encolarAnalisisLey: vi.fn(),
@@ -153,7 +164,7 @@ describe('laboratorioStore.registrarLey - online', () => {
     }
 
     beforeEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: true } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(true), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
         vi.mocked(laboratorioApi.registrarLey).mockResolvedValue({ id: 1, ...payload } as any)
     })
 
@@ -180,12 +191,12 @@ describe('laboratorioStore.registrarLey - online', () => {
 // ============================================================
 describe('laboratorioStore.registrarLey - offline', () => {
     beforeEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: false } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(false), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     afterEach(() => {
         // Restaurar estado online para que no afecte a otros tests
-        vi.mocked(useSync).mockReturnValue({ online: { value: true } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(true), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     it('encola el análisis en IndexedDB cuando no hay conexion', async () => {
@@ -251,11 +262,11 @@ describe('laboratorioStore.descartarLey', () => {
 // ============================================================
 describe('laboratorioStore.completarRecuperacion - offline', () => {
     beforeEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: false } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(false), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     afterEach(() => {
-        vi.mocked(useSync).mockReturnValue({ online: { value: true } } as any)
+        vi.mocked(useSync).mockReturnValue({ online: ref(true), pendientes: ref(0), ultimoSync: ref(null), sincronizar: vi.fn() } as any)
     })
 
     it('encola la recuperacion cuando no hay conexion', async () => {
@@ -387,5 +398,59 @@ describe('DetalleLoteView - Ley Minero modo Solo Ley Final', () => {
 
         const btnGuardar = wrapper.findAll('button').find(b => b.text().includes('Guardar Ley Minero'))
         expect(btnGuardar?.attributes('disabled')).toBeUndefined()
+    })
+})
+
+// ============================================================
+// SUITE 11 - RegistrarSolidosView: Prellenado Newmont Au -> Ag
+// ============================================================
+describe('RegistrarSolidosView - prellenado desde Newmont Au', () => {
+    it('debe prellenar los campos Au 1 y Au 2 con los valores de fino 2 y fino 1 de Newmont Au al agregar Ag', async () => {
+        vi.mocked(useRoute).mockReturnValue({
+            params: { cip: 'CIP-000001-A1' },
+            query: { fromAg: '1', direct: '1' },
+        } as any)
+
+        const cipConAu = {
+            ...cipFake,
+            analisis_ley: [
+                {
+                    id: 1,
+                    material: 'Au',
+                    vigente: true,
+                    eliminado: false,
+                    ley_fino: 0.5,
+                    ley_grueso: 0.5,
+                    ley_final: 0.5,
+                    ley_gr_tm: 17.14,
+                    laboratorio: 'Lab',
+                    tipo_analisis: 'planta',
+                    detalles: [
+                        { id: 1, origen: 'FINO1', mineral_mg: 0.1111, peso: 15, ley: 0.5, numero_ensayo: 1 },
+                        { id: 2, origen: 'FINO2', mineral_mg: 0.2222, peso: 15, ley: 0.5, numero_ensayo: 1 },
+                    ],
+                },
+            ],
+        }
+
+        const wrapper = mount(RegistrarSolidosView, {
+            global: {
+                plugins: [
+                    createTestingPinia({
+                        stubActions: false,
+                        createSpy: vi.fn,
+                        initialState: {
+                            auth: { user: { rol: 'Laboratorista', nombre_completo: 'Test User' } },
+                            laboratorio: { cips: [cipConAu] },
+                        },
+                    }),
+                ],
+            },
+        })
+
+        await flushPromises()
+        const inputsNumber = wrapper.findAll('input[type="number"]')
+        expect((inputsNumber[1].element as HTMLInputElement).value).toBe('0.2222') // Au 1 prellenado con valor de fino 2
+        expect((inputsNumber[2].element as HTMLInputElement).value).toBe('0.1111') // Au 2 prellenado con valor de fino 1
     })
 })

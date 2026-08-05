@@ -148,6 +148,16 @@
             </p>
           </div>
 
+          <!-- Aviso contextual para Pruebas Metalúrgicas -->
+          <div v-if="currentParamCategory === 'pruebas'" class="nota-info-card" style="margin-bottom: 1.25rem; background: rgba(207,151,61,0.07); border-color: rgba(207,151,61,0.3);">
+            <FlaskConical :size="16" class="warn-icon" />
+            <p class="nota-text">
+              <strong>Modo de Identificación de Muestras (<code>pruebas_usa_cip</code>):</strong>
+              <br/>• <strong>CIP Ofuscado (true):</strong> genera códigos alfanuméricos (ej. <code>CIP-058598D-R1</code>) para ocultar el IP del lote ante laboratorios externos.
+              <br/>• <strong>Solo IP (false):</strong> usa el número de IP directo con sufijo (ej. <code>IP-0042-R1</code>) para laboratorios internos que ya conocen el lote.
+            </p>
+          </div>
+
           <div class="settings-grid">
             <div
               v-for="c in filteredConstantes"
@@ -206,6 +216,17 @@
                         <option value="abajo">Hacia Abajo (Truncar)</option>
                         <option value="arriba">Hacia Arriba</option>
                         <option value="bancario">Bancario / Par (.5 par)</option>
+                      </select>
+
+                      <!-- Dropdown para Modo de Identificación Pruebas -->
+                      <select
+                        v-else-if="c.clave === 'pruebas_usa_cip'"
+                        v-model="editsCalculo[c.clave]"
+                        class="field-input field-select select-valor"
+                        :class="{ modified: editsCalculo[c.clave] !== c.valor }"
+                      >
+                        <option value="true">CIP Ofuscado (CIP-XXXX-R1)</option>
+                        <option value="false">Solo IP Lote (IP-XXXX-R1)</option>
                       </select>
 
                       <!-- Textarea para listas JSON -->
@@ -541,6 +562,7 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   CAMPANA_META_ORO_FINO_DEFAULT: 'Meta de Oro Fino por Campaña',
   sla_metalurgia_horas: 'SLA Retraso en Pruebas Metalúrgicas',
   sla_limite_plazo_horas: 'SLA Plazo Límite en Pruebas Metalúrgicas',
+  pruebas_usa_cip: 'Modo de Identificación de Muestras (CIP vs IP)',
 
   // Alertas
   alerta_horas_pesado_muestreo: 'SLA Pesado a Muestreo',
@@ -609,7 +631,7 @@ const PARAM_CATEGORIES = [
     id: 'pruebas',
     name: 'Pruebas Metalúrgicas y Campañas',
     icon: Beaker,
-    keys: ['CAMPANA_META_ORO_FINO_DEFAULT', 'sla_metalurgia_horas', 'sla_limite_plazo_horas']
+    keys: ['CAMPANA_META_ORO_FINO_DEFAULT', 'sla_metalurgia_horas', 'sla_limite_plazo_horas', 'pruebas_usa_cip']
   },
   {
     id: 'alertas',
@@ -863,8 +885,8 @@ async function guardarConstante(clave: string) {
     ui.toast('Parámetro actualizado', 'success')
     await cargarConstantes()
 
-    // Si se actualizó una unidad o factor_oz_tc, actualizamos la config pública
-    if (clave.startsWith('unidad_') || clave === 'factor_oz_tc') {
+    // Si se actualizó una unidad o factor_oz_tc o pruebas_usa_cip, actualizamos la config pública
+    if (clave.startsWith('unidad_') || clave === 'factor_oz_tc' || clave === 'pruebas_usa_cip') {
       const publicConfig = await adminApi.getPublicConfig()
       const { updateUnidadesModulos } = await import('@/utils/units')
       updateUnidadesModulos(publicConfig)

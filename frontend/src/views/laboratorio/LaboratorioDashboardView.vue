@@ -578,8 +578,25 @@ function irARegistrarPlata(fila: any) {
   const cip = fila.cip
   const query = new URLSearchParams()
 
-  // Buscar si ya existe un análisis SOLIDOS para este CIP
   const cipObj = store.cips.find(c => c.cip === cip)
+  const auAnalisis = cipObj?.analisis_ley.find(
+    (a: any) => a.material === 'Au' && a.vigente && !a.eliminado && a.detalles && a.detalles.length > 0
+  ) || cipObj?.analisis_ley.find(
+    (a: any) => a.material === 'Au' && a.vigente && !a.eliminado
+  )
+
+  if (auAnalisis && auAnalisis.detalles) {
+    const dFino1 = auAnalisis.detalles.find((d: any) => d.origen === 'FINO1')
+    const dFino2 = auAnalisis.detalles.find((d: any) => d.origen === 'FINO2')
+    // Au 1 prellenado con valor de fino 2
+    if (dFino2?.mineral_mg != null) query.set('au1', dFino2.mineral_mg.toString())
+    // Au 2 prellenado con valor de fino 1
+    if (dFino1?.mineral_mg != null) query.set('au2', dFino1.mineral_mg.toString())
+    const pesoVal = dFino2?.peso ?? dFino1?.peso
+    if (pesoVal != null) query.set('peso', pesoVal.toString())
+  }
+
+  // Buscar si ya existe un análisis SOLIDOS para este CIP
   const solidosExistente = cipObj?.analisis_recuperacion.find(
     (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
   )

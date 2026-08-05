@@ -253,15 +253,65 @@ const resumen = computed(() => {
 function recalcResumen() { /* trigger reactivity */ }
 function agregarMuestra() { muestras.value.push(nuevaMuestra()) }
 
+// ── Prellenado desde Newmont Au (Plata / Ag) ──────────────────────────────────
+async function prellenarDatosAgDesdeNewmont() {
+  if (!isFromAg || cipActual === '_nuevo') return
+
+  if (route.query.peso || route.query.au1 || route.query.au2) {
+    if (route.query.peso != null && (muestras.value[0].peso_g == null || muestras.value[0].peso_g === 0)) {
+      muestras.value[0].peso_g = Number(route.query.peso)
+    }
+    if (route.query.au1 != null && (muestras.value[0].au1_mg == null || muestras.value[0].au1_mg === 0)) {
+      muestras.value[0].au1_mg = Number(route.query.au1)
+    }
+    if (route.query.au2 != null && (muestras.value[0].au2_mg == null || muestras.value[0].au2_mg === 0)) {
+      muestras.value[0].au2_mg = Number(route.query.au2)
+    }
+    recalcMuestra(0)
+  }
+
+  if (
+    (muestras.value[0].au1_mg == null || muestras.value[0].au1_mg === 0) ||
+    (muestras.value[0].au2_mg == null || muestras.value[0].au2_mg === 0)
+  ) {
+    if (!store.cips.length) {
+      try {
+        await store.cargarCips()
+      } catch {
+        // ignorar error
+      }
+    }
+    const cipObj = store.cips.find(c => c.cip === cipActual)
+    if (cipObj) {
+      const auAnalisis = cipObj.analisis_ley.find(
+        (a: any) => a.material === 'Au' && a.vigente && !a.eliminado && a.detalles && a.detalles.length > 0
+      ) || cipObj.analisis_ley.find(
+        (a: any) => a.material === 'Au' && a.vigente && !a.eliminado
+      )
+
+      if (auAnalisis && auAnalisis.detalles) {
+        const dFino1 = auAnalisis.detalles.find((d: any) => d.origen === 'FINO1')
+        const dFino2 = auAnalisis.detalles.find((d: any) => d.origen === 'FINO2')
+        if (dFino2?.mineral_mg != null && (muestras.value[0].au1_mg == null || muestras.value[0].au1_mg === 0)) {
+          muestras.value[0].au1_mg = Number(dFino2.mineral_mg)
+        }
+        if (dFino1?.mineral_mg != null && (muestras.value[0].au2_mg == null || muestras.value[0].au2_mg === 0)) {
+          muestras.value[0].au2_mg = Number(dFino1.mineral_mg)
+        }
+        const pesoVal = dFino2?.peso ?? dFino1?.peso
+        if (pesoVal != null && (muestras.value[0].peso_g == null || muestras.value[0].peso_g === 0)) {
+          muestras.value[0].peso_g = Number(pesoVal)
+        }
+        recalcMuestra(0)
+      }
+    }
+  }
+}
+
 // ── Ciclo de vida ─────────────────────────────────────────────────────────────
 onMounted(async () => {
   if (modoNuevo || esCreacionDirecta) {
-    if (route.query.peso || route.query.au1 || route.query.au2) {
-      muestras.value[0].peso_g = route.query.peso ? Number(route.query.peso) : null
-      muestras.value[0].au1_mg = route.query.au1 ? Number(route.query.au1) : null
-      muestras.value[0].au2_mg = route.query.au2 ? Number(route.query.au2) : null
-      recalcMuestra(0)
-    }
+    await prellenarDatosAgDesdeNewmont()
     cargando.value = false
     if (modoNuevo) return
   }
@@ -319,6 +369,7 @@ onMounted(async () => {
         }
       }
     }
+    await prellenarDatosAgDesdeNewmont()
   } catch {
     ui.toast('Error al cargar datos', 'error')
   } finally {

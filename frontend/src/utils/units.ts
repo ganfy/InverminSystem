@@ -21,12 +21,20 @@ export const CONFIG_UNIDADES_MODULOS = reactive<Record<string, string>>({
     'DEFAULT': 'TM'
 })
 
+// 4. Configuración de Pruebas Metalúrgicas
+// usa_cip=true  → genera CIPs ofuscados (CIP-XXXXXX-R1) — comportamiento original
+// usa_cip=false → usa el IP del lote con sufijo correlativo (IP-0042-R1)
+export const CONFIG_PRUEBAS = reactive({ usa_cip: true })
+
 export function updateUnidadesModulos(config: Record<string, string>) {
     if (config.unidad_balanza) CONFIG_UNIDADES_MODULOS.BALANZA = config.unidad_balanza
     if (config.unidad_muestreo) CONFIG_UNIDADES_MODULOS.MUESTREO = config.unidad_muestreo
     if (config.unidad_laboratorio) CONFIG_UNIDADES_MODULOS.LABORATORIO = config.unidad_laboratorio
     if (config.unidad_liquidaciones) CONFIG_UNIDADES_MODULOS.LIQUIDACIONES = config.unidad_liquidaciones
     if (config.unidad_default) CONFIG_UNIDADES_MODULOS.DEFAULT = config.unidad_default
+    // Flag de Pruebas: viene como string "true"/"false" desde la config pública
+    if (config.pruebas_usa_cip !== undefined)
+        CONFIG_PRUEBAS.usa_cip = config.pruebas_usa_cip !== 'false'
 }
 
 /**

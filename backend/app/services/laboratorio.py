@@ -27,6 +27,7 @@ from app.models.models import (
 from app.schemas.laboratorio import (
     AnalisisAgCreate,
     AnalisisAgOut,
+    AnalisisDetalleOut,
     AnalisisLeyCreate,
     AnalisisLeyOut,
     AnalisisRecuperacionCreate,
@@ -213,6 +214,7 @@ def _ley_out(
         fecha_descarte=a.fecha_descarte,
         justificacion_descarte=a.justificacion_descarte,
         creado_por_nombre=creado_por_nombre,
+        detalles=[AnalisisDetalleOut.model_validate(d) for d in (a.detalles or [])],
     )
 
 

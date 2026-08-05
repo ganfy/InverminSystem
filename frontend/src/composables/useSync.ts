@@ -13,7 +13,7 @@
  *   VITE_FORCE_OFFLINE=true
  */
 
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, getCurrentInstance } from 'vue'
 import { balanzaApi } from '@/api/balanza'
 import { useUiStore } from '@/stores/ui'
 import {
@@ -567,15 +567,17 @@ async function actualizarContadores(): Promise<void> {
 
 export function useSync() {
 
-    onMounted(() => {
-        if (!FORCE_OFFLINE) {
-            online.value = navigator.onLine
-        }
-        actualizarContadores()
-        if (online.value) {
-            sincronizar()
-        }
-    })
+    if (getCurrentInstance()) {
+        onMounted(() => {
+            if (!FORCE_OFFLINE) {
+                online.value = navigator.onLine
+            }
+            actualizarContadores()
+            if (online.value) {
+                sincronizar()
+            }
+        })
+    }
 
     // ── Exponer ──────────────────────────────────────────────
 

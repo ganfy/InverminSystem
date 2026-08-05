@@ -86,3 +86,34 @@ export function generarParCipsRecuperacion(
 
     return { cip1, cip2, correlativo1, correlativo2, sufijo }
 }
+
+/**
+ * Genera el par de identificadores de recuperación en modo IP (sin CIP ofuscado).
+ *
+ * CRÍTICO: Esta función DEBE mantenerse en sincronía con el backend.
+ * Porta la lógica de services/pruebas.py → _generar_codigo_recuperacion(..., usa_cip=False):
+ *   codigo = f"{ip}-{sufijo}{correlativo}"
+ *
+ * Usado cuando la configuración `pruebas_usa_cip` está en `false`.
+ * El laboratorio interno trabaja directamente con el IP del lote.
+ *
+ * @param ip           - IP del lote (ej: "IP-0042")
+ * @param totalCipsRec - Cuántos códigos de recuperación (R o E) ya existen para este lote
+ * @param tipo         - 'RecuperacionInterno' (default) | 'RecuperacionExterno'
+ * @returns Par { cip1, cip2, correlativo1, correlativo2, sufijo }
+ */
+export function generarParIpRecuperacion(
+    ip: string,
+    totalCipsRec: number,
+    tipo: 'RecuperacionInterno' | 'RecuperacionExterno' = 'RecuperacionInterno',
+): { cip1: string; cip2: string; correlativo1: number; correlativo2: number; sufijo: string } {
+    const sufijo = tipo === 'RecuperacionInterno' ? 'R' : 'E'
+
+    const correlativo1 = totalCipsRec + 1
+    const correlativo2 = totalCipsRec + 2
+
+    const cip1 = `${ip}-${sufijo}${correlativo1}`
+    const cip2 = `${ip}-${sufijo}${correlativo2}`
+
+    return { cip1, cip2, correlativo1, correlativo2, sufijo }
+}
