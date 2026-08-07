@@ -81,7 +81,7 @@
             </tr>
             <tr
               v-for="t in listaFiltrada"
-              :key="t.id"
+              :key="t.provacop_id"
               class="tabla-row"
               :class="{ inactivo: !t.activo }"
             >
@@ -195,12 +195,11 @@ const provacopEditandoId  = ref<number | null>(null)
 const listaFiltrada = computed<TerceroLista[]>(() => {
   const q = busqueda.value.trim().toLowerCase()
   if (!q) return store.lista
-  return store.lista.filter(t =>
-    t.razon_social.toLowerCase().includes(q) ||
-    (t.ruc?.includes(q) ?? false) ||
-    (t.referencia?.toLowerCase().includes(q) ?? false) ||
-    (t.acopiador?.toLowerCase().includes(q) ?? false)
-  )
+  const terms = q.split(/\s+/)
+  return store.lista.filter(t => {
+    const searchable = `${t.razon_social} ${t.ruc ?? ''} ${t.referencia ?? ''} ${t.acopiador ?? ''}`.toLowerCase()
+    return terms.every(term => searchable.includes(term))
+  })
 })
 
 // ── Actions ───────────────────────────────────────────────────────────────────

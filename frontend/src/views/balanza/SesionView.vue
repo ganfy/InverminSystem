@@ -665,21 +665,22 @@ function cerrarEditarSesion() { editSesionModal.visible = false }
 
 const editProvsFiltered = computed(() => {
   const seen = new Set<number>()
-  const q = editSesionModal.busqProv.toLowerCase()
+  const terms = editSesionModal.busqProv.trim().toLowerCase().split(/\s+/)
   return store.provacops.filter(p => {
     if (seen.has(p.proveedor_id)) return false
-    seen.add(p.proveedor_id)
-    return p.proveedor_razon_social.toLowerCase().includes(q)
+    const match = terms.every(t => p.proveedor_razon_social.toLowerCase().includes(t))
+    if (match) seen.add(p.proveedor_id)
+    return match
   })
 })
 
 const editAcopsFiltered = computed(() => {
   if (!editSesionModal.editProv) return []
-  const q = editSesionModal.busqAcop.toLowerCase()
-  return store.provacops.filter(p =>
-    p.proveedor_id === editSesionModal.editProv!.proveedor_id &&
-    p.acopiador_razon_social.toLowerCase().includes(q),
-  )
+  const terms = editSesionModal.busqAcop.trim().toLowerCase().split(/\s+/)
+  return store.provacops.filter(p => {
+    if (p.proveedor_id !== editSesionModal.editProv!.proveedor_id) return false
+    return terms.every(t => p.acopiador_razon_social.toLowerCase().includes(t))
+  })
 })
 
 function editSelProv(p: ProvAcopDropdown) {

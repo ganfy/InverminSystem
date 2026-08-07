@@ -190,8 +190,11 @@ const provsUnicos = computed(() => {
 })
 const provsFiltrados = computed(() => {
   if (!busqProv.value.trim()) return provsUnicos.value
-  const q = busqProv.value.toLowerCase()
-  return provsUnicos.value.filter(p => p.proveedor_razon_social.toLowerCase().includes(q))
+  const terms = busqProv.value.trim().toLowerCase().split(/\s+/)
+  return provsUnicos.value.filter(p => {
+    const rs = p.proveedor_razon_social.toLowerCase()
+    return terms.every(t => rs.includes(t))
+  })
 })
 
 function onInputProv() {
@@ -222,8 +225,11 @@ const acopsDelProv = computed(() => {
 })
 const acopsFiltrados = computed(() => {
   if (!busqAcop.value.trim()) return acopsDelProv.value
-  const q = busqAcop.value.toLowerCase()
-  return acopsDelProv.value.filter(a => a.acopiador_razon_social.toLowerCase().includes(q))
+  const terms = busqAcop.value.trim().toLowerCase().split(/\s+/)
+  return acopsDelProv.value.filter(a => {
+    const rs = a.acopiador_razon_social.toLowerCase()
+    return terms.every(t => rs.includes(t))
+  })
 })
 
 function onInputAcop() {

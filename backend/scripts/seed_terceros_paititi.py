@@ -43,7 +43,7 @@ from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-EXCEL_PATH = Path(__file__).parent.parent.parent / "PL paititi (1).xlsx"
+EXCEL_PATH = Path(__file__).parent.parent.parent / "PL paititi (6).xlsx"
 
 
 # ── Lector de Excel sin dependencias externas ─────────────────────────────────
@@ -156,6 +156,7 @@ def leer_hoja_ruc(excel_path: Path) -> list[dict]:
                         "comision": to_float(raw.get("L")),  # COMISION
                         "acopiador_nombre": str(raw.get("M", "")).strip() or None,
                         "notas_recuperacion": str(raw.get("S", "")).strip() or None,
+                        "notas_plata": str(raw.get("T", "")).strip() or None,
                         "row_num": row_num,
                     }
                 )
@@ -369,6 +370,30 @@ def cargar_terceros(dry_run: bool = False):
             for campo, valor in campo_map.items():
                 if valor is not None:
                     setattr(pc, campo, valor)
+
+            # ── Parámetros de Plata (Ag) ───────────────────────────────────────
+            # Valores por defecto: 3.5 oz/tc y 30% de recuperación
+            umbral_ag = 3.5
+            recup_ag = 30.0
+
+            # El bloque coloreado (filas 109 a 114) tiene 4 oz
+            if p.get("row_num") and 109 <= p["row_num"] <= 114:
+                umbral_ag = 4.0
+                recup_ag = 30.0
+
+            # Si hubiera una nota explícita distinta en la columna T, la priorizamos
+            if p.get("notas_plata") and "PLATA" in p["notas_plata"].upper():
+                import re
+
+                match = re.search(
+                    r"(\d+(?:\.\d+)?)\s*OZ.*?(\d+(?:\.\d+)?)%", p["notas_plata"].upper()
+                )
+                if match:
+                    umbral_ag = float(match.group(1))
+                    recup_ag = float(match.group(2))
+
+            pc.umbral_ag_oz_tc = umbral_ag
+            pc.rec_ag_pct = recup_ag
 
             # ── Lógica de Llampo ───────────────────────────────────────────────
             # Standard rule: +40 for consumption and +10 for acopio
