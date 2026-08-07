@@ -13,7 +13,7 @@ No requieren base de datos; usan únicamente Decimal y la lógica del módulo.
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 # Importar directamente las funciones privadas que necesitamos testear.
 # En Python las funciones con _ son accesibles; esto es aceptable en tests de servicio.
@@ -99,7 +99,7 @@ class TestCalcPrecioXTms:
         # Manual: val_1 = 0.335 * 88/100 * (2400-10) = 0.335*0.88*2390
         val_1 = oz * rec / 100 * (spot - riesgo)
         val = val_1 - maquila - insumos + bono
-        expected = (val * FACTOR).quantize(Decimal("0.0001"))
+        expected = (val * FACTOR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         result = _calc_precio_x_tms(oz, rec, spot, riesgo, maquila, insumos, bono)
         assert result == expected
@@ -145,7 +145,9 @@ class TestCalcPrecioXTms:
         sin_factor = val_1 - maquila - insumos + bono
 
         # El resultado debe ser sin_factor * 1.1023 (con precisión Decimal)
-        assert abs(result - (sin_factor * FACTOR).quantize(Decimal("0.0001"))) < Decimal("0.001")
+        assert abs(
+            result - (sin_factor * FACTOR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        ) < Decimal("0.001")
 
     def test_precio_puede_ser_negativo_en_ley_muy_baja(self):
         # oz=0.05, rec=80, spot=2400, riesgo=400, maquila=95, insumos=8
