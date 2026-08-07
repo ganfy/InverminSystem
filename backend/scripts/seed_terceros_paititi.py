@@ -5,16 +5,16 @@ Mapeo de columnas Excel -> campos del sistema:
   B  → razon_social (NOMBRE)
   C  → referencia (REFERENCIA / PROCEDENCIA)
   D  → ruc
-  E  → lim_ley_superior   (LEY + / Maquila: ley sobre la que sube %)
+  E  → maquila (antes lim_ley_superior)
   F  → riesgo_comercial   (RIESGO COMERCIAL en USD/TM)
   G  → gasto_acopio       (GASTO ACOPIO en USD/TM)
   H  → gasto_consumo      (GASTO CONSUMO en USD/TM)
   I  -> porcentaje_ley_comercial  (% LEY -- porcentaje de recuperación comercial)
-  J  → lim_ley_inferior   (DIFERENCIA MIN LEY — límite inferior de ley)
+  J  → dscto_ley_comercial (antes lim_ley_inferior)
   K  → lim_ley_comercial  (LEY MINIMA — ley comercial mínima / ley volado)
   L  -> comision           (COMISION en USD/TM -- si existe)
   M  -> acopiador (nombre -- se busca como entidad; si no existe, se crea como nuevo)
-  S  -> notas de recuperacion diferenciada por rango de ley (informativo)
+  S  -> notas de recuperacion diferenciada por rango de ley, se parsean los umbrales de recup bajo y medio
 
 Uso:
     # Simulación (no escribe en BD):
@@ -139,6 +139,16 @@ def leer_hoja_ruc(excel_path: Path) -> list[dict]:
                     except (ValueError, TypeError):
                         return None
 
+                notas_s = str(raw.get("S", "")).strip() or None
+                umbral_recup_bajo = None
+                umbral_recup_medio = None
+                if notas_s:
+                    matches = re.findall(r"<\s*(\d+\.\d+)", notas_s)
+                    if len(matches) >= 1:
+                        umbral_recup_bajo = float(matches[0])
+                    if len(matches) >= 2:
+                        umbral_recup_medio = float(matches[1])
+
                 proveedores.append(
                     {
                         "razon_social": str(raw.get("B", "")).strip(),
@@ -146,16 +156,18 @@ def leer_hoja_ruc(excel_path: Path) -> list[dict]:
                         "ruc": ruc_limpio,
                         "ruc_valido": ruc_valido,
                         # Parámetros comerciales
-                        "lim_ley_superior": to_float(raw.get("E")),  # LEY+
+                        "maquila": to_float(raw.get("E")),  # MAQUILA
                         "riesgo_comercial": to_float(raw.get("F")),  # RIESGO COMERCIAL
                         "gasto_acopio": to_float(raw.get("G")),  # GASTO ACOPIO
                         "gasto_consumo": to_float(raw.get("H")),  # GASTO CONSUMO
                         "porcentaje_ley_comercial": to_float(raw.get("I")),  # % LEY
-                        "lim_ley_inferior": to_float(raw.get("J")),  # DIFERENCIA MIN LEY
+                        "dscto_ley_comercial": to_float(raw.get("J")),  # DSCTO LEY COMERCIAL
                         "lim_ley_comercial": to_float(raw.get("K")),  # LEY MINIMA
                         "comision": to_float(raw.get("L")),  # COMISION
                         "acopiador_nombre": str(raw.get("M", "")).strip() or None,
-                        "notas_recuperacion": str(raw.get("S", "")).strip() or None,
+                        "notas_recuperacion": notas_s,
+                        "umbral_recup_bajo": umbral_recup_bajo,
+                        "umbral_recup_medio": umbral_recup_medio,
                         "notas_plata": str(raw.get("T", "")).strip() or None,
                         "row_num": row_num,
                     }
@@ -358,14 +370,16 @@ def cargar_terceros(dry_run: bool = False):
 
             # Mapeo directo de campos
             campo_map = {
-                "lim_ley_superior": p["lim_ley_superior"],
+                "maquila": p["maquila"],
                 "riesgo_comercial": p["riesgo_comercial"],
                 "gasto_acopio": p["gasto_acopio"],
                 "gasto_consumo": p["gasto_consumo"],
                 "porcentaje_ley_comercial": p["porcentaje_ley_comercial"],
-                "lim_ley_inferior": p["lim_ley_inferior"],
+                "dscto_ley_comercial": p["dscto_ley_comercial"],
                 "lim_ley_comercial": p["lim_ley_comercial"],
                 "comision": p["comision"],
+                "umbral_recup_bajo": p["umbral_recup_bajo"],
+                "umbral_recup_medio": p["umbral_recup_medio"],
             }
             for campo, valor in campo_map.items():
                 if valor is not None:
