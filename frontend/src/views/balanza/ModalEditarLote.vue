@@ -74,7 +74,7 @@ import { computed } from 'vue'
 import { X } from 'lucide-vue-next'
 
 const auth = useAuthStore()
-const isAdmin = computed(() => auth.user?.rol === 'Admin')
+const isAdmin = computed(() => auth.puede('BALANZA', 'EDIT_PARAMS'))
 
 defineProps<{ modalData: any; guardando: boolean }>()
 defineEmits(['close', 'save'])

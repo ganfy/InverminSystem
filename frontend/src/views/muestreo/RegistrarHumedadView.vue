@@ -65,8 +65,11 @@
 
         <div class="result-box">
           <label>% HUMEDAD PROMEDIO</label>
-          <div class="result-value">
+          <div class="result-value" :class="{ 'parametro-ajustado': esAjustadoPorParametro }">
             {{ porcentajeHumedadPromedio > 0 ? porcentajeHumedadPromedio.toFixed(2) : '0.00' }}%
+          </div>
+          <div v-if="esAjustadoPorParametro" class="parametro-badge" :title="`Calculado real: ${humedadCalculadaRaw.toFixed(2)}%`">
+            ⚠ Humedad mínima contractual aplicada ({{ humedadMinimaParametro?.toFixed(2) }}%)
           </div>
           <div class="intentos-badge">Ingresando {{ pesosSecos.length }} ensayos (Máx {{ maxIntentos }})</div>
         </div>
@@ -148,13 +151,28 @@ const ensayosValidos = computed(() => {
   return pesosSecos.value.filter(s => s !== null && s > 0 && pesoHumedo.value !== null && s < pesoHumedo.value) as number[]
 })
 
-const porcentajeHumedadPromedio = computed(() => {
+const loteActual = computed(() => store.lotes.find(l => l.ip === ipLote))
+const humedadMinimaParametro = computed(() => loteActual.value?.humedad_minima ?? null)
+
+const humedadCalculadaRaw = computed(() => {
   if (ensayosValidos.value.length === 0 || !pesoHumedo.value) return 0
   let totalHumedad = 0
   ensayosValidos.value.forEach(seco => {
     totalHumedad += store.calcularHumedad(pesoHumedo.value!, seco)
   })
   return totalHumedad / ensayosValidos.value.length
+})
+
+const esAjustadoPorParametro = computed(() => {
+  if (humedadMinimaParametro.value == null || humedadCalculadaRaw.value <= 0) return false
+  return humedadCalculadaRaw.value < humedadMinimaParametro.value
+})
+
+const porcentajeHumedadPromedio = computed(() => {
+  if (esAjustadoPorParametro.value && humedadMinimaParametro.value != null) {
+    return humedadMinimaParametro.value
+  }
+  return humedadCalculadaRaw.value
 })
 
 const puedeGuardar = computed(() => {
@@ -369,15 +387,30 @@ const volver = () => {
 
 .textarea-observaciones {
   width: 100%;
-  background: var(--color-bg-input);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
   color: var(--color-text);
-  font-family: var(--font-main);
-  font-size: var(--text-base);
-  padding: var(--spacing-md);
+  font-family: inherit;
+  font-size: var(--text-sm);
   resize: vertical;
-  min-height: 80px;
+}
+
+.parametro-ajustado {
+  border: 2px dashed #eab308 !important;
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  background: rgba(234, 179, 8, 0.12) !important;
+  color: #eab308 !important;
+  display: inline-block;
+}
+
+.parametro-badge {
+  font-size: 0.78rem;
+  color: #eab308;
+  margin-top: 0.35rem;
+  font-weight: 600;
 }
 
 .textarea-observaciones:focus {

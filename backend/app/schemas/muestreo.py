@@ -15,6 +15,12 @@ class MuestreoCreate(BaseModel):
     fecha_muestreo: datetime | None = None
 
 
+class MuestreoUpdate(BaseModel):
+    peso_humedo: Decimal = Field(..., gt=0)
+    peso_seco: Decimal = Field(..., gt=0)
+    observaciones: str | None = None
+
+
 class MuestreoOut(BaseModel):
     id: int
     lote_id: int

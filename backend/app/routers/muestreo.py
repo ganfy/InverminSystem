@@ -1,8 +1,7 @@
 from datetime import date
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
-from app.models.enums import RolSistema
+from app.core.deps import check_permiso, get_current_user
 from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, MapeoCIP, Muestreo, Usuario
 from app.schemas.muestreo import (
     ActualizarLabCIPRequest,
@@ -10,6 +9,7 @@ from app.schemas.muestreo import (
     MapeoCIPOut,
     MuestreoCreate,
     MuestreoOut,
+    MuestreoUpdate,
     SyncCipResult,
     SyncCipsRequest,
     SyncCipsResponse,
@@ -23,17 +23,23 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/muestreo", tags=["Muestreo"])
 
-_ROLES_COMERCIAL = {
-    RolSistema.ADMIN,
-    RolSistema.GERENCIA,
-    RolSistema.COMERCIAL,
-    RolSistema.JEFE_COMERCIAL,
-}
-
 
 # ==========================================
 # 1. REGISTRO INDIVIDUAL (ONLINE)
 # ==========================================
+@router.patch("/{muestreo_id}", response_model=MuestreoOut, status_code=status.HTTP_200_OK)
+def actualizar_muestreo(
+    muestreo_id: int,
+    datos: MuestreoUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(check_permiso("MUESTREO", "UPDATE")),
+):
+    """Actualiza un intento de humedad dentro de la ventana permitida (1 hora)."""
+    return sample_service.actualizar_muestreo(
+        db=db, muestreo_id=muestreo_id, usuario_id=current_user.id, datos=datos
+    )
+
+
 @router.post("/lotes/{ip_lote}", response_model=MuestreoOut, status_code=status.HTTP_201_CREATED)
 def registrar_muestreo(
     ip_lote: str,
@@ -271,12 +277,9 @@ def actualizar_laboratorio_cip(
     cip_id: int,
     datos: ActualizarLabCIPRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user=Depends(check_permiso("MUESTREO", "UPDATE")),
 ):
-    """Asigna el laboratorio destino a un CIP. Solo Admin/Gerencia/Comercial."""
-    rol = current_user.rol.codigo if current_user.rol else None
-    if rol not in {r.value for r in _ROLES_COMERCIAL}:
-        raise HTTPException(status_code=403, detail="Sin permiso para asignar laboratorio")
+    """Asigna el laboratorio destino a un CIP. Solo roles con permiso MUESTREO/UPDATE."""
     cip = db.query(MapeoCIP).filter(MapeoCIP.id == cip_id).first()
     if not cip:
         raise HTTPException(status_code=404, detail="CIP no encontrado")

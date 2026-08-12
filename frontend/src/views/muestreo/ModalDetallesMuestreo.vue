@@ -14,7 +14,7 @@
           <div v-else-if="errorRed" class="aviso-offline">
             <span class="aviso-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
             <p class="aviso-texto">
-              <strong>Sin conexión.</strong> No se puede consultar el historial detallado de intentos mientras el dispositivo esté fuera de línea.
+              <strong>Sin conexión.</strong> No se puede consultar o editar el historial detallado de intentos mientras el dispositivo esté fuera de línea.
             </p>
           </div>
 
@@ -31,20 +31,60 @@
                   <th>P. HÚMEDO</th>
                   <th>P. SECO</th>
                   <th>% HUMEDAD</th>
-                  <th>OBSERVACIONES</th> </tr>
+                  <th>OBSERVACIONES</th>
+                  <th>ACCIONES</th>
+                </tr>
               </thead>
               <tbody>
                 <tr v-for="item in historial" :key="item.id">
                   <td class="td-mono">#{{ item.intento }}</td>
                   <td class="td-fecha">{{ formatearFecha(item.creado_en) }}</td>
-                  <td class="td-mono">{{ item.peso_humedo }}g</td>
-                  <td class="td-mono">{{ item.peso_seco }}g</td>
-                  <td class="td-mono highlight-gold">
-                    {{ item.porcentaje_humedad }}%
-                  </td>
-                  <td class="td-obs" :title="item.observaciones || ''">
-                    {{ item.observaciones || '---' }}
-                  </td>
+                  
+                  <template v-if="editandoId === item.id">
+                    <td>
+                      <input type="number" v-model.number="formEdit.peso_humedo" class="input input-sm" step="0.01" />
+                    </td>
+                    <td>
+                      <input type="number" v-model.number="formEdit.peso_seco" class="input input-sm" step="0.01" />
+                    </td>
+                    <td class="td-mono highlight-gold">
+                      --
+                    </td>
+                    <td>
+                      <input type="text" v-model="formEdit.observaciones" class="input input-sm" />
+                    </td>
+                    <td>
+                      <div class="acciones-edit">
+                        <button class="btn-icon" @click="guardarEdicion" title="Guardar" :disabled="guardando">
+                          <Check :size="16" />
+                        </button>
+                        <button class="btn-icon btn-icon-danger" @click="cancelarEdicion" title="Cancelar" :disabled="guardando">
+                          <X :size="16" />
+                        </button>
+                      </div>
+                    </td>
+                  </template>
+
+                  <template v-else>
+                    <td class="td-mono">{{ item.peso_humedo }}g</td>
+                    <td class="td-mono">{{ item.peso_seco }}g</td>
+                    <td class="td-mono highlight-gold">
+                      {{ item.porcentaje_humedad }}%
+                    </td>
+                    <td class="td-obs" :title="item.observaciones || ''">
+                      {{ item.observaciones || '---' }}
+                    </td>
+                    <td>
+                      <button 
+                        v-if="esEditable(item.creado_en)"
+                        class="btn-icon"
+                        @click="iniciarEdicion(item)"
+                        title="Editar">
+                        <Edit2 :size="16" />
+                      </button>
+                      <span v-else class="td-obs" title="Expiró el tiempo de edición o el lote fue liquidado">---</span>
+                    </td>
+                  </template>
                 </tr>
               </tbody>
             </table>
@@ -64,7 +104,9 @@ import { muestreoApi, type MuestreoOut } from '@/api/muestreo'
 import { useSync } from '@/composables/useSync'
 import {
   AlertTriangle,
-  X
+  X,
+  Edit2,
+  Check
 } from 'lucide-vue-next'
 
 const props = defineProps<{ ipLote: string }>()
@@ -75,6 +117,14 @@ const cargando = ref(true)
 const historial = ref<MuestreoOut[]>([])
 const errorRed = ref(false)
 
+const editandoId = ref<number | null>(null)
+const guardando = ref(false)
+const formEdit = ref({
+  peso_humedo: 0,
+  peso_seco: 0,
+  observaciones: '' as string | null
+})
+
 onMounted(async () => {
   if (!sync.online.value) {
     errorRed.value = true
@@ -82,6 +132,11 @@ onMounted(async () => {
     return
   }
 
+  await cargarHistorial()
+})
+
+async function cargarHistorial() {
+  cargando.value = true
   try {
     const data = await muestreoApi.listarMuestreosPorLote(props.ipLote)
     historial.value = data
@@ -90,8 +145,50 @@ onMounted(async () => {
   } finally {
     cargando.value = false
   }
+}
 
-})
+function esEditable(creado_en: string) {
+  const diff = new Date().getTime() - new Date(creado_en).getTime()
+  return diff < 60 * 60 * 1000 // 1 hour
+}
+
+function iniciarEdicion(item: MuestreoOut) {
+  editandoId.value = item.id
+  formEdit.value = {
+    peso_humedo: item.peso_humedo,
+    peso_seco: item.peso_seco,
+    observaciones: item.observaciones || ''
+  }
+}
+
+function cancelarEdicion() {
+  editandoId.value = null
+}
+
+async function guardarEdicion() {
+  if (!editandoId.value) return
+  
+  if (formEdit.value.peso_seco >= formEdit.value.peso_humedo) {
+    alert("El peso seco debe ser menor al peso húmedo")
+    return
+  }
+
+  guardando.value = true
+  try {
+    await muestreoApi.actualizarMuestreo(editandoId.value, {
+      peso_humedo: formEdit.value.peso_humedo,
+      peso_seco: formEdit.value.peso_seco,
+      observaciones: formEdit.value.observaciones
+    })
+    editandoId.value = null
+    await cargarHistorial()
+  } catch (error: any) {
+    console.error('Error al editar muestreo', error)
+    alert(error.response?.data?.detail || "Error al actualizar el muestreo.")
+  } finally {
+    guardando.value = false
+  }
+}
 
 function formatearFecha(iso: string) {
   if (!iso) return '---'

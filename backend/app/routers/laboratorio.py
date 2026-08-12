@@ -21,8 +21,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from app.core.database import get_db
-from app.core.deps import check_permiso
-from app.models.enums import EstadoRecuperacion, RolSistema, TipoAnalisis
+from app.core.deps import check_permiso, tiene_permiso
+from app.models.enums import EstadoRecuperacion, TipoAnalisis
 from app.models.models import AnalisisLey, AnalisisRecuperacion, Lote, ParametrosComerciales
 from app.schemas.laboratorio import (
     AnalisisAgCreate,
@@ -50,17 +50,13 @@ from sqlalchemy.orm import Session, joinedload
 
 router = APIRouter(prefix="/laboratorio", tags=["Laboratorio"])
 
-_ROLES_COMERCIAL = {
-    RolSistema.ADMIN,
-    RolSistema.GERENCIA,
-    RolSistema.COMERCIAL,
-    RolSistema.JEFE_COMERCIAL,
-}
 
-
-def _puede_ver_ip(current_user) -> bool:
-    rol = current_user.rol.codigo if current_user.rol else None
-    return rol in {r.value for r in _ROLES_COMERCIAL}
+def _puede_ver_ip(current_user, db) -> bool:
+    """
+    Determina si el usuario puede ver el IP del lote (confidencialidad muestreo ciego).
+    Consulta el permiso LABORATORIO/VIEW_CONFIDENTIAL en la tabla permisos.
+    """
+    return tiene_permiso(current_user, "LABORATORIO", "VIEW_CONFIDENTIAL", db)
 
 
 # ── Vista por CIP (Laboratorista y Comercial) ────────────────────────────────
@@ -77,7 +73,7 @@ def listar_cips(
     Comercial/Gerencia/Admin: recibe lote_ip en cada CIP.
     CIPs de recuperación PENDIENTE aparecen destacados para laboratorista.
     """
-    incluir_ip = _puede_ver_ip(current_user)
+    incluir_ip = _puede_ver_ip(current_user, db)
     return svc.obtener_cips_laboratorio(db, incluir_ip=incluir_ip)
 
 
@@ -913,7 +909,7 @@ def listar_lotes(
     db: Session = Depends(get_db),
 ):
     """Lista lotes con análisis. Incluye ley_planta y ley_minero calculados. Solo Comercial+."""
-    if not _puede_ver_ip(current_user):
+    if not _puede_ver_ip(current_user, db):
         raise HTTPException(
             status_code=403,
             detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",
@@ -929,7 +925,7 @@ def detalle_lote(
     db: Session = Depends(get_db),
 ):
     """Detalle completo de un lote: todos sus análisis, vigentes y descartados."""
-    if not _puede_ver_ip(current_user):
+    if not _puede_ver_ip(current_user, db):
         raise HTTPException(
             status_code=403,
             detail="Solo Comercial, Gerencia y Admin pueden acceder a la vista por IP",

@@ -91,6 +91,11 @@ export const muestreoApi = {
         return response.data
     },
 
+    async actualizarMuestreo(id: number, datos: Partial<MuestreoCreate>): Promise<MuestreoOut> {
+        const response = await api.patch<MuestreoOut>(`/muestreo/${id}`, datos)
+        return response.data
+    },
+
     async listarMuestreosPorLote(ipLote: string): Promise<MuestreoOut[]> {
         const response = await api.get<MuestreoOut[]>(`/muestreo/lotes/${ipLote}/muestreos`)
         return response.data

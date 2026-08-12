@@ -213,12 +213,31 @@ def _calcular_totales_ruma(lotes: list[Lote], db: Session) -> dict:
     }
 
 
-def _build_campana_out(campana: Campana) -> CampanaOut:
+def _build_campana_out(campana: Campana, db: Session | None = None) -> CampanaOut:
     hoy = date.today()
     dias = (hoy - campana.fecha_inicio).days if campana.fecha_inicio else None
     meta = float(campana.meta_oro_fino) if campana.meta_oro_fino else 1.0
     acum = float(campana.oro_fino_acumulado or 0)
     progreso = round((acum / meta) * 100, 1) if meta > 0 else 0.0
+
+    rumas_out = []
+    if db is not None and campana.rumas_campana:
+        for rc in campana.rumas_campana:
+            ruma = rc.ruma
+            if ruma:
+                totales = _calcular_totales_ruma(ruma.lotes, db)
+                rumas_out.append(
+                    RumaLista(
+                        id=ruma.id,
+                        codigo=ruma.codigo,
+                        numero_ruma=ruma.numero_ruma,
+                        fecha_creacion=ruma.fecha_creacion or date.today(),
+                        estado=ruma.estado,
+                        asignada=True,
+                        **totales,
+                    )
+                )
+
     return CampanaOut(
         id=campana.id,
         codigo=campana.codigo,
@@ -232,6 +251,7 @@ def _build_campana_out(campana: Campana) -> CampanaOut:
         total_rumas=campana.total_rumas or 0,
         progreso_pct=progreso,
         dias_transcurridos=dias,
+        rumas=rumas_out,
     )
 
 
@@ -336,8 +356,7 @@ def obtener_campana_activa(db: Session) -> CampanaOut:
 
     # 2. Re-refrescamos el objeto por si hubo cambios persistidos en el helper
     db.refresh(campana)
-
-    return _build_campana_out(campana)
+    return _build_campana_out(campana, db)
 
 
 def listar_campanas(db: Session) -> list[CampanaOut]:
@@ -349,7 +368,7 @@ def listar_campanas(db: Session) -> list[CampanaOut]:
             _actualizar_totales_campana(db, c.id)
             db.refresh(c)
 
-    return [_build_campana_out(c) for c in camps]
+    return [_build_campana_out(c, db) for c in camps]
 
 
 def crear_campana(db: Session, datos: CampanaCreate, usuario: Usuario) -> CampanaOut:
@@ -375,7 +394,7 @@ def crear_campana(db: Session, datos: CampanaCreate, usuario: Usuario) -> Campan
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
-    return _build_campana_out(nueva)
+    return _build_campana_out(nueva, db)
 
 
 def asignar_ruma_a_campana(
@@ -400,6 +419,9 @@ def asignar_ruma_a_campana(
     todos_lotes = db.query(Lote).filter(Lote.ruma_id == ruma.id, ~Lote.eliminado).all()
     total_tms = sum(_calcular_tms_lote(tl, db) or 0.0 for tl in todos_lotes)
 
+    # Al agregar una ruma a campaña, automáticamente queda CERRADA
+    ruma.estado = EstadoRuma.CERRADA
+
     # Crear asociación
     rel = RumaCampana(
         id_ruma=ruma.id, id_campana=campana.id, tonelaje=Decimal(str(round(total_tms, 3)))
@@ -412,7 +434,7 @@ def asignar_ruma_a_campana(
 
     db.commit()
     db.refresh(campana)
-    return _build_campana_out(campana)
+    return _build_campana_out(campana, db)
 
 
 def cerrar_campana(
@@ -453,7 +475,7 @@ def cerrar_campana(
     db.add(nueva)
     db.commit()
     db.refresh(campana)
-    return _build_campana_out(campana)
+    return _build_campana_out(campana, db)
 
 
 def editar_meta_campana(
@@ -465,7 +487,7 @@ def editar_meta_campana(
     campana.meta_oro_fino = datos.meta_oro_fino
     db.commit()
     db.refresh(campana)
-    return _build_campana_out(campana)
+    return _build_campana_out(campana, db)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -531,8 +553,11 @@ def asignar_lotes(
     - Vincula los nuevos, validando habilitado_ruma=True y sin otra ruma.
     """
     ruma = _get_ruma_o_404(db, ruma_id)
-    if ruma.estado == EstadoRuma.CERRADA:
-        raise HTTPException(status_code=400, detail="No se pueden asignar lotes a una ruma cerrada")
+    if ruma.estado == EstadoRuma.CERRADA or len(ruma.rumas_campana) > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No se pueden añadir o modificar lotes a una ruma en campaña o cerrada",
+        )
 
     ips_nuevas = set(datos.ips)
 

@@ -54,9 +54,20 @@
 
     <template v-if="store.puedeVerIP">
       <div class="filtros-bar">
+        <div class="field" style="min-width:180px">
+          <label class="field-label">MATERIAL</label>
+          <select class="field-select field-sm field-input" v-model="filtroMaterialLotes">
+            <option value="">Todos los materiales</option>
+            <option value="Mineral">Mineral</option>
+            <option value="Llampo">Llampo</option>
+            <option value="M.Llampo">M. Llampo</option>
+            <option value="Au">Au</option>
+            <option value="Ag">Ag</option>
+          </select>
+        </div>
         <div class="field" style="flex:1;min-width:200px">
           <label class="field-label">BÚSQUEDA</label>
-          <input type="text" class="field-input" v-model="filtroBusquedaLotes" placeholder="IP o Proveedor" />
+          <input type="text" class="field-input" v-model="filtroBusquedaLotes" placeholder="IP, Proveedor o Material" />
         </div>
       </div>
 
@@ -348,6 +359,7 @@ const tabActual      = ref<'ley' | 'solidos' | 'solucion'>('ley')
 const filtroEstado   = ref('')
 const filtroBusqueda = ref('')
 const filtroBusquedaLotes = ref('')
+const filtroMaterialLotes = ref('')
 const mostrarSoloCIPs = ref(false)
 
 const cipsSeleccionados = ref<string[]>([])
@@ -522,9 +534,19 @@ const filasMostrar = computed(() => {
 })
 
 const lotesFiltrados = computed(() => {
-  if (!filtroBusquedaLotes.value) return lotes.value
-  const q = filtroBusquedaLotes.value.toLowerCase()
-  return lotes.value.filter(l => l.ip.toLowerCase().includes(q) || (l.proveedor || '').toLowerCase().includes(q))
+  return lotes.value.filter(l => {
+    if (filtroMaterialLotes.value && (l.material || '').toLowerCase() !== filtroMaterialLotes.value.toLowerCase()) {
+      return false
+    }
+    if (filtroBusquedaLotes.value) {
+      const q = filtroBusquedaLotes.value.toLowerCase()
+      const matchIp = l.ip.toLowerCase().includes(q)
+      const matchProv = (l.proveedor || '').toLowerCase().includes(q)
+      const matchMat = (l.material || '').toLowerCase().includes(q)
+      if (!matchIp && !matchProv && !matchMat) return false
+    }
+    return true
+  })
 })
 
 function getRecuperacion(lote: LoteLabOut): string {

@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createTestingPinia } from '@pinia/testing'
 import { useLaboratorioStore } from '@/stores/laboratorio'
+import { useAuthStore } from '@/stores/auth'
 import { laboratorioApi } from '@/api/laboratorio'
 import LaboratorioDashboardView from '@/views/laboratorio/LaboratorioDashboardView.vue'
 import DetalleLoteView from '@/views/laboratorio/DetalleLoteView.vue'
@@ -321,17 +322,21 @@ describe('LaboratorioDashboardView - rol Comercial', () => {
         const cipConIp = { ...cipFake, ip: 'IP-0001' }
         vi.mocked(laboratorioApi.listarLotes).mockResolvedValue([loteFake as any])
 
+        // createTestingPinia con stubActions:false para que auth.puede() real
+        // lea el auth.permisos que seteamos a continuación.
+        const pinia = createTestingPinia({ createSpy: vi.fn, stubActions: false })
+
+        const auth = useAuthStore(pinia)
+        auth.user = { rol: 'Comercial', nombre_completo: 'Comercial User' } as any
+        auth.permisos = { LABORATORIO: { VIEW: true, VIEW_CONFIDENTIAL: true } } as any
+
+        const labStore = useLaboratorioStore(pinia)
+        labStore.cips = [cipConIp] as any
+        labStore.lotes = [loteFake] as any
+
         const wrapper = mount(LaboratorioDashboardView, {
             global: {
-                plugins: [
-                    createTestingPinia({
-                        createSpy: vi.fn,
-                        initialState: {
-                            auth: { user: { rol: 'Comercial', nombre_completo: 'Comercial User' } },
-                            laboratorio: { cips: [cipConIp], lotes: [loteFake] },
-                        },
-                    }),
-                ],
+                plugins: [pinia],
                 stubs: { RouterLink: true, RouterView: true },
             },
         })

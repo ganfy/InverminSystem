@@ -234,9 +234,7 @@
   const filtroTexto    = ref('')
   const filtroMaterial = ref('')
 
-  const puedeEditar = computed(() =>
-    ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')
-  )
+  const puedeEditar = computed(() => auth.puede('RUMAS', 'UPDATE'))
 
   // IPs actualmente en la ruma (de la respuesta del servidor)
   const ipsEnRuma = computed(() => new Set(store.rumaDetalle?.lotes.map(l => l.ip) ?? []))

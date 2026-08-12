@@ -139,9 +139,7 @@
   const ui     = useUiStore()
   const router = useRouter()
 
-  const puedeEditar = computed(() =>
-    ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')
-  )
+  const puedeEditar = computed(() => auth.puede('RUMAS', 'UPDATE'))
 
   function fmtNum(v: number | null | undefined, dec = 2) {
     if (v == null) return '—'

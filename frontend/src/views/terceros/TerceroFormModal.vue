@@ -271,6 +271,20 @@
                     </span>
                   </div>
                   <div class="field">
+                    <label class="field-label">Gasto Acopio (Llampo)</label>
+                    <input v-model.number="form.params.gasto_acopio_llampo" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
+                    <span v-if="errores.gasto_acopio_llampo" class="field-error">
+                        {{ errores.gasto_acopio_llampo }}
+                    </span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Gasto Consumo (Llampo)</label>
+                    <input v-model.number="form.params.gasto_consumo_llampo" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
+                    <span v-if="errores.gasto_consumo_llampo" class="field-error">
+                        {{ errores.gasto_consumo_llampo }}
+                    </span>
+                  </div>
+                  <div class="field">
                     <label class="field-label">Maquila (Ley +)</label>
                     <input v-model.number="form.params.maquila" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.maquila" class="field-error">
@@ -282,6 +296,13 @@
                     <input v-model.number="form.params.comision" type="number" step="0.01" class="field-input" placeholder="-" :disabled="soloLecturaParams" />
                     <span v-if="errores.comision" class="field-error">
                         {{ errores.comision }}
+                    </span>
+                  </div>
+                  <div class="field">
+                    <label class="field-label">% Humedad Mínima (opcional)</label>
+                    <input v-model.number="form.params.humedad_minima" type="number" step="0.01" min="0" class="field-input" placeholder="ej: 2.00" :disabled="soloLecturaParams" />
+                    <span v-if="errores.humedad_minima" class="field-error">
+                        {{ errores.humedad_minima }}
                     </span>
                   </div>
                   <div class="field">
@@ -496,10 +517,7 @@ function seleccionarTipo(tipo: TipoAcopiador) {
 }
 
 // ── Permisos ─────────────────────────────────────────────────────────────────
-const soloLecturaParams = computed(() => {
-  const rol = auth.user?.rol
-  return ['Comercial', 'JefeComercial'].includes(rol ?? '')
-})
+const soloLecturaParams = computed(() => !auth.puede('TERCEROS', 'UPDATE'))
 
 const agParamsIncompletos = computed(() => {
   const p = form.value.params
@@ -514,7 +532,8 @@ function emptyParams(): ParametrosComerciales {
     umbral_recup_bajo: null, umbral_recup_medio: null,
     lim_ley_inferior: null,  lim_ley_superior: null,
     gasto_acopio: null,      gasto_consumo: null,
-    maquila: null,           comision: null,
+    gasto_acopio_llampo: null, gasto_consumo_llampo: null,
+    maquila: null,           comision: null, humedad_minima: null,
     lim_ley_comercial: null, dscto_ley_comercial: null,
     porcentaje_ley_comercial: null, riesgo_comercial: null,
     // Plata (Ag)

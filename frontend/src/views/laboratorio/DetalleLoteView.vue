@@ -150,7 +150,7 @@
 
               </template>
               <button
-                v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+                v-if="puedeRegenerarCerts"
                 class="btn-danger-sm"
                 style="margin-left:auto;opacity:0.7"
                 @click="eliminarLey(a.id)"
@@ -579,7 +579,7 @@
                 </label>
               </template>
               <button
-                v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+                v-if="puedeRegenerarCerts"
                 class="btn-danger-sm"
                 style="margin-left:auto;opacity:0.7"
                 @click="eliminarRecuperacion(a.id)"
@@ -1269,10 +1269,7 @@ watch(leyComercialCalc, (nuevaLey) => {
   }
 })
 
-const puedeRegenerarCerts = computed(() => {
-  const rol = auth.user?.rol
-  return rol === 'Admin' || rol === 'Gerencia'
-})
+const puedeRegenerarCerts = computed(() => auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL'))
 
 //watch para certificados
 watch(lote, (l) => {
@@ -1374,7 +1371,7 @@ const cipsExternosPendienteCert = computed(() => {
 
 const analisisRecuperacionList = computed(() => {
   if (!lote.value) return []
-  if (!['Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')) return lote.value.analisis_recuperacion
+  if (!auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')) return lote.value.analisis_recuperacion
 
   // Comercial view: agrupar por CIP para unificar SOLIDOS y SOLUCION
   const agrupados = new Map<string, any>()

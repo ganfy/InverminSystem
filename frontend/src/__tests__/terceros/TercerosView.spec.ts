@@ -15,6 +15,14 @@ describe('TercerosView.vue', () => {
 
     // Configuramos el rol del usuario
     authStore.user = { rol: rolUsuario } as any
+    // Configuramos permisos según el rol (RBAC centralizado: puede() lee permisos, no rol)
+    if (rolUsuario === 'Admin') {
+      authStore.permisos = {
+        TERCEROS: { VIEW: true, CREATE: true, UPDATE: true, DELETE: true },
+      } as any
+    } else {
+      authStore.permisos = {} as any
+    }
     // Configuramos datos iniciales de la tabla
     tercerosStore.lista = [
       { id: 1, razon_social: 'MINERA SUR', ruc: '20123456789', activo: true },

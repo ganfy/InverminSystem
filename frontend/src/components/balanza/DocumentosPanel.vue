@@ -241,9 +241,7 @@
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────────
-  const puedeEliminar = computed(() =>
-    ['Admin', 'Gerencia'].includes(auth.rol ?? '')
-  )
+  const puedeEliminar = computed(() => auth.puede('BALANZA', 'DELETE'))
 
   const hayArchivosParaExtraer = computed(() =>
     props.sesionId

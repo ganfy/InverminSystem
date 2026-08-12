@@ -167,3 +167,53 @@ def me(current_user=Depends(get_current_user)):
         "rol": current_user.rol.codigo if current_user.rol else None,
         "email": current_user.email,
     }
+
+
+@router.get("/me/permisos")
+def me_permisos(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve la matriz de permisos del usuario autenticado.
+
+    Formato de respuesta:
+    {
+      "BALANZA":      { "VIEW": true, "CREATE": true, "UPDATE": true, ... },
+      "LABORATORIO":  { "VIEW": true, "VIEW_CONFIDENTIAL": false, ... },
+      ...
+    }
+
+    Admin siempre recibe todos los permisos en True sin consultar la BD.
+    Usado por el frontend para mostrar/ocultar elementos según permisos reales.
+    """
+    from app.models.enums import RolSistema
+    from app.models.models import Modulo, Operacion, Permiso
+
+    rol_codigo = current_user.rol.codigo if current_user.rol else None
+
+    # Admin: acceso total a todos los módulos y operaciones conocidos
+    if rol_codigo == RolSistema.ADMIN:
+        modulos = db.query(Modulo).all()
+        operaciones = db.query(Operacion).all()
+        return {mod.codigo: {op.codigo: True for op in operaciones} for mod in modulos}
+
+    if not current_user.rol_id:
+        return {}
+
+    # Resto de roles: consultar tabla permisos
+    filas = (
+        db.query(Modulo.codigo, Operacion.codigo, Permiso.permitido)
+        .join(Permiso, Permiso.modulo_id == Modulo.id)
+        .join(Operacion, Permiso.operacion_id == Operacion.id)
+        .filter(Permiso.rol_id == current_user.rol_id)
+        .all()
+    )
+
+    resultado: dict[str, dict[str, bool]] = {}
+    for modulo_codigo, operacion_codigo, permitido in filas:
+        if modulo_codigo not in resultado:
+            resultado[modulo_codigo] = {}
+        resultado[modulo_codigo][operacion_codigo] = bool(permitido)
+
+    return resultado

@@ -1,4 +1,3 @@
-import type { RolSistema } from '@/types/auth'
 import type { Component } from 'vue'
 import { Scale, FlaskConical, Users, LayoutDashboard, Microscope, Boxes, FileText, Beaker, Settings, Receipt, Weight, Flag, BellRing, ShieldCheck } from 'lucide-vue-next'
 
@@ -6,50 +5,45 @@ export interface NavItem {
   label: string
   path:  string
   icon:  string | Component
+  /** Permiso requerido para ver este ítem. Si no viene, hereda el de la sección. */
+  permiso?: { modulo: string; operacion: string }
+  disabled?: boolean
 }
 
 export interface NavSection {
   section: string
-  roles:   RolSistema[]   // qué roles ven esta sección
+  /** Permiso requerido para que la sección sea visible. */
+  permiso: { modulo: string; operacion: string }
   items:   NavItem[]
-}
-
-export interface NavItem {
-  label: string
-  path:  string
-  icon:  string | Component
-  roles?: RolSistema[]  // si no viene, hereda los de la sección
-  disabled?: boolean
 }
 
 export const NAV_CONFIG: NavSection[] = [
   {
     section: 'DASHBOARD',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'],
+    permiso: { modulo: 'DASHBOARD', operacion: 'VIEW' },
     items: [
       { label: 'Dashboard', path: '/', icon: LayoutDashboard },
     ],
   },
   {
     section: 'OPERACIONES',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza', 'Laboratorista', 'TecnicoMuestreo', 'Metalurgista'],
+    permiso: { modulo: 'BALANZA', operacion: 'VIEW' },   // sección visible si puede ver al menos Balanza
     items: [
-      { label: 'Balanza', path: '/balanza', icon: Weight, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza'] },
-      { label: 'Muestreo',            path: '/muestreo',   icon: FlaskConical, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'TecnicoMuestreo'] },
-      { label: 'Pruebas Metalúrgicas',path: '/pruebas',    icon: Beaker, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Metalurgista'] },
-      { label: 'Laboratorio',         path: '/laboratorio',icon: Microscope, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] },
-      { label: 'Liquidaciones',       path: '/liquidaciones', icon: FileText, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
-      { label: 'Facturación',         path: '/facturacion',icon: Receipt, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
-      { label: 'Rumas',               path: '/rumas',      icon: Boxes, roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
+      { label: 'Balanza',              path: '/balanza',      icon: Weight,      permiso: { modulo: 'BALANZA',      operacion: 'VIEW' } },
+      { label: 'Muestreo',             path: '/muestreo',     icon: FlaskConical,permiso: { modulo: 'MUESTREO',     operacion: 'VIEW' } },
+      { label: 'Pruebas Metalúrgicas', path: '/pruebas',      icon: Beaker,      permiso: { modulo: 'PRUEBAS_MET',  operacion: 'VIEW' } },
+      { label: 'Laboratorio',          path: '/laboratorio',  icon: Microscope,  permiso: { modulo: 'LABORATORIO',  operacion: 'VIEW' } },
+      { label: 'Liquidaciones',        path: '/liquidaciones',icon: FileText,    permiso: { modulo: 'LIQUIDACIONES',operacion: 'VIEW' } },
+      { label: 'Rumas',                path: '/rumas',        icon: Boxes,       permiso: { modulo: 'RUMAS',        operacion: 'VIEW' } },
     ],
   },
   {
     section: 'GESTIÓN',
-    roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'],
+    permiso: { modulo: 'TERCEROS', operacion: 'VIEW' },
     items: [
-      { label: 'Terceros',                path: '/terceros',               icon: Users,       roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] },
-      { label: 'Campañas',                path: '/administracion/campanas', icon: Flag,        roles: ['Admin', 'Gerencia'] },
-      { label: 'Administración',          path: '/administracion',          icon: ShieldCheck, roles: ['Admin'] },
+      { label: 'Terceros',      path: '/terceros',               icon: Users,       permiso: { modulo: 'TERCEROS',       operacion: 'VIEW'   } },
+      { label: 'Campañas',      path: '/administracion/campanas',icon: Flag,        permiso: { modulo: 'CAMPANAS',       operacion: 'CREATE' } },
+      { label: 'Administración',path: '/administracion',         icon: ShieldCheck, permiso: { modulo: 'ADMINISTRACION', operacion: 'VIEW'   } },
     ],
   },
 ]

@@ -265,6 +265,7 @@ class ParametrosComerciales(AuditMixin, Base):
     gasto_consumo_llampo = Column(Numeric(10, 2))  # USD
     maquila = Column(Numeric(5, 2))  # %
     comision = Column(Numeric(5, 2))  # %
+    humedad_minima = Column(Numeric(5, 2), nullable=True)  # % humedad mínima acordada (opcional)
     # Plata (Ag) — parámetros contractuales, todos nullable
     umbral_ag_oz_tc = Column(Numeric(8, 4), nullable=True)  # x: piso Oz/TC para pagar Ag
     rec_ag_pct = Column(Numeric(5, 2), nullable=True)  # y: % recuperación aplicada

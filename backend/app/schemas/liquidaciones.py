@@ -67,6 +67,8 @@ class LoteDisponible(BaseModel):
     porcentaje_rec: float | None = None
     usa_dirimencia: bool = False
     listo_para_liquidar: bool = False
+    liquidacion_id: int | None = None
+    numero_liquidacion: str | None = None
 
 
 class LoteFinancieroOut(BaseModel):

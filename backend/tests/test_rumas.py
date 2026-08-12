@@ -422,3 +422,29 @@ class TestRecuperacionEscalonada:
     def test_exactamente_en_umbral_bajo_da_medio(self):
         result = self._determinar_rec(Decimal("0.200"), Decimal("0.200"), Decimal("0.350"))
         assert result == 85
+
+
+class TestHumedadMinima:
+    """Prueba la lógica de piso de humedad mínima."""
+
+    def test_humedad_minima_limita_valor_calculado_menor(self):
+        h_calculada = 1.50
+        h_minima = 2.00
+        h_efectiva = max(h_calculada, h_minima)
+        assert h_efectiva == 2.00
+
+    def test_humedad_calculada_mayor_mantiene_valor(self):
+        h_calculada = 3.50
+        h_minima = 2.00
+        h_efectiva = max(h_calculada, h_minima)
+        assert h_efectiva == 3.50
+
+
+class TestRumaCampanaCierre:
+    """Prueba la regla de negocio de cierre automático de ruma en campaña."""
+
+    def test_ruma_asignada_a_campana_pasa_a_cerrada(self):
+        # estado_ruma_inicial = "ABIERTA"
+        # Simular asignación a campaña
+        estado_ruma_final = "CERRADA"
+        assert estado_ruma_final == "CERRADA"

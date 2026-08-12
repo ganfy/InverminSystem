@@ -179,10 +179,9 @@ const auth  = useAuthStore()
 const ui    = useUiStore()
 
 // ── RBAC ──────────────────────────────────────────────────────────────────────
-const rol        = computed(() => auth.user?.rol ?? '')
-const puedeCrear = computed(() => ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(rol.value))
-const puedeEditar     = computed(() => ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(rol.value))
-const puedeDesactivar = computed(() => ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(rol.value))
+const puedeCrear      = computed(() => auth.puede('TERCEROS', 'CREATE'))
+const puedeEditar     = computed(() => auth.puede('TERCEROS', 'UPDATE'))
+const puedeDesactivar = computed(() => auth.puede('TERCEROS', 'DELETE'))
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const filtroActivo        = ref<boolean | undefined>(true) // por defecto: activos

@@ -400,7 +400,12 @@ class TestGeneracionCIP:
 
 
 class TestRolesComercial:
-    """Verifica que el rol JefeComercial esté presente en los conjuntos de roles comerciales."""
+    """Verifica que el rol JefeComercial tenga permisos VIEW en los módulos comerciales.
+
+    Tras la centralización RBAC (eliminación de _ROLES_COMERCIAL hardcodeados),
+    los permisos se definen exclusivamente en seed.py / tabla `permisos`.
+    Este test verifica que seed.py incluya a JefeComercial en los módulos clave.
+    """
 
     def test_jefe_comercial_in_roles(self):
         import os
@@ -411,14 +416,26 @@ class TestRolesComercial:
         os.environ.setdefault("DB_PASSWORD", "test_pass")
         os.environ.setdefault("SECRET_KEY", "test_secret_key_for_unit_tests")
 
-        from app.models.enums import RolSistema
-        from app.routers.laboratorio import _ROLES_COMERCIAL as ROLES_LAB
-        from app.routers.muestreo import _ROLES_COMERCIAL as ROLES_MUESTREO
-        from app.routers.rumas import _ROLES_COMERCIAL as ROLES_RUMAS
+        from pathlib import Path
 
-        assert RolSistema.JEFE_COMERCIAL in ROLES_LAB
-        assert RolSistema.JEFE_COMERCIAL in ROLES_MUESTREO
-        assert RolSistema.JEFE_COMERCIAL in ROLES_RUMAS
+        seed_path = Path(__file__).parent.parent / "scripts" / "seed.py"
+        source = seed_path.read_text(encoding="utf-8")
+
+        # JefeComercial debe tener VIEW_CONFIDENTIAL en LABORATORIO
+        # (antes cubierto por _ROLES_COMERCIAL hardcodeado)
+        assert (
+            '("JefeComercial", "LABORATORIO", "VIEW_CONFIDENTIAL", True)' in source
+        ), "seed.py no otorga VIEW_CONFIDENTIAL en LABORATORIO a JefeComercial"
+        # JefeComercial debe tener UPDATE en MUESTREO
+        # (antes cubierto por _ROLES_COMERCIAL en muestreo.py)
+        assert (
+            '("JefeComercial", "MUESTREO", "UPDATE", True)' in source
+        ), "seed.py no otorga UPDATE en MUESTREO a JefeComercial"
+        # JefeComercial debe tener VIEW en CAMPANAS
+        # (antes cubierto por _ROLES_COMERCIAL en rumas.py)
+        assert (
+            '("JefeComercial", "CAMPANAS", "VIEW", True)' in source
+        ), "seed.py no otorga VIEW en CAMPANAS a JefeComercial"
 
 
 class TestConfiguracionRedondeo:

@@ -105,6 +105,59 @@
               <FlagOff :size="14" style="margin-right:0.35rem" /> Finalizar y crear nueva campaña
             </button>
           </div>
+
+          <!-- Desglose de Campaña Activa -->
+          <div class="desglose-section" style="margin-top: 1.75rem; border-top: 1px solid var(--color-border); padding-top: 1.25rem;">
+            <div class="hist-titulo" style="display:flex;align-items:center;justify-content:space-between">
+              <span>Desglose de Campaña {{ store.campanaActiva.codigo }} — Rumas Integrantes</span>
+              <span class="badge-meta" style="background:var(--color-gold-bg);color:var(--color-gold);border:1px solid rgba(179,144,40,0.3);padding:0.2rem 0.6rem;border-radius:4px;font-family:var(--font-mono);font-size:0.8rem">
+                {{ store.campanaActiva.rumas?.length || 0 }} Ruma(s)
+              </span>
+            </div>
+            <p class="text-sm text-muted mb-4" style="margin-top:0.25rem">
+              Valores calculados de las rumas que integran la campaña (los 4 parámetros usados para armar rumas).
+            </p>
+
+            <div v-if="!store.campanaActiva.rumas || store.campanaActiva.rumas.length === 0" class="estado-tabla">
+              Sin rumas asignadas a esta campaña aún.
+            </div>
+            <div v-else class="tabla-wrapper">
+              <table class="tabla">
+                <thead>
+                  <tr>
+                    <th>CÓDIGO RUMA</th>
+                    <th>LOTES</th>
+                    <th>TMS TOTAL</th>
+                    <th>LEY AU POND.</th>
+                    <th>% REC. PROM.</th>
+                    <th>% LLAMPO</th>
+                    <th>ESTADO</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="ruma in store.campanaActiva.rumas" :key="ruma.id">
+                    <td class="td-mono td-gold">{{ ruma.codigo }}</td>
+                    <td class="td-mono">{{ ruma.total_lotes }}</td>
+                    <td class="td-mono">{{ fmtNum(ruma.total_tms, 3) }} TMS</td>
+                    <td class="td-mono">
+                      {{ ruma.ley_ponderada != null ? fmtNum(ruma.ley_ponderada, 4) + ' oz/tc' : '—' }}
+                    </td>
+                    <td class="td-mono">
+                      {{ ruma.rec_promedio != null ? fmtNum(ruma.rec_promedio, 1) + '%' : '—' }}
+                    </td>
+                    <td class="td-mono">
+                      {{ ruma.pct_llampo != null ? fmtNum(ruma.pct_llampo, 1) + '%' : '—' }}
+                    </td>
+                    <td>
+                      <span class="badge-estado completo" style="font-size:0.7rem;background:rgba(234,179,8,0.15);color:var(--color-gold);border:1px solid rgba(234,179,8,0.3)">
+                        CERRADA
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- Historial -->
@@ -296,9 +349,7 @@
   const metaInput        = ref<number>(5000)
   const metaNuevaCampana = ref<number>(5000)
 
-  const puedeGestionar = computed(() =>
-    ['Admin', 'Gerencia'].includes(auth.user?.rol ?? '')
-  )
+  const puedeGestionar = computed(() => auth.puede('CAMPANAS', 'CREATE'))
 
   const campanasCerradas = computed(() =>
     store.historialCampanas.filter(c => c.estado === 'CERRADA')
@@ -335,8 +386,9 @@ async function vincularRuma(rumaId: number) {
   if (!store.campanaActiva) return
   const ok = await store.asignarRuma(store.campanaActiva.id, rumaId)
   if (ok) {
-    ui.toast('Ruma añadida a la campaña exitosamente', 'success')
-    await store.cargarCampanaActiva() // Refresca KPIs
+    ui.toast('Ruma añadida a la campaña y cerrada automáticamente', 'success')
+    await store.cargarCampanaActiva() // Refresca KPIs y desglose
+    await store.cargarRumas()
   }
 }
 

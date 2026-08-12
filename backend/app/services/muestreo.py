@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.models.enums import EstadoSesion
@@ -9,7 +9,7 @@ from app.models.models import (
     Muestreo,
     SesionDescarga,
 )
-from app.schemas.muestreo import MuestreoCreate
+from app.schemas.muestreo import MuestreoCreate, MuestreoUpdate
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -91,6 +91,80 @@ def registrar_muestreo(
     db.refresh(nuevo_muestreo)
 
     return nuevo_muestreo
+
+
+def actualizar_muestreo(
+    db: Session, muestreo_id: int, usuario_id: int, datos: MuestreoUpdate
+) -> Muestreo:
+    """
+    Actualiza un registro de humedad dentro de la ventana de 1 hora
+    y solo si el lote está en estado RECEPCIONADO.
+    """
+    from app.models.enums import EstadoLote
+
+    muestreo = (
+        db.query(Muestreo)
+        .options(joinedload(Muestreo.lote))
+        .filter(Muestreo.id == muestreo_id)
+        .first()
+    )
+    if not muestreo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Muestreo con id {muestreo_id} no encontrado.",
+        )
+
+    lote = muestreo.lote
+    if lote.estado != EstadoLote.RECEPCIONADO:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se puede editar: el lote se encuentra en estado {lote.estado}.",
+        )
+
+    # Validar ventana de 1 hora
+    if muestreo.creado_en:
+        if datetime.now() > muestreo.creado_en + timedelta(hours=1):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede editar: ya expiró la ventana de 1 hora permitida.",
+            )
+
+    if datos.peso_seco >= datos.peso_humedo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El peso seco debe ser estrictamente menor al peso húmedo.",
+        )
+
+    humedad = calcular_humedad(datos.peso_humedo, datos.peso_seco)
+    if humedad <= 0 or humedad > 50:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Humedad fuera de rango permitido (0-50%). Valor calculado: {humedad:.2f}%",
+        )
+
+    pesaje = lote.pesajes[0] if lote.pesajes else None
+    if not pesaje or not pesaje.peso_neto:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El lote no tiene un peso neto válido en balanza.",
+        )
+
+    tms = calcular_tms(pesaje.peso_neto, humedad)
+
+    # Actualizar valores
+    muestreo.peso_humedo = datos.peso_humedo
+    muestreo.peso_seco = datos.peso_seco
+    muestreo.observaciones = datos.observaciones
+    muestreo.tms_calculado = tms
+
+    # Al estar usando AuditMixin, también podemos usar los campos de auditoría.
+    muestreo.modificado_por = usuario_id
+    muestreo.modificado_en = datetime.now()
+
+    db.commit()
+    db.refresh(muestreo)
+
+    return muestreo
 
 
 def registrar_muestreo_batch(
@@ -273,6 +347,11 @@ def obtener_lotes_para_muestreo(db: Session):
         # SLA Logic
         pendiente_sla = (estado_muestreo == "COMPLETADO") and (not tiene_etiquetas)
 
+        humedad_minima = None
+        if lote.sesion and lote.sesion.provacop and lote.sesion.provacop.parametros:
+            if lote.sesion.provacop.parametros.humedad_minima is not None:
+                humedad_minima = float(lote.sesion.provacop.parametros.humedad_minima)
+
         resultado.append(
             {
                 "lote_id": lote.id,
@@ -288,6 +367,7 @@ def obtener_lotes_para_muestreo(db: Session):
                 "etiquetado": tiene_etiquetas,
                 "sla_config": {"h_min": h_min, "h_max": h_max},
                 "pendiente_sla": pendiente_sla,
+                "humedad_minima": humedad_minima,
             }
         )
 

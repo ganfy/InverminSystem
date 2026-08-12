@@ -155,9 +155,7 @@ const cambiarFormato = (formato: FormatoRollo) => {
 }
 
 const auth = useAuthStore()
-const puedeAsignarLab = computed(() =>
-  ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(auth.user?.rol ?? '')
-)
+const puedeAsignarLab = computed(() => auth.puede('MUESTREO', 'UPDATE'))
 const labsDisponibles = ref<string[]>([])
 const labsPorCip = ref<Record<number, string>>({})
 

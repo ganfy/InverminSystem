@@ -196,3 +196,39 @@ def check_permiso(modulo: str, operacion: str):
         return current_user
 
     return _check
+
+
+def tiene_permiso(user, modulo: str, operacion: str, db: Session) -> bool:
+    """
+    Verifica si el usuario tiene el permiso indicado sin lanzar excepción.
+    Útil para lógica condicional dentro de un endpoint ya autenticado
+    (ej: incluir_ip en laboratorio, toggles de UI).
+
+    Admin siempre retorna True sin consultar la tabla.
+
+    Uso:
+        from app.core.deps import tiene_permiso
+        incluir_ip = tiene_permiso(current_user, "LABORATORIO", "VIEW_CONFIDENTIAL", db)
+    """
+    from app.models.enums import RolSistema
+    from app.models.models import Modulo, Operacion, Permiso
+
+    rol_codigo = user.rol.codigo if user.rol else None
+    if rol_codigo == RolSistema.ADMIN:
+        return True
+
+    if not user.rol_id:
+        return False
+
+    return bool(
+        db.query(Permiso)
+        .join(Modulo, Permiso.modulo_id == Modulo.id)
+        .join(Operacion, Permiso.operacion_id == Operacion.id)
+        .filter(
+            Permiso.rol_id == user.rol_id,
+            Modulo.codigo == modulo,
+            Operacion.codigo == operacion,
+            Permiso.permitido,
+        )
+        .first()
+    )

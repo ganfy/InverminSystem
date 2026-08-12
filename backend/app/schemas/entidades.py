@@ -36,8 +36,11 @@ class ParametrosSchema(BaseModel):
     # Parámetros comerciales
     gasto_acopio: float | None = None
     gasto_consumo: float | None = None
+    gasto_acopio_llampo: float | None = None
+    gasto_consumo_llampo: float | None = None
     maquila: float | None = None  # %
     comision: float | None = None  # %
+    humedad_minima: float | None = None  # % humedad mínima acordada (opcional)
 
     # Lógica de ley comercial
     lim_ley_comercial: float | None = None  # Si ley comercial <
