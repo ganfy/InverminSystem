@@ -11,7 +11,7 @@ from decimal import Decimal
 
 from app.core.database import get_db
 from app.core.deps import check_permiso
-from app.models.enums import EstadoLote, EstadoSesion, RolSistema
+from app.models.enums import EstadoLote, EstadoSesion
 from app.models.models import (
     Entidad,
     Lote,
@@ -31,7 +31,7 @@ from app.schemas.balanza import (
     SesionEditar,
     SesionLista,
 )
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
@@ -521,7 +521,7 @@ def editar_lote(
     sesion_id: int,
     lote_id: int,
     datos: LoteEditar,
-    current_user=Depends(check_permiso("BALANZA", "UPDATE")),
+    current_user=Depends(check_permiso("BALANZA", "EDIT_PARAMS")),
     db: Session = Depends(get_db),
 ) -> LoteDetalle:
     """
@@ -531,8 +531,6 @@ def editar_lote(
     al actualizar peso_inicial y/o peso_final el motor lo recalcula
     automáticamente (fórmula: peso_inicial - peso_final).
     """
-    if current_user.rol.codigo != RolSistema.ADMIN.value:
-        raise HTTPException(status_code=403, detail="Solo el administrador puede editar lotes.")
 
     lote = (
         db.query(Lote)

@@ -30,17 +30,11 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
     const lotes = ref<LoteLabOut[]>([])
     const cargando = ref(false)
 
-    const puedeVerIP = computed(() => {
-        const r = auth.user?.rol ?? ''
-        return ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(r)
-    })
+    const puedeVerIP = computed(() => auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL'))
 
     const esLaboratorista = computed(() => auth.user?.rol === 'Laboratorista')
 
-    const puedeImportarCert = computed(() => {
-        const r = auth.user?.rol ?? ''
-        return ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'].includes(r)
-    })
+    const puedeImportarCert = computed(() => auth.puede('LABORATORIO', 'VIEW'))
 
     // ── Carga ─────────────────────────────────────────────────────────────────
     async function cargarCips() {

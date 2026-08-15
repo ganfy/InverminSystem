@@ -16,8 +16,11 @@ export interface ParametrosComerciales {
   lim_ley_superior: number | null
   gasto_acopio: number | null
   gasto_consumo: number | null
+  gasto_acopio_llampo: number | null
+  gasto_consumo_llampo: number | null
   maquila: number | null
   comision: number | null
+  humedad_minima: number | null
   lim_ley_comercial: number | null
   dscto_ley_comercial: number | null
   porcentaje_ley_comercial: number | null

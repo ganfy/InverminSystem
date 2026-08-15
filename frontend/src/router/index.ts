@@ -42,47 +42,47 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         // Dashboard principal
-        { path: 'dashboard', name: 'Dashboard', component: DashboardView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
+        { path: 'dashboard', name: 'Dashboard', component: DashboardView, meta: { permiso: { modulo: 'DASHBOARD', operacion: 'VIEW' } } },
 
         // Balanza
-        { path: 'balanza', name: 'Balanza', component: BalanzaView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza'] } },
-        { path: 'balanza/nueva', name: 'RegistrarCamion', component: RegistrarCamionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza'] } },
-        { path: 'balanza/:id', name: 'SesionBalanza', component: SesionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'OperadorBalanza'] } },
+        { path: 'balanza', name: 'Balanza', component: BalanzaView, meta: { permiso: { modulo: 'BALANZA', operacion: 'VIEW' } } },
+        { path: 'balanza/nueva', name: 'RegistrarCamion', component: RegistrarCamionView, meta: { permiso: { modulo: 'BALANZA', operacion: 'VIEW' } } },
+        { path: 'balanza/:id', name: 'SesionBalanza', component: SesionView, meta: { permiso: { modulo: 'BALANZA', operacion: 'VIEW' } } },
 
         // Muestreo
-        { path: 'muestreo', name: 'Muestreo', component: MuestreoView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'TecnicoMuestreo'] } },
-        { path: 'muestreo/:ip', name: 'RegistrarHumedad', component: RegistrarHumedadView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'TecnicoMuestreo'] } },
+        { path: 'muestreo', name: 'Muestreo', component: MuestreoView, meta: { permiso: { modulo: 'MUESTREO', operacion: 'VIEW' } } },
+        { path: 'muestreo/:ip', name: 'RegistrarHumedad', component: RegistrarHumedadView, meta: { permiso: { modulo: 'MUESTREO', operacion: 'VIEW' } } },
 
         // Pruebas
-        { path: 'pruebas', name: 'Pruebas', component: PruebasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Metalurgista'] } },
-        { path: 'pruebas/recuperaciones', name: 'Recuperaciones', component: RecuperacionesPruebasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Metalurgista'] } },
-        { path: 'pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Metalurgista'] } },
+        { path: 'pruebas', name: 'Pruebas', component: PruebasView, meta: { permiso: { modulo: 'PRUEBAS_MET', operacion: 'VIEW' } } },
+        { path: 'pruebas/recuperaciones', name: 'Recuperaciones', component: RecuperacionesPruebasView, meta: { permiso: { modulo: 'PRUEBAS_MET', operacion: 'VIEW' } } },
+        { path: 'pruebas/:ip', name: 'RegistrarPrueba', component: RegistrarPruebasView, meta: { permiso: { modulo: 'PRUEBAS_MET', operacion: 'VIEW' } } },
 
         // Laboratorio
-        { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
-        { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
-        { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
-        { path: 'laboratorio/solidos/:cip', name: 'RegistrarSolidos', component: RegistrarSolidosView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
-        { path: 'laboratorio/solucion/:cip', name: 'RegistrarSolucion', component: RegistrarSolucionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
-        { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
-        { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
-        { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial', 'Laboratorista'] } },
+        { path: 'laboratorio', name: 'Laboratorio', component: LaboratorioView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/ley/:cip', name: 'RegistrarLey', component: RegistrarLeyView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/recuperacion/:cip', name: 'RegistrarRecuperacion', component: RegistrarRecuperacionView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/solidos/:cip', name: 'RegistrarSolidos', component: RegistrarSolidosView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/solucion/:cip', name: 'RegistrarSolucion', component: RegistrarSolucionView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/lote/:ip', name: 'DetalleLote', component: DetalleLoteView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/importar-ley/:cip', name: 'ImportarCertLey', component: ImportarCertificadoLeyView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
+        { path: 'laboratorio/importar-rec/:cip', name: 'ImportarCertRec', component: ImportarCertificadoRecuperacionView, meta: { permiso: { modulo: 'LABORATORIO', operacion: 'VIEW' } } },
 
         // Liquidaciones
-        { path: 'liquidaciones', name: 'Liquidaciones', component: LiquidacionesView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
-        { path: 'liquidaciones/nueva', name: 'CrearLiquidacion', component: CrearLiquidacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
-        { path: 'liquidaciones/:id', name: 'DetalleLiquidacion', component: DetalleLiquidacionView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
+        { path: 'liquidaciones', name: 'Liquidaciones', component: LiquidacionesView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'VIEW' } } },
+        { path: 'liquidaciones/nueva', name: 'CrearLiquidacion', component: CrearLiquidacionView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'CREATE' } } },
+        { path: 'liquidaciones/:id', name: 'DetalleLiquidacion', component: DetalleLiquidacionView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'VIEW' } } },
 
         // Gestión
-        { path: 'terceros', name: 'Terceros', component: TercerosView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
+        { path: 'terceros', name: 'Terceros', component: TercerosView, meta: { permiso: { modulo: 'TERCEROS', operacion: 'VIEW' } } },
 
         // Rumas
-        { path: 'rumas', name: 'Rumas', component: RumasView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
-        { path: 'rumas/:id', name: 'DetalleRuma', component: DetalleRumaView, meta: { roles: ['Admin', 'Gerencia', 'Comercial', 'JefeComercial'] } },
-        { path: 'administracion/campanas', name: 'Campanas', component: CampanasView, meta: { roles: ['Admin', 'Gerencia'] } },
+        { path: 'rumas', name: 'Rumas', component: RumasView, meta: { permiso: { modulo: 'RUMAS', operacion: 'VIEW' } } },
+        { path: 'rumas/:id', name: 'DetalleRuma', component: DetalleRumaView, meta: { permiso: { modulo: 'RUMAS', operacion: 'VIEW' } } },
+        { path: 'administracion/campanas', name: 'Campanas', component: CampanasView, meta: { permiso: { modulo: 'CAMPANAS', operacion: 'CREATE' } } },
 
         // Administración (vista unificada con tabs: Usuarios / Parámetros / Notificaciones)
-        { path: 'administracion', name: 'Administracion', component: () => import('@/views/admin/AdminView.vue'), meta: { roles: ['Admin'] } },
+        { path: 'administracion', name: 'Administracion', component: () => import('@/views/admin/AdminView.vue'), meta: { permiso: { modulo: 'ADMINISTRACION', operacion: 'VIEW' } } },
         { path: 'administracion/config', redirect: { name: 'Administracion' } },
 
         // Error
@@ -142,10 +142,10 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // Guard por roles específicos de ruta (meta.roles)
-  if (to.meta.roles) {
-    const rol = auth.user?.rol ?? ''
-    if (!(to.meta.roles as string[]).includes(rol)) return { name: 'Unauthorized' }
+  // Guard por permisos RBAC de ruta (meta.permiso)
+  if (to.meta.permiso) {
+    const p = to.meta.permiso as { modulo: string; operacion: string }
+    if (!auth.puede(p.modulo, p.operacion)) return { name: 'Unauthorized' }
   }
 
 

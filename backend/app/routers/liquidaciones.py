@@ -9,7 +9,6 @@ import os
 
 from app.core.database import get_db
 from app.core.deps import check_permiso
-from app.models.enums import RolSistema
 from app.models.models import Liquidacion
 from app.schemas.liquidaciones import (
     LiquidacionCreate,
@@ -250,25 +249,15 @@ def descargar_pdf(
 @router.patch(
     "/{liquidacion_id}/lotes/{ip}/parametros",
     response_model=LiquidacionDetalleOut,
-    summary="Admin/Gerencia editan parámetros de un lote en la liquidación",
+    summary="Admin/Gerencia/JefeComercial editan parámetros de un lote en la liquidación",
 )
 def editar_params_lote(
     liquidacion_id: int,
     ip: str,
     body: LiquidacionLoteParamsUpdate,
-    current_user=Depends(check_permiso("LIQUIDACIONES", "UPDATE")),
+    current_user=Depends(check_permiso("LIQUIDACIONES", "EDIT_PARAMS")),
     db: Session = Depends(get_db),
 ):
-    rol = current_user.rol.codigo if current_user.rol else None
-    if rol not in {
-        RolSistema.ADMIN.value,
-        RolSistema.GERENCIA.value,
-        RolSistema.JEFE_COMERCIAL.value,
-    }:
-        raise HTTPException(
-            status_code=403,
-            detail="Solo Admin, Gerencia y Jefe Comercial pueden editar parámetros",
-        )
     try:
         svc.editar_params_lote(db, liquidacion_id, ip, body, current_user.id)
         db.commit()

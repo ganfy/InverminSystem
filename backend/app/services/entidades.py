@@ -103,6 +103,7 @@ def _actualizar_parametros(
         "gasto_consumo",
         "maquila",
         "comision",
+        "humedad_minima",
         "lim_ley_comercial",
         "dscto_ley_comercial",
         "porcentaje_ley_comercial",

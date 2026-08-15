@@ -137,6 +137,18 @@ def _datos_muestreo_promedio(db: Session, lote_id: int) -> tuple[Decimal, Decima
 
     if valid_count > 0:
         h2o_porc = round(total_h2o / valid_count, 2)
+        lote_obj = db.query(Lote).filter(Lote.id == lote_id).first()
+        if (
+            lote_obj
+            and lote_obj.sesion
+            and lote_obj.sesion.provacop
+            and lote_obj.sesion.provacop.parametros
+            and lote_obj.sesion.provacop.parametros.humedad_minima is not None
+        ):
+            h_min_val = float(lote_obj.sesion.provacop.parametros.humedad_minima)
+            if h2o_porc < h_min_val:
+                h2o_porc = h_min_val
+
         humedad_dec = Decimal(str(h2o_porc))
 
         tmh = float(pesaje.peso_neto)
@@ -1079,17 +1091,18 @@ def lotes_disponibles_para_liquidar(
 
     resultado = []
     for lote in lotes:
-        ya_liquidado = (
+        liq_activa = (
             db.query(LiquidacionLote)
             .join(Liquidacion)
-            .filter(
-                LiquidacionLote.lote_id == lote.id,
-                Liquidacion.estado.notin_([EstadoLiquidacion.BORRADOR]),
-            )
+            .filter(LiquidacionLote.lote_id == lote.id)
+            .order_by(Liquidacion.id.desc())
             .first()
         )
-        if ya_liquidado:
+        if liq_activa and liq_activa.liquidacion.estado != "BORRADOR":
             continue
+
+        liquidacion_id = liq_activa.liquidacion_id if liq_activa else None
+        numero_liquidacion = liq_activa.liquidacion.numero_liquidacion if liq_activa else None
 
         fecha_rec = _fecha_recepcion(lote)
         dias = (date.today() - fecha_rec).days if fecha_rec else 0
@@ -1181,6 +1194,8 @@ def lotes_disponibles_para_liquidar(
                 "porcentaje_rec": porcentaje_rec,
                 "usa_dirimencia": usa_dir,
                 "listo_para_liquidar": listo,
+                "liquidacion_id": liquidacion_id,
+                "numero_liquidacion": numero_liquidacion,
                 "provacop_id": provacop_id,  # ya viene como parámetro de la función
                 "proveedor": _nombre_entidad(lote.sesion.provacop.proveedor)
                 if lote.sesion and lote.sesion.provacop

@@ -28,9 +28,19 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken  = ref<string | null>(localStorage.getItem('access_token'))
   const refreshToken = ref<string | null>(localStorage.getItem('refresh_token'))
   const user         = ref<UsuarioMe | null>(null)
+  /** Matriz de permisos: { MODULO: { OPERACION: boolean } } */
+  const permisos     = ref<Record<string, Record<string, boolean>>>({})
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const rol             = computed(() => user.value?.rol ?? null)
+
+  /**
+   * Verifica si el usuario tiene un permiso específico.
+   * Uso: puede('BALANZA', 'VIEW') → true/false
+   */
+  function puede(modulo: string, operacion: string): boolean {
+    return permisos.value[modulo]?.[operacion] === true
+  }
 
   function setTokens(tokens: TokenResponse) {
     accessToken.value  = tokens.access_token
@@ -63,7 +73,8 @@ export const useAuthStore = defineStore('auth', () => {
 
         cachedUsers[userKey] = {
           hash: hash,
-          perfil: user.value
+          perfil: user.value,
+          permisos: permisos.value,
         }
         localStorage.setItem('offline_users_dict', JSON.stringify(cachedUsers))
         localStorage.setItem('last_offline_user', userKey) // Para saber a quién cargarle el perfil
@@ -126,6 +137,7 @@ export const useAuthStore = defineStore('auth', () => {
         const cachedUsers = JSON.parse(localStorage.getItem('offline_users_dict') || '{}')
         if (cachedUsers[lastUser]) {
           user.value = cachedUsers[lastUser].perfil
+          permisos.value = cachedUsers[lastUser].permisos || {}
           // Cargar config guardada si existe en offline
           try {
             const cached = localStorage.getItem('public_config_cache')
@@ -141,6 +153,13 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Flujo normal online
     user.value = await authApi.me()
+
+    // Cargar matriz de permisos RBAC
+    try {
+      permisos.value = await authApi.mePermisos()
+    } catch (err) {
+      console.warn('No se pudo cargar la matriz de permisos:', err)
+    }
 
     // Intentamos cargar la configuración pública (unidades, etc.)
     try {
@@ -170,8 +189,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    accessToken, refreshToken, user,
-    isAuthenticated, rol,
+    accessToken, refreshToken, user, permisos,
+    isAuthenticated, rol, puede,
     login, logout, fetchMe, refresh, clearTokens,
   }
 })

@@ -470,7 +470,7 @@
         </div>
 
         <!-- Editor de umbrales (solo Admin/Gerencia) -->
-        <details class="umbrales-panel" v-if="umbralEdit">
+        <details class="umbrales-panel" v-if="umbralEdit && puedeEditarUmbrales">
           <summary class="umbrales-summary">
             <Settings :size="13" />
             Configurar umbrales de alerta
@@ -670,8 +670,8 @@ const auth     = useAuthStore()
 // ── Trazabilidad drawer ───────────────────────────────────────────────
 const drawerOpen       = ref(false)
 const ipTrazabilidad   = ref<string | null>(null)
-const ROLES_TRAZABILIDAD = ['Admin', 'Gerencia', 'Comercial', 'JefeComercial']
-const canViewTrazabilidad = computed(() => ROLES_TRAZABILIDAD.includes(auth.rol ?? ''))
+const canViewTrazabilidad   = computed(() => auth.puede('RUMAS',      'VIEW'))
+const puedeEditarUmbrales   = computed(() => auth.puede('DASHBOARD',   'UPDATE'))
 function abrirTrazabilidad(ip: string) {
   ipTrazabilidad.value = ip
   drawerOpen.value = true

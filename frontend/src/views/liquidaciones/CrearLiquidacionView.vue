@@ -129,7 +129,8 @@
                   <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtLey(lote.ley_comercial) }}</td>
                   <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
                   <td>
-                    <span v-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
+                    <span v-if="lote.liquidacion_id" class="alerta-tag" style="background:var(--color-gold);color:black;border:none;" :title="'En liquidación: ' + (lote.numero_liquidacion || 'Borrador')">LIQ</span>
+                    <span v-else-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
                     <span v-else-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
                     <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D</span>
                   </td>
@@ -493,10 +494,7 @@
   const store  = useLiquidacionesStore()
   const ui     = useUiStore()
   const auth   = useAuthStore()
-  const puedeEditarParams = computed(() => {
-    if (!auth.user) return false
-    return ['Admin', 'Gerencia', 'JefeComercial'].includes(auth.user.rol)
-  })
+  const puedeEditarParams = computed(() => auth.puede('LIQUIDACIONES', 'EDIT_PARAMS'))
 
 
   // ── State ──────────────────────────────────────────────────────────

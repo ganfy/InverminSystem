@@ -135,17 +135,18 @@ watch(
 const sidebarOpen = ref(false)
 const rol = computed(() => authStore.user?.rol ?? '')
 
-function tieneAcceso(roles?: string[]) {
-  if (!roles || roles.length === 0) return true
-  return roles.includes(rol.value)
+/** Verifica si el usuario puede ver una sección o ítem según su permiso RBAC */
+function tieneAcceso(permiso?: { modulo: string; operacion: string }) {
+  if (!permiso) return true
+  return authStore.puede(permiso.modulo, permiso.operacion)
 }
 
 const visibleSections = computed(() =>
-  NAV_CONFIG.filter(s => tieneAcceso(s.roles))
+  NAV_CONFIG.filter(s => tieneAcceso(s.permiso))
 )
 
 function visibleItems(section: NavSection) {
-  return section.items.filter(i => tieneAcceso(i.roles))
+  return section.items.filter(i => tieneAcceso(i.permiso ?? section.permiso))
 }
 
 const currentTitle = computed(() => {

@@ -1,5 +1,4 @@
-from app.core.deps import get_db, require_roles
-from app.models.models import Usuario
+from app.core.deps import check_permiso, get_db
 from app.schemas.dashboard import (
     AlertasConfig,
     AlertasResponse,
@@ -84,9 +83,7 @@ def guardar_observacion(
 def get_trazabilidad(
     ip: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(
-        require_roles("Admin", "Gerencia", "Comercial", "JefeComercial")
-    ),
+    current_user=Depends(check_permiso("DASHBOARD", "VIEW")),
 ):
-    """Retorna el cuadro de trazabilidad administrativa completo de un lote."""
+    """Retorna el cuadro de trazabilidad administrativa completa de un lote."""
     return obtener_trazabilidad_lote(db, ip)

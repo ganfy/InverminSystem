@@ -17,4 +17,9 @@ export const authApi = {
   me(): Promise<UsuarioMe> {
     return api.get('/auth/me').then((r) => r.data)
   },
+
+  /** Devuelve la matriz de permisos { MODULO: { OPERACION: boolean } } */
+  mePermisos(): Promise<Record<string, Record<string, boolean>>> {
+    return api.get('/auth/me/permisos').then((r) => r.data)
+  },
 }

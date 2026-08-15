@@ -109,6 +109,8 @@ export interface LoteDisponible {
     porcentaje_rec: number | null
     usa_dirimencia: boolean
     listo_para_liquidar: boolean
+    liquidacion_id?: number | null
+    numero_liquidacion?: string | null
     // identificación de acopiador y proveedor para agrupar
     provacop_id: number
     proveedor: string

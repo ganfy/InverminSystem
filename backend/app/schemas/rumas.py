@@ -26,6 +26,24 @@ class CampanaCerrarRequest(BaseModel):
     )
 
 
+class RumaLista(BaseModel):
+    """Vista resumida para el listado de rumas."""
+
+    id: int
+    codigo: str
+    numero_ruma: int
+    fecha_creacion: date
+    estado: str
+    total_lotes: int = 0
+    total_tms: float = 0.0
+    ley_ponderada: float | None = None
+    rec_promedio: float | None = None
+    pct_llampo: float | None = None
+    asignada: bool = False  # si tiene campaña asignada o es independiente
+
+    model_config = {"from_attributes": True}
+
+
 class CampanaOut(BaseModel):
     id: int
     codigo: str
@@ -40,6 +58,7 @@ class CampanaOut(BaseModel):
     # calculados
     progreso_pct: float
     dias_transcurridos: int | None
+    rumas: list[RumaLista] = []
 
     model_config = {"from_attributes": True}
 
@@ -82,23 +101,6 @@ class RumaOut(BaseModel):
     ley_ponderada: float | None = None
     rec_promedio: float | None = None
     pct_llampo: float | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class RumaLista(BaseModel):
-    """Vista resumida para el listado de rumas."""
-
-    id: int
-    codigo: str
-    numero_ruma: int
-    fecha_creacion: date
-    estado: str
-    total_lotes: int = 0
-    total_tms: float = 0.0
-    ley_ponderada: float | None = None
-    rec_promedio: float | None = None
-    asignada: bool = False  # si tiene campaña asignada o es independiente
 
     model_config = {"from_attributes": True}
 

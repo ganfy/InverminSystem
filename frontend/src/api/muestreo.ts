@@ -80,6 +80,7 @@ export interface LoteMuestreo {
         h_max: number
     }
     pendiente_sla: boolean
+    humedad_minima?: number | null
 }
 
 export const muestreoApi = {
@@ -88,6 +89,11 @@ export const muestreoApi = {
      */
     async registrarMuestreo(ipLote: string, datos: MuestreoCreate): Promise<MuestreoOut> {
         const response = await api.post<MuestreoOut>(`/muestreo/lotes/${ipLote}`, datos)
+        return response.data
+    },
+
+    async actualizarMuestreo(id: number, datos: Partial<MuestreoCreate>): Promise<MuestreoOut> {
+        const response = await api.patch<MuestreoOut>(`/muestreo/${id}`, datos)
         return response.data
     },
 

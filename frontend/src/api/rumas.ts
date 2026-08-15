@@ -15,6 +15,7 @@ export interface CampanaOut {
     total_rumas: number
     progreso_pct: number
     dias_transcurridos: number | null
+    rumas?: RumaLista[]
 }
 
 export interface RumaLista {
@@ -27,6 +28,7 @@ export interface RumaLista {
     total_tms: number
     ley_ponderada: number | null
     rec_promedio: number | null
+    pct_llampo: number | null
     asignada: boolean
 }
 

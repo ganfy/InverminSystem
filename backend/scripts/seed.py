@@ -29,6 +29,7 @@ ROLES = [
     # Roles de sistema
     {"codigo": "Admin", "nombre": "Administrador"},
     {"codigo": "Gerencia", "nombre": "Gerencia General"},
+    {"codigo": "JefeComercial", "nombre": "Jefe Comercial"},
     {"codigo": "Comercial", "nombre": "Área Comercial"},
     {"codigo": "Laboratorista", "nombre": "Técnico Analista"},
     {"codigo": "OperadorBalanza", "nombre": "Operador de Balanza"},
@@ -57,6 +58,9 @@ OPERACIONES = [
     {"codigo": "UPDATE", "nombre": "Editar"},
     {"codigo": "DELETE", "nombre": "Eliminar"},
     {"codigo": "VIEW", "nombre": "Ver"},
+    # Operaciones especiales (no son CRUD genérico)
+    {"codigo": "VIEW_CONFIDENTIAL", "nombre": "Ver datos confidenciales (IP de lote)"},
+    {"codigo": "EDIT_PARAMS", "nombre": "Editar parámetros sensibles"},
 ]
 
 # Matriz de permisos: (rol, modulo, operacion) → permitido
@@ -130,20 +134,34 @@ PERMISOS = [
     ("Gerencia", "RUMAS", "CREATE", True),
     ("Gerencia", "RUMAS", "UPDATE", True),
     ("Gerencia", "RUMAS", "VIEW", True),
+    ("JefeComercial", "RUMAS", "CREATE", True),
+    ("JefeComercial", "RUMAS", "UPDATE", True),
+    ("JefeComercial", "RUMAS", "VIEW", True),
     ("Comercial", "RUMAS", "CREATE", True),
     ("Comercial", "RUMAS", "UPDATE", True),
     ("Comercial", "RUMAS", "VIEW", True),
     # ── LIQUIDACIONES ─────────────────────────────────────────────────────────
+    # EDIT_PARAMS: Admin/Gerencia/JefeComercial pueden editar parámetros de lote
+    # Comercial tiene UPDATE (emitir, cambiar estado) pero NO EDIT_PARAMS
     ("Admin", "LIQUIDACIONES", "CREATE", True),
     ("Admin", "LIQUIDACIONES", "UPDATE", True),
     ("Admin", "LIQUIDACIONES", "VIEW", True),
+    ("Admin", "LIQUIDACIONES", "EDIT_PARAMS", True),
     ("Gerencia", "LIQUIDACIONES", "CREATE", True),
     ("Gerencia", "LIQUIDACIONES", "UPDATE", True),
     ("Gerencia", "LIQUIDACIONES", "VIEW", True),
+    ("Gerencia", "LIQUIDACIONES", "EDIT_PARAMS", True),
+    ("JefeComercial", "LIQUIDACIONES", "CREATE", True),
+    ("JefeComercial", "LIQUIDACIONES", "UPDATE", True),
+    ("JefeComercial", "LIQUIDACIONES", "VIEW", True),
+    ("JefeComercial", "LIQUIDACIONES", "EDIT_PARAMS", True),
     ("Comercial", "LIQUIDACIONES", "CREATE", True),
     ("Comercial", "LIQUIDACIONES", "UPDATE", True),
     ("Comercial", "LIQUIDACIONES", "VIEW", True),
+    ("Comercial", "LIQUIDACIONES", "EDIT_PARAMS", False),
     # ── CAMPAÑAS ──────────────────────────────────────────────────────────────
+    # Crear/cerrar/editar campaña: solo Admin y Gerencia (_ROLES_GERENCIA)
+    # Ver campaña: Admin, Gerencia, JefeComercial, Comercial, y operativos
     ("Admin", "CAMPANAS", "CREATE", True),
     ("Admin", "CAMPANAS", "UPDATE", True),
     ("Admin", "CAMPANAS", "DELETE", True),
@@ -151,6 +169,7 @@ PERMISOS = [
     ("Gerencia", "CAMPANAS", "CREATE", True),
     ("Gerencia", "CAMPANAS", "UPDATE", True),
     ("Gerencia", "CAMPANAS", "VIEW", True),
+    ("JefeComercial", "CAMPANAS", "VIEW", True),
     ("Comercial", "CAMPANAS", "VIEW", True),
     ("OperadorBalanza", "CAMPANAS", "VIEW", True),
     ("TecnicoMuestreo", "CAMPANAS", "VIEW", True),
@@ -161,6 +180,9 @@ PERMISOS = [
     ("Gerencia", "TERCEROS", "CREATE", True),
     ("Gerencia", "TERCEROS", "UPDATE", True),
     ("Gerencia", "TERCEROS", "VIEW", True),
+    ("JefeComercial", "TERCEROS", "CREATE", True),
+    ("JefeComercial", "TERCEROS", "UPDATE", True),
+    ("JefeComercial", "TERCEROS", "VIEW", True),
     ("Comercial", "TERCEROS", "CREATE", True),
     ("Comercial", "TERCEROS", "UPDATE", True),
     ("Comercial", "TERCEROS", "VIEW", True),
@@ -169,14 +191,42 @@ PERMISOS = [
     ("Admin", "DASHBOARD", "UPDATE", True),
     ("Gerencia", "DASHBOARD", "VIEW", True),
     ("Gerencia", "DASHBOARD", "UPDATE", True),
+    ("JefeComercial", "DASHBOARD", "VIEW", True),
+    ("JefeComercial", "DASHBOARD", "UPDATE", True),
     ("Comercial", "DASHBOARD", "VIEW", True),
     ("Comercial", "DASHBOARD", "UPDATE", True),
     # ── ADMINISTRACIÓN ────────────────────────────────────────────────────────
+    # UPDATE/DELETE → solo Admin; VIEW → Admin + Gerencia
     ("Admin", "ADMINISTRACION", "CREATE", True),
     ("Admin", "ADMINISTRACION", "UPDATE", True),
     ("Admin", "ADMINISTRACION", "DELETE", True),
     ("Admin", "ADMINISTRACION", "VIEW", True),
     ("Gerencia", "ADMINISTRACION", "VIEW", True),
+    # ── LABORATORIO — VIEW_CONFIDENTIAL (ver IP del lote, muestreo ciego) ─────
+    # Laboratorista: nunca ve el IP (confidencialidad RF-LAB-001)
+    ("Admin", "LABORATORIO", "VIEW_CONFIDENTIAL", True),
+    ("Gerencia", "LABORATORIO", "VIEW_CONFIDENTIAL", True),
+    ("JefeComercial", "LABORATORIO", "VIEW_CONFIDENTIAL", True),
+    ("Comercial", "LABORATORIO", "VIEW_CONFIDENTIAL", True),
+    ("Laboratorista", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
+    ("TecnicoMuestreo", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
+    ("OperadorBalanza", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
+    ("Metalurgista", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
+    # ── BALANZA — EDIT_PARAMS (editar lote completo, no solo pesaje) ──────────
+    # OperadorBalanza puede crear pesajes (UPDATE) pero no editar el lote entero
+    ("Admin", "BALANZA", "EDIT_PARAMS", True),
+    ("Gerencia", "BALANZA", "EDIT_PARAMS", False),
+    ("JefeComercial", "BALANZA", "EDIT_PARAMS", False),
+    ("Comercial", "BALANZA", "EDIT_PARAMS", False),
+    ("OperadorBalanza", "BALANZA", "EDIT_PARAMS", False),
+    ("TecnicoMuestreo", "BALANZA", "EDIT_PARAMS", False),
+    ("Laboratorista", "BALANZA", "EDIT_PARAMS", False),
+    ("Metalurgista", "BALANZA", "EDIT_PARAMS", False),
+    # ── MUESTREO — JefeComercial puede asignar laboratorio a CIP ─────────────
+    ("JefeComercial", "MUESTREO", "VIEW", True),
+    ("JefeComercial", "MUESTREO", "UPDATE", True),
+    # ── PRUEBAS MET — JefeComercial puede ver ────────────────────────────────
+    ("JefeComercial", "PRUEBAS_MET", "VIEW", True),
 ]
 
 CONFIGURACIONES = [
