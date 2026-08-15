@@ -44,7 +44,7 @@
         </div>
 
         <button 
-          v-if="intentoActual + pesosSecos.length <= maxIntentos" 
+          v-if="Number(intentoActual) + pesosSecos.length <= maxIntentos" 
           class="btn-secondary btn-sm add-btn" 
           @click="addEnsayo"
         >
@@ -151,7 +151,9 @@ const ensayosValidos = computed(() => {
   return pesosSecos.value.filter(s => s !== null && s > 0 && pesoHumedo.value !== null && s < pesoHumedo.value) as number[]
 })
 
-const loteActual = computed(() => store.lotes.find(l => l.ip === ipLote))
+const loteActual = computed(() => {
+  return store.lotesPendientes.find(l => l.ip === ipLote) || store.lotesCompletados.find(l => l.ip === ipLote)
+})
 const humedadMinimaParametro = computed(() => loteActual.value?.humedad_minima ?? null)
 
 const humedadCalculadaRaw = computed(() => {
@@ -191,7 +193,7 @@ onMounted(async () => {
 
 const addEnsayo = (e?: Event) => {
   if (e) e.preventDefault();
-  if (intentoActual.value + pesosSecos.value.length <= maxIntentos) {
+  if (Number(intentoActual.value) + pesosSecos.value.length <= maxIntentos) {
     pesosSecos.value.push(null)
   }
 }

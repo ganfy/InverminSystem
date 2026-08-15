@@ -42,16 +42,16 @@
                   
                   <template v-if="editandoId === item.id">
                     <td>
-                      <input type="number" v-model.number="formEdit.peso_humedo" class="input input-sm" step="0.01" />
+                      <input type="number" v-model.number="formEdit.peso_humedo" class="pinput" step="1" style="width: 70px; padding: 0.2rem;" />
                     </td>
                     <td>
-                      <input type="number" v-model.number="formEdit.peso_seco" class="input input-sm" step="0.01" />
+                      <input type="number" v-model.number="formEdit.peso_seco" class="pinput" step="1" style="width: 70px; padding: 0.2rem;" />
                     </td>
                     <td class="td-mono highlight-gold">
                       --
                     </td>
                     <td>
-                      <input type="text" v-model="formEdit.observaciones" class="input input-sm" />
+                      <input type="text" v-model="formEdit.observaciones" class="pinput" style="width: 120px; padding: 0.2rem;" />
                     </td>
                     <td>
                       <div class="acciones-edit">
@@ -66,8 +66,8 @@
                   </template>
 
                   <template v-else>
-                    <td class="td-mono">{{ item.peso_humedo }}g</td>
-                    <td class="td-mono">{{ item.peso_seco }}g</td>
+                    <td class="td-mono">{{ Math.round(item.peso_humedo) }}g</td>
+                    <td class="td-mono">{{ Math.round(item.peso_seco) }}g</td>
                     <td class="td-mono highlight-gold">
                       {{ item.porcentaje_humedad }}%
                     </td>

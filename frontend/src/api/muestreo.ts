@@ -80,6 +80,7 @@ export interface LoteMuestreo {
         h_max: number
     }
     pendiente_sla: boolean
+    humedad_minima?: number | null
 }
 
 export const muestreoApi = {
