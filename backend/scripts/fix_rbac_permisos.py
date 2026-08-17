@@ -167,9 +167,11 @@ def run(db):
     # OperadorBalanza tiene UPDATE=True para crear pesajes, pero no para editar lote.
     print("\n  Insertando permisos EDIT_PARAMS en BALANZA (editar lote completo)...")
     upsert_permiso("Admin", "BALANZA", "EDIT_PARAMS", True)
+    upsert_permiso("Comercial", "BALANZA", "EDIT_PARAMS", True)
+    upsert_permiso("Comercial", "BALANZA", "UPDATE", True)
+    upsert_permiso("Comercial", "MUESTREO", "UPDATE", True)
     for rol_codigo in (
         "Gerencia",
-        "Comercial",
         "JefeComercial",
         "OperadorBalanza",
         "TecnicoMuestreo",

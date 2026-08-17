@@ -243,7 +243,7 @@
           v-for="lote in sesion?.lotes.filter(l => !l.eliminado)"
           :key="lote.ip"
           :lote="lote"
-          :is-admin="authStore.user?.rol === 'Admin'"
+          :is-admin="authStore.puede('BALANZA', 'EDIT_PARAMS')"
           :is-online="online"
           :modo-otro="lote.tipo_material === 'Otro'"
           @editar="abrirEditarLote"
