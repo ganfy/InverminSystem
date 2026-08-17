@@ -99,7 +99,7 @@ PERMISOS = [
     ("Admin", "MUESTREO", "VIEW", True),
     ("Gerencia", "MUESTREO", "VIEW", True),
     ("Comercial", "MUESTREO", "VIEW", True),
-    ("OperadorBalanza", "MUESTREO", "VIEW", True),
+    ("OperadorBalanza", "MUESTREO", "VIEW", False),
     ("TecnicoMuestreo", "MUESTREO", "CREATE", True),
     ("TecnicoMuestreo", "MUESTREO", "UPDATE", True),
     ("TecnicoMuestreo", "MUESTREO", "VIEW", True),
@@ -137,9 +137,9 @@ PERMISOS = [
     ("JefeComercial", "RUMAS", "CREATE", True),
     ("JefeComercial", "RUMAS", "UPDATE", True),
     ("JefeComercial", "RUMAS", "VIEW", True),
-    ("Comercial", "RUMAS", "CREATE", True),
-    ("Comercial", "RUMAS", "UPDATE", True),
-    ("Comercial", "RUMAS", "VIEW", True),
+    ("Comercial", "RUMAS", "CREATE", False),
+    ("Comercial", "RUMAS", "UPDATE", False),
+    ("Comercial", "RUMAS", "VIEW", False),
     # ── LIQUIDACIONES ─────────────────────────────────────────────────────────
     # EDIT_PARAMS: Admin/Gerencia/JefeComercial pueden editar parámetros de lote
     # Comercial tiene UPDATE (emitir, cambiar estado) pero NO EDIT_PARAMS
@@ -183,9 +183,9 @@ PERMISOS = [
     ("JefeComercial", "TERCEROS", "CREATE", True),
     ("JefeComercial", "TERCEROS", "UPDATE", True),
     ("JefeComercial", "TERCEROS", "VIEW", True),
-    ("Comercial", "TERCEROS", "CREATE", True),
-    ("Comercial", "TERCEROS", "UPDATE", True),
-    ("Comercial", "TERCEROS", "VIEW", True),
+    ("Comercial", "TERCEROS", "CREATE", False),
+    ("Comercial", "TERCEROS", "UPDATE", False),
+    ("Comercial", "TERCEROS", "VIEW", False),
     # ── DASHBOARD ─────────────────────────────────────────────────────────────
     ("Admin", "DASHBOARD", "VIEW", True),
     ("Admin", "DASHBOARD", "UPDATE", True),

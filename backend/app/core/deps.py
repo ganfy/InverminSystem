@@ -198,6 +198,58 @@ def check_permiso(modulo: str, operacion: str):
     return _check
 
 
+def check_any_permiso(permisos: list[tuple[str, str]]):
+    """
+    Dependency factory que verifica si el usuario tiene AL MENOS UNO
+    de los permisos indicados en la lista (modulo, operacion).
+    """
+
+    def _check(
+        current_user=Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ):
+        from app.models.enums import RolSistema
+        from app.models.models import Modulo, Operacion, Permiso
+        from sqlalchemy import and_, or_
+
+        rol_codigo = current_user.rol.codigo if current_user.rol else None
+
+        if rol_codigo == RolSistema.ADMIN:
+            return current_user
+
+        condiciones = []
+        for modulo, operacion in permisos:
+            condiciones.append(and_(Modulo.codigo == modulo, Operacion.codigo == operacion))
+
+        tiene_permiso = (
+            db.query(Permiso)
+            .join(Modulo, Permiso.modulo_id == Modulo.id)
+            .join(Operacion, Permiso.operacion_id == Operacion.id)
+            .filter(
+                Permiso.rol_id == current_user.rol_id,
+                Permiso.permitido,
+                or_(*condiciones),
+            )
+            .first()
+        )
+
+        if not tiene_permiso:
+            logger.warning(
+                "ACCESO_DENEGADO usuario=%s rol=%s permisos_requeridos=%s",
+                current_user.username,
+                rol_codigo,
+                permisos,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tiene permisos para realizar esta acción",
+            )
+
+        return current_user
+
+    return _check
+
+
 def tiene_permiso(user, modulo: str, operacion: str, db: Session) -> bool:
     """
     Verifica si el usuario tiene el permiso indicado sin lanzar excepción.

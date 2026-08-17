@@ -4,7 +4,7 @@ Endpoints orientados a la pantalla de gestión de terceros.
 """
 
 from app.core.database import get_db
-from app.core.deps import check_permiso
+from app.core.deps import check_any_permiso, check_permiso
 from app.schemas.entidades import (
     AcopiadorDropdown,
     CambiarAcopiadorPayload,
@@ -107,7 +107,7 @@ def buscar_por_ruc(
 @router.get("/provacop", response_model=list[ProvacopDropdown])
 def listar_provacops(
     con_lotes: bool = Query(False, description="Solo provacops con lotes listos para liquidar"),
-    current_user=Depends(check_permiso("TERCEROS", "VIEW")),
+    current_user=Depends(check_any_permiso([("TERCEROS", "VIEW"), ("LIQUIDACIONES", "VIEW")])),
     db: Session = Depends(get_db),
 ):
     """Lista relaciones proveedor-acopiador para el dropdown de nueva liquidación."""
