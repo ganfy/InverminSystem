@@ -86,18 +86,19 @@ def _ley_minero(db: Session, lote_id: int) -> Decimal | None:
     return Decimal(str(a.ley_final)).quantize(q_lab, rounding=constantes.redondeo_ley_laboratorio)
 
 
-def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
+def _ley_solo_planta(
+    db: Session, lote_id: int, excluidos: list[int] | None = None
+) -> Decimal | None:
     """Solo análisis tipo 'planta' (lab propio). Para display."""
-    analisis = (
-        db.query(AnalisisLey)
-        .filter(
-            AnalisisLey.lote_id == lote_id,
-            AnalisisLey.vigente == True,  # noqa: E712
-            AnalisisLey.tipo_analisis == TipoAnalisis.PLANTA,
-            AnalisisLey.material == "Au",
-        )
-        .all()
+    query = db.query(AnalisisLey).filter(
+        AnalisisLey.lote_id == lote_id,
+        AnalisisLey.vigente == True,  # noqa: E712
+        AnalisisLey.tipo_analisis == TipoAnalisis.PLANTA,
+        AnalisisLey.material == "Au",
     )
+    if excluidos:
+        query = query.filter(AnalisisLey.id.notin_(excluidos))
+    analisis = query.all()
     if not analisis:
         return None
     from app.services.config_calculo import get_constantes, get_quantize_decimal
@@ -117,18 +118,19 @@ def _ley_solo_planta(db: Session, lote_id: int) -> Decimal | None:
     return (total / len(leyes)).quantize(q_lab, rounding=constantes.redondeo_ley_planta)
 
 
-def _ley_solo_externo(db: Session, lote_id: int) -> Decimal | None:
+def _ley_solo_externo(
+    db: Session, lote_id: int, excluidos: list[int] | None = None
+) -> Decimal | None:
     """Solo análisis tipo 'externo'. Para display."""
-    analisis = (
-        db.query(AnalisisLey)
-        .filter(
-            AnalisisLey.lote_id == lote_id,
-            AnalisisLey.vigente == True,  # noqa: E712
-            AnalisisLey.tipo_analisis == TipoAnalisis.EXTERNO,
-            AnalisisLey.material == "Au",
-        )
-        .all()
+    query = db.query(AnalisisLey).filter(
+        AnalisisLey.lote_id == lote_id,
+        AnalisisLey.vigente == True,  # noqa: E712
+        AnalisisLey.tipo_analisis == TipoAnalisis.EXTERNO,
+        AnalisisLey.material == "Au",
     )
+    if excluidos:
+        query = query.filter(AnalisisLey.id.notin_(excluidos))
+    analisis = query.all()
     if not analisis:
         return None
     from app.services.config_calculo import get_constantes, get_quantize_decimal

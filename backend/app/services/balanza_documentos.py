@@ -408,6 +408,59 @@ def _extraer_de_ticket_invermin(texto: str) -> dict:
     return r
 
 
+def _extraer_razon_social_cabecera(texto: str) -> str | None:
+    """
+    Busca la razón social en las primeras líneas del documento (cabecera).
+    Soporta razones sociales de múltiples líneas y elimina el RUC si se pegó.
+    """
+    lineas = texto.splitlines()
+    lineas_cabecera = []
+
+    for linea in lineas[:15]:
+        linea = linea.strip()
+        if not linea or len(linea) < 3:
+            continue
+
+        l_upper = linea.upper()
+        if "INVERMIN" in l_upper or "ESTA ES UNA" in l_upper:
+            continue
+
+        # Si llegamos al RUC, cortamos
+        if re.search(r"\bRUC\b", l_upper):
+            # Agregar lo que esté antes del RUC en la misma línea
+            parte_antes = re.split(r"(?i)\bRUC\b", linea)[0].strip()
+            if parte_antes and not re.search(
+                r"(?i)(fecha|motivo|punto|direcci|llegada|partida)", parte_antes
+            ):
+                lineas_cabecera.append(parte_antes)
+            break
+
+        # Ignorar líneas que parecen metadata o direcciones
+        if re.search(
+            r"(?i)^(fecha|motivo|punto|direcci|llegada|partida|referencia|nro\.|otr\.|mza\.|lote\.|av\.|jr\.|calle\.|carretera|kilometro)",
+            l_upper,
+        ):
+            continue
+
+        # Ignorar líneas que son solo provincias/departamentos
+        if re.search(
+            r"(?i)(parinacochas|ayacucho|caraveli|arequipa|lima|ica|nazca|nasca|palpa|pisco|chincha)",
+            l_upper,
+        ) and not re.search(
+            r"\b(E\.I\.R\.L|S\.A\.C|S\.A\.|EMPRESA|MINERA|TRANSPORT|CONSORCIO|COMERCIAL|SOCIEDAD|IMPORTACION)\b",
+            l_upper,
+        ):
+            continue
+
+        lineas_cabecera.append(linea)
+
+    rs = " ".join(lineas_cabecera).strip()
+    rs = re.sub(r"\s+", " ", rs)
+    if len(rs) > 4:
+        return rs
+    return None
+
+
 def _extraer_de_grr(texto: str) -> dict:
     """
     Extrae de la GRR Electrónica SUNAT (imagen escaneada o impresa).
@@ -431,30 +484,11 @@ def _extraer_de_grr(texto: str) -> dict:
     if m:
         r["guia_remision"] = _normalizar_guia(m.group(1), m.group(2))
 
-    # ── Razón social del REMITENTE (proveedor de la carga) ────────────────────
-    # Estrategia 0: cabecera del documento — primera línea en mayúsculas que
-    # no sea INVERMIN ni el título de la guía. La GRR de SAYMED pone el nombre
-    # del emisor (proveedor) como encabezado principal antes de las secciones.
+    # Estrategia 0: cabecera del documento — usando extracción robusta de múltiples líneas
     if not r.get("razon_social"):
-        ruc_invermin = "20601910587"
-        for linea in texto.splitlines():
-            linea = linea.strip()
-            if not linea or len(linea) < 5:
-                continue
-            l_upper = linea.upper()
-            # Ignorar líneas basura o de INVERMIN
-            if "INVERMIN" in l_upper or "ESTA ES UNA" in l_upper:
-                continue
-            # Debe parecer una razón social: mayúsculas, al menos 2 palabras,
-            # contiene E.I.R.L., S.A.C., S.A., E.I.R.L, EMPRESA, MINERA, etc.
-            if re.search(
-                r"\b(E\.I\.R\.L|S\.A\.C|S\.A\.|EMPRESA|MINERA|TRANSPORT|CONSORCIO|COMERCIAL|SOCIEDAD)\b",
-                l_upper,
-            ):
-                rs = re.sub(r"\s+", " ", linea).strip()
-                if len(rs) > 4:
-                    r["razon_social"] = rs
-                    break
+        rs_cabecera = _extraer_razon_social_cabecera(texto)
+        if rs_cabecera:
+            r["razon_social"] = rs_cabecera
     # Estrategia 1: línea inmediatamente después de "Datos del Remitente"
     m = re.search(
         r"[Dd]atos del [Rr]emitente[^\n]*\n+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\,\-]{4,}?)\n",
@@ -669,20 +703,9 @@ def _extraer_de_grt(texto: str) -> dict:
 
     # ── Transportista (razón social del emisor de la GRT) ─────────────────────
     # GRT electrónica: primera línea significativa = "TRANSPORT RICHY S.A.C."
-    for linea in texto.splitlines():
-        linea = linea.strip()
-        if not linea or len(linea) < 5:
-            continue
-        l_upper = linea.upper()
-        if "INVERMIN" in l_upper or "ESTA ES UNA" in l_upper:
-            continue
-        if re.search(
-            r"\b(E\.I\.R\.L|S\.A\.C|S\.A\.|EMPRESA|MINERA|TRANSPORT|CONSORCIO|COMERCIAL)\b", l_upper
-        ):
-            rs = re.sub(r"\s+", " ", linea).strip()
-            if len(rs) > 4:
-                r["razon_social_transportista"] = rs
-                break
+    rs_cabecera = _extraer_razon_social_cabecera(texto)
+    if rs_cabecera:
+        r["razon_social_transportista"] = rs_cabecera
 
     # ── Peso bruto (referencia) ───────────────────────────────────────────────
     m = re.search(r"Peso Bruto total de la carga[:\s]+([\d]+(?:[.,]\d+)?)", texto, re.IGNORECASE)

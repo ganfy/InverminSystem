@@ -220,8 +220,9 @@ export const laboratorioApi = {
         return data
     },
 
-    async getLeyComercial(ip: string): Promise<LeyComercialCalc> {
-        const { data } = await api.get(`/laboratorio/lotes/${ip}/ley-comercial`)
+    async getLeyComercial(ip: string, excluidos?: string): Promise<LeyComercialCalc> {
+        const params = excluidos ? { excluidos } : undefined
+        const { data } = await api.get(`/laboratorio/lotes/${ip}/ley-comercial`, { params })
         return data
     },
 

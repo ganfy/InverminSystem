@@ -108,6 +108,7 @@
               <thead>
                 <tr>
                   <th>LOTE</th>
+                  <th>PROVEEDOR</th>
                   <th>RECEPCIÓN</th>
                   <th>TMH</th>
                   <th>%H₂O</th>
@@ -139,6 +140,7 @@
                     <span class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</span>
                     <span v-if="lote.usa_dirimencia" class="badge-dirimencia" title="Usó dirimencia">D</span>
                   </td>
+                  <td class="td-muted">{{ lote.proveedor || store.detalle?.proveedor_razon_social || '—' }}</td>
                   <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
                   <td class="td-mono td-right">{{ fmtNum(lote.tmh, 3) }}</td>
                   <td class="td-mono td-right">{{ fmtNum(lote.pct_humedad, 2) }}%</td>

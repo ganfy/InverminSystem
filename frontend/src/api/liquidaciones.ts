@@ -43,6 +43,7 @@ export interface AlertaLote {
 
 export interface LoteFinancieroOut {
     ip: string
+    proveedor?: string | null
     fecha_recepcion: string | null
     tmh: number
     pct_humedad: number
