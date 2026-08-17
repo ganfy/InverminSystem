@@ -407,6 +407,7 @@ async def extraer_certificado_recuperacion(
 @router.get("/lotes/{ip}/ley-comercial")
 def preview_ley_comercial(
     ip: str,
+    excluidos: str | None = Query(None, description="IDs excluidos separados por comas"),
     current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
@@ -426,7 +427,9 @@ def preview_ley_comercial(
     if not lote:
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
-    ley_base = calcular_ley_planta(db, lote.id)
+    excluidos_list = [int(e) for e in excluidos.split(",")] if excluidos else None
+
+    ley_base = calcular_ley_planta(db, lote.id, excluidos=excluidos_list)
     if ley_base is None:
         # Fallback: si no hay análisis planta/externo vigentes, usar dirimencia (flujo legacy)
         ley_base = svc._ley_dirimencia(db, lote.id)
@@ -456,8 +459,8 @@ def preview_ley_comercial(
         rounding=constantes.redondeo_ley_comercial,
     )
 
-    ley_solo_planta = svc._ley_solo_planta(db, lote.id)
-    ley_externo = svc._ley_solo_externo(db, lote.id)
+    ley_solo_planta = svc._ley_solo_planta(db, lote.id, excluidos=excluidos_list)
+    ley_externo = svc._ley_solo_externo(db, lote.id, excluidos=excluidos_list)
     ley_minero = svc._ley_minero(db, lote.id)
     ley_dirimencia = svc._ley_dirimencia(db, lote.id)
 

@@ -53,6 +53,9 @@ class AlertaLote(BaseModel):
 
 class LoteDisponible(BaseModel):
     ip: str
+    proveedor: str | None = None
+    acopiador: str | None = None
+    provacop_id: int | None = None
     tipo_material: str | None
     fecha_recepcion: date | None
     dias_almacen: int
@@ -73,6 +76,7 @@ class LoteDisponible(BaseModel):
 
 class LoteFinancieroOut(BaseModel):
     ip: str
+    proveedor: str | None = None
     fecha_recepcion: date | None
     tmh: Decimal
     pct_humedad: Decimal

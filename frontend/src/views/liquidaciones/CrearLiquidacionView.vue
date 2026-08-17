@@ -97,6 +97,7 @@
                 <tr>
                   <th><input type="checkbox" :checked="todosSeleccionados" @change="toggleTodos" class="check" /></th>
                   <th>IP</th>
+                  <th>PROVEEDOR</th>
                   <th>MATERIAL</th>
                   <th>RECEPCIÓN</th>
                   <th class="col-r">TMS</th>
@@ -121,6 +122,7 @@
                     <input type="checkbox" :checked="lotesSeleccionados.includes(lote.ip)" @change="toggleLote(lote.ip)" class="check" />
                   </td>
                   <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                  <td class="td-muted">{{ lote.proveedor || '—' }}</td>
                   <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
                   <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
                   <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
@@ -226,6 +228,7 @@
             <thead>
               <tr>
                 <th>LOTE</th>
+                <th>PROVEEDOR</th>
                 <th>RECEPCIÓN</th>
                 <th>TMH</th>
                 <th>%H₂O</th>
@@ -257,6 +260,7 @@
                   {{ lote.ip }}
                   <span v-if="lote.usa_dirimencia" class="badge-dirimencia" title="Usó dirimencia">D</span>
                 </td>
+                <td class="td-muted">{{ lote.proveedor || store.preview?.proveedor_razon_social || '—' }}</td>
                 <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
                 <td class="td-mono td-right">{{ fmtNum(lote.tmh, 3) }}</td>
                 <td class="td-mono td-right">{{ fmtNum(lote.pct_humedad, 2) }}%</td>
@@ -277,7 +281,7 @@
               </tr>
               <!-- Fila Desplegable de Profit -->
               <tr v-if="expandedLots.includes(lote.ip)" class="fila-profit">
-                <td :colspan="hayAg ? 17 : 14" style="padding: 0;">
+                <td :colspan="hayAg ? 18 : 15" style="padding: 0;">
                   <div class="profit-container">
                     <div class="profit-header">DESGLOSE DE PROFIT</div>
                     <div class="profit-grid">
@@ -340,7 +344,7 @@
               </template>
               <!-- Fila total -->
               <tr class="fila-total">
-                <td colspan="4" style="text-align:right">TOTALES</td>
+                <td colspan="5" style="text-align:right">TOTALES</td>
                 <td class="td-mono td-right">{{ fmtNum(store.preview.total_tms, 3) }}</td>
                 <td colspan="8" />
                 <!-- celdas vacías para columnas Ag -->

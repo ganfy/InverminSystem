@@ -229,6 +229,7 @@
                 <thead>
                   <tr>
                     <th>IP</th>
+                    <th>PROVEEDOR</th>
                     <th>MATERIAL</th>
                     <th>RECEPCIÓN</th>
                     <th class="col-r">TMS</th>
@@ -248,6 +249,7 @@
                     :class="{ 'fila-volado': lote.volado, 'fila-vencimiento': lote.alerta_vencimiento && !lote.volado }"
                   >
                     <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                    <td class="td-muted">{{ lote.proveedor || grupo.proveedor || '—' }}</td>
                     <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
                     <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
                     <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>

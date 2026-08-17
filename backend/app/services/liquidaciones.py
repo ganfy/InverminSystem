@@ -598,6 +598,14 @@ def _calcular_lote(
 
     snapshot = {
         "ip": lote.ip,
+        "proveedor": (
+            lote.sesion.provacop.proveedor.razon_social
+            if lote.sesion
+            and lote.sesion.provacop
+            and lote.sesion.provacop.proveedor
+            and lote.sesion.provacop.proveedor.razon_social
+            else (lote.sesion.razon_social if lote.sesion and lote.sesion.razon_social else "—")
+        ),
         "fecha_recepcion": fecha_rec,
         "tmh": tmh,
         "pct_humedad": humedad,
@@ -1005,9 +1013,21 @@ def _to_resumen(liq: Liquidacion) -> LiquidacionResumenOut:
 
 
 def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
+    prov_nombre = "—"
+    if ll.lote and ll.lote.sesion:
+        if (
+            ll.lote.sesion.provacop
+            and ll.lote.sesion.provacop.proveedor
+            and ll.lote.sesion.provacop.proveedor.razon_social
+        ):
+            prov_nombre = ll.lote.sesion.provacop.proveedor.razon_social
+        elif ll.lote.sesion.razon_social:
+            prov_nombre = ll.lote.sesion.razon_social
+
     return LiquidacionLoteOut(
         liquidacion_id=ll.liquidacion_id,
         ip=ll.lote.ip if ll.lote else "",
+        proveedor=prov_nombre,
         fecha_recepcion=ll.fecha_recepcion_lote,
         fecha_emision=ll.fecha_emision,
         tmh=ll.tmh_snapshot or Decimal("0"),
@@ -1077,7 +1097,16 @@ def lotes_disponibles_para_liquidar(
 ) -> list[dict]:
     lotes = (
         db.query(Lote)
-        .options(joinedload(Lote.pesajes), joinedload(Lote.muestreos))
+        .options(
+            joinedload(Lote.pesajes),
+            joinedload(Lote.muestreos),
+            joinedload(Lote.sesion)
+            .joinedload(SesionDescarga.provacop)
+            .joinedload(ProveedorAcopiador.proveedor),
+            joinedload(Lote.sesion)
+            .joinedload(SesionDescarga.provacop)
+            .joinedload(ProveedorAcopiador.acopiador),
+        )
         .join(Lote.sesion)
         .filter(
             Lote.sesion.has(provacop_id=provacop_id),
@@ -1197,9 +1226,18 @@ def lotes_disponibles_para_liquidar(
                 "liquidacion_id": liquidacion_id,
                 "numero_liquidacion": numero_liquidacion,
                 "provacop_id": provacop_id,  # ya viene como parámetro de la función
-                "proveedor": _nombre_entidad(lote.sesion.provacop.proveedor)
-                if lote.sesion and lote.sesion.provacop
-                else "—",
+                "proveedor": (
+                    lote.sesion.provacop.proveedor.razon_social
+                    if lote.sesion
+                    and lote.sesion.provacop
+                    and lote.sesion.provacop.proveedor
+                    and lote.sesion.provacop.proveedor.razon_social
+                    else (
+                        lote.sesion.razon_social
+                        if lote.sesion and lote.sesion.razon_social
+                        else "—"
+                    )
+                ),
                 "acopiador": _nombre_entidad(lote.sesion.provacop.acopiador)
                 if lote.sesion and lote.sesion.provacop
                 else "—",

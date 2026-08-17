@@ -238,11 +238,7 @@
                   <span v-if="excluidos.size > 0" class="badge-simulando" style="margin-left:0.4rem;font-size:0.6rem">SIM</span>
                 </span>
                 <span class="lc-valor mono" :class="{ gold: excluidos.size === 0 }">
-                  {{ fmtOz(leyPlantaSoloSimulada) }} oz/TC
-                  <span v-if="excluidos.size > 0 && leyComercialCalc?.ley_planta_solo != null"
-                    style="font-size:0.7rem;color:var(--color-text-faint);margin-left:0.35rem">
-                    (antes: {{ fmtOz(leyComercialCalc.ley_planta_solo) }})
-                  </span>
+                  {{ fmtOz(leyComercialCalc.ley_planta_solo) }} oz/TC
                 </span>
               </div>
 
@@ -323,8 +319,13 @@
           </div>
 
           <div v-else-if="!leyComercialCalc && !cargandoLeyComercial" class="info-box warning" style="margin-top:0.75rem">
-            <AlertTriangle /> No se pudo calcular la ley comercial.
-            <button class="btn-secondary" style="margin-left:0.5rem;font-size:0.75rem" @click="recargarLeyComercial">Reintentar</button>
+            <template v-if="excluidos.size > 0 && leyPlantaSimulada === null">
+              <AlertTriangle :size="16" /> Sin análisis vigentes restantes. La simulación no puede continuar.
+            </template>
+            <template v-else>
+              <AlertTriangle /> No se pudo calcular la ley comercial.
+              <button class="btn-secondary" style="margin-left:0.5rem;font-size:0.75rem" @click="recargarLeyComercial">Reintentar</button>
+            </template>
           </div>
         </section>
 
@@ -1037,21 +1038,10 @@ function toggleExcluido(id: number) {
   const s = new Set(excluidos.value)
   s.has(id) ? s.delete(id) : s.add(id)
   excluidos.value = s
+  recargarLeyComercial()
 }
 
-// Simula ley_planta_solo (solo tipo 'planta') para display con exclusiones
-const leyPlantaSoloSimulada = computed<number | null>(() => {
-  if (!lote.value) return null
-  if (excluidos.value.size === 0)
-    return leyComercialCalc.value?.ley_planta_solo ?? null
-  const vigentes = lote.value.analisis_ley.filter(
-    a => a.vigente && !a.eliminado && !excluidos.value.has(a.id)
-      && a.tipo_analisis === 'planta' && a.material !== 'Ag',
-  )
-  if (vigentes.length === 0) return null
-  const prom = vigentes.reduce((acc, a) => acc + Number(Number(a.ley_final).toFixed(3)), 0) / vigentes.length
-  return parseFloat(prom.toFixed(4))
-})
+
 
 // ¿Tiene algún análisis Au vigente (cualquier tipo)? Controla visibilidad del card
 const tieneAnalisisLeyVigente = computed(() => {
@@ -1245,19 +1235,34 @@ watch(lote, async (l: LoteLabOut | null) => {
   if (l != null && tieneAnalisisLeyVigente.value && !leyComercialCalc.value) {
     cargandoLeyComercial.value = true
     try {
-      leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
-    } catch { } finally {
+      const excParam = excluidos.value.size > 0 ? Array.from(excluidos.value).join(',') : undefined
+      leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual, excParam)
+    } catch {
+      leyComercialCalc.value = null
+    } finally {
       cargandoLeyComercial.value = false
     }
   }
 }, { immediate: true })
 
 async function recargarLeyComercial() {
-  if (!tieneAnalisisLeyVigente.value) return
+  if (!tieneAnalisisLeyVigente.value) {
+    leyComercialCalc.value = null
+    return
+  }
+
+  if (excluidos.value.size > 0 && leyPlantaSimulada.value === null) {
+    leyComercialCalc.value = null
+    return
+  }
+
   cargandoLeyComercial.value = true
   try {
-    leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual)
-  } catch { } finally {
+    const excParam = excluidos.value.size > 0 ? Array.from(excluidos.value).join(',') : undefined
+    leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual, excParam)
+  } catch {
+    leyComercialCalc.value = null
+  } finally {
     cargandoLeyComercial.value = false
   }
 }

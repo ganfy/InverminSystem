@@ -95,22 +95,23 @@ def _get_sub_tipos_enviados(db: Session, cip: str | None) -> list[str]:
     return list(set(enviados))
 
 
-def calcular_ley_planta(db: Session, lote_id: int) -> Decimal | None:
+def calcular_ley_planta(
+    db: Session, lote_id: int, excluidos: list[int] | None = None
+) -> Decimal | None:
     """
     Calcula ley planta = promedio de análisis de ley VIGENTES del lote.
     Excluye tipo 'minero'.
     Función compartida usada por pruebas y laboratorio.
     """
-    analisis = (
-        db.query(AnalisisLey)
-        .filter(
-            AnalisisLey.lote_id == lote_id,
-            AnalisisLey.vigente == True,  # noqa: E712
-            AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
-            AnalisisLey.material == "Au",
-        )
-        .all()
+    query = db.query(AnalisisLey).filter(
+        AnalisisLey.lote_id == lote_id,
+        AnalisisLey.vigente == True,  # noqa: E712
+        AnalisisLey.tipo_analisis.in_(["planta", "externo"]),
+        AnalisisLey.material == "Au",
     )
+    if excluidos:
+        query = query.filter(AnalisisLey.id.notin_(excluidos))
+    analisis = query.all()
     if not analisis:
         return None
 
