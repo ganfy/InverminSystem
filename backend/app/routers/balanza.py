@@ -50,7 +50,7 @@ router = APIRouter(prefix="/balanza", tags=["Balanza"])
 @router.get("/provacop", response_model=list[ProvAcopDropdown])
 def listar_provacop(
     busqueda: str | None = Query(None, description="Filtrar por razón social proveedor"),
-    current_user=Depends(check_permiso("BALANZA", "CREATE")),
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """
@@ -255,7 +255,7 @@ def editar_lote(
     sesion_id: int,
     lote_id: int,
     datos: LoteEditar,
-    current_user=Depends(check_permiso("BALANZA", "ADMIN")),  # solo Admin
+    current_user=Depends(check_permiso("BALANZA", "EDIT_PARAMS")),
     db: Session = Depends(get_db),
 ):
     """
@@ -319,7 +319,7 @@ async def subir_documento(
 )
 def listar_documentos(
     sesion_id: int,
-    current_user=Depends(check_permiso("BALANZA", "READ")),
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """Lista todos los documentos adjuntos a una sesión."""
@@ -330,7 +330,7 @@ def listar_documentos(
 def descargar_documento(
     sesion_id: int,
     doc_id: int,
-    current_user=Depends(check_permiso("BALANZA", "READ")),
+    current_user=Depends(check_permiso("BALANZA", "VIEW")),
     db: Session = Depends(get_db),
 ):
     """Descarga el archivo de un documento adjunto."""

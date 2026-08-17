@@ -9,8 +9,6 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from app.core.database import get_db
-from app.core.deps import check_permiso
 from app.models.enums import EstadoLote, EstadoSesion
 from app.models.models import (
     Entidad,
@@ -31,7 +29,6 @@ from app.schemas.balanza import (
     SesionEditar,
     SesionLista,
 )
-from fastapi import Depends
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
@@ -518,11 +515,11 @@ def editar_sesion(
 
 
 def editar_lote(
+    db: Session,
     sesion_id: int,
     lote_id: int,
     datos: LoteEditar,
-    current_user=Depends(check_permiso("BALANZA", "EDIT_PARAMS")),
-    db: Session = Depends(get_db),
+    usuario_id: int,
 ) -> LoteDetalle:
     """
     Admin: edita tipo_material y/o datos de pesaje de un lote existente.
@@ -596,9 +593,9 @@ def editar_lote(
                 )
             pesaje.justificacion_manual = datos.justificacion_manual if datos.es_manual else None
 
-        pesaje.modificado_por = current_user.id
+        pesaje.modificado_por = usuario_id
 
-    lote.modificado_por = current_user.id
+    lote.modificado_por = usuario_id
     lote.modificado_en = _ahora()
     db.flush()
 
