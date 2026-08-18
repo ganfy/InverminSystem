@@ -67,7 +67,7 @@
         </div>
         <div class="field" style="flex:1;min-width:200px">
           <label class="field-label">BÚSQUEDA</label>
-          <input type="text" class="field-input" v-model="filtroBusquedaLotes" placeholder="IP, Proveedor o Material" />
+          <input type="text" class="field-input" v-model="filtroBusquedaLotes" placeholder="IP, CIP, Proveedor o Material" />
         </div>
       </div>
 
@@ -540,10 +540,12 @@ const lotesFiltrados = computed(() => {
     }
     if (filtroBusquedaLotes.value) {
       const q = filtroBusquedaLotes.value.toLowerCase()
-      const matchIp = l.ip.toLowerCase().includes(q)
+      const matchIp  = l.ip.toLowerCase().includes(q)
       const matchProv = (l.proveedor || '').toLowerCase().includes(q)
-      const matchMat = (l.material || '').toLowerCase().includes(q)
-      if (!matchIp && !matchProv && !matchMat) return false
+      const matchMat  = (l.material || '').toLowerCase().includes(q)
+      // Buscar también en cualquier CIP vinculado al lote
+      const matchCip  = (l.cips || []).some((cip: string) => cip.toLowerCase().includes(q))
+      if (!matchIp && !matchProv && !matchMat && !matchCip) return false
     }
     return true
   })
