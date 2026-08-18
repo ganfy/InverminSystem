@@ -18,6 +18,7 @@ from app.models.models import (
     AnalisisDetalle,
     AnalisisLey,
     AnalisisRecuperacion,
+    Configuracion,
     Lote,
     MapeoCIP,
     ProveedorAcopiador,
@@ -41,7 +42,7 @@ from app.schemas.laboratorio import (
     SyncLaboratorioResponse,
     SyncResultado,
 )
-from app.services.config_calculo import get_constantes, get_quantize_decimal
+from app.services.config_calculo import DEFAULTS, get_constantes, get_quantize_decimal
 from app.services.pruebas import calcular_ley_planta
 from fastapi import UploadFile
 from sqlalchemy.orm import Session, joinedload
@@ -435,6 +436,38 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         c.codigo_cip not in cips_con_rec_vigente for c in cips_recuperacion
     )
 
+    # ── Alerta: diferencia excesiva entre análisis de laboratorio ─────────────
+    # Compara las leyes finales de análisis vigentes de tipo planta/externo/normal.
+    # Si max - min > umbral (config LAB_DIFERENCIA_PLANTA_MINERO) → alerta.
+    try:
+        _cfg_row = (
+            db.query(Configuracion)
+            .filter(Configuracion.clave == "LAB_DIFERENCIA_PLANTA_MINERO")
+            .first()
+        )
+        umbral_labs = (
+            float(_cfg_row.valor)
+            if _cfg_row
+            else float(DEFAULTS.get("LAB_DIFERENCIA_PLANTA_MINERO", "0.10"))
+        )
+    except Exception:
+        umbral_labs = float(DEFAULTS.get("LAB_DIFERENCIA_PLANTA_MINERO", "0.10"))
+
+    tipos_lab = (TipoAnalisis.PLANTA, TipoAnalisis.EXTERNO)
+    leyes_vigentes = [
+        float(a.ley_final)
+        for a in analisis_ley
+        if a.vigente
+        and a.tipo_analisis in tipos_lab
+        and a.material != "Ag"
+        and a.ley_final is not None
+    ]
+    alerta_diferencia_analisis: float | None = None
+    if len(leyes_vigentes) >= 2:
+        diff_labs = max(leyes_vigentes) - min(leyes_vigentes)
+        if diff_labs > umbral_labs:
+            alerta_diferencia_analisis = diff_labs
+
     return LoteLabOut(
         ip=lote.ip,
         lote_id=lote.id,
@@ -458,6 +491,7 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         cert_reconocimiento_url=cert_reconocimiento_record.certificado_url
         if cert_reconocimiento_record
         else None,
+        alerta_diferencia_analisis=alerta_diferencia_analisis,
     )
 
 

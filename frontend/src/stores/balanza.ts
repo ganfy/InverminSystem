@@ -124,15 +124,20 @@ function _fmtPeso(v: number | null | undefined): string {
   return v != null ? Number(v).toFixed(3) : '-'
 }
 
-function _fmtFecha(iso: string | null | undefined): string {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleString('es-PE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  }).replace(',', '')
+function _fmtFecha(iso: string | null | undefined, esOffline: boolean): string {
+    if (!iso) return '-'
+    const str = (esOffline || iso.includes('+') || iso.endsWith('Z')) ? iso : iso + 'Z'
+    return new Date(str).toLocaleString('es-PE', {
+      timeZone: 'America/Lima',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
 }
 
 function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
+  const esOffline = !!s.offline_id;
+  // Helper local para usar en el template
+  const formatF = (iso: string | null | undefined) => _fmtFecha(iso, esOffline)
   const esOtro = lote.tipo_material === 'Otro'
 
   // Observaciones: para 'Otro' usar texto libre, para mineral/llampo generar IP|LOTE|cantidad
@@ -174,8 +179,8 @@ function _ticketCuerpo(lote: LoteDetalle, s: SesionDetalle): string {
 <table class="seccion"><tr>
   <td class="col-fechas">
     <table class="datos">
-      <tr><td class="lbl">Fecha Inicial</td><td class="sep">:</td><td>${_fmtFecha(lote.pesaje?.fecha_inicio)}</td></tr>
-      <tr><td class="lbl">Fecha Final</td><td class="sep">:</td><td>${_fmtFecha(lote.pesaje?.fecha_fin)}</td></tr>
+      <tr><td class="lbl">Fecha Inicial</td><td class="sep">:</td><td>${formatF(lote.pesaje?.fecha_inicio)}</td></tr>
+      <tr><td class="lbl">Fecha Final</td><td class="sep">:</td><td>${formatF(lote.pesaje?.fecha_fin)}</td></tr>
     </table>
   </td>
   <td class="col-pesos">

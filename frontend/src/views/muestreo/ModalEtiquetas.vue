@@ -329,8 +329,8 @@ const ejecutarImpresion = () => {
     .etiqueta-print {
       width: ${esDobleColumna ? '50%' : '100%'};
       max-width: ${esDobleColumna ? '50%' : '100%'};
-      height: ${esDobleColumna ? '25.4mm' : 'auto'};
-      max-height: ${esDobleColumna ? '25.4mm' : 'none'};
+      height: ${esDobleColumna ? '24.5mm' : 'auto'};
+      max-height: ${esDobleColumna ? '24.5mm' : 'none'};
       overflow: hidden;
       box-sizing: border-box;
       padding: ${esDobleColumna ? '1mm 1mm' : '3mm 2mm'};
@@ -340,14 +340,18 @@ const ejecutarImpresion = () => {
       align-items: center;
       page-break-inside: avoid;
       break-inside: avoid;
-      ${esDobleColumna ? '' : 'page-break-after: always; break-after: page;'}
     }
     ${esDobleColumna ? `
-    .etiqueta-print:nth-child(2n) {
+    .etiqueta-print:nth-child(2n):not(:last-child) {
       page-break-after: always;
       break-after: page;
     }
-    ` : ''}
+    ` : `
+    .etiqueta-print:not(:last-child) {
+      page-break-after: always;
+      break-after: page;
+    }
+    `}
     .etiqueta-title { font-size: ${esDobleColumna ? '0.5rem' : '0.7rem'}; font-weight: 900; letter-spacing: 0.05em; margin: 0; line-height: 1.15; }
     .etiqueta-subtitle { font-size: ${esDobleColumna ? '0.42rem' : '0.6rem'}; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 1px; width: 100%; text-align: center; margin: 1px 0; line-height: 1.15; }
     .barcode-visual { width: 95%; max-width: 100%; height: ${esDobleColumna ? '26px' : '50px'}; margin: 1px 0; }

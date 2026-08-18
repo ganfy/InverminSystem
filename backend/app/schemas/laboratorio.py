@@ -315,6 +315,8 @@ class LoteLabOut(BaseModel):
     cert_reconocimiento_url: str | None = None
     ley_ag_gr_tm: float | None = None  # ley de plata vigente (g/TM), None si no hay
     ley_ag_oz_tc: float | None = None
+    # Alerta: diferencia entre análisis de lab > umbral → recomendar enviar otra muestra
+    alerta_diferencia_analisis: float | None = None  # valor de la diferencia; None = sin alerta
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

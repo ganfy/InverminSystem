@@ -329,13 +329,90 @@
           </div>
         </section>
 
+        <!-- Alerta #1: diferencia excesiva entre análisis de laboratorio -->
+        <div v-if="lote.alerta_diferencia_analisis != null" class="alerta-labs-diff">
+          <AlertTriangle :size="16" style="flex-shrink:0;margin-top:1px" />
+
+          <!-- Caso A: solo 2 análisis → pedir contramuestra -->
+          <template v-if="outlierAnalisis === null">
+            <span>
+              Diferencia entre análisis de laboratorio:
+              <strong style="font-family:var(--font-mono)">{{ lote.alerta_diferencia_analisis.toFixed(4) }} oz/TC</strong>
+              — Se recomienda enviar <strong>otra muestra</strong> al laboratorio para confirmar el resultado.
+            </span>
+          </template>
+
+          <!-- Caso B: 3+ análisis → mostrar outlier y acción -->
+          <template v-else>
+            <div class="alerta-labs-body">
+              <span class="alerta-labs-resumen">
+                Diferencia entre análisis:
+                <strong style="font-family:var(--font-mono)">{{ lote.alerta_diferencia_analisis.toFixed(4) }} oz/TC</strong>
+              </span>
+              <div class="outlier-box">
+                <div class="outlier-label">⚠️ Análisis atípico detectado</div>
+                <div class="outlier-data">
+                  <span class="od-field">
+                    <span class="od-lbl">LABORATORIO</span>
+                    <span class="od-val">{{ outlierAnalisis.laboratorio || '—' }}</span>
+                  </span>
+                  <span class="od-field">
+                    <span class="od-lbl">CIP</span>
+                    <span class="od-val td-mono" style="color:var(--color-gold)">{{ outlierAnalisis.cip || '—' }}</span>
+                  </span>
+                  <span class="od-field">
+                    <span class="od-lbl">LEY FINAL</span>
+                    <span class="od-val td-mono">{{ Number(outlierAnalisis.ley_final).toFixed(4) }} oz/TC</span>
+                  </span>
+                  <span class="od-field od-field--impact">
+                    <span class="od-lbl">DIFERENCIA RESTANTE</span>
+                    <span
+                      class="od-val td-mono"
+                      :class="outlierAnalisis.diff_restante <= 0.10 ? 'od-resuelto' : 'od-persiste'"
+                    >
+                      {{ outlierAnalisis.diff_restante.toFixed(4) }} oz/TC
+                      <span v-if="outlierAnalisis.diff_restante <= 0.10" style="font-size:0.7rem;margin-left:0.3rem">✓ Resuelve el problema</span>
+                      <span v-else style="font-size:0.7rem;margin-left:0.3rem">(aún fuera de rango)</span>
+                    </span>
+                  </span>
+                </div>
+                <button
+                  class="btn-danger-sm outlier-btn"
+                  @click="descartarOutlier"
+                  title="Marcar este análisis como descartado"
+                >
+                  Descartar este análisis
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Alerta #2: dirimencia pendiente (diferencia planta/minero > umbral) -->
         <div v-if="alertaDirimencia" class="dirimencia-request-alert">
-          <AlertTriangle :size="16" /> Diferencia Planta/Minero:
-          <strong style="font-family:var(--font-mono)">{{ alertaDirimencia.toFixed(4) }} oz/TC</strong>
-          supera el límite (0.10). Se recomienda solicitar dirimencia.
+          <AlertTriangle :size="16" />
+          <span>
+            Diferencia Planta/Minero:
+            <strong style="font-family:var(--font-mono)">{{ alertaDirimencia.toFixed(4) }} oz/TC</strong>
+            supera el límite (0.10). Se recomienda solicitar dirimencia.
+          </span>
           <button class="btn-warning-sm" style="margin-left:0.75rem" @click="abrirModalDirimencia">
             Solicitar Dirimencia →
           </button>
+        </div>
+
+        <!-- Indicador: lote ya tiene dirimencia — muestra modo DIRIMENCIA + diferencia -->
+        <div v-if="lote.tiene_dirimencia && lote.ley_planta && lote.ley_minero" class="dirimencia-activa-banner">
+          <AlertTriangle :size="14" />
+          <span>
+            Este lote entró a
+            <span class="dirim-mode-badge dirim-mode-dirimencia">DIRIMENCIA</span>
+            — Diferencia Planta/Minero:
+            <strong style="font-family:var(--font-mono)">
+              {{ Math.abs(Number(lote.ley_planta) - Number(lote.ley_minero)).toFixed(4) }} oz/TC
+            </strong>
+            (ley final determinada por análisis de dirimencia con clapeo).
+          </span>
         </div>
 
         <div class="acciones-lote" style="display:flex;gap:0.75rem;flex-wrap:wrap">
@@ -1468,6 +1545,58 @@ const alertaDirimencia = computed(() => {
   return diff > 0.10 ? diff : null
 })
 
+// ── Outlier de análisis de laboratorio (para alerta inteligente) ───────────────
+// Retorna null si hay menos de 3 análisis vigentes (aún no llegó la contramuestra).
+// Si hay 3+, detecta el que más se aleja del promedio de los demás.
+const outlierAnalisis = computed(() => {
+  if (!lote.value || lote.value.alerta_diferencia_analisis == null) return null
+
+  const TIPOS_LAB = ['planta', 'externo']
+  const vigentes = lote.value.analisis_ley.filter(
+    a => a.vigente && TIPOS_LAB.includes(a.tipo_analisis) && a.material !== 'Ag' && a.ley_final != null
+  )
+
+  if (vigentes.length < 3) return null  // con solo 2 → pedir contramuestra
+
+  // Para cada análisis: calcular su distancia al promedio de los demás
+  let maxDesv = -1
+  let candidato: typeof vigentes[0] | null = null
+  let diffRestante = 0
+
+  for (const a of vigentes) {
+    const otros = vigentes.filter(o => o.id !== a.id)
+    const prom = otros.reduce((s, o) => s + Number(o.ley_final), 0) / otros.length
+    const desv = Math.abs(Number(a.ley_final) - prom)
+    const dr = otros.length >= 2
+      ? Math.max(...otros.map(o => Number(o.ley_final))) - Math.min(...otros.map(o => Number(o.ley_final)))
+      : 0
+    if (desv > maxDesv) {
+      maxDesv = desv
+      candidato = a
+      diffRestante = dr
+    }
+  }
+
+  if (!candidato) return null
+  return { ...candidato, diff_restante: diffRestante }
+})
+
+async function descartarOutlier() {
+  if (!outlierAnalisis.value) return
+  const a = outlierAnalisis.value
+  const lab = a.laboratorio || 'desconocido'
+  const ley = Number(a.ley_final).toFixed(4)
+  const ok = await ui.showConfirm({
+    title: 'Descartar análisis atípico',
+    message: `¿Descartar el análisis de ${lab} (CIP: ${a.cip ?? '—'}, Ley: ${ley} oz/TC)?\n` +
+             `Este registro quedará marcado como descartado y no se incluirá en el cálculo de ley planta.`,
+    confirmLabel: 'Descartar',
+    danger: true,
+  })
+  if (!ok) return
+  await eliminarLey(a.id)
+}
+
 // ── Ley minero ────────────────────────────────────────────────────────────────
 const modalLeyMinero      = ref(false)
 const guardandoLeyMinero  = ref(false)
@@ -1779,6 +1908,76 @@ onMounted(async () => {
   border-radius: 6px; padding: 0.75rem 1rem; color: #fbbf24; font-size: var(--text-sm);
   margin-bottom: 1rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
 }
+
+/* Alerta: diferencia entre análisis de laboratorio */
+.alerta-labs-diff {
+  background: rgba(249,115,22,0.10); border: 1px solid rgba(249,115,22,0.45);
+  border-radius: 6px; padding: 0.75rem 1rem; color: #fb923c; font-size: var(--text-sm);
+  margin-bottom: 0.75rem; display: flex; align-items: flex-start; gap: 0.5rem;
+}
+.alerta-labs-diff svg { flex-shrink: 0; margin-top: 2px; }
+
+/* Layout del cuerpo de alerta con outlier */
+.alerta-labs-body { display: flex; flex-direction: column; gap: 0.6rem; flex: 1; }
+.alerta-labs-resumen { font-size: var(--text-sm); }
+
+/* Caja del outlier */
+.outlier-box {
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(249,115,22,0.3);
+  border-radius: 6px; padding: 0.65rem 0.85rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.outlier-label {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #fb923c;
+}
+.outlier-data {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem;
+}
+.od-field {
+  display: flex; flex-direction: column; gap: 0.1rem;
+}
+.od-field--impact { margin-left: auto; }
+.od-lbl {
+  font-size: 0.6rem; color: rgba(251,146,60,0.6);
+  font-family: var(--font-mono); letter-spacing: 0.07em; text-transform: uppercase;
+}
+.od-val { font-size: 0.8rem; color: #fed7aa; }
+.od-resuelto { color: #4ade80 !important; }
+.od-persiste  { color: #f87171 !important; }
+
+/* Botón de acción del outlier */
+.outlier-btn {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  font-size: 0.72rem !important;
+  padding: 0.25rem 0.7rem !important;
+}
+
+/* Banner: dirimencia ya activa en el lote */
+.dirimencia-activa-banner {
+  background: rgba(168,85,247,0.10); border: 1px solid rgba(168,85,247,0.35);
+  border-radius: 6px; padding: 0.65rem 1rem; color: #c084fc; font-size: var(--text-sm);
+  margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+}
+
+/* Badge de modo clapeo */
+.dirim-mode-badge {
+  display: inline-flex; align-items: center;
+  font-size: 0.65rem; font-family: var(--font-mono); letter-spacing: 0.07em;
+  padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700;
+  vertical-align: middle; margin: 0 0.15rem;
+}
+.dirim-mode-promedio {
+  background: rgba(234,179,8,0.15); color: #fbbf24;
+  border: 1px solid rgba(234,179,8,0.4);
+}
+.dirim-mode-dirimencia {
+  background: rgba(168,85,247,0.18); color: #c084fc;
+  border: 1px solid rgba(168,85,247,0.45);
+}
+
 
 .info-box { border-radius: 6px; padding: 0.75rem 1rem; font-size: var(--text-sm); margin-bottom: 1rem; }
 .info-box.warning { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.3); color: #fbbf24; }

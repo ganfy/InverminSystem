@@ -555,8 +555,7 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   labs_lista: 'Lista de Laboratorios Externos',
 
   // Laboratorio
-  LAB_DIFERENCIA_MAX_PCT: 'Diferencia Máxima Permitida entre Labs',
-  LAB_DIFERENCIA_PLANTA_MINERO: 'Diferencia Máxima Ley Planta vs Minero',
+  LAB_DIFERENCIA_PLANTA_MINERO: 'Diferencia Máxima entre Labs / Planta vs Minero',
 
   // Pruebas
   CAMPANA_META_ORO_FINO_DEFAULT: 'Meta de Oro Fino por Campaña',
@@ -585,7 +584,6 @@ const UNIDADES: Record<string, string> = {
   MUESTREO_HUMEDAD_MAX_PCT: '%',
   MUESTREO_MALLA_MIN_PCT: '%',
   MUESTREO_MALLA_MAX_PCT: '%',
-  LAB_DIFERENCIA_MAX_PCT: '%',
   LAB_DIFERENCIA_PLANTA_MINERO: 'Oz/TC',
   CAMPANA_META_ORO_FINO_DEFAULT: 'g',
   sla_metalurgia_horas: 'horas',
@@ -625,7 +623,7 @@ const PARAM_CATEGORIES = [
     id: 'laboratorio',
     name: 'Laboratorio y Calidad',
     icon: Microscope,
-    keys: ['LAB_DIFERENCIA_MAX_PCT', 'LAB_DIFERENCIA_PLANTA_MINERO']
+    keys: ['LAB_DIFERENCIA_PLANTA_MINERO']
   },
   {
     id: 'pruebas',

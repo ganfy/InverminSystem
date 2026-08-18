@@ -272,6 +272,57 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- ── Tabla de Clapeo (Promedio vs Dirimencia) ───────────────── -->
+            <template v-if="grupo.lotes.some(l => l.oz_tc_minero != null)">
+              <div class="clapeo-section">
+                <div class="clapeo-header">
+                  <span class="clapeo-title">Cuadro de Clapeo · {{ grupo.proveedor }}</span>
+                  <span class="clapeo-hint">Muestra la diferencia Planta/Minero y el modo de liquidación por lote</span>
+                </div>
+                <table class="tabla clapeo-tabla">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th class="col-r">LEY PAITITI</th>
+                      <th class="col-r">LEY MINERO</th>
+                      <th class="col-r">DIFERENCIA</th>
+                      <th class="col-c">MODO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="lote in grupo.lotes.filter(l => l.oz_tc_minero != null)"
+                      :key="'clap-' + lote.ip"
+                      class="tabla-row"
+                    >
+                      <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                      <td class="col-r td-mono">{{ fmtLey(lote.oz_tc_planta) }}</td>
+                      <td class="col-r td-mono">{{ fmtLey(lote.oz_tc_minero) }}</td>
+                      <td
+                        class="col-r td-mono"
+                        :class="clapDiffClass(lote)"
+                      >
+                        {{ clapDiff(lote) }}
+                      </td>
+                      <td class="col-c">
+                        <!-- Modo proyectado: basado en la regla |planta - minero| > 0.10 -->
+                        <span
+                          v-if="lote.oz_tc_planta != null && lote.oz_tc_minero != null && Math.abs(lote.oz_tc_planta - lote.oz_tc_minero) > 0.10"
+                          class="clap-badge clap-dirimencia"
+                          title="La diferencia supera 0.10 oz/TC — corresponde dirimencia"
+                        >DIRIMENCIA</span>
+                        <span
+                          v-else
+                          class="clap-badge clap-promedio"
+                          title="Diferencia dentro del límite — se liquidará por promedio"
+                        >PROMEDIO</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
           </div>
         </template>
 
@@ -493,6 +544,19 @@ function badgeClass(estado: string) {
     FACTURADA: 'badge-facturada',
     PAGADA:    'badge-pagada',
   }[estado] ?? 'badge-generada'
+}
+
+// ── Clapeo helpers ────────────────────────────────────────────────────────────
+function clapDiff(lote: LoteDisponible): string {
+  if (lote.oz_tc_planta == null || lote.oz_tc_minero == null) return '—'
+  const diff = lote.oz_tc_planta - lote.oz_tc_minero
+  return (diff >= 0 ? '+' : '') + diff.toFixed(3)
+}
+function clapDiffClass(lote: LoteDisponible): string {
+  if (lote.oz_tc_planta == null || lote.oz_tc_minero == null) return ''
+  const diff = Math.abs(lote.oz_tc_planta - lote.oz_tc_minero)
+  if (diff > 0.10) return 'clap-diff-alert'
+  return 'clap-diff-ok'
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -830,4 +894,62 @@ th.col-r, td.col-r { text-align: right !important; }
 }
 .text-gold { color: var(--color-gold); }
 .text-muted { color: var(--color-text-muted); }
+
+/* ── Tabla de Clapeo ──────────────────────────────────────────────────────── */
+.clapeo-section {
+  margin-top: 1.25rem;
+  border: 1px solid rgba(168,85,247,0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(168,85,247,0.04);
+}
+.clapeo-header {
+  display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.6rem 1rem;
+  background: rgba(168,85,247,0.10);
+  border-bottom: 1px solid rgba(168,85,247,0.18);
+}
+.clapeo-title {
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #c084fc; font-family: var(--font-mono);
+}
+.clapeo-hint {
+  font-size: 0.72rem; color: var(--color-text-faint);
+}
+.clapeo-tabla {
+  margin: 0;
+  border-radius: 0;
+  border: none;
+}
+.clapeo-tabla th, .clapeo-tabla td {
+  font-size: 0.78rem;
+  padding: 0.45rem 0.75rem;
+}
+.clapeo-tabla thead th {
+  background: rgba(168,85,247,0.07);
+  color: var(--color-text-faint);
+  font-size: 0.65rem;
+  letter-spacing: 0.07em;
+}
+.col-c { text-align: center; }
+
+/* Badges PROMEDIO / DIRIMENCIA en la tabla de clapeo */
+.clap-badge {
+  display: inline-block;
+  font-size: 0.65rem; font-family: var(--font-mono); font-weight: 700;
+  letter-spacing: 0.07em; padding: 0.18rem 0.55rem; border-radius: 4px;
+}
+.clap-promedio {
+  background: rgba(234,179,8,0.18); color: #fbbf24;
+  border: 1px solid rgba(234,179,8,0.4);
+}
+.clap-dirimencia {
+  background: rgba(168,85,247,0.20); color: #c084fc;
+  border: 1px solid rgba(168,85,247,0.45);
+}
+
+/* Diferencia: rojo si excede umbral, verde si está en rango */
+.clap-diff-alert { color: #f87171; font-weight: 600; }
+.clap-diff-ok    { color: var(--color-text-muted); }
+
 </style>

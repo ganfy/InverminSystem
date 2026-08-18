@@ -414,7 +414,12 @@ def descargar_ticket(
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{nombre}"',
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
