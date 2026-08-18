@@ -318,7 +318,7 @@ const ejecutarImpresion = () => {
 
   // 2. Definimos el CSS exclusivo para esta nueva pestaña de impresión
   const printCss = `
-    @page { size: ${esDobleColumna ? '4in 1in portrait' : 'auto'}; margin: 0mm; }
+    @page { size: ${esDobleColumna ? '4in 1in' : 'auto'}; margin: 0mm; }
     body { font-family: sans-serif; margin: 0; padding: 0; background: white; color: black; }
     #area-impresion {
       display: flex;
