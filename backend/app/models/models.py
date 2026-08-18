@@ -248,6 +248,7 @@ class ParametrosComerciales(AuditMixin, Base):
     """
 
     __tablename__ = "parametros_comerciales"
+    __table_args__ = {"implicit_returning": False}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     provacop_id = Column(Integer, ForeignKey("proveedor_acopiador.id"), nullable=False, unique=True)
