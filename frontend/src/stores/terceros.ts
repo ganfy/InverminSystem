@@ -100,6 +100,12 @@ export const useTercerosStore = defineStore('terceros', () => {
     return tercerosApi.parametrosAcopiador(acopiadorId)
   }
 
+  async function crearAcopiador(datos: { razon_social: string; ruc?: string | null }) {
+    const nuevo = await tercerosApi.crearAcopiador(datos)
+    await cargarAcopiadores()
+    return nuevo
+  }
+
    async function eliminar(id: number): Promise<void> {
     await tercerosApi.eliminar(id)
     lista.value = lista.value.filter(t => t.id !== id)
@@ -124,6 +130,6 @@ export const useTercerosStore = defineStore('terceros', () => {
   return {
     lista, acopiadores, cargando, error,
     cargar, cargarAcopiadores, obtener,
-    crear, editar, toggleEstado, parametrosAcopiador,
+    crear, editar, toggleEstado, parametrosAcopiador, crearAcopiador,
   }
 })

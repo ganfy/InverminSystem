@@ -18,6 +18,7 @@ from app.models.models import (
     SesionDescarga,
 )
 from app.schemas.entidades import (
+    AcopiadorCrear,
     ParametrosSchema,
     RegistroRapidoPayload,
     TerceroCrear,
@@ -274,6 +275,33 @@ def obtener_tercero(db: Session, entidad_id: int, provacop_id: int | None = None
         provacop = _get_provacop_de_entidad(db, entidad_id)
 
     return _serializar_tercero(entidad, provacop, db)
+
+
+def crear_acopiador(db: Session, datos: AcopiadorCrear, usuario_id: int) -> dict:
+    # Buscar si ya existe
+    acopiador = db.query(Entidad).filter_by(ruc=datos.ruc).first() if datos.ruc else None
+
+    if acopiador is None:
+        acopiador = Entidad(
+            ruc=datos.ruc,
+            razon_social=datos.razon_social,
+            tipo=TipoEntidad.EMPRESA,
+            activo=True,
+            creado_por=usuario_id,
+        )
+        db.add(acopiador)
+        db.flush()
+
+    _asignar_rol(db, acopiador, RolEntidad.ACOPIADOR)
+    db.commit()
+    db.refresh(acopiador)
+
+    return {
+        "id": acopiador.id,
+        "razon_social": acopiador.razon_social,
+        "ruc": acopiador.ruc,
+        "es_propio": False,
+    }
 
 
 def crear_tercero(

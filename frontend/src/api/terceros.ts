@@ -158,6 +158,10 @@ const terceros = {
   registroRapido(datos: RegistroRapidoPayload): Promise<{ provacop_id: number }> {
     return api.post('/terceros/registro-rapido', datos).then(r => r.data)
   },
+
+  crearAcopiador(payload: { razon_social: string; ruc?: string | null }): Promise<AcopiadorDropdown> {
+    return api.post('/terceros/acopiadores', payload).then(r => r.data)
+  },
 }
 
 export default terceros

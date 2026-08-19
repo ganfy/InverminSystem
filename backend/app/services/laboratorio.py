@@ -453,6 +453,18 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
     except Exception:
         umbral_labs = float(DEFAULTS.get("LAB_DIFERENCIA_PLANTA_MINERO", "0.10"))
 
+    try:
+        _cfg_row_ree = (
+            db.query(Configuracion).filter(Configuracion.clave == "LAB_DIFERENCIA_REE").first()
+        )
+        umbral_ree = (
+            float(_cfg_row_ree.valor)
+            if _cfg_row_ree
+            else float(DEFAULTS.get("LAB_DIFERENCIA_REE", "0.050"))
+        )
+    except Exception:
+        umbral_ree = float(DEFAULTS.get("LAB_DIFERENCIA_REE", "0.050"))
+
     tipos_lab = (TipoAnalisis.PLANTA, TipoAnalisis.EXTERNO)
     leyes_vigentes = [
         float(a.ley_final)
@@ -463,10 +475,13 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         and a.ley_final is not None
     ]
     alerta_diferencia_analisis: float | None = None
+    alerta_diferencia_ree: float | None = None
     if len(leyes_vigentes) >= 2:
         diff_labs = max(leyes_vigentes) - min(leyes_vigentes)
         if diff_labs > umbral_labs:
             alerta_diferencia_analisis = diff_labs
+        elif diff_labs > umbral_ree:
+            alerta_diferencia_ree = diff_labs
 
     return LoteLabOut(
         ip=lote.ip,
@@ -492,6 +507,7 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         if cert_reconocimiento_record
         else None,
         alerta_diferencia_analisis=alerta_diferencia_analisis,
+        alerta_diferencia_ree=alerta_diferencia_ree,
     )
 
 

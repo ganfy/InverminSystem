@@ -36,6 +36,7 @@ DEFAULTS: dict[str, str] = {
     "labs_lista": '["Minares South S.R.L.", "El Dorado - Invermin Paititi", "Quantum", "Otro"]',
     # Laboratorio
     "LAB_DIFERENCIA_PLANTA_MINERO": "0.10",
+    "LAB_DIFERENCIA_REE": "0.050",
     # Campaña / Planta / Empresa
     "empresa_nombre": "INVERMIN PAITITI S.A.C.",
     "empresa_planta": "Planta El Dorado",
@@ -89,6 +90,7 @@ DESCRIPCIONES: dict[str, str] = {
     "MUESTREO_CIPS_IMPRIMIR": "Cantidad de códigos CIP que se imprimen al dar clic en Etiquetar",
     "labs_lista": "Lista de laboratorios externos disponibles para asignar a CIPs (formato JSON)",
     "LAB_DIFERENCIA_PLANTA_MINERO": "Diferencia máxima de ley Au (Oz/TC) entre análisis de laboratorio entre sí, y entre ley planta y ley minero. Si se supera este umbral: entre labs → se alerta y recomienda enviar otra muestra; entre planta y minero → se activa la dirimencia.",
+    "LAB_DIFERENCIA_REE": "Umbral de diferencia de ley Au (Oz/TC) para recomendar un nuevo ensayo (REE).",
     "empresa_nombre": "Razón social / Nombre de la empresa para documentos y reportes",
     "empresa_planta": "Nombre de la planta/sede operativa",
     "empresa_ruc": "RUC de la empresa",

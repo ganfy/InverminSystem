@@ -167,9 +167,7 @@
                     </div>
 
                     <!-- Registrar nuevo -->
-                    <template>
-                        <Transition name="slide-down">
-                            <div v-if="mostrarNuevoAcopiador" class="nuevo-acop-form">
+                    <div v-if="mostrarNuevoAcopiador" class="nuevo-acop-form">
                             <div class="nuevo-acop-header">
                                 <span class="field-label" style="margin:0">Registrar nuevo acopiador</span>
                                 <button class="btn-icon" @click="mostrarNuevoAcopiador = false">
@@ -195,18 +193,22 @@
                                 />
                                 </div>
                             </div>
+                            <div class="form-grid" style="margin-top:0.75rem">
+                                <button class="btn-primary" :disabled="guardandoNuevoAcopiador || !nuevoAcopiador.razon_social.trim()" @click.prevent="crearAcopiadorDirecto">
+                                  <span v-if="guardandoNuevoAcopiador" class="spinner spinner-sm" />
+                                  <span v-else>Guardar Acopiador</span>
+                                </button>
                             </div>
-                        </Transition>
+                            </div>
 
                         <button
                             v-if="!mostrarNuevoAcopiador"
                             class="btn-nuevo-acop"
-                            @click="mostrarNuevoAcopiador = true"
+                            @click.prevent="mostrarNuevoAcopiador = true"
                         >
                             <Plus :size="13" />
                             Registrar nuevo acopiador
                         </button>
-                        </template>
                 </template>
                 </template>
             </div>
@@ -515,6 +517,7 @@ const tiposAcopiador = [
 
 // Estado del autocomplete
 const buscandoRuc    = ref(false)
+const guardandoNuevoAcopiador = ref(false)
 const proveedorEncontrado = ref(false)
 
 function seleccionarTipo(tipo: TipoAcopiador) {
@@ -811,6 +814,25 @@ async function guardar() {
     ui.toast(msg, 'error')
   } finally {
     guardando.value = false
+  }
+}
+
+async function crearAcopiadorDirecto() {
+  guardandoNuevoAcopiador.value = true
+  try {
+    const nuevo = await store.crearAcopiador({
+      razon_social: nuevoAcopiador.value.razon_social,
+      ruc: nuevoAcopiador.value.ruc || null
+    })
+    form.value.acopiador_id = nuevo.id
+    mostrarNuevoAcopiador.value = false
+    nuevoAcopiador.value = { razon_social: '', ruc: '' }
+    ui.toast(`Acopiador ${nuevo.razon_social} creado exitosamente`, 'success')
+  } catch (err: any) {
+    const msg = err.response?.data?.detail ?? 'Error al crear acopiador'
+    ui.toast(msg, 'error')
+  } finally {
+    guardandoNuevoAcopiador.value = false
   }
 }
 </script>

@@ -237,6 +237,8 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   redondeo_ley_planta: 'Redondeo Ley Planta',
   redondeo_ley_comercial: 'Redondeo Ley Comercial',
   redondeo_ley_final: 'Redondeo Ley Final',
+  LAB_DIFERENCIA_PLANTA_MINERO: 'Umbral Diferencia Lab (Muestra)',
+  LAB_DIFERENCIA_REE: 'Umbral Diferencia Lab (REE)',
 }
 
 const UNIDADES: Record<string, string> = {
@@ -248,6 +250,8 @@ const UNIDADES: Record<string, string> = {
   tamano_bloque_ip: 'IPs',
   tamano_bloque_ticket: 'tickets',
   costo_fijo_planta_maquila: 'USD/TM',
+  LAB_DIFERENCIA_PLANTA_MINERO: 'Oz/TC',
+  LAB_DIFERENCIA_REE: 'Oz/TC',
 }
 
 // Claves críticas que requieren advertencia especial al editar

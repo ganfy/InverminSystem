@@ -317,6 +317,7 @@ class LoteLabOut(BaseModel):
     ley_ag_oz_tc: float | None = None
     # Alerta: diferencia entre análisis de lab > umbral → recomendar enviar otra muestra
     alerta_diferencia_analisis: float | None = None  # valor de la diferencia; None = sin alerta
+    alerta_diferencia_ree: float | None = None  # valor de la diferencia para el umbral REE
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

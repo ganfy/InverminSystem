@@ -6,6 +6,7 @@ Endpoints orientados a la pantalla de gestión de terceros.
 from app.core.database import get_db
 from app.core.deps import check_any_permiso, check_permiso
 from app.schemas.entidades import (
+    AcopiadorCrear,
     AcopiadorDropdown,
     CambiarAcopiadorPayload,
     ParametrosRespuesta,
@@ -61,6 +62,21 @@ def registro_rapido(
     try:
         provacop_id = svc.registro_rapido(db, datos, usuario_id=current_user.id)
         return {"provacop_id": provacop_id}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+@router.post("/acopiadores", response_model=AcopiadorDropdown, status_code=status.HTTP_201_CREATED)
+def crear_acopiador(
+    datos: AcopiadorCrear,
+    current_user=Depends(check_permiso("TERCEROS", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Registra un acopiador de forma independiente.
+    """
+    try:
+        return svc.crear_acopiador(db, datos, usuario_id=current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 

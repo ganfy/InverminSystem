@@ -388,6 +388,16 @@
           </template>
         </div>
 
+        <!-- Alerta #1.5: diferencia excesiva entre análisis de laboratorio (REE) -->
+        <div v-else-if="lote.alerta_diferencia_ree != null" class="alerta-labs-diff alerta-ree">
+          <AlertTriangle :size="16" style="flex-shrink:0;margin-top:1px" />
+          <span>
+            Diferencia entre análisis de laboratorio:
+            <strong style="font-family:var(--font-mono)">{{ lote.alerta_diferencia_ree.toFixed(4) }} oz/TC</strong>
+            — Se recomienda solicitar <strong>otro ensayo (REE)</strong>.
+          </span>
+        </div>
+
         <!-- Alerta #2: dirimencia pendiente (diferencia planta/minero > umbral) -->
         <div v-if="alertaDirimencia" class="dirimencia-request-alert">
           <AlertTriangle :size="16" />

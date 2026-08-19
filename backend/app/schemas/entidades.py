@@ -201,6 +201,12 @@ class TerceroEditar(BaseModel):
     provacop_id: int | None = None
 
 
+class AcopiadorCrear(BaseModel):
+    razon_social: str
+    ruc: str | None = None
+    provacop_id: int | None = None
+
+
 class CambiarAcopiadorPayload(BaseModel):
     """Payload para cambiar el acopiador de un proveedor (sin sesiones)."""
 
