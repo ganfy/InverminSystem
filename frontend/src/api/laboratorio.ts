@@ -407,3 +407,10 @@ export async function descargarCertificadoRecuperacion(analisisId: number): Prom
     link.click()
     URL.revokeObjectURL(url)
 }
+
+/** Crea un CIP de re-ensayo (REE) para el mismo lote del CIP dado.
+ *  Retorna el código del nuevo CIP generado. */
+export async function crearEnsayoREE(cip: string): Promise<{ nuevo_cip: string }> {
+    const { data } = await api.post(`/laboratorio/cip/${encodeURIComponent(cip)}/crear-ensayo-ree`)
+    return data
+}

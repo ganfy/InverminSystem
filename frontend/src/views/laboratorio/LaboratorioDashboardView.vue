@@ -274,6 +274,19 @@
                     >
                       + Ag
                     </button>
+                    <!-- Botón de re-ensayo (REE) -->
+                    <button
+                      v-if="fila.estado === 'COMPLETADO'"
+                      class="btn-secondary"
+                      style="font-size:0.75rem;padding:0.3rem 0.75rem;color:#a3e635;border-color:rgba(163,230,53,0.4)"
+                      @click="agregarEnsayoREE(fila.cip)"
+                      :disabled="cargandoREE === fila.cip"
+                      title="Añadir un nuevo ensayo de re-ensayo (REE) para este CIP"
+                    >
+                      <span v-if="cargandoREE === fila.cip" class="spinner" style="margin-right:0.3rem"></span>
+                      <span v-else>+ Ensayo</span>
+                    </button>
+
                   </td>
                 </tr>
               </template>
@@ -341,6 +354,7 @@ import AlertasBanner from '@/components/AlertasBanner.vue'
 import { useUiStore } from '@/stores/ui'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
+import { crearEnsayoREE } from '@/api/laboratorio'
 import type { CIPAnalisisOut, LoteLabOut, AnalisisRecuperacionOut } from '@/types/laboratorio'
 import { useSync } from '@/composables/useSync'
 import { obtenerAnalisisLeyPendientes, type AnalisisLeyOfflineItem } from '@/composables/useOfflineQueue'
@@ -364,6 +378,9 @@ const mostrarSoloCIPs = ref(false)
 
 const cipsSeleccionados = ref<string[]>([])
 const generandoConjunto = ref(false)
+
+// ── Estado de carga para ensayo REE por CIP ────────────────────────────────────────────────────────────
+const cargandoREE = ref<string | null>(null)
 
 // Resetear selección al cambiar de pestaña
 watch(tabActual, () => {
@@ -591,6 +608,21 @@ function irARegistrarRecuperacion(fila: any) {
 }
 function irADetalleLote(ip: string) {
   router.push(`/laboratorio/lote/${ip}`)
+}
+
+async function agregarEnsayoREE(cipOrigen: string) {
+  if (cargandoREE.value) return
+  cargandoREE.value = cipOrigen
+  try {
+    const { nuevo_cip } = await crearEnsayoREE(cipOrigen)
+    ui.toast(`Re-ensayo creado: ${nuevo_cip}`, 'success')
+    router.push(`/laboratorio/ley/${nuevo_cip}`)
+  } catch (err: any) {
+    const msg = err?.response?.data?.detail ?? 'Error al crear el re-ensayo'
+    ui.toast(msg, 'error')
+  } finally {
+    cargandoREE.value = null
+  }
 }
 
 function irANuevoReconocimiento(subtipo: 'solidos' | 'solucion') {

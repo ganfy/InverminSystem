@@ -372,3 +372,81 @@ def obtener_lotes_para_muestreo(db: Session):
         )
 
     return resultado
+
+
+def crear_cip_ensayo_extra(db: Session, cip_origen: str) -> MapeoCIP:
+    """
+    Crea un CIP de re-ensayo (sufijo REE) para el mismo lote del CIP de origen.
+    El código generado conserva la misma base ofuscada que el CIP original:
+        CIP-{base_ofuscada}-REE{n}
+    donde n = número de CIPs REE ya existentes para ese lote + 1.
+
+    Este nuevo CIP tendrá fecha_envio = hoy (para que aparezca correctamente
+    en los certificados de laboratorio).
+    """
+    import re as _re
+
+    # 1. Buscar el CIP origen
+    mapeo_origen = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_origen).first()
+    if not mapeo_origen:
+        from fastapi import HTTPException
+        from fastapi import status as http_status
+
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND, detail=f"CIP '{cip_origen}' no encontrado."
+        )
+
+    lote_id = mapeo_origen.lote_id
+    if not lote_id:
+        from fastapi import HTTPException
+        from fastapi import status as http_status
+
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="El CIP de origen no está asociado a un lote.",
+        )
+
+    # 2. Extraer la base ofuscada del CIP origen (ej: "058598D" de "CIP-058598D-A1")
+    match = _re.match(r"^CIP-([A-Z0-9]+)-", cip_origen)
+    if not match:
+        from fastapi import HTTPException
+        from fastapi import status as http_status
+
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato de CIP no reconocido: '{cip_origen}'",
+        )
+    base_ofuscada = match.group(1)
+
+    # 3. Contar CIPs REE existentes para este lote
+    cips_ree_existentes = (
+        db.query(MapeoCIP)
+        .filter(
+            MapeoCIP.lote_id == lote_id,
+            MapeoCIP.codigo_cip.like("%-REE%"),
+        )
+        .count()
+    )
+    n_ree = cips_ree_existentes + 1
+
+    # 4. Construir código final: CIP-{base}-REEn
+    codigo_ree = f"CIP-{base_ofuscada}-REE{n_ree}"
+
+    # Verificar que no exista ya (idempotencia)
+    existente = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == codigo_ree).first()
+    if existente:
+        return existente
+
+    # 5. Crear el nuevo MapeoCIP
+    nuevo_cip = MapeoCIP(
+        lote_id=lote_id,
+        codigo_cip=codigo_ree,
+        laboratorio=mapeo_origen.laboratorio or "Paititi",
+        tipo_muestra="Laboratorio",
+        fecha_envio=datetime.now().date(),  # fecha de ingreso del re-ensayo
+    )
+    db.add(nuevo_cip)
+    db.commit()
+    db.refresh(nuevo_cip)
+
+    return nuevo_cip

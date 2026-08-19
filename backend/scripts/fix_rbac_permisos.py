@@ -197,8 +197,18 @@ def run(db):
     ):
         upsert_permiso(rol_codigo, "LIQUIDACIONES", "EDIT_PARAMS", False)
 
+    # ── 8. TERCEROS para Comercial — puede ver y registrar, pero NO editar parámetros ──
+    # Comercial puede: ver la lista, registrar proveedores (hasta sección Acopiador)
+    # Comercial NO puede: editar parámetros comerciales (UPDATE queda bloqueado)
+    print("\n  Insertando permisos TERCEROS para Comercial (VIEW + CREATE, sin UPDATE)...")
+    upsert_permiso("Comercial", "TERCEROS", "VIEW", True)
+    upsert_permiso("Comercial", "TERCEROS", "CREATE", True)
+    upsert_permiso("Comercial", "TERCEROS", "UPDATE", False)  # Bloquea editar parámetros
+    upsert_permiso("Comercial", "TERCEROS", "DELETE", False)
+
     db.commit()
     print(f"\n  {creados} permisos nuevos insertados, {actualizados} actualizados.")
+
     print("\n=== Sincronización completada ===\n")
 
 

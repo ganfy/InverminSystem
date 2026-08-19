@@ -20,6 +20,26 @@
         </button>
       </div>
 
+      <!-- ── Búsqueda por IP ─────────────────────────── -->
+      <div class="busqueda-bar">
+        <div class="busqueda-input-wrap">
+          <Search :size="16" class="busqueda-icon" />
+          <input
+            v-model="busquedaIP"
+            type="text"
+            class="busqueda-input"
+            placeholder="Buscar por IP…"
+            autocomplete="off"
+          />
+          <button v-if="busquedaIP" class="busqueda-clear" @click="busquedaIP = ''" title="Limpiar">
+            <X :size="14" />
+          </button>
+        </div>
+        <span v-if="busquedaIP" class="busqueda-hint">
+          {{ lotesMostrar.length }} resultado{{ lotesMostrar.length !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
       <div class="cards-grid">
         <div v-if="store.cargando" class="sin-datos">Cargando lotes...</div>
         <div v-else-if="lotesMostrar.length === 0" class="sin-datos">No hay lotes en esta sección.</div>
@@ -155,14 +175,18 @@ function calcularEstadoSLA(lote: any) {
 }
 
 const tabActual = ref<'PENDIENTES' | 'COMPLETADOS'>('PENDIENTES')
+const busquedaIP = ref('')
 
 // Variable para controlar qué modal de detalles está abierto
 const modalDetallesIp = ref<string | null>(null)
 
 const lotesMostrar = computed(() => {
-  return tabActual.value === 'PENDIENTES'
+  const lista = tabActual.value === 'PENDIENTES'
     ? store.lotesPendientes
     : store.lotesCompletados
+  const q = busquedaIP.value.trim().toLowerCase()
+  if (!q) return lista
+  return lista.filter(l => l.ip.toLowerCase().includes(q))
 })
 
 onMounted(async () => {
@@ -210,6 +234,70 @@ async function onEtiquetasGeneradas() {
   padding: var(--page-padding);
   max-width: 1200px;
   margin: 0 auto;
+}
+
+/* ── Búsqueda ───────────────────────────────────────────────── */
+.busqueda-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: calc(var(--spacing-lg) * 1.2);
+}
+
+.busqueda-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 380px;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--spacing-sm);
+  transition: border-color 0.15s;
+}
+.busqueda-input-wrap:focus-within {
+  border-color: var(--color-gold);
+}
+
+.busqueda-icon {
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+  margin-right: var(--spacing-xs);
+}
+
+.busqueda-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  padding: var(--spacing-sm) 0;
+  flex: 1;
+  min-width: 0;
+}
+.busqueda-input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.busqueda-clear {
+  background: transparent;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
+}
+.busqueda-clear:hover { color: var(--color-error); }
+
+.busqueda-hint {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
 }
 
 .tabs-container {

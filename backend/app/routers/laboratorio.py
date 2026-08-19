@@ -42,6 +42,7 @@ from app.schemas.laboratorio import (
 )
 from app.services import certificado_ley_pdf as cert_svc
 from app.services import laboratorio as svc
+from app.services import muestreo as muestreo_svc
 from app.services.pruebas import calcular_ley_planta
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi import UploadFile as FastAPIFile
@@ -950,3 +951,25 @@ def sync_batch(
 ):
     """Sincroniza análisis registrados offline desde tablet de laboratorio."""
     return svc.sincronizar_batch(db, payload, current_user.id)
+
+
+# ── Re-ensayo (Laboratorio) ───────────────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/cip/{cip}/crear-ensayo-ree",
+    summary="Crear CIP de re-ensayo (REE) para un CIP existente",
+)
+def crear_ensayo_ree(
+    cip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Genera un nuevo MapeoCIP con sufijo REE para el mismo lote del CIP dado.
+    El código tendrá la forma CIP-{misma_base}-REE{n}.
+    Accesible por Laboratorista (quien registra el re-ensayo).
+    Devuelve: { "nuevo_cip": "CIP-XXXXXX-REE1" }
+    """
+    nuevo_mapeo = muestreo_svc.crear_cip_ensayo_extra(db, cip_origen=cip)
+    return {"nuevo_cip": nuevo_mapeo.codigo_cip}
