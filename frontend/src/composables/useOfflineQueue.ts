@@ -20,7 +20,7 @@ import type { LoteMuestreo } from '@/api/muestreo'
 import type { TipoAnalisis, OrigenDatos } from '@/types/laboratorio'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 12
+const DB_VERSION = 13
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -210,6 +210,17 @@ export interface CipPruebaOfflineData {
     sync_error: string | null
 }
 
+// ── Tipo para CIPs de reensayo offline (REE) ────────────────────────────────
+
+export interface CipREEOfflineData {
+    offline_id: string       // UUID local
+    cip_origen: string       // CIP que originó el reensayo (ej: "CIP-058598D-A1")
+    codigo_ree: string       // CIP calculado localmente (ej: "CIP-058598D-REE1")
+    lote_id: number          // ID numérico del lote
+    synced: boolean
+    sync_error: string | null
+}
+
 // ── Apertura de DB ─────────────────────────────────────────
 
 let _db: IDBDatabase | null = null
@@ -273,6 +284,10 @@ async function openDB(): Promise<IDBDatabase> {
             if (oldVersion < 12) {
                 // Cola de pares CIP de recuperación generados offline en Pruebas Met.
                 db.createObjectStore('cips_pruebas_q', { keyPath: 'offline_id' })
+            }
+            if (oldVersion < 13) {
+                // Cola de CIPs REE (re-ensayo) generados offline
+                db.createObjectStore('cips_ree_q', { keyPath: 'offline_id' })
             }
         }
 
@@ -464,7 +479,7 @@ export async function limpiarSynced(): Promise<number> {
 
 export async function contarPendientes(): Promise<number> {
     try {
-        const [sesiones, lotes, fin, muestreos, pruebas, analisisLab, analisisRec, cips, cipsPruebas] = await Promise.all([
+        const [sesiones, lotes, fin, muestreos, pruebas, analisisLab, analisisRec, cips, cipsPruebas, cipsREE] = await Promise.all([
             getAll<SesionOfflineData>('sesiones_q').catch(() => []),
             getAll<LoteOnlineData>('lotes_online_q').catch(() => []),
             getAll<FinalizacionPendiente>('finalizaciones_q').catch(() => []),
@@ -474,6 +489,7 @@ export async function contarPendientes(): Promise<number> {
             getAll<AnalisisRecuperacionOfflineItem>('analisis_rec_q').catch(() => []),
             getAll<CipOfflineData>('cips_muestreo_q').catch(() => []),
             getAll<CipPruebaOfflineData>('cips_pruebas_q').catch(() => []),
+            getAll<CipREEOfflineData>('cips_ree_q').catch(() => []),
         ])
         return (
             sesiones.filter(s => !s.synced).length +
@@ -484,7 +500,8 @@ export async function contarPendientes(): Promise<number> {
             analisisLab.filter(a => !a.synced).length +
             analisisRec.filter(a => !a.synced).length +
             cips.filter(c => !c.synced).length +
-            cipsPruebas.filter(c => !c.synced).length
+            cipsPruebas.filter(c => !c.synced).length +
+            cipsREE.filter(c => !c.synced).length
         )
     } catch {
         return 0
@@ -1012,5 +1029,47 @@ export async function limpiarCipsPruebasSynced(): Promise<void> {
     const todos = await getAll<CipPruebaOfflineData>('cips_pruebas_q')
     for (const c of todos.filter(x => x.synced)) {
         await del('cips_pruebas_q', c.offline_id)
+    }
+}
+
+
+// ==========================================
+// MÓDULO: CIPs REE (RE-ENSAYO) OFFLINE
+// ==========================================
+
+export async function encolarCipREE(cip: CipREEOfflineData): Promise<void> {
+    await put('cips_ree_q', cip)
+}
+
+export async function obtenerCipsREEPendientes(): Promise<CipREEOfflineData[]> {
+    const todos = await getAll<CipREEOfflineData>('cips_ree_q')
+    return todos.filter(c => !c.synced)
+}
+
+/**
+ * Devuelve todos los CIPs REE offline (synced o no) para un lote concreto.
+ * Útil para calcular el correlativo offline sin colisionar con pendientes.
+ */
+export async function obtenerCipsREEPorLote(lote_id: number): Promise<CipREEOfflineData[]> {
+    const todos = await getAll<CipREEOfflineData>('cips_ree_q')
+    return todos.filter(c => c.lote_id === lote_id)
+}
+
+export async function marcarCipREESynced(offline_id: string): Promise<void> {
+    const cip = await get<CipREEOfflineData>('cips_ree_q', offline_id)
+    if (!cip) return
+    await put('cips_ree_q', { ...cip, synced: true, sync_error: null })
+}
+
+export async function marcarCipREEError(offline_id: string, error: string): Promise<void> {
+    const cip = await get<CipREEOfflineData>('cips_ree_q', offline_id)
+    if (!cip) return
+    await put('cips_ree_q', { ...cip, sync_error: error })
+}
+
+export async function limpiarCipsREESynced(): Promise<void> {
+    const todos = await getAll<CipREEOfflineData>('cips_ree_q')
+    for (const c of todos.filter(x => x.synced)) {
+        await del('cips_ree_q', c.offline_id)
     }
 }

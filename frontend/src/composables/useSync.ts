@@ -63,8 +63,12 @@ import {
     marcarCipPruebaSynced,
     marcarCipPruebaError,
     limpiarCipsPruebasSynced,
+    obtenerCipsREEPendientes,
+    marcarCipREESynced,
+    marcarCipREEError,
+    limpiarCipsREESynced,
 } from '@/composables/useOfflineQueue'
-import { laboratorioApi } from '@/api/laboratorio'
+import { laboratorioApi, crearEnsayoREE } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
 import { pruebasApi } from '@/api/pruebas'
 import type {
@@ -389,6 +393,24 @@ async function sincronizarCipsPruebas(): Promise<void> {
     }
 }
 
+async function sincronizarREE(): Promise<void> {
+    const pendientes = await obtenerCipsREEPendientes()
+    if (pendientes.length === 0) return
+
+    for (const cip of pendientes) {
+        try {
+            // El backend es idempotente: si el REE ya existe, devuelve el mismo.
+            await crearEnsayoREE(cip.cip_origen)
+            await marcarCipREESynced(cip.offline_id)
+        } catch (err: any) {
+            const msg = err?.response?.data?.detail ?? err?.message ?? 'Error desconocido'
+            await marcarCipREEError(cip.offline_id, msg)
+            console.error(`[useSync] Error al sincronizar CIP REE ${cip.codigo_ree}:`, msg)
+        }
+    }
+    await limpiarCipsREESynced()
+}
+
 async function sincronizarLaboratorio(): Promise<void> {
     const pendientesLey = await obtenerAnalisisLeyPendientes()
     const pendientesRec = await obtenerAnalisisRecuperacionPendientes()
@@ -543,6 +565,7 @@ async function sincronizar(): Promise<void> {
         await sincronizarPruebas()
         await sincronizarCips()
         await sincronizarCipsPruebas()
+        await sincronizarREE()            // CIPs REE antes que análisis de ley
         await sincronizarLaboratorio()
 
         ultimoSync.value = new Date().toLocaleString('es-PE')

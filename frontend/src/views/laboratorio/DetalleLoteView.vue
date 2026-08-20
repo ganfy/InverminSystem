@@ -147,6 +147,18 @@
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none"
                     @change="adjuntarCertLey($event, a.id)" />
                 </label>
+                <!-- Botón Solicitar Reensayo: visible solo en análisis Au (no Ag) con CIP -->
+                <button
+                  v-if="a.material !== 'Ag' && a.cip"
+                  class="btn-secondary-sm"
+                  style="color:#a3e635;border-color:rgba(163,230,53,0.35)"
+                  :disabled="cargandoREE === a.cip"
+                  :title="'Crear un nuevo ensayo de re-ensayo (REE) para el CIP ' + a.cip"
+                  @click="agregarEnsayoREEDetalle(a.cip)"
+                >
+                  <span v-if="cargandoREE === a.cip" class="spinner" style="width:0.7rem;height:0.7rem;margin-right:0.25rem"></span>
+                  <span v-else>+ Reensayo</span>
+                </button>
 
               </template>
               <button
@@ -1037,7 +1049,7 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import type { LoteLabOut } from '@/types/laboratorio'
-import { laboratorioApi, type LeyComercialCalc } from '@/api/laboratorio'
+import { laboratorioApi, crearEnsayoREE, type LeyComercialCalc } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
 import { pruebasApi } from '@/api/pruebas'
 
@@ -1055,6 +1067,32 @@ const tabActual      = ref<'ley' | 'rec'>('ley')
 const materialFiltro = ref<'Au' | 'Ag'>('Au')
 const analisisAgCache = ref<import('@/types/laboratorio').AnalisisLeyOut[]>([])
 const cargandoAg      = ref(false)
+
+// ── Re-ensayo (REE) ──────────────────────────────────────────────────────────
+const cargandoREE = ref<string | null>(null)
+
+/**
+ * Crea un CIP de re-ensayo para el análisis indicado y recarga el lote.
+ * No navega: el CIP REE quedará disponible en "Registrar Nueva Ley" para
+ * que laboratorio (o comercial) lo use cuando quiera.
+ */
+async function agregarEnsayoREEDetalle(cipOrigen: string) {
+  if (cargandoREE.value) return
+  cargandoREE.value = cipOrigen
+  try {
+    const { nuevo_cip } = await crearEnsayoREE(cipOrigen)
+    ui.toast(`Re-ensayo creado: ${nuevo_cip} — disponible en "Registrar Nueva Ley"`, 'success')
+    // Recargar lote para que el nuevo CIP aparezca en cips_detalle
+    lote.value = await store.cargarDetalleLote(ipActual)
+  } catch (err: any) {
+    const msg = err?.response?.data?.detail ?? 'Error al crear el re-ensayo'
+    ui.toast(msg, 'error')
+  } finally {
+    cargandoREE.value = null
+  }
+}
+
+
 
 const analisisFiltrado = computed(() => {
   if (!lote.value) return []

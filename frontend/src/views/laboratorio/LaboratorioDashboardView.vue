@@ -357,7 +357,8 @@ import { laboratorioApi } from '@/api/laboratorio'
 import { crearEnsayoREE } from '@/api/laboratorio'
 import type { CIPAnalisisOut, LoteLabOut, AnalisisRecuperacionOut } from '@/types/laboratorio'
 import { useSync } from '@/composables/useSync'
-import { obtenerAnalisisLeyPendientes, type AnalisisLeyOfflineItem } from '@/composables/useOfflineQueue'
+import { obtenerAnalisisLeyPendientes, type AnalisisLeyOfflineItem, encolarCipREE, obtenerCipsREEPorLote } from '@/composables/useOfflineQueue'
+import { generateUUID } from '@/utils/uuid'
 
 const router = useRouter()
 const store  = useLaboratorioStore()
@@ -614,9 +615,52 @@ async function agregarEnsayoREE(cipOrigen: string) {
   if (cargandoREE.value) return
   cargandoREE.value = cipOrigen
   try {
-    const { nuevo_cip } = await crearEnsayoREE(cipOrigen)
-    ui.toast(`Re-ensayo creado: ${nuevo_cip}`, 'success')
-    router.push(`/laboratorio/ley/${nuevo_cip}`)
+    if (online.value) {
+      // ── Modo online: llamada directa al servidor ────────────────────────────
+      const { nuevo_cip } = await crearEnsayoREE(cipOrigen)
+      ui.toast(`Re-ensayo creado: ${nuevo_cip}`, 'success')
+      router.push(`/laboratorio/ley/${nuevo_cip}`)
+    } else {
+      // ── Modo offline: cálculo local del código REE ─────────────────────────
+      // 1. Obtener el CIP origen del caché local
+      const cipData = store.cips.find(c => c.cip === cipOrigen)
+      if (!cipData) {
+        ui.toast('CIP no encontrado en caché local. Reconecta para crear el reensayo.', 'error')
+        return
+      }
+
+      // 2. Extraer la base ofuscada del código CIP (ej: "058598D" de "CIP-058598D-A1")
+      const match = cipOrigen.match(/^CIP-([A-Z0-9]+)-/)
+      if (!match) {
+        ui.toast('Formato de CIP no reconocido.', 'error')
+        return
+      }
+      const baseOfuscada = match[1]!
+
+      // 3. Contar REEs existentes: en caché de CIPs del store + pendientes offline para este lote
+      const loteId = cipData.lote_id
+      const cipsReeLoteCache = store.cips.filter(
+        c => c.lote_id === loteId && c.cip.includes('-REE')
+      ).length
+      const cipsReeLoteOffline = (await obtenerCipsREEPorLote(loteId)).length
+      const nRee = cipsReeLoteCache + cipsReeLoteOffline + 1
+
+      // 4. Construir código
+      const codigoRee = `CIP-${baseOfuscada}-REE${nRee}`
+
+      // 5. Encolar en IndexedDB
+      await encolarCipREE({
+        offline_id: generateUUID(),
+        cip_origen: cipOrigen,
+        codigo_ree: codigoRee,
+        lote_id: loteId,
+        synced: false,
+        sync_error: null,
+      })
+
+      ui.toast(`Re-ensayo creado offline: ${codigoRee}. Se sincronizará al reconectar.`, 'info')
+      router.push(`/laboratorio/ley/${codigoRee}`)
+    }
   } catch (err: any) {
     const msg = err?.response?.data?.detail ?? 'Error al crear el re-ensayo'
     ui.toast(msg, 'error')
