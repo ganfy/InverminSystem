@@ -2,8 +2,22 @@
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal modal-md">
       <header class="modal-header">
-        <div class="modal-title-group">
+        <div class="modal-title-group" style="position: relative; display: flex; align-items: center; gap: 0.5rem;">
           <h2>Etiquetado CIP: <span class="gold">{{ ipLote }}</span></h2>
+          <button class="btn-icon" @click="mostrarAyuda = !mostrarAyuda" title="Ayuda sobre sufijos">
+            <HelpCircle :size="18" />
+          </button>
+          
+          <div v-if="mostrarAyuda" class="ayuda-popover">
+            <h4>Sufijos de Etiquetas</h4>
+            <ul>
+              <li><strong>1 y 2:</strong> Laboratorio</li>
+              <li><strong>3:</strong> Contramuestra</li>
+              <li><strong>4:</strong> Minero</li>
+              <li><strong>5:</strong> Dirimencia</li>
+              <li><strong>6, 7:</strong> Remuestreo</li>
+            </ul>
+          </div>
         </div>
         <button class="modal-close" @click="emit('close')"><X :size="20" /></button>
       </header>
@@ -127,7 +141,7 @@ import { useMuestreoStore } from '@/stores/muestreo'
 import { useUiStore } from '@/stores/ui'
 import { useSync } from '@/composables/useSync'
 import type { MapeoCIPOut } from '@/api/muestreo'
-import { X, WifiOff } from 'lucide-vue-next'
+import { X, WifiOff, HelpCircle } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { muestreoApi } from '@/api/muestreo'
 import { adminApi } from '@/api/admin'
@@ -138,6 +152,8 @@ const emit = defineEmits(['close', 'etiquetado'])
 const store = useMuestreoStore()
 const ui = useUiStore()
 const sync = useSync()
+
+const mostrarAyuda = ref(false)
 
 const MAX_CIPS = 5 // Esto podría venir de un endpoint de configuración global después
 const cargando = ref(true)
@@ -503,6 +519,52 @@ async function cambiarLab(cip: MapeoCIPOut, lab: string) {
   max-width: 340px;
   margin: 0 auto;
   width: 100%;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.btn-icon:hover {
+  color: var(--color-gold);
+}
+.ayuda-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  background: var(--color-background-soft, #1e1e1e);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 100;
+  width: max-content;
+  text-align: left;
+}
+.ayuda-popover h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--color-gold);
+  font-size: 0.9rem;
+}
+.ayuda-popover ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.ayuda-popover li strong {
+  color: var(--color-text-bright, #fff);
 }
 
 @media print { .no-print { display: none !important; } }
