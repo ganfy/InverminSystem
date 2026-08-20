@@ -532,6 +532,17 @@ const filasMostrar = computed(() => {
       if (cipsConAnalisisOffline.has(c.cip)) return false  // excluir si ya está en sección offline
       
       if (tm === 'PROCESO' && mostrarSoloCIPs.value) return false
+      
+      // Ocultar completados si el tipo de análisis es externo (ej. llenado desde Comercial)
+      if (c.estado_ley === 'COMPLETADO') {
+        const vigente = c.analisis_ley.find(x => x.vigente)
+        const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
+        const a = vigente ?? ultimo
+        if (a && a.tipo_analisis === 'externo') {
+          return false // Es externo, se oculta del dashboard de laboratorio
+        }
+      }
+
       return true
     }
     // For solidos/solucion tab: show Recuperacion types, or PROCESO if it has recuperacion analysis
