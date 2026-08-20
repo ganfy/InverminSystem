@@ -127,6 +127,7 @@ PERMISOS = [
     ("Comercial", "PRUEBAS_MET", "VIEW", True),
     ("Metalurgista", "PRUEBAS_MET", "CREATE", True),
     ("Metalurgista", "PRUEBAS_MET", "VIEW", True),
+    ("Metalurgista", "PRUEBAS_MET", "UPDATE", True),
     # ── RUMAS ─────────────────────────────────────────────────────────────────
     ("Admin", "RUMAS", "CREATE", True),
     ("Admin", "RUMAS", "UPDATE", True),

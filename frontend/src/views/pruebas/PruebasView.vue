@@ -285,15 +285,40 @@
         </div>
         <div class="modal-body" style="text-align:center; max-height: 60vh; overflow-y: auto;">
           <p class="field-label" style="margin-bottom:0.5rem">LOTE: {{ etiquetaModal.ip }}</p>
-          <div style="display:flex; flex-direction:column; gap:1.5rem; align-items:center;">
-            <div v-for="(cip, i) in etiquetaModal.cips" :key="cip" class="etiqueta-cip" style="width: fit-content;">
+          
+          <div class="control-impresion no-print">
+            <div class="formato-selector">
+              <span class="formato-label">Formato de Rollo:</span>
+              <div class="formato-toggle">
+                <button
+                  type="button"
+                  class="btn-toggle"
+                  :class="{ active: formatoRollo === '2col' }"
+                  @click="cambiarFormato('2col')"
+                >
+                  2 Columnas (2"×1" Doble)
+                </button>
+                <button
+                  type="button"
+                  class="btn-toggle"
+                  :class="{ active: formatoRollo === '1col' }"
+                  @click="cambiarFormato('1col')"
+                >
+                  1 Columna (4"×2" / Simple)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="area-impresion-pruebas" class="grid-etiquetas" :class="{ 'grid-etiquetas--1col': formatoRollo === '1col' }">
+            <div v-for="(cip, i) in etiquetaModal.cips" :key="cip" class="etiqueta-print">
               <span class="etiqueta-title">INVERMIN PAITITI S.A.C. - RECUPERACIÓN</span>
-              <svg :id="'barcode-prueba-' + i" class="barcode-container"></svg>
+              <svg :id="'barcode-prueba-' + i" class="barcode-visual"></svg>
               <span class="etiqueta-codigo">{{ cip }}</span>
             </div>
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer no-print">
           <button class="btn-secondary" @click="etiquetaModal = null">Cerrar</button>
           <button class="btn-primary" @click="imprimirEtiqueta(etiquetaModal)">Imprimir Todas</button>
         </div>
@@ -543,6 +568,15 @@ const pruebasOffline = ref<PruebaQueueData[]>([])
 const cargando      = ref(false)
 const etiquetando   = ref<string | null>(null)   // IP en proceso de etiquetado
 const etiquetaModal = ref<{ ip: string; cips: string[] } | null>(null)
+
+type FormatoRollo = '1col' | '2col'
+const formatoRollo = ref<FormatoRollo>(
+  (localStorage.getItem('invermin_formato_etiquetas') as FormatoRollo) || '2col'
+)
+const cambiarFormato = (formato: FormatoRollo) => {
+  formatoRollo.value = formato
+  localStorage.setItem('invermin_formato_etiquetas', formato)
+}
 
 const ipsSeleccionados = ref<string[]>([])
 const filtroEstado   = ref('Todos')
@@ -997,18 +1031,49 @@ async function confirmarAdicion() {
 }
 
 function imprimirEtiqueta(e: { ip: string; cips: string[] }) {
+  const esDobleColumna = formatoRollo.value === '2col';
+
   const css = `
-    @page { size: auto; margin: 0mm; }
-    body { font-family: monospace; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:100vh; margin:0; padding:20px; box-sizing:border-box;}
-    .et { border:2px dashed #333; border-radius:8px; padding:12px 18px; text-align:center; width:100%; max-width:100%; box-sizing:border-box; page-break-after: always; margin: 10px auto; display: block;}
-    .et:last-child { page-break-after: auto; }
-    .et-title { font-size:0.65rem; font-weight:900; letter-spacing:.1em; display:block; margin-bottom:4px; }
-    .et-sub { font-size:0.55rem; border-bottom:1px solid #000; padding-bottom:4px; display:block; width:100%; text-align:center; margin-bottom:8px; }
-    svg { width:95%; max-width:100%; height:45px; margin:6px 0; }
-    .et-code { font-size:1.6rem; font-weight:900; margin-top:8px; display:block; letter-spacing:0.05em; }
+    @page { size: ${esDobleColumna ? '4in 1in' : 'auto'}; margin: 0mm; }
+    body { font-family: sans-serif; margin: 0; padding: 0; background: white; color: black; }
+    #area-impresion-pruebas {
+      display: flex;
+      flex-wrap: ${esDobleColumna ? 'wrap' : 'nowrap'};
+      flex-direction: ${esDobleColumna ? 'row' : 'column'};
+      width: 100%;
+    }
+    .etiqueta-print {
+      width: ${esDobleColumna ? '50%' : '100%'};
+      max-width: ${esDobleColumna ? '50%' : '100%'};
+      height: ${esDobleColumna ? '24.5mm' : 'auto'};
+      max-height: ${esDobleColumna ? '24.5mm' : 'none'};
+      overflow: hidden;
+      box-sizing: border-box;
+      padding: ${esDobleColumna ? '1mm 1mm' : '3mm 2mm'};
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    ${esDobleColumna ? `
+    .etiqueta-print:nth-child(2n):not(:last-child) {
+      page-break-after: always;
+      break-after: page;
+    }
+    ` : `
+    .etiqueta-print:not(:last-child) {
+      page-break-after: always;
+      break-after: page;
+    }
+    `}
+    .etiqueta-title { font-size: ${esDobleColumna ? '0.45rem' : '0.65rem'}; font-weight: 900; letter-spacing: 0.05em; margin: 0 0 2px 0; line-height: 1.15; text-align: center; }
+    .barcode-visual { width: 95%; max-width: 100%; height: ${esDobleColumna ? '26px' : '45px'}; margin: 1px 0; }
+    .etiqueta-codigo { font-family: monospace; font-size: ${esDobleColumna ? '0.85rem' : '1.2rem'}; font-weight: 900; letter-spacing: 0.03em; margin: 2px 0 0 0; line-height: 1.15; }
+    .no-print { display: none !important; }
     @media print {
-      body { display: block; justify-content: unset; align-items: unset; min-height: unset; padding:0; margin:0;}
-      .et { margin: 0; border: none; padding: 3mm 2mm; border-radius:0; width: 100%; max-width: 100%; }
+      .etiqueta-print { border: none !important; border-radius: 0; box-shadow: none !important; }
     }
   `
 
@@ -1016,22 +1081,23 @@ function imprimirEtiqueta(e: { ip: string; cips: string[] }) {
     const svgEl = document.querySelector<SVGElement>(`#barcode-prueba-${i}`)
     const svgHtml = svgEl ? svgEl.outerHTML : ''
     return `
-    <div class="et">
-      <span class="et-title">INVERMIN PAITITI S.A.C.</span>
-      <span class="et-sub">RECUPERACIÓN</span>
+    <div class="etiqueta-print">
+      <span class="etiqueta-title">INVERMIN PAITITI S.A.C. - RECUPERACIÓN</span>
       ${svgHtml}
-      <span class="et-code">${cip}</span>
+      <span class="etiqueta-codigo">${cip}</span>
     </div>`
   }).join('');
 
-  const html = `<!DOCTYPE html><html><head><style>${css}</style></head><body>
-    ${htmlEtiquetas}
-    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),200))<\/script>
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Impresión de Etiquetas Pruebas</title><style>${css}</style></head><body>
+    <div id="area-impresion-pruebas">
+      ${htmlEtiquetas}
+    </div>
+    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250))<\/script>
   </body></html>`
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   window.open(url, '_blank')
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  setTimeout(() => URL.revokeObjectURL(url), 120000)
 }
 </script>
 
@@ -1041,6 +1107,80 @@ function imprimirEtiqueta(e: { ip: string; cips: string[] }) {
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+/* ── Estilos de Etiquetas (Impresión Doble) ────────────────────────── */
+.control-impresion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+.formato-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--color-background-soft, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+}
+.formato-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.formato-toggle {
+  display: inline-flex;
+  background: var(--color-background-mute, rgba(0, 0, 0, 0.35));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  padding: 2px;
+}
+.btn-toggle {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-toggle:hover {
+  color: var(--color-text);
+}
+.btn-toggle.active {
+  background: var(--color-gold, #d4af37);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.grid-etiquetas { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid-etiquetas--1col { grid-template-columns: 1fr; max-width: 340px; margin: 0 auto; width: 100%; }
+
+.etiqueta-print {
+  background-color: #ffffff;
+  color: #000000;
+  border-radius: 4px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  border: 1px dashed #ccc;
+  page-break-inside: avoid;
+}
+.etiqueta-title { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; text-align: center; }
+.barcode-visual { transform: scaleY(1.1); margin: 0.5rem 0; width: 95%; height: 45px; }
+.etiqueta-codigo { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 900; letter-spacing: 0.05em; }
+
+@media print { .no-print { display: none !important; } }
+@media (max-width: 560px) {
+  .grid-etiquetas { grid-template-columns: 1fr; }
 }
 
 /* ── Offline section ─────────────────────────────────── */

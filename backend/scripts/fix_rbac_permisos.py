@@ -206,6 +206,11 @@ def run(db):
     upsert_permiso("Comercial", "TERCEROS", "UPDATE", False)  # Bloquea editar parámetros
     upsert_permiso("Comercial", "TERCEROS", "DELETE", False)
 
+    print(
+        "\n  Insertando permiso PRUEBAS_MET/UPDATE para Metalurgista (necesario para etiquetar y adiciones)..."
+    )
+    upsert_permiso("Metalurgista", "PRUEBAS_MET", "UPDATE", True)
+
     db.commit()
     print(f"\n  {creados} permisos nuevos insertados, {actualizados} actualizados.")
 
