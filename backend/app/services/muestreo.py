@@ -313,6 +313,7 @@ def obtener_lotes_para_muestreo(db: Session):
             SesionDescarga.estado == EstadoSesion.COMPLETO,
             ~Lote.eliminado,
             Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]),
+            Lote.ip.like("IP-%"),
         )
         .all()
     )
@@ -418,16 +419,22 @@ def crear_cip_ensayo_extra(db: Session, cip_origen: str) -> MapeoCIP:
         )
     base_ofuscada = match.group(1)
 
-    # 3. Contar CIPs REE existentes para este lote
+    # 3. Encontrar el número máximo de REE para esta base de CIP
     cips_ree_existentes = (
-        db.query(MapeoCIP)
-        .filter(
-            MapeoCIP.lote_id == lote_id,
-            MapeoCIP.codigo_cip.like("%-REE%"),
-        )
-        .count()
+        db.query(MapeoCIP.codigo_cip)
+        .filter(MapeoCIP.codigo_cip.like(f"CIP-{base_ofuscada}-REE%"))
+        .all()
     )
-    n_ree = cips_ree_existentes + 1
+
+    max_n = 0
+    for (codigo,) in cips_ree_existentes:
+        match_ree = _re.search(r"-REE(\d+)$", codigo)
+        if match_ree:
+            n = int(match_ree.group(1))
+            if n > max_n:
+                max_n = n
+
+    n_ree = max_n + 1
 
     # 4. Construir código final: CIP-{base}-REEn
     codigo_ree = f"CIP-{base_ofuscada}-REE{n_ree}"
