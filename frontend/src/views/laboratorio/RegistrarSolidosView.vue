@@ -200,7 +200,7 @@ interface Muestra {
 }
 
 function nuevaMuestra(): Muestra {
-  return { peso_g: null, au1_mg: null, au2_mg: null, au_ag_mg: null, numero_ensayo: 1, _calc: null }
+  return { peso_g: null, au1_mg: null, au2_mg: null, au_ag_mg: 0, numero_ensayo: 1, _calc: null }
 }
 
 const muestras = ref<Muestra[]>([nuevaMuestra()])
@@ -364,7 +364,7 @@ onMounted(async () => {
                   peso_g: parseFloat(d.peso || d.peso_g || 0),
                   au1_mg: null,
                   au2_mg: null,
-                  au_ag_mg: null,
+                  au_ag_mg: 0,
                   numero_ensayo: num,
                   _calc: null
                 })

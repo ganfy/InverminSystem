@@ -1130,7 +1130,7 @@ const modalAgAnalisisId = ref<number | null>(null)  // analisis Au sobre el que 
 const agGuardando       = ref(false)
 const agErr             = ref('')
 const formAg = ref({
-  au_ag_mg:       null as number | null,
+  au_ag_mg:       0 as number | null,
   au_mg:          null as number | null,
   peso_muestra:   null as number | null,
   laboratorio:    '',
@@ -1274,7 +1274,7 @@ const previewAg = computed(() => {
 
 function abrirModalAg(analisisAuId: number, labDefault: string) {
   formAg.value = {
-    au_ag_mg: null, au_mg: null, peso_muestra: null,
+    au_ag_mg: 0, au_mg: null, peso_muestra: null,
     laboratorio: labDefault,
     fecha_analisis: new Date().toISOString().split('T')[0],
   }

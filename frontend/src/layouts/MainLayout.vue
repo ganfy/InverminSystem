@@ -196,15 +196,7 @@ watch(() => online.value, (isOnline) => {
   transition: transform 0.25s ease;
 }
 
-/* Desktop: siempre visible */
-@media (min-width: 768px) {
-  .sidebar {
-    transform: translateX(0);
-    position: sticky;
-    top: 0;
-    height: 100vh;
-  }
-}
+
 
 /* Mobile: abierto */
 .sidebar--open {
@@ -367,13 +359,7 @@ watch(() => online.value, (isOnline) => {
   min-width: 0;
 }
 
-@media (min-width: 768px) {
-  .main-wrapper {
-    margin-left: 5%;
-    margin-right: 5%;
-    margin-top: 1%;
-  }
-}
+
 
 /* ── Topbar mobile ───────────────────────────────────────────── */
 .topbar {
@@ -390,10 +376,15 @@ watch(() => online.value, (isOnline) => {
 
 @media (min-width: 768px) {
   .topbar {
+    background: transparent;
+    border-bottom: none;
+    padding: 1rem 1.5rem 0 1.5rem;
+    position: static;
+  }
+  .topbar-title {
     display: none;
   }
 }
-
 .hamburger {
   background: transparent;
   border: none;

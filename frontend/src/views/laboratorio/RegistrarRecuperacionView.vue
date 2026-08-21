@@ -283,7 +283,7 @@ function toOzTc(grTm: number | null): number | null {
 }
 
 function muestraVacia(): MuestraForm {
-  return { peso_g: null, au1_mg: null, au2_mg: null, au_ag_mg: null, numero_ensayo: 1, _leyAu: null, _leyAg: null }
+  return { peso_g: null, au1_mg: null, au2_mg: null, au_ag_mg: 0, numero_ensayo: 1, _leyAu: null, _leyAg: null }
 }
 
 const muestras = ref<MuestraForm[]>([muestraVacia()])
