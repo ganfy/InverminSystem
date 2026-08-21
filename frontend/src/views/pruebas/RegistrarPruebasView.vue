@@ -124,8 +124,8 @@
     porcentaje_nacn: null as number | null,
     ph_inicial: 6 as number | null,
     ph_final: null as number | null,
-    adicion_nacn: null as number | null,
-    adicion_naoh: null as number | null,
+    adicion_nacn: 12.5 as number | null,
+    adicion_naoh: 4 as number | null,
     gasto_agno3: null as number | null,
   })
 
@@ -144,8 +144,8 @@
           porcentaje_nacn: datosGuardados.porcentaje_nacn,
           ph_inicial: datosGuardados.ph_inicial,
           ph_final: datosGuardados.ph_final,
-          adicion_nacn: datosGuardados.adicion_nacn,
-          adicion_naoh: datosGuardados.adicion_naoh,
+          adicion_nacn: datosGuardados.adicion_nacn ?? 12.5,
+          adicion_naoh: datosGuardados.adicion_naoh ?? 4,
           gasto_agno3: datosGuardados.gasto_agno3
         }
       }

@@ -105,7 +105,7 @@
             title="Recuperación baja — crear nueva prueba metalúrgica"
           >
             <span v-if="remuestreando === item.ip" class="spinner" style="margin-right:0.3rem"></span>
-            Mandar a Remuestreo
+            Enviar Reensayo
           </button>
         </div>
       </div>
@@ -174,18 +174,18 @@ function fmtD(v?: number | null, dec = 3) {
 
 async function mandarARemuestreo(ip: string) {
   const ok = await ui.showConfirm({
-    title: 'Mandar a Remuestreo',
+    title: 'Enviar Reensayo',
     message: `Recuperación baja detectada para ${ip}. Se creará una nueva prueba metalúrgica. ¿Confirmar?`,
-    confirmLabel: 'Confirmar Remuestreo',
+    confirmLabel: 'Confirmar Reensayo',
   })
   if (!ok) return
   remuestreando.value = ip
   try {
     await pruebasApi.solicitarRemuestreo(ip)
-    ui.toast(`Remuestreo solicitado para ${ip}. Nueva prueba creada en Pruebas Metalúrgicas.`, 'success')
+    ui.toast(`Reensayo solicitado para ${ip}. Nueva prueba creada en Pruebas Metalúrgicas.`, 'success')
     await cargar()
   } catch (e: any) {
-    ui.toast(e?.response?.data?.detail ?? 'Error al solicitar remuestreo', 'error')
+    ui.toast(e?.response?.data?.detail ?? 'Error al solicitar reensayo', 'error')
   } finally {
     remuestreando.value = null
   }

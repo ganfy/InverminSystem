@@ -101,6 +101,10 @@ describe('useSync - Manager de Sincronización', () => {
                 const pendientesPostSync = await obtenerSesionesPendientes()
                 expect(pendientesPostSync).toHaveLength(0)
             }, { timeout: 10000, interval: 50 })
+
+            await vi.waitFor(() => {
+                expect(syncManager.sincronizando.value).toBe(false)
+            }, { timeout: 10000 })
         })
     })
 

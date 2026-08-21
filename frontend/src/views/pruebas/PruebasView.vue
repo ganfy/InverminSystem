@@ -197,9 +197,9 @@
                   + Adición
                 </button>
 
-                <!-- Etiquetar: solo cuando COMPLETADO y sin CIP aún -->
+                <!-- Etiquetar: solo cuando COMPLETADO, o EN PROCESO faltando 5h, y sin CIP aún -->
                 <button
-                  v-if="prueba.estado === 'COMPLETADO' && !prueba.etiquetado"
+                  v-if="puedeEtiquetar(prueba)"
                   class="btn-secondary"
                   style="font-size:0.75rem;padding:0.3rem 0.75rem"
                   :disabled="etiquetando === prueba.ip"
@@ -582,6 +582,21 @@ const ipsSeleccionados = ref<string[]>([])
 const filtroEstado   = ref('Todos')
 const filtroBusqueda = ref('')
 const mostrarDescartadas = ref(false)
+
+function puedeEtiquetar(prueba: LotePruebaList) {
+  if (prueba.etiquetado) return false
+  if (prueba.estado === 'COMPLETADO') return true
+  if (prueba.estado === 'EN PROCESO' && prueba.fecha_ingreso) {
+    const restante = obtenerTiempoRestante(prueba.fecha_ingreso)
+    if (restante.terminado) return true
+    
+    // Si faltan <= 5 horas (por ej. 4h 59m, o exactamente 5h 0m)
+    if (restante.horas < 5 || (restante.horas === 5 && restante.minutos === 0)) {
+      return true
+    }
+  }
+  return false
+}
 
 // ── Descartar prueba ──────────────────────────────────────────────────────────
 const modalDescartar  = ref<string | null>(null)  // IP de la prueba a descartar

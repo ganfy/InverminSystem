@@ -365,8 +365,11 @@ def etiquetar_prueba(
         raise ValueError("No se puede etiquetar una prueba descartada")
 
     ahora = datetime.now(UTC).replace(tzinfo=None)
-    if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=48):
-        raise ValueError("La prueba aún no ha completado las 48 horas requeridas")
+    # Se permite etiquetar hasta 5 horas antes de que se cumplan las 48h (es decir, a las 43h)
+    if not prueba.fecha_ingreso or ahora < prueba.fecha_ingreso + timedelta(hours=43):
+        raise ValueError(
+            "La prueba aún no ha completado las horas requeridas (se permite etiquetar 5h antes de las 48h)"
+        )
 
     # Contador independiente: solo CIPs de recuperación (no incluye los de muestreo/laboratorio)
     total_cips = (
