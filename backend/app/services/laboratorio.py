@@ -556,6 +556,25 @@ def obtener_detalle_lote(db: Session, ip: str, material: str | None = None) -> L
 def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: int) -> AnalisisLey:
     from datetime import date
 
+    # Idempotencia: previene duplicados exactos enviados por sync offline o doble click
+    existente = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.cip == datos.cip,
+            AnalisisLey.tipo_analisis == datos.tipo_analisis,
+            AnalisisLey.material == datos.material,
+            AnalisisLey.vigente,
+            ~AnalisisLey.eliminado,
+        )
+        .first()
+    )
+    if existente and existente.origen_datos == datos.origen_datos:
+        if (
+            abs(float(existente.ley_fino) - float(datos.ley_fino)) < 1e-5
+            and abs(float(existente.ley_grueso) - float(datos.ley_grueso)) < 1e-5
+        ):
+            return existente
+
     mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == datos.cip).first()
 
     if not mapeo:
@@ -706,6 +725,32 @@ def registrar_analisis_recuperacion(
     Usado para: laboratorio externo via certificado, o flujos de Proceso sin pending previo.
     """
     from datetime import date
+
+    # Idempotencia: previene duplicados exactos enviados por sync offline o doble click
+    existente = (
+        db.query(AnalisisRecuperacion)
+        .filter(
+            AnalisisRecuperacion.cip == datos.cip,
+            AnalisisRecuperacion.vigente,
+            ~AnalisisRecuperacion.eliminado,
+            AnalisisRecuperacion.estado == EstadoRecuperacion.COMPLETADO,
+            AnalisisRecuperacion.sub_tipo == (datos.sub_tipo or None),
+        )
+        .first()
+    )
+    if existente and existente.origen_datos == datos.origen_datos:
+        match_cola = (
+            abs(float(existente.ley_cola) - float(datos.ley_cola)) < 1e-5
+            if existente.ley_cola is not None and datos.ley_cola is not None
+            else existente.ley_cola == datos.ley_cola
+        )
+        match_liq = (
+            abs(float(existente.ley_liquido) - float(datos.ley_liquido)) < 1e-5
+            if existente.ley_liquido is not None and datos.ley_liquido is not None
+            else existente.ley_liquido == datos.ley_liquido
+        )
+        if match_cola and match_liq:
+            return existente
 
     mapeo = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == datos.cip).first()
 

@@ -652,6 +652,7 @@ class AnalisisDetalle(Base):
     analisis_recuperacion = relationship(
         "AnalisisRecuperacion",
         foreign_keys=[recuperacion_id],
+        back_populates="detalles",
     )
 
 
@@ -708,6 +709,12 @@ class AnalisisRecuperacion(AuditMixin, Base):
         back_populates="analisis_recuperacion",
     )
     descartador = relationship("Usuario", foreign_keys=[descartado_por])
+    detalles = relationship(
+        "AnalisisDetalle",
+        foreign_keys="AnalisisDetalle.recuperacion_id",
+        back_populates="analisis_recuperacion",
+        cascade="all, delete-orphan",
+    )
 
 
 # =============================================================================

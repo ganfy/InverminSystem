@@ -158,6 +158,7 @@ import { useLaboratorioStore } from '@/stores/laboratorio'
 import { useUiStore } from '@/stores/ui'
 import type { AnalisisRecuperacionOut } from '@/types/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
+import axiosApi from '@/api/axios'
 
 const router = useRouter()
 const route = useRoute()
@@ -341,8 +342,9 @@ onMounted(async () => {
 
       // Detectar si ya existe COMPLETADO de tipo SOLIDOS
       const completado = cipObj.analisis_recuperacion.find(
-        a => a.estado === 'COMPLETADO' && a.vigente &&
-             (a.sub_tipo === 'SOLIDOS' || !a.sub_tipo)
+        (a: any) => a.estado === 'COMPLETADO' && a.vigente &&
+             (a.sub_tipo === 'SOLIDOS' || !a.sub_tipo) &&
+             (analisisIdParam ? a.id === analisisIdParam : true)
       )
       if (completado) {
         yaGuardado.value = true
@@ -352,16 +354,28 @@ onMounted(async () => {
 
         // Cargar muestras del backend para que el usuario pueda verlas/editarlas
         try {
-          const res = await api.get(`/laboratorio/recuperacion/${completado.id}`)
+          const res = await axiosApi.get(`/laboratorio/recuperacion/${completado.id}`)
           if (res.data && res.data.detalles && res.data.detalles.length) {
-            muestras.value = res.data.detalles.map((d: any) => ({
-              peso_g: d.peso_g,
-              au1_mg: d.au1_mg,
-              au2_mg: d.au2_mg,
-              au_ag_mg: d.au_ag_mg,
-              numero_ensayo: d.numero_ensayo || 1,
-              _calc: null
-            }))
+            const agrupado = new Map<number, any>()
+            for (const d of res.data.detalles) {
+              const num = d.numero_ensayo || 1
+              if (!agrupado.has(num)) {
+                agrupado.set(num, {
+                  peso_g: parseFloat(d.peso || d.peso_g || 0),
+                  au1_mg: null,
+                  au2_mg: null,
+                  au_ag_mg: null,
+                  numero_ensayo: num,
+                  _calc: null
+                })
+              }
+              const obj = agrupado.get(num)
+              const val = d.mineral_mg != null ? parseFloat(d.mineral_mg) : null
+              if (d.origen === 'AU1') obj.au1_mg = val
+              else if (d.origen === 'AU2') obj.au2_mg = val
+              else if (d.origen === 'AU_AG') obj.au_ag_mg = val
+            }
+            muestras.value = Array.from(agrupado.values())
             muestras.value.forEach((_, i) => recalcMuestra(i))
           }
         } catch (e) {
