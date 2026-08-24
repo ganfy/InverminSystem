@@ -51,6 +51,7 @@ def run(db):
     ops_nuevas = [
         ("VIEW_CONFIDENTIAL", "Ver datos confidenciales (IP de lote)"),
         ("EDIT_PARAMS", "Editar parámetros sensibles"),
+        ("REGULARIZAR", "Regularizar lotes y registros temporales"),
     ]
     op_map = {}
     for codigo, nombre in ops_nuevas:
@@ -180,7 +181,13 @@ def run(db):
     ):
         upsert_permiso(rol_codigo, "BALANZA", "EDIT_PARAMS", False)
 
-    # ── 7. EDIT_PARAMS en LIQUIDACIONES — Admin, Gerencia, JefeComercial ──────
+    print("\n  Insertando permisos REGULARIZAR en BALANZA (regularizar lote observado)...")
+    for rol_codigo in ("Admin", "Gerencia", "Comercial", "JefeComercial"):
+        upsert_permiso(rol_codigo, "BALANZA", "REGULARIZAR", True)
+    for rol_codigo in ("Laboratorista", "TecnicoMuestreo", "OperadorBalanza", "Metalurgista"):
+        upsert_permiso(rol_codigo, "BALANZA", "REGULARIZAR", False)
+
+    # 🚧 7. EDIT_PARAMS en LIQUIDACIONES - Admin, Gerencia, JefeComercial 🚧──────
     # Actualmente: liquidaciones.py L262-271:
     #   rol in {Admin.value, Gerencia.value, JefeComercial.value}
     # Comercial tiene LIQUIDACIONES/UPDATE=True (puede emitir/cambiar estado)

@@ -564,3 +564,27 @@ def sincronizar_batch(
     Orden interno de procesamiento: sesiones → lotes → pesajes.
     """
     return offline_svc.sincronizar_batch(db, payload, current_user.id)
+
+
+@router.post("/lotes/{lote_id}/regularizar", response_model=LoteDetalle)
+def regularizar_lote(
+    lote_id: int,
+    current_user=Depends(check_permiso("BALANZA", "REGULARIZAR")),
+    db: Session = Depends(get_db),
+):
+    try:
+        return svc.regularizar_lote(db, lote_id=lote_id, usuario_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post("/sesiones/{sesion_id}/regularizar_observados", response_model=list[LoteDetalle])
+def regularizar_lotes_sesion(
+    sesion_id: int,
+    current_user=Depends(check_permiso("BALANZA", "REGULARIZAR")),
+    db: Session = Depends(get_db),
+):
+    try:
+        return svc.regularizar_lotes_sesion(db, sesion_id=sesion_id, usuario_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e

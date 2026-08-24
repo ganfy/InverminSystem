@@ -61,6 +61,7 @@ OPERACIONES = [
     # Operaciones especiales (no son CRUD genérico)
     {"codigo": "VIEW_CONFIDENTIAL", "nombre": "Ver datos confidenciales (IP de lote)"},
     {"codigo": "EDIT_PARAMS", "nombre": "Editar parámetros sensibles"},
+    {"codigo": "REGULARIZAR", "nombre": "Regularizar lotes y registros temporales"},
 ]
 
 # Matriz de permisos: (rol, modulo, operacion) → permitido
@@ -214,6 +215,15 @@ PERMISOS = [
     ("TecnicoMuestreo", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
     ("OperadorBalanza", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
     ("Metalurgista", "LABORATORIO", "VIEW_CONFIDENTIAL", False),
+    # ── BALANZA - REGULARIZAR (regularizar lote observado) ──
+    ("Admin", "BALANZA", "REGULARIZAR", True),
+    ("Gerencia", "BALANZA", "REGULARIZAR", True),
+    ("JefeComercial", "BALANZA", "REGULARIZAR", True),
+    ("Comercial", "BALANZA", "REGULARIZAR", True),
+    ("Laboratorista", "BALANZA", "REGULARIZAR", False),
+    ("TecnicoMuestreo", "BALANZA", "REGULARIZAR", False),
+    ("OperadorBalanza", "BALANZA", "REGULARIZAR", False),
+    ("Metalurgista", "BALANZA", "REGULARIZAR", False),
     # ── BALANZA — EDIT_PARAMS (editar lote completo, no solo pesaje) ──────────
     # OperadorBalanza puede crear pesajes (UPDATE) pero no editar el lote entero
     ("Admin", "BALANZA", "EDIT_PARAMS", True),

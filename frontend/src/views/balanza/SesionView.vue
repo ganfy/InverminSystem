@@ -53,6 +53,14 @@
             Granel
           </label>
         </div>
+        
+        <!-- Checkbox Observado -->
+        <div v-if="sesion?.estado === 'EN_PROCESO'" class="header-campo">
+          <label class="granel-label" style="color: #ea580c; font-weight: 600;">
+            <input type="checkbox" v-model="esObservado" />
+            Observado
+          </label>
+        </div>
       </div>
       <div class="header-right">
         <!-- [OFFLINE] indicador -->
@@ -219,6 +227,7 @@
               Balanza desconectada. Se registrará justificación automática.
             </div>
           </div>
+
           <div v-if="mostrarFaltantes && loteFormFaltantes.length > 0" class="form-faltantes">
             <span class="faltante-icono"><AlertTriangle :size="20" class="aviso-icono" /></span>
             Falta: {{ loteFormFaltantes.join(' · ') }}
@@ -244,10 +253,12 @@
           :key="lote.ip"
           :lote="lote"
           :is-admin="authStore.puede('BALANZA', 'EDIT_PARAMS')"
+          :can-regularizar="authStore.puede('BALANZA', 'REGULARIZAR')"
           :is-online="online"
           :modo-otro="lote.tipo_material === 'Otro'"
           @editar="abrirEditarLote"
           @eliminar="abrirEliminar"
+          @regularizar="confirmarRegularizar"
           @ver-ticket="store.verTicket"
           @imprimir-ticket="store.imprimirTicket"
         />
@@ -306,6 +317,16 @@
       @close="cerrarEliminar"
       @confirm="confirmarEliminar"
     />
+
+    <ModalRegularizar
+      v-if="regularizarModal.visible"
+      :ops-count="regularizarModal.opsCount"
+      :lote-numero="regularizarModal.loteNumero"
+      :guardando="store.guardando"
+      @close="regularizarModal.visible = false"
+      @regularizar-uno="ejecutarRegularizar(false)"
+      @regularizar-todos="ejecutarRegularizar(true)"
+    />
   </div>
 </template>
 
@@ -322,6 +343,7 @@ import LoteCard from '@/components/balanza/LoteCard.vue'
 import ModalEditarSesion from './ModalEditarSesion.vue'
 import ModalEditarLote from './ModalEditarLote.vue'
 import ModalEliminarLote from './ModalEliminarLote.vue'
+import ModalRegularizar from './ModalRegularizar.vue'
 import type { LoteDetalle, ProvAcopDropdown } from '@/api/balanza'
 import { balanzaApi } from '@/api/balanza'
 import { formatPesoPorModulo, getUnidadPorModulo, convertirParaInput, convertirParaBD } from '@/utils/units'
@@ -418,6 +440,9 @@ const tipoMaterial = ref('')
 
 // ── Observaciones para tipo 'Otro' ─────────────────────────
 const observacionesOtro = ref('')
+
+// ── Flag de Observado ──────────────────────────────────────
+const esObservado = ref(false)
 
 // ── Total de sacos (suma de lotes activos) ──────────────────
 const totalSacos = computed(() =>
@@ -560,6 +585,7 @@ async function registrarLote() {
     {
       tipo_material: tipoMaterial.value,
       observaciones: tipoMaterial.value === 'Otro' ? (observacionesOtro.value || null) : null,
+      generar_op: esObservado.value,
       pesaje: {
         peso_inicial: convertirParaBD(loteForm.peso_inicial, 'BALANZA')!,
         peso_final:   convertirParaBD(loteForm.peso_final, 'BALANZA')!,
@@ -580,11 +606,45 @@ async function registrarLote() {
     isManualTara.value = false
     // Limpiar observaciones para tipo Otro después de registrar
     if (tipoMaterial.value === 'Otro') observacionesOtro.value = ''
+    esObservado.value = false
     preFillBruto()
   }
 }
 
-// ── Sesión ─────────────────────────────────────────────────
+const regularizarModal = reactive({
+  visible: false,
+  loteId: 0,
+  loteNumero: '' as number | string,
+  opsCount: 0
+})
+
+async function confirmarRegularizar(lote: LoteDetalle) {
+  if (esOffline.value) { ui.toast('No disponible offline', 'warning'); return }
+  
+  const ops = lotesActivos.value.filter(l => l.ip && l.ip.startsWith('OP-'))
+  
+  regularizarModal.loteId = lote.id
+  regularizarModal.loteNumero = lote.numero_lote
+  regularizarModal.opsCount = ops.length
+  regularizarModal.visible = true
+}
+
+async function ejecutarRegularizar(todos: boolean) {
+  const sesionId = sesionIdRaw.value.startsWith('offline-') ? -1 : sesionIdNum.value
+  let success = false
+  
+  if (todos) {
+    success = await store.regularizarLotesSesion(sesionId)
+  } else {
+    success = await store.regularizarLote(sesionId, regularizarModal.loteId)
+  }
+  
+  if (success) {
+    regularizarModal.visible = false
+  }
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────
 async function pausar() {
   if (esOffline.value) { ui.toast('Pausar no disponible sin conexión', 'warning'); return }
   const ok = await ui.showConfirm({

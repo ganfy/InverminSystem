@@ -153,11 +153,11 @@ def _cargar_sesion(db: Session, sesion_id: int) -> SesionDescarga:
 # =============================================================================
 
 
-def generar_ip(db: Session) -> str:
+def generar_ip(db: Session, prefijo: str = "IP") -> str:
     """
-    Genera el siguiente IP secuencial del año en curso.
+    Genera el siguiente correlativo (IP u OP) del año en curso.
 
-    Carga los IPs existentes del año y busca el máximo del sufijo numérico.
+    Carga los correlativos existentes del año y busca el máximo del sufijo numérico.
     También respeta `proximo_ip` de configuracion como piso mínimo, de modo que
     el administrador pueda saltar la numeración desde el panel de administración.
     La unicidad final la garantiza el UNIQUE constraint de lotes.ip.
@@ -169,7 +169,7 @@ def generar_ip(db: Session) -> str:
     ips_anio = (
         db.query(Lote.ip)
         .filter(
-            Lote.ip.like("IP-%"),
+            Lote.ip.like(f"{prefijo}-%"),
             extract("year", Lote.creado_en) == anio_actual,
         )
         .all()
@@ -195,7 +195,7 @@ def generar_ip(db: Session) -> str:
         except (ValueError, TypeError):
             pass
 
-    return f"IP-{max_num + 1:04d}"
+    return f"{prefijo}-{max_num + 1:04d}"
 
 
 # =============================================================================
@@ -340,7 +340,11 @@ def agregar_lote(
     ahora = _ahora()
     es_otro = datos.tipo_material not in ["Mineral", "Llampo", "M.Llampo"]
     # Para no minerales: la IP se asignará después del flush del pesaje (OT-{pesaje.id})
-    ip_placeholder = generar_ip(db) if not es_otro else f"OT-{numero_lote:04d}"
+    if es_otro:
+        ip_placeholder = f"OT-{numero_lote:04d}"
+    else:
+        ip_placeholder = generar_ip(db, "OP") if datos.generar_op else generar_ip(db, "IP")
+
     p = datos.pesaje
 
     lote = Lote(
@@ -646,3 +650,65 @@ def listar_provacop_activos(
         )
         for pa, prov, acop in q.order_by(proveedor_alias.razon_social).all()
     ]
+
+
+def regularizar_lote(db: Session, lote_id: int, usuario_id: int) -> LoteDetalle:
+    lote = db.query(Lote).filter(Lote.id == lote_id).first()
+    if not lote:
+        raise ValueError("Lote no encontrado")
+    if not lote.ip.startswith("OP-"):
+        raise ValueError("El lote no es un ingreso observado (OP)")
+    ahora = _ahora()
+    nuevo_ip = generar_ip(db, "IP")
+    lote.ip = nuevo_ip
+    lote.creado_en = ahora
+    pesaje = db.query(Pesaje).filter(Pesaje.lote_id == lote.id).first()
+    if pesaje:
+        if pesaje.fecha_inicio and pesaje.fecha_fin:
+            duracion = pesaje.fecha_fin - pesaje.fecha_inicio
+            pesaje.fecha_fin = ahora
+            pesaje.fecha_inicio = ahora - duracion
+        else:
+            pesaje.fecha_fin = ahora
+            pesaje.fecha_inicio = ahora
+    db.commit()
+    return _serializar_lote(lote)
+
+
+def regularizar_lotes_sesion(db: Session, sesion_id: int, usuario_id: int) -> list[LoteDetalle]:
+    lotes = db.query(Lote).filter(Lote.sesion_id == sesion_id, Lote.eliminado.is_(False)).all()
+    ops = [lot for lot in lotes if lot.ip and lot.ip.startswith("OP-")]
+    if not ops:
+        raise ValueError("No hay lotes observados (OP) en esta sesión")
+
+    # Ordenar por fecha de creación original para mantener el orden cronológico
+    ops.sort(key=lambda lot: lot.creado_en)
+
+    ahora = _ahora()
+    fecha_base = ops[0].creado_en
+    lotes_actualizados = []
+
+    for lote in ops:
+        # Calcular el desplazamiento respecto al lote más antiguo
+        diferencia = lote.creado_en - fecha_base
+        nueva_fecha = ahora + diferencia
+
+        nuevo_ip = generar_ip(db, "IP")
+        lote.ip = nuevo_ip
+        lote.creado_en = nueva_fecha
+
+        pesaje = db.query(Pesaje).filter(Pesaje.lote_id == lote.id).first()
+        if pesaje:
+            if pesaje.fecha_inicio and pesaje.fecha_fin:
+                duracion = pesaje.fecha_fin - pesaje.fecha_inicio
+                pesaje.fecha_fin = nueva_fecha
+                pesaje.fecha_inicio = nueva_fecha - duracion
+            else:
+                pesaje.fecha_fin = nueva_fecha
+                pesaje.fecha_inicio = nueva_fecha
+
+        lotes_actualizados.append(lote)
+        db.flush()  # Para que el próximo generar_ip() vea este IP y no lo duplique
+
+    db.commit()
+    return [_serializar_lote(lot) for lot in lotes_actualizados]

@@ -132,6 +132,7 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     lotes_db = (
         db.query(Lote)
         .filter(~Lote.eliminado, Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]))
+        .filter(Lote.ip.like("IP-%"))
         .all()
     )
 

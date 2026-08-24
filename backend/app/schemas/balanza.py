@@ -91,6 +91,7 @@ class LoteCrear(BaseModel):
 
     tipo_material: str = "Mineral"
     observaciones: str | None = None  # Solo para tipo='Otro'
+    generar_op: bool = False
     pesaje: PesajeCrear
 
     @field_validator("tipo_material")

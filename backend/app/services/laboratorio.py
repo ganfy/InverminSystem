@@ -519,6 +519,7 @@ def obtener_lotes_laboratorio(db: Session) -> list[LoteLabOut]:
         .filter(
             Lote.id.in_(lote_ids_con_cip),
             Lote.eliminado == False,  # noqa: E712
+            Lote.ip.like("IP-%"),
         )
         .options(
             joinedload(Lote.sesion)

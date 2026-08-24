@@ -41,6 +41,7 @@ export interface PesajeDetalle {
 export interface LoteCrear {
   tipo_material: string
   observaciones?: string | null  // Solo para tipo 'Otro'
+  generar_op?: boolean
   pesaje: PesajeCrear
 }
 
@@ -227,6 +228,12 @@ export const balanzaApi = {
   },
   eliminarLote(sesionId: number, loteId: number, datos: EliminarLoteRequest): Promise<void> {
     return api.delete(`/balanza/${sesionId}/lotes/${loteId}`, { data: datos }).then(() => undefined)
+  },
+  regularizarLote(loteId: number): Promise<LoteDetalle> {
+    return api.post(`/balanza/lotes/${loteId}/regularizar`).then(r => r.data)
+  },
+  regularizarLotesSesion(sesionId: number): Promise<LoteDetalle[]> {
+    return api.post(`/balanza/sesiones/${sesionId}/regularizar_observados`).then(r => r.data)
   },
 
   // Ticket PDF - retorna Blob para descarga con auth

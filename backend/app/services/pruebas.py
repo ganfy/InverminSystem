@@ -142,6 +142,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
         .filter(
             Lote.eliminado == False,  # noqa: E712
             Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]),
+            Lote.ip.like("IP-%"),
         )
         .order_by(Lote.id.desc())
         .all()

@@ -871,6 +871,41 @@ export const useBalanzaStore = defineStore('balanza', () => {
     }
   }
 
+  async function regularizarLote(
+    sesionId: number,
+    loteId: number,
+  ): Promise<boolean> {
+    guardando.value = true
+    try {
+      await balanzaApi.regularizarLote(loteId)
+      await cargarSesion(sesionId)
+      ui.toast('Lote regularizado a IP', 'success')
+      return true
+    } catch (e: any) {
+      ui.toast(e?.response?.data?.detail ?? 'Error al regularizar lote', 'error')
+      return false
+    } finally {
+      guardando.value = false
+    }
+  }
+
+  async function regularizarLotesSesion(
+    sesionId: number,
+  ): Promise<boolean> {
+    guardando.value = true
+    try {
+      await balanzaApi.regularizarLotesSesion(sesionId)
+      await cargarSesion(sesionId)
+      ui.toast('Lotes de la sesión regularizados a IP', 'success')
+      return true
+    } catch (e: any) {
+      ui.toast(e?.response?.data?.detail ?? 'Error al regularizar lotes', 'error')
+      return false
+    } finally {
+      guardando.value = false
+    }
+  }
+
   // ── Helper para actualizar el contador
   async function actualizarLotesHybridPendientes(sesionId?: number) {
     lotesHybridPendientes.value = await contarLotesOnlinePendientes(sesionId)
@@ -1018,6 +1053,8 @@ export const useBalanzaStore = defineStore('balanza', () => {
     agregarLote,
     editarLote,
     eliminarLote,
+    regularizarLote,
+    regularizarLotesSesion,
     // Tickets
     descargarTicket,
     descargarTicketsSesion,

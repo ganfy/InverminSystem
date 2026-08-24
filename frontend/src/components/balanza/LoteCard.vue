@@ -19,6 +19,14 @@
             :disabled="!isOnline && lote.id !== -1"
             @click="$emit('eliminar', lote)"
           ><Trash :size="14" /></button>
+          
+          <button
+            v-if="lote.ip && lote.ip.startsWith('OP-') && canRegularizar"
+            class="btn-icon btn-secondary"
+            title="Regularizar a IP oficial"
+            :disabled="!isOnline"
+            @click="$emit('regularizar', lote)"
+          ><FileCheck :size="14" /></button>
 
           <span v-if="lote.local_only" class="badge-local-lote" title="Pendiente de sincronizar"><WifiOff :size="12" style="margin-right: 4px;" /> LOCAL</span>
           <span class="badge-lote-estado" :class="loteEstadoClass(lote)">{{ loteEstadoLabel(lote) }}</span>
@@ -62,16 +70,17 @@
   <script setup lang="ts">
   import type { LoteDetalle } from '@/api/balanza'
   import { formatPesoPorModulo, getUnidadPorModulo } from '@/utils/units'
-  import { Pencil, Trash2, WifiOff, Eye, Printer, Trash } from 'lucide-vue-next'
+  import { Pencil, Trash2, WifiOff, Eye, Printer, Trash, FileCheck } from 'lucide-vue-next'
 
   defineProps<{
     lote: LoteDetalle
     isAdmin: boolean
+    canRegularizar: boolean
     isOnline: boolean
     modoOtro?: boolean  // true para tipo 'Otro': oculta IP/Lote, muestra observaciones
   }>()
 
-  defineEmits(['editar', 'eliminar', 'verTicket', 'imprimirTicket'])
+  defineEmits(['editar', 'eliminar', 'regularizar', 'verTicket', 'imprimirTicket'])
 
   function loteEstadoClass(lote: LoteDetalle) { return lote.pesaje?.peso_final != null ? 'lc-completado' : 'lc-en-proceso' }
   function loteEstadoLabel(lote: LoteDetalle) { return lote.pesaje?.peso_final != null ? 'Completado' : 'En proceso' }
