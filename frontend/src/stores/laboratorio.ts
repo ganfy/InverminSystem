@@ -30,7 +30,8 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
     const lotes = ref<LoteLabOut[]>([])
     const cargando = ref(false)
 
-    const puedeVerIP = computed(() => auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL'))
+    const modoLaboratorioForzado = ref(false)
+    const puedeVerIP = computed(() => auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL') && !modoLaboratorioForzado.value)
 
     const esLaboratorista = computed(() => auth.user?.rol === 'Laboratorista')
 
@@ -326,7 +327,7 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
 
     return {
         cips, lotes, cargando,
-        puedeVerIP, esLaboratorista,
+        puedeVerIP, esLaboratorista, modoLaboratorioForzado,
         cargarCips, cargarLotes, cargarDetalleLote,
         registrarLey,
         enviarRecuperacion, completarRecuperacion, registrarRecuperacion,

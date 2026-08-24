@@ -380,10 +380,10 @@ onMounted(async () => {
         analisisCompletadoId.value = analysisToLoad.id
         certificadoGenerado.value = false  // nunca bloquear el form de Ag
       } else {
-        // Au: bloquear si el cert ya fue generado
+        // Au: bloquear si el cert ya fue generado (a menos que estemos editando)
         yaGuardado.value = true
         analisisCompletadoId.value = analysisToLoad.id
-        certificadoGenerado.value = !!analysisToLoad.certificado_url
+        certificadoGenerado.value = route.query.edit === '1' ? false : !!analysisToLoad.certificado_url
       }
 
       if (route.query.gen === '1') {
@@ -449,6 +449,7 @@ async function guardar() {
     ...form.value,
     ...(form.value.material === 'Ag' ? { punto: punto.value } : {}),
     ...(muestrasDetalle ? { muestras_detalle: muestrasDetalle } : {}),
+    es_edicion: route.query.edit === '1',
   }
 
   guardando.value = true

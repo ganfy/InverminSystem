@@ -12,6 +12,14 @@
         </p>
       </div>
       <div style="display:flex;gap:0.75rem;align-items:center">
+        <button
+          v-if="auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia'"
+          class="btn-secondary"
+          @click="store.modoLaboratorioForzado = !store.modoLaboratorioForzado; recargar()"
+        >
+          <Eye :size="16" style="margin-right:0.4rem" />
+          {{ store.modoLaboratorioForzado ? 'Ver Comercial' : 'Ver Laboratorista' }}
+        </button>
         <button class="btn-secondary" @click="recargar" :disabled="store.cargando || cargandoLotes">
           <RefreshCw :size="16" :class="{ spinner: store.cargando || cargandoLotes }" style="margin-right:0.4rem" />
           ACTUALIZAR
@@ -265,6 +273,14 @@
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem;opacity:0.7" @click="generarCertLey(fila)" title="Regenerar certificado (e.g. tras agregar ley Ag)">↺ Regen.</button>
                     <button
+                      v-if="fila.estado === 'COMPLETADO' && auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')"
+                      class="btn-secondary"
+                      style="font-size:0.75rem;padding:0.3rem 0.75rem;border-color:var(--color-warning);color:var(--color-warning)"
+                      @click="editarLey(fila.cip)"
+                    >
+                      Editar
+                    </button>
+                    <button
                       v-if="fila.estado === 'COMPLETADO'"
                       class="btn-secondary"
                       style="font-size:0.75rem;padding:0.3rem 0.75rem;color:#60a5fa;border-color:rgba(96,165,250,0.4)"
@@ -311,6 +327,14 @@
                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Registrar</button>
                     <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
+                    <button
+                      v-if="fila.estado === 'COMPLETADO' && auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')"
+                      class="btn-secondary"
+                      style="font-size:0.75rem;padding:0.3rem 0.75rem;border-color:var(--color-warning);color:var(--color-warning)"
+                      @click="editarRecuperacion(fila)"
+                    >
+                      Editar
+                    </button>
                   </td>
                 </tr>
               </template>
@@ -335,6 +359,14 @@
                     <button v-if="fila.estado === 'PENDIENTE'" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Registrar</button>
                     <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
+                    <button
+                      v-if="fila.estado === 'COMPLETADO' && auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')"
+                      class="btn-secondary"
+                      style="font-size:0.75rem;padding:0.3rem 0.75rem;border-color:var(--color-warning);color:var(--color-warning)"
+                      @click="editarRecuperacion(fila)"
+                    >
+                      Editar
+                    </button>
                   </td>
                 </tr>
               </template>
@@ -349,9 +381,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FlaskConical, RefreshCw, WifiOff, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-vue-next'
+import { FlaskConical, RefreshCw, WifiOff, ChevronUp, ChevronDown, AlertTriangle, Eye } from 'lucide-vue-next'
 import AlertasBanner from '@/components/AlertasBanner.vue'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { useLaboratorioStore } from '@/stores/laboratorio'
 import { laboratorioApi } from '@/api/laboratorio'
 import { crearEnsayoREE } from '@/api/laboratorio'
@@ -363,6 +396,7 @@ import { generateUUID } from '@/utils/uuid'
 const router = useRouter()
 const store  = useLaboratorioStore()
 const ui     = useUiStore()
+const auth   = useAuthStore()
 const {
   online,
   pendientes: pendientesSync,
@@ -609,6 +643,17 @@ async function verCertificado(ruta: string) {
 }
 
 function irARegistrarLey(cip: string) { router.push(`/laboratorio/ley/${cip}`) }
+
+async function editarLey(cip: string) {
+  const ok = await ui.showConfirm({
+    title: 'Editar análisis completado',
+    message: 'Este análisis ya está completado. Si el certificado ya se generó, modificar los datos requerirá que genere uno nuevo. ¿Continuar?',
+    confirmLabel: 'Sí, editar',
+    danger: true
+  })
+  if (ok) router.push(`/laboratorio/ley/${cip}?edit=1`)
+}
+
 function irARegistrarRecuperacion(fila: any) {
   if (fila.sub_tipo === 'SOLIDOS') {
     router.push(`/laboratorio/solidos/${fila.cip}?id=${fila.id}`)
@@ -616,6 +661,24 @@ function irARegistrarRecuperacion(fila: any) {
     router.push(`/laboratorio/solucion/${fila.cip}?id=${fila.id}`)
   } else {
     router.push(`/laboratorio/recuperacion/${fila.cip}?id=${fila.id}`)
+  }
+}
+
+async function editarRecuperacion(fila: any) {
+  const ok = await ui.showConfirm({
+    title: 'Editar análisis completado',
+    message: 'Este análisis ya está completado. Si el certificado ya se generó, modificar los datos requerirá que genere uno nuevo. ¿Continuar?',
+    confirmLabel: 'Sí, editar',
+    danger: true
+  })
+  if (ok) {
+    if (fila.sub_tipo === 'SOLIDOS') {
+      router.push(`/laboratorio/solidos/${fila.cip}?id=${fila.id}&edit=1`)
+    } else if (fila.sub_tipo === 'SOLUCION') {
+      router.push(`/laboratorio/solucion/${fila.cip}?id=${fila.id}&edit=1`)
+    } else {
+      router.push(`/laboratorio/recuperacion/${fila.cip}?id=${fila.id}&edit=1`)
+    }
   }
 }
 function irADetalleLote(ip: string) {

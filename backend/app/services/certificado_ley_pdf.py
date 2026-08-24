@@ -140,10 +140,10 @@ _TEMPLATE = """
 """
 
 
-def _fmt_oz(v: float | None) -> str:
+def _fmt_oz(v: float | None, dec: int = 4) -> str:
     if v is None:
         return "-"
-    return f"{v:.4f}"
+    return f"{v:.{dec}f}"
 
 
 def _fmt_date(dt: datetime | None) -> str:
@@ -243,6 +243,7 @@ def generar_certificado_ley_comercial_pdf(
 
     constantes_pdf = get_constantes(db)
     q_com_pdf = get_quantize_decimal(constantes_pdf.decimales_ley_comercial)
+    dec_com = int(constantes_pdf.decimales_ley_comercial)
     calc = calcular_ley_comercial(
         ley_planta,
         params,
@@ -289,12 +290,12 @@ def generar_certificado_ley_comercial_pdf(
 
     fila_cols = ["<tr>", "<td>1</td>", f'<td class="codigo">{ip_lote}</td>']
     if "ley_au_oz" in columnas:
-        fila_cols.append(f"<td><strong>{_fmt_oz(ley_comercial)}</strong></td>")
+        fila_cols.append(f"<td><strong>{_fmt_oz(ley_comercial, dec_com)}</strong></td>")
     if "ley_au_gr" in columnas:
         fila_cols.append(f"<td><strong>{float(ley_au_gr_tm):.3f}</strong></td>")
     if "ley_ag_oz" in columnas:
         if ley_ag_vigente and (mostrar_ag or "ley_ag_oz" in columnas):
-            fila_cols.append(f"<td><strong>{_fmt_oz(float(ley_ag_oz_tc))}</strong></td>")
+            fila_cols.append(f"<td><strong>{_fmt_oz(float(ley_ag_oz_tc), dec_com)}</strong></td>")
         else:
             fila_cols.append("<td>-</td>")
     if "ley_ag_gr" in columnas:
@@ -447,6 +448,10 @@ def generar_certificado_ensayo_cip_pdf(
 ) -> bytes:
     """Certificado de ensayo Fire Assay para laboratorista (por CIP, sin revelar IP)."""
     from app.models.models import AnalisisLey, Configuracion, MapeoCIP
+    from app.services.config_calculo import get_constantes
+
+    constantes_pdf = get_constantes(db)
+    dec_lab = int(constantes_pdf.decimales_ley_laboratorio)
 
     cip = db.query(MapeoCIP).filter(MapeoCIP.codigo_cip == cip_code).first()
     if not cip:
@@ -491,10 +496,10 @@ def generar_certificado_ensayo_cip_pdf(
             f"<tr>"
             f"<td>{i}</td>"
             f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
-            f"<td>{_fmt_oz(float(a.ley_grueso) if a.ley_grueso else None)}</td>"
-            f"<td>{_fmt_oz(float(a.ley_fino) if a.ley_fino else None)}</td>"
-            f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None)}</strong></td>"
-            f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None)}</td>"
+            f"<td>{_fmt_oz(float(a.ley_grueso) if a.ley_grueso else None, dec_lab)}</td>"
+            f"<td>{_fmt_oz(float(a.ley_fino) if a.ley_fino else None, dec_lab)}</td>"
+            f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None, dec_lab)}</strong></td>"
+            f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None, dec_lab)}</td>"
             f"</tr>"
         )
 
@@ -507,8 +512,8 @@ def generar_certificado_ensayo_cip_pdf(
                 f"<tr>"
                 f"<td>{i}</td>"
                 f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
-                f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None)}</strong></td>"
-                f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None)}</td>"
+                f"<td><strong>{_fmt_oz(float(a.ley_final) if a.ley_final else None, dec_lab)}</strong></td>"
+                f"<td>{_fmt_oz(float(a.ley_gr_tm) if a.ley_gr_tm else None, dec_lab)}</td>"
                 f"</tr>"
             )
         bloque_ag = f"""
@@ -645,6 +650,11 @@ def generar_certificado_recuperacion_cip_pdf(
     if not cip:
         raise ValueError(f"CIP {cip_code} no encontrado")
 
+    from app.services.config_calculo import get_constantes
+
+    constantes_pdf = get_constantes(db)
+    dec_lab = int(constantes_pdf.decimales_ley_laboratorio)
+
     analista_nombre = "DEPARTAMENTO TÉCNICO"
     analisis_list = [a]  # Solo imprimimos este registro específico
 
@@ -693,12 +703,13 @@ def generar_certificado_recuperacion_cip_pdf(
                 "<th>Ley Ag (g/TM)</th>"
                 "</tr>"
             )
-            au_oz = _fmt_oz(cola_au_oz)
+            au_oz = _fmt_oz(cola_au_oz, dec_lab)
             au_gtm = f"{(cola_au_oz * 34.2857):.3f}" if cola_au_oz is not None else "-"
             ag_oz = _fmt_oz(
                 float(ley_ag_rec.ley_fino)
                 if ley_ag_rec and ley_ag_rec.ley_fino is not None
-                else None
+                else None,
+                dec_lab,
             )
             ag_gtm = (
                 f"{float(ley_ag_rec.ley_gr_tm):.3f}"
@@ -726,14 +737,14 @@ def generar_certificado_recuperacion_cip_pdf(
             # Columnas SOLIDOS (izquierda)
             if solidos_rec and solidos_rec.ley_cola is not None:
                 s_au_oz = float(solidos_rec.ley_cola)
-                s_au_oz_str = _fmt_oz(s_au_oz)
+                s_au_oz_str = _fmt_oz(s_au_oz, dec_lab)
                 s_au_gtm_str = f"{s_au_oz * 34.2857:.3f}"
             else:
                 s_au_oz_str = "TRAZAS"
                 s_au_gtm_str = "TRAZAS"
 
             if ley_ag_rec and ley_ag_rec.ley_fino is not None:
-                s_ag_oz_str = _fmt_oz(float(ley_ag_rec.ley_fino))
+                s_ag_oz_str = _fmt_oz(float(ley_ag_rec.ley_fino), dec_lab)
             else:
                 s_ag_oz_str = "TRAZAS"
 
@@ -826,6 +837,10 @@ def generar_certificado_recuperacion_comercial_pdf(db: Session, ip_lote: str) ->
     Genera el PDF de certificado de recuperación (formato Paititi con marca de agua)
     para entregar al proveedor. Usa el análisis de recuperación COMPLETADO vigente del lote.
     """
+    from app.services.config_calculo import get_constantes
+
+    constantes_pdf = get_constantes(db)
+    dec_com = int(constantes_pdf.decimales_ley_comercial)
 
     lote = (
         db.query(Lote)
@@ -893,8 +908,8 @@ def generar_certificado_recuperacion_comercial_pdf(db: Session, ip_lote: str) ->
             f"<tr>"
             f"<td>{i}</td>"
             f"<td style='color:#b8860b'>{ip_lote}</td>"
-            f"<td>{_fmt_oz(float(a.ley_cabeza)  if a.ley_cabeza  is not None else None)}</td>"
-            f"<td>{_fmt_oz(float(a.ley_cola)    if a.ley_cola    is not None else None)}</td>"
+            f"<td>{_fmt_oz(float(a.ley_cabeza)  if a.ley_cabeza  is not None else None, dec_com)}</td>"
+            f"<td>{_fmt_oz(float(a.ley_cola)    if a.ley_cola    is not None else None, dec_com)}</td>"
             f"<td>{f'{float(a.ley_liquido):.4f}' if a.ley_liquido is not None else '-'}</td>"  # g/m³ directo
             f"<td><strong>{rec_str}</strong></td>"
             f"</tr>"
@@ -1005,6 +1020,11 @@ def generar_cert_reconocimiento_cip_pdf(
     Certificado de reconocimineto por IP para comercial/admin.
     Muestra las columnas solicitadas o un set por defecto.
     """
+    from app.services.config_calculo import get_constantes
+
+    constantes_pdf = get_constantes(db)
+    dec_com = int(constantes_pdf.decimales_ley_comercial)
+
     lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
     if not lote:
         raise ValueError(f"Lote {ip_lote} no encontrado")
@@ -1063,8 +1083,8 @@ def generar_cert_reconocimiento_cip_pdf(
 
     filas = ""
     for i, a in enumerate(analisis_list, 1):
-        cabeza = _fmt_oz(float(a.ley_cabeza) if a.ley_cabeza is not None else None)
-        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
+        cabeza = _fmt_oz(float(a.ley_cabeza) if a.ley_cabeza is not None else None, dec_com)
+        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None, dec_com)
         liquido = (
             f"{float(a.ley_liquido):.4f}" if a.ley_liquido is not None else "-"
         )  # g/m³ directo
@@ -1134,7 +1154,11 @@ def generar_cert_reconocimiento_cip_pdf(
 
 
 def generar_certificado_ensayo_conjunto_pdf(db: Session, cips: list[str]) -> bytes:
-    """Genera un certificado de ensayo consolidado para múltiples CIPs.\"\"\" """
+    """Genera un certificado de ensayo consolidado para múltiples CIPs."""
+    from app.services.config_calculo import get_constantes
+
+    constantes_pdf = get_constantes(db)
+    dec_lab = int(constantes_pdf.decimales_ley_laboratorio)
 
     analista_nombre = ""
     filas_au = ""
@@ -1180,10 +1204,10 @@ def generar_certificado_ensayo_conjunto_pdf(db: Session, cips: list[str]) -> byt
                 f"<tr>"
                 f"<td>{i}</td>"
                 f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
-                f"<td>{_fmt_oz(float(a_au.ley_grueso) if a_au.ley_grueso is not None else None)}</td>"
-                f"<td>{_fmt_oz(float(a_au.ley_fino) if a_au.ley_fino is not None else None)}</td>"
-                f"<td><strong>{_fmt_oz(float(a_au.ley_final) if a_au.ley_final is not None else None)}</strong></td>"
-                f"<td>{_fmt_oz(float(a_au.ley_gr_tm) if a_au.ley_gr_tm is not None else None)}</td>"
+                f"<td>{_fmt_oz(float(a_au.ley_grueso) if a_au.ley_grueso is not None else None, dec_lab)}</td>"
+                f"<td>{_fmt_oz(float(a_au.ley_fino) if a_au.ley_fino is not None else None, dec_lab)}</td>"
+                f"<td><strong>{_fmt_oz(float(a_au.ley_final) if a_au.ley_final is not None else None, dec_lab)}</strong></td>"
+                f"<td>{_fmt_oz(float(a_au.ley_gr_tm) if a_au.ley_gr_tm is not None else None, dec_lab)}</td>"
                 f"</tr>"
             )
 
@@ -1193,8 +1217,8 @@ def generar_certificado_ensayo_conjunto_pdf(db: Session, cips: list[str]) -> byt
                 f"<tr>"
                 f"<td>{i}</td>"
                 f"<td style='font-family:monospace;color:#b8860b'>{cip_code}</td>"
-                f"<td><strong>{_fmt_oz(float(a_ag.ley_final) if a_ag.ley_final is not None else None)}</strong></td>"
-                f"<td>{_fmt_oz(float(a_ag.ley_gr_tm) if a_ag.ley_gr_tm is not None else None)}</td>"
+                f"<td><strong>{_fmt_oz(float(a_ag.ley_final) if a_ag.ley_final is not None else None, dec_lab)}</strong></td>"
+                f"<td>{_fmt_oz(float(a_ag.ley_gr_tm) if a_ag.ley_gr_tm is not None else None, dec_lab)}</td>"
                 f"</tr>"
             )
 
@@ -1244,6 +1268,11 @@ def generar_certificado_ensayo_conjunto_pdf(db: Session, cips: list[str]) -> byt
 
 
 def generar_certificado_recuperacion_conjunto_pdf(db: Session, cips: list[str]) -> bytes:
+    from app.services.config_calculo import get_constantes
+
+    constantes_pdf = get_constantes(db)
+    dec_lab = int(constantes_pdf.decimales_ley_laboratorio)
+
     analista_nombre = "DEPARTAMENTO TÉCNICO"
     laboratorio = "-"
     fecha_recepcion = "-"
@@ -1278,7 +1307,7 @@ def generar_certificado_recuperacion_conjunto_pdf(db: Session, cips: list[str]) 
                     datetime.combine(cip_obj_r.fecha_envio, datetime.min.time())
                 )
 
-        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None)
+        cola = _fmt_oz(float(a.ley_cola) if a.ley_cola is not None else None, dec_lab)
         liquido = (
             f"{float(a.ley_liquido):.4f}" if a.ley_liquido is not None else "-"
         )  # g/m³ directo

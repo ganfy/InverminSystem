@@ -368,7 +368,7 @@ onMounted(async () => {
       if (completado) {
         yaGuardado.value = true
         analisisCompletadoId.value = completado.id
-        certificadoGenerado.value = !!completado.certificado_url
+        certificadoGenerado.value = route.query.edit === '1' ? false : !!completado.certificado_url
         if (!pending) analisisPendiente.value = completado
       }
       
@@ -400,21 +400,45 @@ async function guardar() {
   }
 
   guardando.value = true
-  const payload = {
-    muestras: muestras.value.map(m => ({
-      peso_g:        m.peso_g,
-      au1_mg:        m.au1_mg,
-      au2_mg:        m.au2_mg,
-      au_ag_mg:      m.au_ag_mg,
-      numero_ensayo: m.numero_ensayo,
-    })),
-    ley_cola: resumen.value.leyColaAuOzTc,
-    ley_liquido:     solucionAu.value != null ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(4)) : null,
-    solucion_ag_g_m3: solucionAg.value,
-    fecha_analisis:  fechaAnalisis.value,
+  let result;
+  
+  if (route.query.edit === '1') {
+    const payloadFull = {
+      cip: cipActual,
+      laboratorio: analisisPendiente.value?.laboratorio || 'Paititi',
+      ley_cabeza: analisisPendiente.value?.ley_cabeza,
+      ley_cola: resumen.value.leyColaAuOzTc,
+      ley_liquido: solucionAu.value != null ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(4)) : null,
+      solucion_ag_g_m3: solucionAg.value,
+      sub_tipo: analisisPendiente.value?.sub_tipo,
+      fecha_analisis: fechaAnalisis.value,
+      muestras: muestras.value.map(m => ({
+        peso_g:        m.peso_g,
+        au1_mg:        m.au1_mg,
+        au2_mg:        m.au2_mg,
+        au_ag_mg:      m.au_ag_mg,
+        numero_ensayo: m.numero_ensayo,
+      })),
+      es_edicion: true
+    }
+    result = await store.registrarRecuperacion(payloadFull)
+  } else {
+    const payload = {
+      muestras: muestras.value.map(m => ({
+        peso_g:        m.peso_g,
+        au1_mg:        m.au1_mg,
+        au2_mg:        m.au2_mg,
+        au_ag_mg:      m.au_ag_mg,
+        numero_ensayo: m.numero_ensayo,
+      })),
+      ley_cola: resumen.value.leyColaAuOzTc,
+      ley_liquido:     solucionAu.value != null ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(4)) : null,
+      solucion_ag_g_m3: solucionAg.value,
+      fecha_analisis:  fechaAnalisis.value,
+    }
+    result = await store.completarRecuperacion(analisisPendiente.value.id, payload)
   }
 
-  const result = await store.completarRecuperacion(analisisPendiente.value.id, payload)
   if (result) {
     yaGuardado.value = true
     analisisCompletadoId.value = result.id

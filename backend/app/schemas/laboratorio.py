@@ -50,6 +50,9 @@ class AnalisisLeyCreate(BaseModel):
         "Valores sugeridos: PROCESO, LAB. METAL\u00daRGICO, RECONOCIMIENTO, LOTE. "
         "Si no se envía, se usa el default del template.",
     )
+    es_edicion: bool = Field(
+        False, description="Indica si es una edición/corrección. Invalida registros anteriores."
+    )
 
     @model_validator(mode="after")
     def validar_segun_material(self) -> "AnalisisLeyCreate":
@@ -169,6 +172,9 @@ class AnalisisRecuperacionCreate(BaseModel):
     )
     muestras: list["MuestraReconocimientoIn"] | None = Field(
         default=None, description="Muestras de reconocimiento opcionales para creación directa."
+    )
+    es_edicion: bool = Field(
+        False, description="Indica si es una edición/corrección. Invalida registros anteriores."
     )
 
 

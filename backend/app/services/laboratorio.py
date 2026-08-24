@@ -319,7 +319,7 @@ def obtener_cips_laboratorio(
         else:
             estado_rec = "SIN_DATOS"
 
-        ip = lote.ip if incluir_ip else None
+        ip = lote.ip if (incluir_ip and lote) else None
 
         ids = {a.creado_por for a in analisis_ley + analisis_rec if a.creado_por}
         nombres = _nombres_usuarios(db, ids)
@@ -598,6 +598,15 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     if datos.laboratorio:
         mapeo.laboratorio = datos.laboratorio or "Paititi"
 
+    if datos.es_edicion:
+        db.query(AnalisisLey).filter(
+            AnalisisLey.cip == datos.cip,
+            AnalisisLey.tipo_analisis == datos.tipo_analisis,
+            AnalisisLey.material == datos.material,
+            AnalisisLey.vigente,
+            ~AnalisisLey.eliminado,
+        ).update({"vigente": False}, synchronize_session="fetch")
+
     # Dirimencia: invalidar análisis previos vigentes del mismo lote
     # if datos.tipo_analisis == TipoAnalisis.DIRIMENCIA:
     #     previos = (
@@ -780,6 +789,14 @@ def registrar_analisis_recuperacion(
     # Actualizar laboratorio destino en el mapeo
     if datos.laboratorio:
         mapeo.laboratorio = datos.laboratorio or "Paititi"
+
+    if datos.es_edicion:
+        db.query(AnalisisRecuperacion).filter(
+            AnalisisRecuperacion.cip == datos.cip,
+            AnalisisRecuperacion.sub_tipo == (datos.sub_tipo or None),
+            AnalisisRecuperacion.vigente,
+            ~AnalisisRecuperacion.eliminado,
+        ).update({"vigente": False}, synchronize_session="fetch")
 
     constantes = get_constantes(db)
     q_planta = get_quantize_decimal(constantes.decimales_ley_planta)
