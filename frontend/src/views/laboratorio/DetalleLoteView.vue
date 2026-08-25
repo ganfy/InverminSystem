@@ -640,7 +640,10 @@
               <span class="lf-label">RESPONSABLE:</span>
               <span class="lf-value" style="color:var(--color-text-muted)">{{ a.creado_por_nombre }}</span>
             </div>
-            <div class="lab-field"><span class="lf-label">LEY CABEZA:</span>    <span class="lf-value">{{ a.ley_cabeza ?? '-' }}</span></div>
+            <div class="lab-field">
+              <span class="lf-label">LEY CABEZA:</span>
+              <span class="lf-value">{{ a.ley_cabeza ?? '-' }}</span>
+            </div>
             <div class="lab-field"><span class="lf-label">LEY COLA:</span>      <span class="lf-value">{{ a.ley_cola ?? '-' }}</span></div>
             <div class="lab-field"><span class="lf-label">LEY LÍQUIDO:</span>   <span class="lf-value">{{ a.ley_liquido ?? '-' }}</span></div>
             <div class="lab-field">
@@ -673,6 +676,28 @@
                 <button class="btn-danger-sm" @click="toggleDescartarRec(a.id)" title="Excluir del cálculo">
                   Descartar
                 </button>
+                
+                <button
+                  v-if="ley_cabeza != null && a.ley_cabeza !== null && Number(a.ley_cabeza) !== Number(ley_cabeza)"
+                  class="btn-secondary-sm"
+                  style="color: var(--color-text-muted); border-color: var(--color-border);"
+                  @click="recalcularLeyCabezaRec(a.id)"
+                  title="Actualizar ley cabeza y recalcular"
+                >
+                  <RefreshCw :size="13" style="margin-right:0.2rem" />
+                  Actualizar Cabeza
+                </button>
+                <button
+                  v-if="a.ley_cola !== null && Number(a.ley_cola) !== Number(obtenerLeyColaActualizada(a))"
+                  class="btn-secondary-sm"
+                  style="color: var(--color-text-muted); border-color: var(--color-border);"
+                  @click="actualizarLeyColaDirecto(a.id, obtenerLeyColaActualizada(a))"
+                  title="Actualizar ley cola con el registro más reciente y recalcular"
+                >
+                  <RefreshCw :size="13" style="margin-right:0.2rem" />
+                  Actualizar Cola
+                </button>
+
                 <label class="btn-secondary-sm" title="Adjuntar certificado">
                   Adjuntar cert.
                   <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" @change="adjuntarCertRec($event, a.id)" />
@@ -728,6 +753,36 @@
             </button>
           </div>
         </div>
+
+        <section class="card" v-if="analisisRecuperacionList.length > 0" style="margin-top:1.5rem; padding:1.25rem;">
+          <h2 class="card-titulo" style="margin-bottom:1rem; font-size:0.9rem; border-bottom:1px solid var(--color-border); padding-bottom:0.5rem;">
+            LEYES ACTUALIZADAS
+          </h2>
+          
+          <div class="lc-grid" style="grid-template-columns: 1fr 1fr;">
+            <!-- Columna Izquierda: Ley Cabeza -->
+            <div class="lc-item">
+              <span class="lc-label">LEY CABEZA (Actualizada)</span>
+              <span class="lc-valor mono gold" style="margin: 0.2rem 0">{{ fmtOz(ley_cabeza) }} oz/TC</span>
+              <span v-if="leyComercialCalc" style="font-size:0.75rem; color:var(--color-text-dim);">
+                (Planta: {{ fmtOz(leyComercialCalc.ley_planta_solo) }} | Externo: {{ fmtOz(leyComercialCalc.ley_externo) }})
+              </span>
+            </div>
+
+            <!-- Columna Derecha: Leyes Cola (puede haber varias) -->
+            <div style="display:flex; flex-direction:column; gap:1rem;">
+              <template v-for="a in analisisRecuperacionList" :key="'cola-'+a.id">
+                <div class="lc-item">
+                  <span class="lc-label">LEY COLA ACTUALIZADA <span style="color:var(--color-gold)">({{ a.cip }})</span></span>
+                  <span class="lc-valor mono" style="margin: 0.2rem 0">{{ fmtOz(obtenerLeyColaActualizada(a)) }} oz/TC</span>
+                  <span style="font-size:0.75rem; color:var(--color-text-dim);">
+                    (Registrado actual en recuperación: {{ a.ley_cola ?? '-' }})
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </section>
 
         <!-- Sección: certificado de recuperación comercial -->
         <section class="card" v-if="tieneRecuperacionVigente">
@@ -1582,6 +1637,64 @@ async function cancelarEnvioExterno(cipCodigo: string) {
     ui.toast('Envío cancelado. CIP disponible nuevamente.', 'success')
   } catch {
     ui.toast('Error al cancelar el envío', 'error')
+  }
+}
+
+async function recalcularLeyCabezaRec(analisisId: number) {
+  if (ley_cabeza.value == null) {
+    ui.toast('No hay ley cabeza calculada actualmente', 'error')
+    return
+  }
+  const ok = await ui.showConfirm({
+    title: 'Recalcular Recuperación',
+    message: `¿Actualizar la ley cabeza de este análisis a ${ley_cabeza.value} y recalcular la recuperación?`,
+    confirmLabel: 'Recalcular',
+  })
+  if (!ok) return
+  try {
+    await laboratorioApi.actualizarLeyCabezaRecuperacion(analisisId, ley_cabeza.value)
+    ui.toast('Ley cabeza actualizada y recuperación recalculada', 'success')
+    lote.value = await store.cargarDetalleLote(ipActual)
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al recalcular', 'error')
+  }
+}
+
+async function solicitarRecalcularLeyCola(analisisId: number) {
+  const val = await ui.showPrompt({
+    title: 'Actualizar Ley Cola',
+    message: 'Ingrese el nuevo valor para ley cola (oz/TC):',
+    confirmLabel: 'Actualizar'
+  })
+  if (val === null || val.trim() === '') return // Cancelled or empty
+
+  const parsedVal = parseFloat(val.replace(',', '.'))
+  if (isNaN(parsedVal) || parsedVal < 0) {
+    ui.toast('Valor ingresado no es válido para ley cola', 'error')
+    return
+  }
+
+  await actualizarLeyColaDirecto(analisisId, parsedVal)
+}
+
+function obtenerLeyColaActualizada(a: any): number | null {
+  // Consultar si hay un Análisis Ley para este CIP que contenga un nuevo ley_final
+  const leyEnRegistros = lote.value?.analisis_ley?.find(l => l.cip === a.cip && l.vigente)
+  if (leyEnRegistros && leyEnRegistros.ley_final !== null) {
+    return Number(leyEnRegistros.ley_final)
+  }
+  // Si no hay un registro nuevo, el actualizado sigue siendo el mismo actual
+  return a.ley_cola !== null ? Number(a.ley_cola) : null
+}
+
+async function actualizarLeyColaDirecto(analisisId: number, nuevaLeyCola: number | null) {
+  if (nuevaLeyCola === null || isNaN(nuevaLeyCola)) return
+  try {
+    await laboratorioApi.actualizarLeyColaRecuperacion(analisisId, nuevaLeyCola)
+    ui.toast('Ley cola actualizada y recuperación recalculada', 'success')
+    lote.value = await store.cargarDetalleLote(ipActual)
+  } catch (e: any) {
+    ui.toast(e?.response?.data?.detail ?? 'Error al actualizar ley cola', 'error')
   }
 }
 

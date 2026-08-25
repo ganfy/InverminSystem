@@ -152,6 +152,14 @@ class AnalisisAgOut(BaseModel):
 # ── Análisis de Recuperación ──────────────────────────────────────────────────
 
 
+class RecalcularLeyCabezaRequest(BaseModel):
+    ley_cabeza: Decimal | None = Field(None, ge=0)
+
+
+class RecalcularLeyColaRequest(BaseModel):
+    ley_cola: Decimal | None = Field(None, ge=0)
+
+
 class AnalisisRecuperacionCreate(BaseModel):
     """Para registro manual directo (laboratorio externo via certificado, o lab propio sin pending)."""
 

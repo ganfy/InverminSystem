@@ -168,6 +168,16 @@ export const laboratorioApi = {
         return data
     },
 
+    async actualizarLeyCabezaRecuperacion(analisisId: number, ley_cabeza: number): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.patch(`/laboratorio/recuperacion/${analisisId}/ley-cabeza`, { ley_cabeza })
+        return data
+    },
+
+    async actualizarLeyColaRecuperacion(analisisId: number, ley_cola: number): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.patch(`/laboratorio/recuperacion/${analisisId}/ley-cola`, { ley_cola })
+        return data
+    },
+
     async descartarRecuperacion(analisisId: number, req: DescartarRequest): Promise<AnalisisRecuperacionOut> {
         const { data } = await api.patch(`/laboratorio/recuperacion/${analisisId}/descartar`, req)
         return data

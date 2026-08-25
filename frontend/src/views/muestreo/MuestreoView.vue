@@ -35,6 +35,10 @@
             <X :size="14" />
           </button>
         </div>
+        <button class="btn-icon" @click="sortDesc = !sortDesc" :title="sortDesc ? 'Orden descendente' : 'Orden ascendente'" style="background:var(--color-bg-input); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:0.5rem; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+          <ArrowDown v-if="sortDesc" :size="20" style="color:var(--color-text-dim)" />
+          <ArrowUp v-else :size="20" style="color:var(--color-text-dim)" />
+        </button>
         <span v-if="busquedaIP" class="busqueda-hint">
           {{ lotesMostrar.length }} resultado{{ lotesMostrar.length !== 1 ? 's' : '' }}
         </span>
@@ -139,6 +143,8 @@ import {
   Tag,
   RefreshCw,
   FlaskConical,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-vue-next'
 
 
@@ -176,14 +182,20 @@ function calcularEstadoSLA(lote: any) {
 
 const tabActual = ref<'PENDIENTES' | 'COMPLETADOS'>('PENDIENTES')
 const busquedaIP = ref('')
+const sortDesc = ref(true)
 
 // Variable para controlar qué modal de detalles está abierto
 const modalDetallesIp = ref<string | null>(null)
 
 const lotesMostrar = computed(() => {
-  const lista = tabActual.value === 'PENDIENTES'
-    ? store.lotesPendientes
-    : store.lotesCompletados
+  let lista = tabActual.value === 'PENDIENTES'
+    ? [...store.lotesPendientes]
+    : [...store.lotesCompletados]
+  
+  lista.sort((a, b) => {
+    return sortDesc.value ? b.ip.localeCompare(a.ip) : a.ip.localeCompare(b.ip)
+  })
+  
   const q = busquedaIP.value.trim().toLowerCase()
   if (!q) return lista
   return lista.filter(l => l.ip.toLowerCase().includes(q))

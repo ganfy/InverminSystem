@@ -37,6 +37,8 @@ from app.schemas.laboratorio import (
     DescartarRequest,
     EnviarRecuperacionInternaRequest,
     LoteLabOut,
+    RecalcularLeyCabezaRequest,
+    RecalcularLeyColaRequest,
     SyncLaboratorioRequest,
     SyncLaboratorioResponse,
 )
@@ -311,6 +313,68 @@ def completar_recuperacion(
 
 
 # ── Registro directo de recuperación (flujo externo / sin pending) ────────────
+
+
+@router.patch(
+    "/recuperacion/{analisis_id}/ley-cabeza",
+    response_model=AnalisisRecuperacionOut,
+    summary="Actualiza la ley_cabeza de un análisis de recuperación y recalcula",
+)
+def actualizar_ley_cabeza_recuperacion(
+    analisis_id: int,
+    datos: RecalcularLeyCabezaRequest,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    a = (
+        db.query(AnalisisRecuperacion)
+        .filter(AnalisisRecuperacion.id == analisis_id, ~AnalisisRecuperacion.eliminado)
+        .first()
+    )
+    if not a:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+
+    a.ley_cabeza = datos.ley_cabeza
+    a.modificado_por = current_user.id
+    db.commit()
+
+    return (
+        db.query(AnalisisRecuperacion)
+        .options(joinedload(AnalisisRecuperacion.detalles))
+        .filter(AnalisisRecuperacion.id == a.id)
+        .first()
+    )
+
+
+@router.patch(
+    "/recuperacion/{analisis_id}/ley-cola",
+    response_model=AnalisisRecuperacionOut,
+    summary="Actualiza la ley_cola de un análisis de recuperación y recalcula",
+)
+def actualizar_ley_cola_recuperacion(
+    analisis_id: int,
+    datos: RecalcularLeyColaRequest,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    a = (
+        db.query(AnalisisRecuperacion)
+        .filter(AnalisisRecuperacion.id == analisis_id, ~AnalisisRecuperacion.eliminado)
+        .first()
+    )
+    if not a:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+
+    a.ley_cola = datos.ley_cola
+    a.modificado_por = current_user.id
+    db.commit()
+
+    return (
+        db.query(AnalisisRecuperacion)
+        .options(joinedload(AnalisisRecuperacion.detalles))
+        .filter(AnalisisRecuperacion.id == a.id)
+        .first()
+    )
 
 
 @router.post("/recuperacion", response_model=AnalisisRecuperacionOut, status_code=201)
