@@ -136,22 +136,24 @@ def scrape_y_guardar_hoy(db: Session) -> SpotHistorico | None:
         logger.info("spot_historico: hoy es fin de semana, no hay LBMA Fix.")
         return None
 
-    precio_au = obtener_ultimo_valor_oro_pm()
-    if not precio_au:
+    res_au = obtener_ultimo_valor_oro_pm()
+    if not res_au:
         logger.warning("spot_historico: scraper Au falló, no se guardó.")
         return None
 
-    precio_ag_raw = obtener_ultimo_valor_plata_noon()
-    precio_ag = Decimal(str(precio_ag_raw)) if precio_ag_raw else None
+    fecha_au, precio_au = res_au
+
+    res_ag = obtener_ultimo_valor_plata_noon()
+    precio_ag = Decimal(str(res_ag[1])) if res_ag else None
 
     registro = guardar_spot(
         db,
-        fecha=hoy,
+        fecha=fecha_au,
         precio_au_usd=Decimal(str(precio_au)),
         precio_ag_usd=precio_ag,
         fuente="SCRAPING",
     )
-    logger.info(f"spot_historico: guardado Au={precio_au} Ag={precio_ag} para {hoy}")
+    logger.info(f"spot_historico: guardado Au={precio_au} Ag={precio_ag} para {fecha_au}")
     return registro
 
 

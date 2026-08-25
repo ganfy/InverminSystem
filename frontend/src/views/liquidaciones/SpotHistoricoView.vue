@@ -18,7 +18,7 @@
       <div style="display:flex;gap:0.5rem">
         <button class="btn-secondary" @click="fetchHoy" :disabled="cargandoScraping">
           <RefreshCw :size="15" :class="{ 'spin': cargandoScraping }" />
-          {{ cargandoScraping ? 'Obteniendo…' : 'Obtener precio hoy' }}
+          {{ cargandoScraping ? 'Actualizando…' : 'Actualizar spot' }}
         </button>
         <button class="btn-primary" @click="abrirModalNuevo">
           <Plus :size="16" />
@@ -56,7 +56,7 @@
         <span class="spinner" /> Cargando…
       </div>
       <div v-else-if="spots.length === 0" class="estado-vacio">
-        Sin registros. Use "Registrar spot" o "Obtener precio hoy".
+        Sin registros. Use "Registrar spot" o "Actualizar spot".
       </div>
       <table v-else class="tabla">
         <thead>

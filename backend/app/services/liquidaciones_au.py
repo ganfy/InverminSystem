@@ -1,11 +1,13 @@
+from datetime import date, datetime
+
 import requests
 from bs4 import BeautifulSoup
 
 
-def obtener_ultimo_valor_oro_pm() -> float | None:
+def obtener_ultimo_valor_oro_pm() -> tuple[date, float] | None:
     """
     Obtiene el último valor disponible del 'Gold PM' desde la página de LBMA Fix.
-    Retorna el valor como un float o None si ocurre un error.
+    Retorna una tupla (fecha, valor) o None si ocurre un error.
     """
     url = "https://goldsilver.com/price-charts/historical-london-fix/"
 
@@ -45,11 +47,17 @@ def obtener_ultimo_valor_oro_pm() -> float | None:
                     if len(columnas) > indice_pm:
                         valor_pm = columnas[indice_pm].text.strip()
 
-                        # Validar que el valor no esté vacío o sea un guion
                         if valor_pm and valor_pm != "-":
                             # Limpiar comas (si las hay) y convertir a número
                             valor_limpio = valor_pm.replace(",", "")
-                            return float(valor_limpio)
+                            # Extraer y parsear la fecha (ej: "24 Aug 2026")
+                            fecha_str = columnas[0].text.strip()
+                            try:
+                                fecha = datetime.strptime(fecha_str, "%d %b %Y").date()
+                            except ValueError:
+                                # En caso de que cambie el formato, intentar "%b %d, %Y"
+                                fecha = datetime.strptime(fecha_str, "%b %d, %Y").date()
+                            return fecha, float(valor_limpio)
 
     except requests.exceptions.RequestException as e:
         print(f"Error de red al intentar acceder a la página: {e}")
@@ -61,8 +69,9 @@ def obtener_ultimo_valor_oro_pm() -> float | None:
 
 # --- Bloque de prueba rápida ---
 if __name__ == "__main__":
-    precio_oro = obtener_ultimo_valor_oro_pm()
-    if precio_oro:
-        print(f"¡Éxito! El último precio del oro (PM) es: ${precio_oro}")
+    resultado = obtener_ultimo_valor_oro_pm()
+    if resultado:
+        fecha, precio_oro = resultado
+        print(f"¡Éxito! El último precio del oro (PM) es: ${precio_oro} para la fecha {fecha}")
     else:
         print("No se pudo obtener el precio del oro.")

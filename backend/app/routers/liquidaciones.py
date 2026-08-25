@@ -67,26 +67,29 @@ def precio_oro(
 ):
     """
     Obtiene el último valor del Gold PM desde LBMA Fix.
-    Si guardar=true, también lo persiste en spot_historico para la fecha de hoy.
+    Si guardar=true, también lo persiste en spot_historico usando la fecha devuelta por el scraping.
     Retorna null si el scraping falla.
     """
-    valor = obtener_ultimo_valor_oro_pm()
-    if valor and guardar:
-        from datetime import date as _date
+    res_au = obtener_ultimo_valor_oro_pm()
+    if not res_au:
+        return None
 
-        hoy = _date.today()
-        if hoy.weekday() < 5:  # solo en días hábiles
-            # Obtener plata también para el guardado conjunto
-            plata_raw = obtener_ultimo_valor_plata_noon()
-            plata = Decimal(str(plata_raw)) if plata_raw else None
-            svc_spot.guardar_spot(
-                db,
-                fecha=hoy,
-                precio_au_usd=Decimal(str(valor)),
-                precio_ag_usd=plata,
-                fuente="SCRAPING",
-            )
-    return valor
+    fecha_au, valor_au = res_au
+
+    if guardar:
+        # Obtener plata también para el guardado conjunto
+        res_ag = obtener_ultimo_valor_plata_noon()
+        plata = Decimal(str(res_ag[1])) if res_ag else None
+
+        # Guardamos utilizando la fecha obtenida del scraping
+        svc_spot.guardar_spot(
+            db,
+            fecha=fecha_au,
+            precio_au_usd=Decimal(str(valor_au)),
+            precio_ag_usd=plata,
+            fuente="SCRAPING",
+        )
+    return valor_au
 
 
 @router.get("/precio-plata", response_model=float | None)
@@ -94,7 +97,8 @@ def precio_plata(
     current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
 ):
     """Obtiene el último valor de Plata Noon Fix. Retorna null si falla."""
-    return obtener_ultimo_valor_plata_noon()
+    res_ag = obtener_ultimo_valor_plata_noon()
+    return res_ag[1] if res_ag else None
 
 
 # ── Spot Histórico CRUD ───────────────────────────────────────────────────────
