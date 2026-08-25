@@ -266,8 +266,6 @@ def registrar_prueba(
                 f"Malla {datos.malla_porcentaje:.1f}% fuera del rango aceptable (88% - 94%)"
             )
 
-    datos.fecha_ingreso = datetime.now(UTC).replace(tzinfo=None)
-
     prueba_existente = (
         db.query(PruebaMetalurgica)
         .filter(PruebaMetalurgica.lote_id == lote.id)
@@ -276,11 +274,18 @@ def registrar_prueba(
     )
 
     if prueba_existente:
-        for campo, valor in datos.model_dump().items():
+        dump = datos.model_dump()
+        if not prueba_existente.fecha_ingreso:
+            dump["fecha_ingreso"] = datetime.now(UTC).replace(tzinfo=None)
+        elif "fecha_ingreso" in dump:
+            del dump["fecha_ingreso"]
+
+        for campo, valor in dump.items():
             setattr(prueba_existente, campo, valor)
         prueba_existente.modificado_por = usuario_id
         prueba = prueba_existente
     else:
+        datos.fecha_ingreso = datetime.now(UTC).replace(tzinfo=None)
         prueba = PruebaMetalurgica(
             lote_id=lote.id,
             **datos.model_dump(),

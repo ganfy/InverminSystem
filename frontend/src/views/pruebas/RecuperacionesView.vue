@@ -97,7 +97,7 @@
         </div>
 
         <!-- Card Footer (Acciones) -->
-        <div class="rc-footer" v-if="item.recuperacion != null && Number(item.recuperacion) < 70">
+        <div class="rc-footer" v-if="item.recuperacion != null && Number(item.recuperacion) < CONFIG_PRUEBAS.umbral_recup_baja">
           <button
             class="btn-remuestreo"
             :disabled="remuestreando === item.ip"
@@ -113,9 +113,9 @@
 
     <!-- Leyenda recuperación -->
     <div class="rec-leyenda">
-      <span class="leyenda-item rec-alta">≥ 85% Buena</span>
-      <span class="leyenda-item rec-media">70-84% Regular</span>
-      <span class="leyenda-item rec-baja">&lt; 70% Baja</span>
+      <span class="leyenda-item rec-alta">≥ {{ CONFIG_PRUEBAS.umbral_recup_alta }}% Buena</span>
+      <span class="leyenda-item rec-media">{{ CONFIG_PRUEBAS.umbral_recup_baja }}-{{ CONFIG_PRUEBAS.umbral_recup_alta - 1 }}% Regular</span>
+      <span class="leyenda-item rec-baja">&lt; {{ CONFIG_PRUEBAS.umbral_recup_baja }}% Baja</span>
     </div>
   </div>
 </template>
@@ -126,6 +126,7 @@ import { useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import { pruebasApi, type RecuperacionItem } from '@/api/pruebas'
 import { useUiStore } from '@/stores/ui'
+import { CONFIG_PRUEBAS } from '@/utils/units'
 
 const router  = useRouter()
 const ui      = useUiStore()
@@ -157,8 +158,8 @@ const filtrados = computed(() => {
 
 function recClass(v: number | null) {
   if (v == null) return ''
-  if (v >= 85) return 'rec-alta'
-  if (v >= 70) return 'rec-media'
+  if (v >= CONFIG_PRUEBAS.umbral_recup_alta) return 'rec-alta'
+  if (v >= CONFIG_PRUEBAS.umbral_recup_baja) return 'rec-media'
   return 'rec-baja'
 }
 

@@ -562,6 +562,8 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   sla_metalurgia_horas: 'SLA Retraso en Pruebas Metalúrgicas',
   sla_limite_plazo_horas: 'SLA Plazo Límite en Pruebas Metalúrgicas',
   pruebas_usa_cip: 'Modo de Identificación de Muestras (CIP vs IP)',
+  pruebas_umbral_recup_alta: 'Umbral Alta Recuperación',
+  pruebas_umbral_recup_baja: 'Umbral Baja Recuperación (Reensayo)',
 
   // Alertas
   alerta_horas_pesado_muestreo: 'SLA Pesado a Muestreo',
@@ -588,6 +590,8 @@ const UNIDADES: Record<string, string> = {
   CAMPANA_META_ORO_FINO_DEFAULT: 'g',
   sla_metalurgia_horas: 'horas',
   sla_limite_plazo_horas: 'horas',
+  pruebas_umbral_recup_alta: '%',
+  pruebas_umbral_recup_baja: '%',
   alerta_horas_pesado_muestreo: 'horas',
   alerta_horas_muestreo_ley: 'horas',
   alerta_horas_ley_recuperacion: 'horas',
@@ -629,7 +633,7 @@ const PARAM_CATEGORIES = [
     id: 'pruebas',
     name: 'Pruebas Metalúrgicas y Campañas',
     icon: Beaker,
-    keys: ['CAMPANA_META_ORO_FINO_DEFAULT', 'sla_metalurgia_horas', 'sla_limite_plazo_horas', 'pruebas_usa_cip']
+    keys: ['CAMPANA_META_ORO_FINO_DEFAULT', 'sla_metalurgia_horas', 'sla_limite_plazo_horas', 'pruebas_usa_cip', 'pruebas_umbral_recup_alta', 'pruebas_umbral_recup_baja']
   },
   {
     id: 'alertas',

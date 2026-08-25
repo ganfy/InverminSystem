@@ -225,9 +225,9 @@
                 <template v-if="prueba.estado === 'COMPLETADO' && prueba.etiquetado">
                   <!-- Todo ya fue enviado -->
                   <span
-                    v-if="prueba.sub_tipos_enviados.includes('SOLIDOS') && prueba.sub_tipos_enviados.includes('SOLUCION')"
+                    v-if="isTodoEnviado(prueba)"
                     class="badge-lab-enviado"
-                    :title="'Enviado: ' + prueba.sub_tipos_enviados.join(' + ')"
+                    title="Enviado: Sólidos y Solución para todos los CIPs"
                   >
                     <FlaskConical :size="12" style="margin-right:0.25rem;vertical-align:middle" />
                     Enviado
@@ -240,12 +240,12 @@
                     style="font-size:0.75rem;padding:0.3rem 0.75rem"
                     :disabled="enviandoLab === prueba.ip"
                     @click="abrirModalEnviarLab(prueba)"
-                    :title="prueba.sub_tipos_enviados.length ? 'Ya enviado: ' + prueba.sub_tipos_enviados.join(', ') + '. Click para enviar el resto.' : 'Enviar muestras al laboratorio interno Paititi'"
+                    title="Enviar muestras al laboratorio interno Paititi"
                   >
                     <span v-if="enviandoLab === prueba.ip" class="spinner" style="margin-right:0.3rem"></span>
                     <FlaskConical v-else :size="14" style="margin-right:0.25rem;vertical-align:middle" />
                     Enviar a Lab
-                    <span v-if="prueba.sub_tipos_enviados.length" style="font-size:0.65rem;opacity:0.7;margin-left:0.2rem">(parcial)</span>
+                    <span v-if="tieneEnviosParciales(prueba)" style="font-size:0.65rem;opacity:0.7;margin-left:0.2rem">(parcial)</span>
                   </button>
                 </template>
               </template>
@@ -491,7 +491,7 @@
                   <div style="font-size:0.75rem;color:var(--color-text-muted)">Reconocimiento de sólidos por Fire Assay</div>
                 </div>
                 <span
-                  v-if="modalEnviarLab.sub_tipos_enviados.includes('SOLIDOS')"
+                  v-if="yaEnviadosCipActual.includes('SOLIDOS')"
                   style="font-size:0.7rem;background:rgba(99,102,241,0.15);color:#a5b4fc;border-radius:4px;padding:0.1rem 0.4rem;white-space:nowrap"
                 >✓ Enviado</span>
               </div>
@@ -513,7 +513,7 @@
                   <div style="font-size:0.75rem;color:var(--color-text-muted)">Leyes en solución por Absorción Atómica</div>
                 </div>
                 <span
-                  v-if="modalEnviarLab.sub_tipos_enviados.includes('SOLUCION')"
+                  v-if="yaEnviadosCipActual.includes('SOLUCION')"
                   style="font-size:0.7rem;background:rgba(99,102,241,0.15);color:#a5b4fc;border-radius:4px;padding:0.1rem 0.4rem;white-space:nowrap"
                 >✓ Enviado</span>
               </div>
@@ -613,6 +613,25 @@ const yaEnviadosCipActual = computed(() => {
   if (!modalEnviarLab.value || !envioCip.value) return []
   return modalEnviarLab.value.sub_tipos_enviados_por_cip?.[envioCip.value] || []
 })
+
+function isTodoEnviado(prueba: LotePruebaList) {
+  if (!prueba.cips_asignados || prueba.cips_asignados.length === 0) return false;
+  for (const cip of prueba.cips_asignados) {
+    const enviados = prueba.sub_tipos_enviados_por_cip?.[cip] || [];
+    if (!enviados.includes('SOLIDOS') || !enviados.includes('SOLUCION')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function tieneEnviosParciales(prueba: LotePruebaList) {
+  if (!prueba.cips_asignados) return false;
+  return prueba.cips_asignados.some(cip => {
+    const enviados = prueba.sub_tipos_enviados_por_cip?.[cip] || [];
+    return enviados.length > 0;
+  });
+}
 
 // Sub-tipos seleccionados por el usuario en el modo actual
 const envioSubTipos = computed(() => {

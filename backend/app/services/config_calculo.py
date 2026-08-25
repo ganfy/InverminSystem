@@ -50,6 +50,8 @@ DEFAULTS: dict[str, str] = {
     # "true"  → genera CIPs ofuscados (ej: CIP-058598D-R1) — comportamiento original
     # "false" → usa el IP del lote con sufijo correlativo (ej: IP-0042-R1)
     "pruebas_usa_cip": "true",
+    "pruebas_umbral_recup_alta": "85",
+    "pruebas_umbral_recup_baja": "70",
     # Alertas Dashboard
     "alerta_horas_pesado_muestreo": "24",
     "alerta_horas_muestreo_ley": "24",
@@ -99,6 +101,8 @@ DESCRIPCIONES: dict[str, str] = {
     "sla_metalurgia_horas": "Tiempo de espera en horas para considerar una prueba metalúrgica como retrasada",
     "sla_limite_plazo_horas": "Plazo máximo en horas para completar una prueba antes de alertar de incumplimiento",
     "pruebas_usa_cip": "Modo de identificación de muestras en Pruebas Metalúrgicas. 'true': genera CIPs ofuscados (CIP-XXXXXX-R1). 'false': usa el IP del lote con sufijo correlativo (IP-0042-R1).",
+    "pruebas_umbral_recup_alta": "Porcentaje de recuperación a partir del cual se considera como 'Buena/Alta' en Pruebas Metalúrgicas.",
+    "pruebas_umbral_recup_baja": "Porcentaje de recuperación por debajo del cual se considera como 'Baja' en Pruebas Metalúrgicas y se habilita el remuestreo.",
     "alerta_horas_pesado_muestreo": "Horas máximas entre pesado en balanza y muestreo antes de generar alerta",
     "alerta_horas_muestreo_ley": "Horas máximas entre muestreo y resultado de ley antes de generar alerta",
     "alerta_horas_ley_recuperacion": "Horas máximas entre resultado de ley y recuperación antes de generar alerta",
@@ -332,6 +336,8 @@ def get_config_public_dict(db: Session) -> dict[str, str]:
         "factor_oz_tc",
         "MUESTREO_CIPS_IMPRIMIR",
         "pruebas_usa_cip",
+        "pruebas_umbral_recup_alta",
+        "pruebas_umbral_recup_baja",
     ]
     rows = (
         db.query(Configuracion.clave, Configuracion.valor)

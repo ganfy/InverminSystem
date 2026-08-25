@@ -24,7 +24,11 @@ export const CONFIG_UNIDADES_MODULOS = reactive<Record<string, string>>({
 // 4. Configuración de Pruebas Metalúrgicas
 // usa_cip=true  → genera CIPs ofuscados (CIP-XXXXXX-R1) — comportamiento original
 // usa_cip=false → usa el IP del lote con sufijo correlativo (IP-0042-R1)
-export const CONFIG_PRUEBAS = reactive({ usa_cip: true })
+export const CONFIG_PRUEBAS = reactive({ 
+    usa_cip: true,
+    umbral_recup_alta: 85,
+    umbral_recup_baja: 70
+})
 
 export function updateUnidadesModulos(config: Record<string, string>) {
     if (config.unidad_balanza) CONFIG_UNIDADES_MODULOS.BALANZA = config.unidad_balanza
@@ -35,6 +39,10 @@ export function updateUnidadesModulos(config: Record<string, string>) {
     // Flag de Pruebas: viene como string "true"/"false" desde la config pública
     if (config.pruebas_usa_cip !== undefined)
         CONFIG_PRUEBAS.usa_cip = config.pruebas_usa_cip !== 'false'
+    if (config.pruebas_umbral_recup_alta !== undefined)
+        CONFIG_PRUEBAS.umbral_recup_alta = Number(config.pruebas_umbral_recup_alta) || 85
+    if (config.pruebas_umbral_recup_baja !== undefined)
+        CONFIG_PRUEBAS.umbral_recup_baja = Number(config.pruebas_umbral_recup_baja) || 70
 }
 
 /**
