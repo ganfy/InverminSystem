@@ -328,7 +328,35 @@
               </div>
             </section>
 
-            <!-- 7 · RUMA / CAMPAÑA -->
+            <!-- 7 · LIQUIDACIÓN -->
+            <section class="trz-card">
+              <div class="trz-card-head" @click="toggleSection('liq')">
+                <span class="head-icon"><FileText :size="13"/></span>
+                <span class="head-title">Liquidación</span>
+                <ChevronDown class="head-caret" :class="{ rotated: open_sections.liq }" :size="14"/>
+              </div>
+              <div v-show="open_sections.liq" class="trz-card-body">
+                <template v-if="data.liquidacion">
+                  <div class="g3">
+                    <Field label="N° Liquidación" :val="data.liquidacion.numero_liquidacion" mono class="g-span2" />
+                    <Field label="Estado"         :val="data.liquidacion.estado" />
+                    <Field label="Spot USD"       :val="'$' + fmtNum(data.liquidacion.precio_oro_usd)" mono />
+                    <Field label="Total USD"      :val="'$' + fmtNum(data.liquidacion.valor_total_usd)" mono gold />
+                    <Field label="Fino rec."      :val="data.liquidacion.fino_recuperable?.toFixed(4)" mono />
+                    <Field label="Ley comercial"  :val="data.liquidacion.ley_comercial?.toFixed(4)" mono />
+                    <Field label="Dirimencia"     :val="data.liquidacion.usa_dirimencia ? 'Sí' : 'No'" />
+                  </div>
+                  <ResponsableRow :accion="data.liquidacion.generacion" label="Generado por" />
+                  <ResponsableRow v-if="data.liquidacion.cierre" :accion="data.liquidacion.cierre" label="Cerrado por" />
+                </template>
+                <div v-else class="empty-state-row">
+                  <Clock :size="12" />
+                  <span>Pendiente de liquidación</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- 8 · RUMA / CAMPAÑA -->
             <section class="trz-card">
               <div class="trz-card-head" @click="toggleSection('ruma')">
                 <span class="head-icon"><Layers :size="13"/></span>
@@ -356,34 +384,6 @@
                   >
                     {{ data.habilitado_ruma ? 'Habilitado para Ruma' : 'Habilitar manualmente' }}
                   </button>
-                </div>
-              </div>
-            </section>
-
-            <!-- 8 · LIQUIDACIÓN -->
-            <section class="trz-card">
-              <div class="trz-card-head" @click="toggleSection('liq')">
-                <span class="head-icon"><FileText :size="13"/></span>
-                <span class="head-title">Liquidación</span>
-                <ChevronDown class="head-caret" :class="{ rotated: open_sections.liq }" :size="14"/>
-              </div>
-              <div v-show="open_sections.liq" class="trz-card-body">
-                <template v-if="data.liquidacion">
-                  <div class="g3">
-                    <Field label="N° Liquidación" :val="data.liquidacion.numero_liquidacion" mono class="g-span2" />
-                    <Field label="Estado"         :val="data.liquidacion.estado" />
-                    <Field label="Spot USD"       :val="'$' + fmtNum(data.liquidacion.precio_oro_usd)" mono />
-                    <Field label="Total USD"      :val="'$' + fmtNum(data.liquidacion.valor_total_usd)" mono gold />
-                    <Field label="Fino rec."      :val="data.liquidacion.fino_recuperable?.toFixed(4)" mono />
-                    <Field label="Ley comercial"  :val="data.liquidacion.ley_comercial?.toFixed(4)" mono />
-                    <Field label="Dirimencia"     :val="data.liquidacion.usa_dirimencia ? 'Sí' : 'No'" />
-                  </div>
-                  <ResponsableRow :accion="data.liquidacion.generacion" label="Generado por" />
-                  <ResponsableRow v-if="data.liquidacion.cierre" :accion="data.liquidacion.cierre" label="Cerrado por" />
-                </template>
-                <div v-else class="empty-state-row">
-                  <Clock :size="12" />
-                  <span>Pendiente de liquidación</span>
                 </div>
               </div>
             </section>
@@ -655,8 +655,8 @@ const timeline = computed(() => {
     { key: 'mue',     label: 'Muestreo',  icon: Droplets,     status: d?.muestreos.length            ? 'done' : 'pend' },
     { key: 'prueba',  label: 'Pruebas',   icon: FlaskConical, status: d?.prueba_metalurgica           ? 'done' : 'pend' },
     { key: 'lab',     label: 'Lab',       icon: BarChart2,    status: d?.analisis_ley.some(a=>a.vigente) ? 'done' : 'pend' },
-    { key: 'ruma',    label: 'Ruma',      icon: Layers,       status: d?.ruma                        ? 'done' : 'pend' },
     { key: 'liq',     label: 'Liquid.',   icon: FileText,     status: d?.liquidacion                 ? 'done' : 'pend' },
+    { key: 'ruma',    label: 'Ruma',      icon: Layers,       status: d?.ruma                        ? 'done' : 'pend' },
   ]
 })
 

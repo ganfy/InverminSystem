@@ -174,7 +174,7 @@
                     <div class="tooltip-row"><span class="t-badge t-humedad">FALTA HUMEDAD</span><span>Sin resultado de muestreo</span></div>
                     <div class="tooltip-row"><span class="t-badge t-ley">FALTA LEY</span><span>Sin análisis de ley</span></div>
                     <div class="tooltip-row"><span class="t-badge t-rec">FALTA REC.</span><span>Sin análisis de recuperación</span></div>
-                    <div class="tooltip-row"><span class="t-badge t-sin">SIN DATOS</span><span>Sin ningún dato registrado</span></div>
+                    <div class="tooltip-row"><span class="t-badge t-sin">FALTA CIP</span><span>Aún no ingresa a laboratorio</span></div>
                   </div>
                 </span>
               </th>
@@ -991,7 +991,7 @@ const donutSegments = computed((): DonutSeg[] => {
     { label: 'Falta Rec.',    value: c.falta_rec,       color: '#f59e0b' },
     { label: 'Falta Ley',     value: c.falta_ley,       color: '#60a5fa' },
     { label: 'Falta Muestreo',value: c.falta_muestreo,  color: '#c084fc' },
-    { label: 'Sin datos',     value: c.sin_datos,       color: '#475569' },
+    { label: 'Falta CIP',     value: c.sin_datos,       color: '#475569' },
   ].filter(i => i.value > 0)
   const total = items.reduce((s, i) => s + i.value, 0)
   if (!total) return []
@@ -1127,7 +1127,7 @@ function labelAnalisis(lote: LoteDashboard): string {
     return 'COMPLETO'
   }
   return {
-    SIN_DATOS: 'Sin datos',
+    SIN_DATOS: 'Falta CIP',
     FALTA_MUESTREO: 'Falta humedad',
     FALTA_LEY: 'Falta ley',
     FALTA_REC: 'Falta recuperación',
