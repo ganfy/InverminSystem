@@ -29,7 +29,9 @@ def upgrade() -> None:
         sa.Column("precio_au_usd", sa.Numeric(precision=10, scale=2), nullable=False),
         sa.Column("precio_ag_usd", sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column("fuente", sa.String(length=20), nullable=True),
-        sa.Column("creado_en", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "creado_en", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.Column("modificado_en", sa.DateTime(), nullable=True),
         sa.Column("creado_por", sa.Integer(), nullable=True),
         sa.Column("modificado_por", sa.Integer(), nullable=True),
