@@ -506,7 +506,7 @@
 
   <script setup lang="ts">
   import { ref, computed, onMounted } from 'vue'
-  import { useRouter } from 'vue-router'
+  import { useRouter, useRoute } from 'vue-router'
   import {
     ChevronLeft, FilePlus, AlertTriangle, Info, CheckCircle,
   } from 'lucide-vue-next'
@@ -517,6 +517,7 @@
   import { obtenerPrecioOro, obtenerPrecioPlata, type EditOverrides } from '@/api/liquidaciones'
 
   const router = useRouter()
+  const route  = useRoute()
   const store  = useLiquidacionesStore()
   const ui     = useUiStore()
   const auth   = useAuthStore()
@@ -734,9 +735,14 @@ async function recalcularConOverrides() {
     return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  onMounted(() => {
+  onMounted(async () => {
     store.limpiarPreview()
-    cargarProvacops()
+    await cargarProvacops()
+    const queryId = Number(route?.query?.provacop_id)
+    if (queryId && !isNaN(queryId)) {
+      provacopId.value = queryId
+      await onProvacopChange()
+    }
     cargarPrecio()
     expandedLots.value = []
   })

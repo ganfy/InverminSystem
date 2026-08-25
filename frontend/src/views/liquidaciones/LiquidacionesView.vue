@@ -276,11 +276,11 @@
               </table>
             </div>
 
-            <!-- ── Tabla de Clapeo (Promedio vs Dirimencia) ───────────────── -->
+            <!-- ── Tabla de Prevalencia de Leyes (Promedio vs Dirimencia) ───────────────── -->
             <template v-if="grupo.lotes.some(l => l.oz_tc_minero != null)">
               <div class="clapeo-section">
                 <div class="clapeo-header">
-                  <span class="clapeo-title">Cuadro de Clapeo · {{ grupo.proveedor }}</span>
+                  <span class="clapeo-title">Prevalencia de Leyes · {{ grupo.proveedor }}</span>
                   <span class="clapeo-hint">Muestra la diferencia Planta/Minero y el modo de liquidación por lote</span>
                 </div>
                 <table class="tabla clapeo-tabla">
@@ -481,7 +481,7 @@ function irACrearConProvacop(grupo: GrupoProvacop) {
   // Navegar al wizard con provacop pre-seleccionado via query param
   router.push({
     path: '/liquidaciones/nueva',
-    query: { proveedor: grupo.proveedor, acopiador: grupo.acopiador }
+    query: { provacop_id: grupo.provacop_id }
   })
 }
 
