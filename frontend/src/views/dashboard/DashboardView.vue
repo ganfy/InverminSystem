@@ -16,35 +16,60 @@
     </header>
 
     <section class="kpi-grid">
-      <div class="kpi-card gold-accent">
+      <div 
+        class="kpi-card gold-accent kpi-card-interactive" 
+        :class="{ active: filtroKpi === 'au_real_100' }"
+        @click="aplicarFiltroKpi('au_real_100')"
+        title="Au Real 100%: Total de gramos de oro contenido. Fórmula: Σ(TMS × Ley Promedio gr/TM). Clic para ver los lotes que suman a esta métrica."
+      >
         <div class="kpi-info">
           <span class="kpi-label">Au Real 100%</span>
           <span class="kpi-value">{{ data?.kpis.au_real_100 ? fmtNum(data.kpis.au_real_100) : '0.00' }}g</span>
         </div>
         <Zap class="kpi-icon" :size="32" />
       </div>
-      <div class="kpi-card gold-accent">
+      <div 
+        class="kpi-card gold-accent kpi-card-interactive"
+        :class="{ active: filtroKpi === 'au_real_rec' }"
+        @click="aplicarFiltroKpi('au_real_rec')"
+        title="Au Real Rec.: Oro recuperable esperado. Fórmula: Σ(TMS × Ley Promedio gr/TM × % Recuperación). Clic para ver los lotes."
+      >
         <div class="kpi-info">
           <span class="kpi-label">Au Real Rec.</span>
           <span class="kpi-value">{{ data?.kpis.au_real_rec ? fmtNum(data.kpis.au_real_rec) : '0.00' }}g</span>
         </div>
         <TrendingUp class="kpi-icon" :size="32" />
       </div>
-      <div class="kpi-card">
+      <div 
+        class="kpi-card kpi-card-interactive"
+        :class="{ active: filtroKpi === 'tmh_stock' }"
+        @click="aplicarFiltroKpi('tmh_stock')"
+        title="TMH en Stock: Total de Toneladas Métricas Húmedas. Clic para ver todos los lotes."
+      >
         <div class="kpi-info">
           <span class="kpi-label">TMH en Stock</span>
           <span class="kpi-value highlight">{{ data?.kpis.tmh_stock.toFixed(2) }} TM</span>
         </div>
         <Scale class="kpi-icon" :size="32" />
       </div>
-      <div class="kpi-card">
+      <div 
+        class="kpi-card kpi-card-interactive"
+        :class="{ active: filtroKpi === 'tms_stock' }"
+        @click="aplicarFiltroKpi('tms_stock')"
+        title="TMS en Stock: Total de Toneladas Métricas Secas (descontando humedad). Clic para ver los lotes con humedad registrada."
+      >
         <div class="kpi-info">
           <span class="kpi-label">TMS en Stock</span>
           <span class="kpi-value">{{ data?.kpis.tms_stock.toFixed(2) }} TM</span>
         </div>
         <Database class="kpi-icon" :size="32" />
       </div>
-      <div class="kpi-card">
+      <div 
+        class="kpi-card kpi-card-interactive"
+        :class="{ active: filtroKpi === 'oz_stock' }"
+        @click="aplicarFiltroKpi('oz_stock')"
+        title="Oz en Stock: Equivalente en onzas del Au Real 100%. Fórmula: (Au Real 100% / 31.1035). Clic para ver los lotes."
+      >
         <div class="kpi-info">
           <span class="kpi-label">Oz en Stock</span>
           <span class="kpi-value">{{ data?.kpis.oz_stock.toFixed(2) }} oz</span>
@@ -52,7 +77,12 @@
         <Coins class="kpi-icon" :size="32" />
       </div>
 
-      <div class="kpi-card">
+      <div 
+        class="kpi-card kpi-card-interactive"
+        :class="{ active: filtroKpi === 'oz_habilitados' }"
+        @click="aplicarFiltroKpi('oz_habilitados')"
+        title="Oz Disponibles Ruma: Onzas en lotes habilitados o volados que no han sido asignados a ninguna ruma. Clic para ver lotes."
+      >
         <div class="kpi-info">
           <span class="kpi-label">Oz Disponibles Ruma</span>
           <span class="kpi-value highlight">{{ (data?.kpis.oz_habilitados ?? 0).toFixed(3) }} oz</span>
@@ -188,7 +218,7 @@
                       title="Este lote tiene o tuvo análisis de dirimencia"
                     >DIRIM</span>
                     <span
-                      v-if="['ASIGNADO_RUMA', 'LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(lote.estado)"
+                      v-if="['ASIGNADO_RUMA', 'LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(lote.estado) || !!lote.ruma_codigo"
                       class="tag-sec tag-en-ruma"
                       :title="lote.ruma_codigo ? 'Asignado a ' + lote.ruma_codigo : 'Lote ya asignado a ruma'"
                     >{{ labelEnRuma(lote) }}</span>
@@ -741,13 +771,50 @@ const filtroEstadoLote = ref('')
 const busquedaLiq      = ref('')
 const filtroEstadoLiq  = ref('')
 const filtroAnalisis   = ref('')
+const filtroKpi        = ref<string | null>(null)
+
+function aplicarFiltroKpi(kpi: string) {
+  if (filtroKpi.value === kpi) {
+    filtroKpi.value = null // Toggle off
+  } else {
+    filtroKpi.value = kpi
+    filtroEstadoLote.value = ''
+    filtroAnalisis.value = ''
+    busquedaLote.value = ''
+    if (tabActual.value !== 'lotes') {
+      tabActual.value = 'lotes'
+    }
+  }
+}
 
 // ── Computed ──────────────────────────────────────────────────────────
 const lotesFiltrados = computed(() => {
   if (!data.value) return []
   return data.value.lotes.filter(l => {
-    if (filtroEstadoLote.value && l.estado !== filtroEstadoLote.value) return false
+    if (filtroEstadoLote.value) {
+      if (filtroEstadoLote.value === 'ASIGNADO_RUMA') {
+        const enRuma = ['ASIGNADO_RUMA', 'LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(l.estado) || !!l.ruma_codigo
+        if (!enRuma) return false
+      } else {
+        if (l.estado !== filtroEstadoLote.value) return false
+      }
+    }
+    
     if (filtroAnalisis.value && l.estado_analisis !== filtroAnalisis.value) return false
+    
+    if (filtroKpi.value) {
+      if (filtroKpi.value === 'tms_stock') {
+        if (l.tms == null) return false
+      } else if (filtroKpi.value === 'au_real_100' || filtroKpi.value === 'oz_stock') {
+        if (l.tms == null || l.ley_avg == null) return false
+      } else if (filtroKpi.value === 'au_real_rec') {
+        if (l.tms == null || l.ley_avg == null || l.rec_porc == null) return false
+      } else if (filtroKpi.value === 'oz_habilitados') {
+        const enRuma = ['ASIGNADO_RUMA', 'LIQUIDADO', 'FACTURADO', 'PAGADO'].includes(l.estado) || !!l.ruma_codigo
+        if (enRuma || !l.habilitado_ruma) return false
+      }
+    }
+
     const q = busquedaLote.value.toLowerCase()
     if (!q) return true
     return l.ip.toLowerCase().includes(q) || l.proveedor.toLowerCase().includes(q)
@@ -868,7 +935,7 @@ function exportarLotesCSV() {
     '%H2O': l.h2o_porc ?? '',
     'Proveedor': l.proveedor,
     'RUC': l.ruc ?? '',
-    'Ley Prom gr/TM': l.ley_avg ?? '',
+    'Ley Prom oz/TC': l.ley_avg ?? '',
     '% Rec': l.rec_porc ?? '',
     'Acopiador': l.acopiador ?? '',
     'Estado': l.estado,
@@ -1110,6 +1177,14 @@ onMounted(() => {
   transform: translateY(-3px); 
   border-color: var(--color-border-focus);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); 
+}
+.kpi-card.active {
+  border-color: var(--color-gold) !important;
+  box-shadow: 0 0 0 1px var(--color-gold), 0 4px 15px rgba(179, 144, 40, 0.2);
+  background: linear-gradient(135deg, var(--color-bg-card) 0%, rgba(179, 144, 40, 0.05) 100%);
+}
+.kpi-card-interactive {
+  cursor: pointer;
 }
 .gold-accent { border-left: 3px solid var(--color-gold); }
 .kpi-info { display: flex; flex-direction: column; gap: 0.25rem; }
