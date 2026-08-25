@@ -931,6 +931,30 @@ class LiquidacionLote(AuditMixin, Base):
 
 
 # =============================================================================
+# SPOTS HISTÓRICOS DE METALES (Au / Ag)
+# =============================================================================
+
+
+class SpotHistorico(AuditMixin, Base):
+    """
+    Precio spot diario del oro (Au) y plata (Ag) — LBMA Fix.
+    Se registra un único precio por fecha hábil (lunes–viernes).
+    Los fines de semana no tienen fix propio; la lógica de lookup
+    mapea sábado → viernes anterior, domingo → lunes siguiente.
+
+    fuente: "SCRAPING" (automático) | "MANUAL" (ingresado por usuario)
+    """
+
+    __tablename__ = "spot_historico"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fecha = Column(Date, nullable=False, unique=True)  # Fecha hábil (lunes–viernes)
+    precio_au_usd = Column(Numeric(10, 2), nullable=False)  # Gold PM Fix (USD/Oz Troy)
+    precio_ag_usd = Column(Numeric(10, 2), nullable=True)  # Silver Noon Fix (USD/Oz Troy)
+    fuente = Column(String(20), default="MANUAL")  # "SCRAPING" | "MANUAL"
+
+
+# =============================================================================
 # CONFIGURACIÓN Y CATÁLOGOS
 # =============================================================================
 

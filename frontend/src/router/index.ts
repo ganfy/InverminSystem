@@ -24,6 +24,7 @@ import ImportarCertificadoRecuperacionView from '@/views/laboratorio/ImportarCer
 import LiquidacionesView from '@/views/liquidaciones/LiquidacionesView.vue'
 import CrearLiquidacionView from '@/views/liquidaciones/CrearLiquidacionView.vue'
 import DetalleLiquidacionView from '@/views/liquidaciones/DetalleLiquidacionView.vue'
+import SpotHistoricoView from '@/views/liquidaciones/SpotHistoricoView.vue'
 import TercerosView from '@/views/terceros/TercerosView.vue'
 import RumasView from '@/views/rumas/RumasView.vue'
 import DetalleRumaView from '@/views/rumas/DetalleRumaView.vue'
@@ -71,6 +72,7 @@ const router = createRouter({
         // Liquidaciones
         { path: 'liquidaciones', name: 'Liquidaciones', component: LiquidacionesView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'VIEW' } } },
         { path: 'liquidaciones/nueva', name: 'CrearLiquidacion', component: CrearLiquidacionView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'CREATE' } } },
+        { path: 'liquidaciones/spots', name: 'SpotHistorico', component: SpotHistoricoView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'VIEW' } } },
         { path: 'liquidaciones/:id', name: 'DetalleLiquidacion', component: DetalleLiquidacionView, meta: { permiso: { modulo: 'LIQUIDACIONES', operacion: 'VIEW' } } },
 
         // Gestión

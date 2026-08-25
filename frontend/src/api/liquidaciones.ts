@@ -74,6 +74,9 @@ export interface LoteFinancieroOut {
     spot_ag_usd?: number | null
     valor_ag_usd?: number | null
     aplica_ag?: boolean
+    // Spot histórico por IP
+    fecha_spot_efectiva?: string | null     // fecha LBMA Fix usada
+    spot_desde_historico?: boolean          // true = histórico, false = fallback manual
 }
 
 export interface LiquidacionPreviewOut {
@@ -170,13 +173,31 @@ export interface EditOverrides {
     rec_liq: Record<string, number | null>
 }
 
+// ── Spot Histórico ─────────────────────────────────────────────────────────────
+
+export interface SpotHistoricoOut {
+    id: number
+    fecha: string
+    precio_au_usd: number
+    precio_ag_usd: number | null
+    fuente: string
+}
+
+export interface SpotHistoricoIn {
+    fecha: string
+    precio_au_usd: number
+    precio_ag_usd?: number | null
+    fuente?: string
+}
+
 // ── API calls ──────────────────────────────────────────────────────────────────
 /**
- * Obtiene el precio diario del oro (London Fix PM)
+ * Obtiene el precio diario del oro (London Fix PM).
+ * Si guardar=true, también lo guarda en el histórico para hoy.
  * Retorna un number o null si no se pudo obtener.
  */
-export const obtenerPrecioOro = async (): Promise<number | null> => {
-    const response = await api.get('/liquidaciones/precio-oro');
+export const obtenerPrecioOro = async (guardar = false): Promise<number | null> => {
+    const response = await api.get('/liquidaciones/precio-oro', { params: { guardar } });
     return response.data;
 };
 
@@ -188,6 +209,23 @@ export const obtenerPrecioPlata = async (): Promise<number | null> => {
     const response = await api.get('/liquidaciones/precio-plata');
     return response.data;
 };
+
+// Spot histórico CRUD
+export function getSpotHistorico(params?: { desde?: string; hasta?: string; limit?: number }) {
+    return api.get<SpotHistoricoOut[]>('/liquidaciones/spot-historico', { params })
+}
+
+export function crearSpotHistorico(data: SpotHistoricoIn) {
+    return api.post<SpotHistoricoOut>('/liquidaciones/spot-historico', data)
+}
+
+export function eliminarSpotHistorico(id: number) {
+    return api.delete(`/liquidaciones/spot-historico/${id}`)
+}
+
+export function getSpotPorFecha(fecha: string) {
+    return api.get<SpotHistoricoOut | null>(`/liquidaciones/spot-historico/fecha/${fecha}`)
+}
 
 
 export function getLotesDisponibles(provacop_id: number) {

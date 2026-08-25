@@ -16,6 +16,9 @@
           <button class="btn-secondary btn-con-icono" @click="handleExportarPL">
             <Download :size="16" /> Exportar PL
           </button>
+          <button class="btn-secondary btn-con-icono" @click="router.push('/liquidaciones/spots')">
+            <TrendingUp :size="16" /> Spots históricos
+          </button>
         <button class="btn-primary btn-con-icono" @click="router.push('/liquidaciones/nueva')">
           <Plus :size="16" /> Nueva Liquidación
         </button>
@@ -336,7 +339,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { FileText, Download, Plus } from 'lucide-vue-next'
+import { FileText, Download, Plus, TrendingUp } from 'lucide-vue-next'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
 import { useUiStore } from '@/stores/ui'
 import api from '@/api/axios'

@@ -205,8 +205,13 @@
             <span class="resumen-val">{{ store.preview.acopiador_nombre }}</span>
           </div>
           <div class="resumen-col">
-            <span class="resumen-lbl">SPOT ORO</span>
-            <span class="resumen-val">${{ fmtNum(store.preview.spot_usd, 2) }} /Oz</span>
+            <span class="resumen-lbl">SPOT FALLBACK</span>
+            <span class="resumen-val" style="font-size:0.85rem">${{ fmtNum(store.preview.spot_usd, 2) }} /Oz</span>
+            <span class="resumen-sub" style="font-size:0.7rem">
+              <RouterLink :to="{ name: 'SpotHistorico' }" style="color:var(--color-primary)">
+                Ver histórico →
+              </RouterLink>
+            </span>
           </div>
           <div class="resumen-col">
             <span class="resumen-lbl">TOTAL TMS</span>
@@ -238,6 +243,7 @@
                 <th>LEY MINERO</th>
                 <th>PROMEDIO</th>
                 <th>%REC LIQ</th>
+                <th>SPOT (Au)</th>
                 <th>MAQUILA</th>
                 <th>INSUMOS</th>
                 <th>PRECIO/TMS</th>
@@ -270,6 +276,22 @@
                 <td class="td-mono td-right">{{ fmtLey(lote.oz_tc_minero) }}</td>
                 <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtLey(lote.oz_tc_promedio) }}</td>
                 <td class="td-mono td-right">{{ fmtNum(lote.pct_rec_liq, 1) }}%</td>
+                <td class="td-mono td-right td-spot">
+                  <span
+                    :class="lote.spot_desde_historico ? 'badge-spot-ok' : 'badge-spot-warn'"
+                    :title="lote.spot_desde_historico
+                      ? `LBMA Fix ${fmtDate(lote.fecha_spot_efectiva)} (histórico)`
+                      : 'Spot manual (sin histórico para esta fecha)'"
+                  >
+                    ${{ fmtNum(lote.spot_usd, 2) }}
+                    <span v-if="!lote.spot_desde_historico" style="font-size:0.65rem">⚠</span>
+                    <span v-else style="font-size:0.65rem">✓</span>
+                  </span>
+                  <div v-if="lote.fecha_spot_efectiva && lote.fecha_spot_efectiva !== lote.fecha_recepcion"
+                    style="font-size:0.65rem;color:var(--color-text-muted);margin-top:1px">
+                    (ajustado: {{ fmtDate(lote.fecha_spot_efectiva) }})
+                  </div>
+                </td>
                 <td class="td-mono td-right">{{ fmtNum(lote.maquila, 2) }}</td>
                 <td class="td-mono td-right">${{ fmtNum(lote.insumos_total, 2) }}</td>
                 <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 2) }}</td>
@@ -931,4 +953,19 @@ async function recalcularConOverrides() {
   .text-success { color: var(--color-success) !important; }
   .text-danger { color: var(--color-error) !important; }
   .text-gold { color: var(--color-gold) !important; }
+
+  /* Spot por IP — badges de histórico */
+  .td-spot { min-width: 90px; }
+  .badge-spot-ok {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3);
+    color: #15803d; border-radius: 4px; padding: 1px 5px;
+    font-size: 0.8rem; font-weight: 700; white-space: nowrap;
+  }
+  .badge-spot-warn {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.35);
+    color: #92400e; border-radius: 4px; padding: 1px 5px;
+    font-size: 0.8rem; font-weight: 700; white-space: nowrap;
+  }
   </style>

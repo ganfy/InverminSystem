@@ -213,6 +213,9 @@ def run(db):
     upsert_permiso("Comercial", "TERCEROS", "UPDATE", False)  # Bloquea editar parámetros
     upsert_permiso("Comercial", "TERCEROS", "DELETE", False)
 
+    print("\n  Insertando permisos DASHBOARD para Comercial...")
+    upsert_permiso("Comercial", "DASHBOARD", "VIEW", True)
+
     print(
         "\n  Insertando permiso PRUEBAS_MET/UPDATE para Metalurgista (necesario para etiquetar y adiciones)..."
     )

@@ -21,6 +21,7 @@ from app.routers import (
     rumas,
     usuarios,
 )
+from app.services.spot_historico import scheduler_loop_spots
 from app.services.telegram_alertas import scheduler_loop
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,6 +57,9 @@ async def lifespan(app: FastAPI):
 
     # tg_task = asyncio.create_task(scheduler_loop())
     asyncio.create_task(scheduler_loop())
+
+    # ── Spot histórico scheduler (diario, 18:00 días hábiles) ─────────────────
+    asyncio.create_task(scheduler_loop_spots())
 
     yield
 

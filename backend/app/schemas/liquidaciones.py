@@ -125,6 +125,10 @@ class LoteFinancieroOut(BaseModel):
     valor_ag_usd: Decimal | None = None
     aplica_ag: bool = False
 
+    # Spot histórico por fecha de recepción
+    fecha_spot_efectiva: date | None = None  # fecha del LBMA Fix usado
+    spot_desde_historico: bool = False  # True si vino de spot_historico, False si fue fallback
+
     model_config = {"from_attributes": True}
 
 

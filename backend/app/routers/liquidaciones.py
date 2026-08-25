@@ -6,6 +6,8 @@ Permisos RBAC (RF-SYS-001):
 """
 
 import os
+from datetime import date
+from decimal import Decimal
 
 from app.core.database import get_db
 from app.core.deps import check_permiso
@@ -22,6 +24,7 @@ from app.schemas.liquidaciones import (
     LoteDisponible,
 )
 from app.services import liquidaciones as svc
+from app.services import spot_historico as svc_spot
 from app.services.liquidaciones_ag import obtener_ultimo_valor_plata_noon
 from app.services.liquidaciones_au import obtener_ultimo_valor_oro_pm
 from app.services.liquidaciones_pdf import guardar_pdf_liquidacion
@@ -32,15 +35,58 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/liquidaciones", tags=["Liquidaciones"])
 
-# Precio del oro para liquidaciones - se obtiene en tiempo real desde LBMA Fix (Gold PM) usando web scraping.
+
+# ── Schemas de Spot Histórico ────────────────────────────────────────────────
+
+
+class SpotHistoricoIn(BaseModel):
+    fecha: date
+    precio_au_usd: Decimal = Field(..., gt=0, description="Gold PM Fix (USD/Oz Troy)")
+    precio_ag_usd: Decimal | None = Field(None, gt=0, description="Silver Noon Fix (USD/Oz Troy)")
+    fuente: str = "MANUAL"
+
+
+class SpotHistoricoOut(BaseModel):
+    id: int
+    fecha: date
+    precio_au_usd: Decimal
+    precio_ag_usd: Decimal | None
+    fuente: str
+
+    model_config = {"from_attributes": True}
+
+
+# ── Precio spot en tiempo real (scraping) ────────────────────────────────────
 
 
 @router.get("/precio-oro", response_model=float | None)
 def precio_oro(
+    guardar: bool = Query(False, description="Si True, guarda el precio en el histórico"),
     current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
 ):
-    """Obtiene el último valor del Gold PM desde LBMA Fix. Retorna null si falla."""
-    return obtener_ultimo_valor_oro_pm()
+    """
+    Obtiene el último valor del Gold PM desde LBMA Fix.
+    Si guardar=true, también lo persiste en spot_historico para la fecha de hoy.
+    Retorna null si el scraping falla.
+    """
+    valor = obtener_ultimo_valor_oro_pm()
+    if valor and guardar:
+        from datetime import date as _date
+
+        hoy = _date.today()
+        if hoy.weekday() < 5:  # solo en días hábiles
+            # Obtener plata también para el guardado conjunto
+            plata_raw = obtener_ultimo_valor_plata_noon()
+            plata = Decimal(str(plata_raw)) if plata_raw else None
+            svc_spot.guardar_spot(
+                db,
+                fecha=hoy,
+                precio_au_usd=Decimal(str(valor)),
+                precio_ag_usd=plata,
+                fuente="SCRAPING",
+            )
+    return valor
 
 
 @router.get("/precio-plata", response_model=float | None)
@@ -49,6 +95,61 @@ def precio_plata(
 ):
     """Obtiene el último valor de Plata Noon Fix. Retorna null si falla."""
     return obtener_ultimo_valor_plata_noon()
+
+
+# ── Spot Histórico CRUD ───────────────────────────────────────────────────────
+
+
+@router.get("/spot-historico", response_model=list[SpotHistoricoOut])
+def listar_spot_historico(
+    desde: date | None = Query(None),
+    hasta: date | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Lista el histórico de spots del oro/plata, ordenado por fecha DESC."""
+    return svc_spot.listar_spots(db, desde=desde, hasta=hasta, limit=limit)
+
+
+@router.post("/spot-historico", response_model=SpotHistoricoOut)
+def crear_spot_historico(
+    data: SpotHistoricoIn,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """Registra o actualiza el spot para una fecha específica."""
+    return svc_spot.guardar_spot(
+        db,
+        fecha=data.fecha,
+        precio_au_usd=data.precio_au_usd,
+        precio_ag_usd=data.precio_ag_usd,
+        fuente=data.fuente or "MANUAL",
+    )
+
+
+@router.delete("/spot-historico/{spot_id}", status_code=204)
+def eliminar_spot_historico(
+    spot_id: int,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Elimina un registro del histórico de spots."""
+    if not svc_spot.eliminar_spot(db, spot_id):
+        raise HTTPException(status_code=404, detail="Spot no encontrado")
+
+
+@router.get("/spot-historico/fecha/{fecha}", response_model=SpotHistoricoOut | None)
+def get_spot_por_fecha(
+    fecha: date,
+    current_user=Depends(check_permiso("LIQUIDACIONES", "VIEW")),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna el spot efectivo para una fecha dada (aplica regla fin de semana).
+    Útil para consultar qué spot se usará para un lote con esa fecha de recepción.
+    """
+    return svc_spot.get_spot_para_fecha(db, fecha)
 
 
 # ── Lotes disponibles para liquidar ──────────────────────────────────────────

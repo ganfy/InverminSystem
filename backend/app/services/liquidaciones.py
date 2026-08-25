@@ -57,6 +57,7 @@ from app.schemas.liquidaciones import (
 )
 from app.services.config_calculo import get_constantes
 from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
+from app.services.spot_historico import fecha_efectiva_spot, get_spot_para_fecha
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -311,6 +312,14 @@ def _calcular_lote(
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
+    El precio spot (Au y Ag) se resuelve desde el histórico según la
+    fecha de recepción del lote, aplicando la regla de fin de semana:
+      - Sábado  → viernes anterior
+      - Domingo → lunes siguiente
+      - Lunes–Viernes → misma fecha
+    Si no existe registro en el histórico, se usa spot_usd como fallback
+    (warning, no crítico) y se emite AlertaLote(tipo="SIN_SPOT_HISTORICO").
+
     Retorna (snapshot_dict, alertas).
     alertas con critico=True bloquean la liquidacion.
     """
@@ -339,6 +348,36 @@ def _calcular_lote(
     )
     sacos = pesaje.sacos if pesaje else None
     fecha_rec = _fecha_recepcion(lote)
+
+    # ── Resolución del spot histórico por fecha de recepción ─────────────────
+    spot_historico_registro = None
+    spot_historico_warning = False
+    fecha_spot_efectiva = fecha_efectiva_spot(fecha_rec) if fecha_rec else None
+
+    if fecha_rec:
+        spot_historico_registro = get_spot_para_fecha(db, fecha_rec)
+        if spot_historico_registro:
+            # Usar precio del histórico; prioridad: Au del histórico, Ag del histórico
+            spot_usd = Decimal(str(spot_historico_registro.precio_au_usd))
+            if spot_ag_usd is None and spot_historico_registro.precio_ag_usd:
+                spot_ag_usd = Decimal(str(spot_historico_registro.precio_ag_usd))
+        else:
+            # Fallback al spot global ingresado por el usuario
+            spot_historico_warning = True
+
+    if spot_historico_warning:
+        alertas.append(
+            AlertaLote(
+                tipo="SIN_SPOT_HISTORICO",
+                mensaje=(
+                    f"{lote.ip}: no hay spot histórico para "
+                    f"{fecha_spot_efectiva.strftime('%d/%m/%Y') if fecha_spot_efectiva else '?'} "
+                    f"(fecha recepción: {fecha_rec.strftime('%d/%m/%Y') if fecha_rec else '?'}). "
+                    "Se usó el precio spot ingresado manualmente."
+                ),
+                critico=False,
+            )
+        )
 
     # ── Parametros comerciales ────────────────────────────────────────────────
     if not params:
@@ -651,9 +690,13 @@ def _calcular_lote(
         "fecha_recepcion_lote": fecha_rec,
         "maquila_aplicada": maquila,
         "riesgo_aplicado": riesgo,
+        # Spot histórico
         "spot_usd_snapshot": spot_usd,
         "insumos_liquidacion": insumos,
         "gasto_acopio_liquidacion": gasto_acopio,
+        # Metadatos del spot (para mostrar en UI)
+        "fecha_spot_efectiva": fecha_spot_efectiva,
+        "spot_desde_historico": spot_historico_registro is not None,
     }
 
     return snapshot, alertas
