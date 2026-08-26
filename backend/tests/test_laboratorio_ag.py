@@ -582,7 +582,7 @@ class TestRegistrarAnalisisAg:
     def test_ag_invalida_anterior_y_crea_nuevo(self):
         """
         Si ya existe un Ag vigente para el lote, se marca como no vigente
-        ANTES de crear el nuevo. Solo hay un Ag vigente por lote.
+        ANTES de crear el nuevo. Solo hay un Ag vigente por CIP.
         """
         from unittest.mock import patch
 

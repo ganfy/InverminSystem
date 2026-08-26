@@ -624,7 +624,7 @@ def registrar_analisis_ley(db: Session, datos: AnalisisLeyCreate, usuario_id: in
     if datos.material == "Ag":
         datos.ley_grueso = 0.0
         db.query(AnalisisLey).filter(
-            AnalisisLey.lote_id == mapeo.lote_id,
+            AnalisisLey.cip == datos.cip,
             AnalisisLey.material == "Ag",
             AnalisisLey.vigente == True,  # noqa: E712
         ).update({"vigente": False}, synchronize_session="fetch")
@@ -852,7 +852,7 @@ def registrar_analisis_recuperacion(
         )
         tipo_an = analisis_au.tipo_analisis if analisis_au else TipoAnalisis.PLANTA
         db.query(AnalisisLey).filter(
-            AnalisisLey.lote_id == nuevo.lote_id,
+            AnalisisLey.cip == nuevo.cip,
             AnalisisLey.material == "Ag",
             AnalisisLey.vigente,
         ).update({"vigente": False}, synchronize_session="fetch")
@@ -1228,7 +1228,7 @@ def completar_recuperacion(
 
         # Inactivamos cualquier análisis de Ag previo del lote
         db.query(AnalisisLey).filter(
-            AnalisisLey.lote_id == a.lote_id,
+            AnalisisLey.cip == a.cip,
             AnalisisLey.material == "Ag",
             AnalisisLey.vigente == True,  # noqa: E712
         ).update({"vigente": False}, synchronize_session="fetch")
@@ -1733,7 +1733,15 @@ def sincronizar_batch(
     ley_res: list[SyncResultado] = []
     rec_res: list[SyncResultado] = []
 
-    for item in payload.analisis_ley:
+    # Deduplicar: si hay dos items para el mismo (cip, tipo, material),
+    # quedar solo con el último recibido
+    seen: dict[tuple, int] = {}
+    for i, item in enumerate(payload.analisis_ley):
+        key = (item.datos.cip, item.datos.tipo_analisis, item.datos.material)
+        seen[key] = i
+    analisis_dedup = [payload.analisis_ley[i] for i in sorted(seen.values())]
+
+    for item in analisis_dedup:
         try:
             nuevo = registrar_analisis_ley(db, item.datos, usuario_id)
             db.flush()
@@ -1878,7 +1886,7 @@ def registrar_analisis_ag(
 ) -> "AnalisisAgOut":
     """
     Crea un AnalisisLey con material='Ag' vinculado al mismo lote que analisis_au_id.
-    Si ya existe un Ag vigente para ese lote, lo marca como no vigente primero.
+    Si ya existe un Ag vigente para ese CIP, lo marca como no vigente primero.
     """
     from app.models.models import AnalisisLey
     from app.schemas.laboratorio import AnalisisAgOut
@@ -1893,7 +1901,7 @@ def registrar_analisis_ag(
 
     # Marcar Ag anterior como no vigente
     db.query(AnalisisLey).filter(
-        AnalisisLey.lote_id == lote_id,
+        AnalisisLey.cip == analisis_au.cip,
         AnalisisLey.material == "Ag",
         AnalisisLey.vigente == True,  # noqa: E712
     ).update({"vigente": False}, synchronize_session="fetch")
