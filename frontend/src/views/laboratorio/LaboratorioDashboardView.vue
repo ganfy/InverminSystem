@@ -75,7 +75,13 @@
         </div>
         <div class="field" style="flex:1;min-width:200px">
           <label class="field-label">BÚSQUEDA</label>
-          <input type="text" class="field-input" v-model="filtroBusquedaLotes" placeholder="IP, CIP, Proveedor o Material" />
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <input type="text" class="field-input" v-model="filtroBusquedaLotes" placeholder="IP, CIP, Proveedor o Material" />
+            <button class="btn-icon" @click="sortDescLotes = !sortDescLotes" :title="sortDescLotes ? 'Orden descendente' : 'Orden ascendente'" style="background:var(--color-bg-input); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:0.5rem; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+              <ArrowDown v-if="sortDescLotes" :size="20" style="color:var(--color-text-dim)" />
+              <ArrowUp v-else :size="20" style="color:var(--color-text-dim)" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -281,14 +287,12 @@
                       Editar
                     </button>
                     <button
-                      v-if="fila.estado === 'COMPLETADO'"
                       class="btn-secondary"
                       style="font-size:0.75rem;padding:0.3rem 0.75rem;color:#60a5fa;border-color:rgba(96,165,250,0.4)"
                       @click="irARegistrarPlata(fila)"
-                      :disabled="fila.tieneAg"
-                      :title="fila.tieneAg ? 'La Ley de Plata ya ha sido agregada' : 'Agregar ley de plata a este análisis'"
+                      :title="fila.tieneAg ? 'Editar ley de plata de este análisis' : 'Agregar ley de plata a este análisis'"
                     >
-                      + Ag
+                      {{ fila.tieneAg ? 'Ag ✓' : '+ Ag' }}
                     </button>
                     <!-- Botón de re-ensayo (REE) -->
                     <button
@@ -381,7 +385,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { FlaskConical, RefreshCw, WifiOff, ChevronUp, ChevronDown, AlertTriangle, Eye } from 'lucide-vue-next'
+import { FlaskConical, RefreshCw, WifiOff, ChevronUp, ChevronDown, AlertTriangle, Eye, ArrowUp, ArrowDown } from 'lucide-vue-next'
 import AlertasBanner from '@/components/AlertasBanner.vue'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -410,6 +414,7 @@ const filtroBusqueda = ref('')
 const filtroBusquedaLotes = ref('')
 const filtroMaterialLotes = ref('')
 const mostrarSoloCIPs = ref(false)
+const sortDescLotes       = ref(true)
 
 const cipsSeleccionados = ref<string[]>([])
 const generandoConjunto = ref(false)
@@ -509,10 +514,10 @@ const pendientesSolucion = computed(() => {
 
 function mapearCIP(c: CIPAnalisisOut) {
   if (tabActual.value === 'ley') {
-    const vigente = c.analisis_ley.find(x => x.vigente)
-    const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
+    const vigente = c.analisis_ley.find(x => x.vigente && x.material === 'Au')
+    const ultimo = c.analisis_ley.filter(x => x.material === 'Au').pop()
     const a = vigente ?? ultimo
-    const tieneAg = c.analisis_ley.some(x => x.material === 'Ag' && x.vigente && x.estado === 'COMPLETADO')
+    const tieneAg = c.analisis_ley.some(x => x.material === 'Ag' && x.vigente)
     return [{
       id: a?.id,
       cip: c.cip,
@@ -579,9 +584,9 @@ const filasMostrar = computed(() => {
 
       return true
     }
-    // For solidos/solucion tab: show Recuperacion types, or PROCESO if it has recuperacion analysis
+    // For solidos/solucion tab: show Recuperacion types, or PROCESO/LABORATORIO if it has recuperacion analysis
     if (tm === 'RECUPERACIONINTERNO' || tm === 'RECUPERACIONEXTERNO') return true
-    if (tm === 'PROCESO' && c.analisis_recuperacion.length > 0) {
+    if ((tm === 'PROCESO' || tm === 'LABORATORIO') && c.analisis_recuperacion.length > 0) {
       if (mostrarSoloCIPs.value) return false
       return true
     }
@@ -597,7 +602,7 @@ const filasMostrar = computed(() => {
 })
 
 const lotesFiltrados = computed(() => {
-  return lotes.value.filter(l => {
+  const filtrados = lotes.value.filter(l => {
     if (filtroMaterialLotes.value && (l.material || '').toLowerCase() !== filtroMaterialLotes.value.toLowerCase()) {
       return false
     }
@@ -611,6 +616,9 @@ const lotesFiltrados = computed(() => {
       if (!matchIp && !matchProv && !matchMat && !matchCip) return false
     }
     return true
+  })
+  return filtrados.sort((a, b) => {
+    return sortDescLotes.value ? b.ip.localeCompare(a.ip) : a.ip.localeCompare(b.ip);
   })
 })
 
@@ -749,45 +757,10 @@ function irANuevoReconocimiento(subtipo: 'solidos' | 'solucion') {
 }
 
 function irARegistrarPlata(fila: any) {
-  const cip = fila.cip
-  const query = new URLSearchParams()
-
-  const cipObj = store.cips.find(c => c.cip === cip)
-  const auAnalisis = cipObj?.analisis_ley.find(
-    (a: any) => a.material === 'Au' && a.vigente && !a.eliminado && a.detalles && a.detalles.length > 0
-  ) || cipObj?.analisis_ley.find(
-    (a: any) => a.material === 'Au' && a.vigente && !a.eliminado
-  )
-
-  if (auAnalisis && auAnalisis.detalles) {
-    const dFino1 = auAnalisis.detalles.find((d: any) => d.origen === 'FINO1')
-    const dFino2 = auAnalisis.detalles.find((d: any) => d.origen === 'FINO2')
-    // Au 1 prellenado con valor de fino 2
-    if (dFino2?.mineral_mg != null) query.set('au1', dFino2.mineral_mg.toString())
-    // Au 2 prellenado con valor de fino 1
-    if (dFino1?.mineral_mg != null) query.set('au2', dFino1.mineral_mg.toString())
-    const pesoVal = dFino2?.peso ?? dFino1?.peso
-    if (pesoVal != null) query.set('peso', pesoVal.toString())
-  }
-
-  // Buscar si ya existe un análisis SOLIDOS para este CIP
-  const solidosExistente = cipObj?.analisis_recuperacion.find(
-    (a: any) => (a.sub_tipo === 'SOLIDOS') && a.vigente && !a.eliminado
-  )
-
-  if (solidosExistente) {
-    // Navegar al análisis SOLIDOS existente
-    query.set('id', solidosExistente.id.toString())
-    query.set('fromAg', '1')
-    const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
-    window.open(url.href, '_blank')
-    return
-  }
-
-  // Crear nuevo análisis SOLIDOS
-  query.set('direct', '1')
-  query.set('fromAg', '1')
-  const url = router.resolve(`/laboratorio/solidos/${cip}?${query.toString()}`)
+  // Abre el formulario Newmont (RegistrarLeyView) para agregar/editar la Ley de Plata.
+  // El formulario carga los datos Au bloqueados y expone el campo Au+Ag con la fórmula Newmont.
+  // No se crea un análisis de sólidos extra.
+  const url = router.resolve(`/laboratorio/ley/${fila.cip}`)
   window.open(url.href, '_blank')
 }
 

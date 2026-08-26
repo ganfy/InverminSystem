@@ -88,7 +88,13 @@
       </div>
       <div class="field" style="flex:1">
         <label class="field-label">Búsqueda</label>
-        <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="Buscar por IP, CIP..." />
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <input type="text" class="field-input" v-model="filtroBusqueda" placeholder="Buscar por IP, CIP..." />
+          <button class="btn-icon" @click="sortDesc = !sortDesc" :title="sortDesc ? 'Orden descendente' : 'Orden ascendente'" style="background:var(--color-bg-input); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:0.5rem; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+            <ArrowDown v-if="sortDesc" :size="20" style="color:var(--color-text-dim)" />
+            <ArrowUp v-else :size="20" style="color:var(--color-text-dim)" />
+          </button>
+        </div>
       </div>
       <div class="field" style="align-items:center; flex-direction:row; gap:0.5rem; justify-content:flex-end">
         <input type="checkbox" id="toggleDescartadas" v-model="mostrarDescartadas" />
@@ -555,7 +561,7 @@ import {
 import { generarParCipsRecuperacion, generarParIpRecuperacion } from '@/utils/cipGenerator'
 import { CONFIG_PRUEBAS } from '@/utils/units'
 import { generateUUID } from '@/utils/uuid'
-import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical } from 'lucide-vue-next'
+import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical, ArrowDown, ArrowUp } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()
@@ -582,6 +588,7 @@ const ipsSeleccionados = ref<string[]>([])
 const filtroEstado   = ref('Todos')
 const filtroBusqueda = ref('')
 const mostrarDescartadas = ref(false)
+const sortDesc = ref(true)
 
 function puedeEtiquetar(prueba: LotePruebaList) {
   if (prueba.etiquetado) return false
@@ -782,10 +789,12 @@ const pruebasFiltradas = computed(() => {
     return true;
   });
 
-  // Ordenar para que los descartados vayan al final de la lista
+  // Ordenar para que los descartados vayan al final de la lista, y luego por IP
   return filtrado.sort((a, b) => {
-    if (a.descartado === b.descartado) return 0;
-    return a.descartado ? 1 : -1;
+    if (a.descartado !== b.descartado) {
+      return a.descartado ? 1 : -1;
+    }
+    return sortDesc.value ? b.ip.localeCompare(a.ip) : a.ip.localeCompare(b.ip);
   });
 })
 

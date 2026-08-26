@@ -334,6 +334,7 @@ def get_config_public_dict(db: Session) -> dict[str, str]:
         "empresa_ruc",
         "empresa_direccion",
         "factor_oz_tc",
+        "MAX_CIPS_GENERADOS",
         "MUESTREO_CIPS_IMPRIMIR",
         "pruebas_usa_cip",
         "pruebas_umbral_recup_alta",

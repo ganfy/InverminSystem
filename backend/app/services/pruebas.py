@@ -608,9 +608,12 @@ def obtener_recuperaciones(db: Session) -> list[RecuperacionItem]:
     """
     registros = (
         db.query(AnalisisRecuperacion)
+        .outerjoin(MapeoCIP, MapeoCIP.codigo_cip == AnalisisRecuperacion.cip)
         .filter(
             AnalisisRecuperacion.vigente == True,  # noqa: E712
             AnalisisRecuperacion.ley_cola != None,  # noqa: E711
+            (MapeoCIP.tipo_muestra != TipoMuestra.LABORATORIO)
+            | MapeoCIP.id.is_(None),  # Laboratorio hace referencia a CIPs para Newmont
         )
         .order_by(AnalisisRecuperacion.fecha_analisis.desc())
         .all()

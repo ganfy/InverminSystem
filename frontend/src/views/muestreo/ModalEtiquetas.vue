@@ -155,7 +155,7 @@ const sync = useSync()
 
 const mostrarAyuda = ref(false)
 
-const MAX_CIPS = 5 // Esto podría venir de un endpoint de configuración global después
+const MAX_CIPS = ref(5)
 const cargando = ref(true)
 const mensajeCarga = ref('Consultando historial de etiquetas...')
 const codigosExistentes = ref<MapeoCIPOut[]>([])
@@ -249,6 +249,9 @@ const inicializarEtiquetas = async () => {
     if (config['MUESTREO_CIPS_IMPRIMIR']) {
       cantidadAImprimir = parseInt(config['MUESTREO_CIPS_IMPRIMIR'], 10) || 3
     }
+    if (config['MAX_CIPS_GENERADOS']) {
+      MAX_CIPS.value = parseInt(config['MAX_CIPS_GENERADOS'], 10) || 5
+    }
   } catch (e) {
     console.error('No se pudo cargar config de impresión', e)
   }
@@ -284,7 +287,7 @@ const inicializarEtiquetas = async () => {
 }
 
 const generarExtra = async () => {
-  if (codigosExistentes.value.length >= MAX_CIPS) return
+  if (codigosExistentes.value.length >= MAX_CIPS.value) return
 
   mensajeCarga.value = 'Generando etiqueta extra...'
   cargando.value = true

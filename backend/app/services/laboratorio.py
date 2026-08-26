@@ -1087,7 +1087,8 @@ def _procesar_muestras_reconocimiento(
         if ley_cola_gr_tm
         else None
     )
-    ley_cola_ag = _promedio_decimal(*leyes_ag_gr_tm)
+    has_ag = any(m.au_ag_mg > 0 for m in muestras)
+    ley_cola_ag = _promedio_decimal(*leyes_ag_gr_tm) if has_ag else None
     return ley_cola_oz_tc, ley_cola_ag
 
 

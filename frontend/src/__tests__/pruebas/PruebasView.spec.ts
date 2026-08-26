@@ -160,7 +160,7 @@ describe('PruebasView', () => {
         expect(routerPushMock).toHaveBeenCalledWith(
             expect.objectContaining({
                 name: 'RegistrarPrueba',
-                params: { ip: 'IP-001' } // El primer lote en la tabla
+                params: { ip: 'IP-003' } // El primer lote en la tabla por orden descendente
             })
         )
     })
