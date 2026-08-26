@@ -329,6 +329,29 @@ def registrar_prueba(
 
 
 @router.post(
+    "/{ip_lote}/adelantar-fecha",
+    response_model=PruebaMetalurgicaOut,
+    status_code=status.HTTP_200_OK,
+    summary="Adelanta 24 horas a la fecha de ingreso de la prueba en proceso",
+)
+def adelantar_fecha(
+    ip_lote: str,
+    current_user=Depends(check_permiso("PRUEBAS_MET", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    try:
+        prueba = pruebas_service.adelantar_fecha_ingreso_24h(db, ip_lote, current_user.id)
+        db.commit()
+        response = PruebaMetalurgicaOut.model_validate(prueba)
+        if prueba.fecha_ingreso:
+            response.fecha_salida = prueba.fecha_ingreso + timedelta(hours=48)
+        return response
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.post(
     "/{ip_lote}/remuestreo",
     response_model=PruebaMetalurgicaOut,
     status_code=status.HTTP_201_CREATED,

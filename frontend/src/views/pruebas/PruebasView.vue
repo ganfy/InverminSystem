@@ -203,6 +203,17 @@
                   + Adición
                 </button>
 
+                <!-- Adelantar 24 hrs: solo cuando EN PROCESO, para Admin/Jefe Comercial -->
+                <button
+                  v-if="prueba.estado === 'EN PROCESO' && (auth.rol === 'Admin' || auth.rol === 'Comercial')"
+                  class="btn-secondary"
+                  style="font-size:0.75rem;padding:0.3rem 0.75rem"
+                  @click="adelantar24h(prueba.ip)"
+                  title="Adelantar 24 horas"
+                >
+                  <FastForward :size="14" style="margin-right:0.25rem;vertical-align:middle" /> 24h
+                </button>
+
                 <!-- Etiquetar: solo cuando COMPLETADO, o EN PROCESO faltando 5h, y sin CIP aún -->
                 <button
                   v-if="puedeEtiquetar(prueba)"
@@ -547,6 +558,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import AlertasBanner from '@/components/AlertasBanner.vue'
 import { pruebasApi, type LotePruebaList } from '@/api/pruebas'
 import { useSync } from '@/composables/useSync'
@@ -561,11 +573,12 @@ import {
 import { generarParCipsRecuperacion, generarParIpRecuperacion } from '@/utils/cipGenerator'
 import { CONFIG_PRUEBAS } from '@/utils/units'
 import { generateUUID } from '@/utils/uuid'
-import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical, ArrowDown, ArrowUp } from 'lucide-vue-next'
+import { WifiOff, Tag, RefreshCw, Beaker, Layers, FlaskConical, ArrowDown, ArrowUp, FastForward } from 'lucide-vue-next'
 import JsBarcode from 'jsbarcode'
 
 const router  = useRouter()
 const ui      = useUiStore()
+const auth    = useAuthStore()
 const sync    = useSync()
 const { pendientes, online, ultimoSync } = sync
 
@@ -901,6 +914,16 @@ function obtenerTiempoRestante(fechaIngreso: string) {
 // ── Acciones ──────────────────────────────────────────────────────────────────
 function irARegistrar(ip: string) {
   router.push({ name: 'RegistrarPrueba', params: { ip } })
+}
+
+async function adelantar24h(ip: string) {
+  try {
+    await pruebasApi.adelantarFecha(ip)
+    ui.toast(`Se adelantó la prueba del lote ${ip} por 24 horas`, 'success')
+    await cargarDatos() // Refrescar vista
+  } catch (e: any) {
+    ui.toast(e.response?.data?.detail || 'Error al adelantar la fecha', 'error')
+  }
 }
 
 async function etiquetar(ip: string) {

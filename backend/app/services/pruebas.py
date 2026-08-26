@@ -434,6 +434,34 @@ def etiquetar_prueba(
     )
 
 
+def adelantar_fecha_ingreso_24h(db: Session, ip_lote: str, usuario_id: int) -> PruebaMetalurgica:
+    """Resta 24 horas a la fecha de ingreso de la prueba pendiente más reciente (EN PROCESO)."""
+    lote = db.query(Lote).filter(Lote.ip == ip_lote).first()
+    if not lote:
+        raise ValueError(f"Lote '{ip_lote}' no encontrado")
+
+    prueba = (
+        db.query(PruebaMetalurgica)
+        .filter(
+            PruebaMetalurgica.lote_id == lote.id,
+            PruebaMetalurgica.cip.is_(None),
+            PruebaMetalurgica.descartado == False,  # noqa: E712
+        )
+        .order_by(PruebaMetalurgica.id.desc())
+        .first()
+    )
+    if not prueba:
+        raise ValueError(f"No hay prueba metalúrgica en proceso para '{ip_lote}'")
+
+    if not prueba.fecha_ingreso:
+        raise ValueError("La prueba no tiene fecha de ingreso registrada")
+
+    prueba.fecha_ingreso = prueba.fecha_ingreso - timedelta(hours=24)
+    prueba.modificado_por = usuario_id
+    db.flush()
+    return prueba
+
+
 # ── Descartar prueba ─────────────────────────────────────────────────────────────
 
 

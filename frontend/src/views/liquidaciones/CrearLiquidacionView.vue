@@ -540,13 +540,13 @@
   const provacopSeleccionado = computed(() => provacops.value.find(p => p.id === provacopId.value))
   const tituloPaso = computed(() => ['Selección de lotes', 'Revisión de valores', 'Confirmar'][paso.value - 1])
 
-  const todosSeleccionados = computed(() =>
-    store.lotesDisponibles.length > 0 &&
-    store.lotesDisponibles.every(l => lotesSeleccionados.value.includes(l.ip))
-  )
-
   const lotesListos = computed(() =>
     store.lotesDisponibles.filter(l => l.listo_para_liquidar)
+  )
+
+  const todosSeleccionados = computed(() =>
+    lotesListos.value.length > 0 &&
+    lotesListos.value.every(l => lotesSeleccionados.value.includes(l.ip))
   )
 
   const puedeCalcular = computed(() =>
@@ -606,7 +606,7 @@
     if (todosSeleccionados.value) {
       lotesSeleccionados.value = []
     } else {
-      lotesSeleccionados.value = store.lotesDisponibles.map(l => l.ip)
+      lotesSeleccionados.value = lotesListos.value.map(l => l.ip)
     }
   }
 

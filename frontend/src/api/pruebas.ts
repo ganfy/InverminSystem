@@ -178,4 +178,10 @@ export const pruebasApi = {
         const { data } = await api.post<SyncCipsPruebasResponse>('/pruebas/sync-cips', { cips })
         return data
     },
+
+    /** Resta 24 horas a la fecha de ingreso de una prueba EN PROCESO */
+    async adelantarFecha(ip: string): Promise<PruebaMetalurgicaOut> {
+        const { data } = await api.post(`/pruebas/${ip}/adelantar-fecha`)
+        return data
+    },
 }

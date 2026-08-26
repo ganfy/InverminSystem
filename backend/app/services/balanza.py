@@ -544,16 +544,26 @@ def editar_lote(
     if lote.eliminado:
         raise ValueError("No se puede editar un lote eliminado")
 
-    # VALIDACIÓN: Bloquear edición de datos sensibles si ya pasó a muestreo
-    if lote.mapeo_cip is not None:
-        intenta_editar_sensible = any(
-            [
-                datos.tipo_material is not None and datos.tipo_material != lote.tipo_material,
-                datos.peso_inicial is not None,
-                datos.peso_final is not None,
-            ]
-        )
-        if intenta_editar_sensible:
+    pesaje_actual = lote.pesajes[0] if lote.pesajes else None
+
+    # VALIDACIÓN: Bloquear edición de datos sensibles si ya pasó a muestreo o tiene pruebas
+    # Solo bloquear si REALMENTE se están alterando los pesos o el material
+    intenta_editar_sensible = False
+
+    if datos.tipo_material is not None and datos.tipo_material != lote.tipo_material:
+        intenta_editar_sensible = True
+    if pesaje_actual:
+        if datos.peso_inicial is not None and datos.peso_inicial != pesaje_actual.peso_inicial:
+            intenta_editar_sensible = True
+        if datos.peso_final is not None and datos.peso_final != pesaje_actual.peso_final:
+            intenta_editar_sensible = True
+
+    if intenta_editar_sensible:
+        if lote.muestreos:
+            raise ValueError(
+                "No se pueden alterar pesos ni el tipo de material de un lote que ya tiene un registro de muestreo/humedad."
+            )
+        if lote.mapeo_cip is not None:
             raise ValueError(
                 "No se pueden alterar pesos ni el tipo de material de un lote que ya tiene un código CIP asignado."
             )
