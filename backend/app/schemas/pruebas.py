@@ -54,8 +54,10 @@ class PruebaMetalurgicaOut(PruebaMetalurgicaBase):
 
 
 class LotePruebaList(BaseModel):
+    prueba_id: int
     lote_id: int = 0  # ID numérico del lote — necesario para generar CIPs offline
     ip: str
+    es_reensayo: bool = False
     fecha_recepcion: datetime | None = None
     fecha_ingreso: datetime | None = None
     fecha_salida: datetime | None = None

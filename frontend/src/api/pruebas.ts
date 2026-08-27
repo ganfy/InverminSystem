@@ -19,8 +19,10 @@ export interface PruebaMetalurgicaOut extends PruebaMetalurgicaCreate {
 }
 
 export interface LotePruebaList {
+    prueba_id: number
     lote_id: number
     ip: string
+    es_reensayo: boolean
     fecha_recepcion: string | null
     fecha_ingreso: string | null
     fecha_salida: string | null

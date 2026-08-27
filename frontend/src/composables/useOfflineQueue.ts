@@ -20,7 +20,7 @@ import type { LoteMuestreo } from '@/api/muestreo'
 import type { TipoAnalisis, OrigenDatos } from '@/types/laboratorio'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 13
+const DB_VERSION = 14
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -288,6 +288,12 @@ async function openDB(): Promise<IDBDatabase> {
             if (oldVersion < 13) {
                 // Cola de CIPs REE (re-ensayo) generados offline
                 db.createObjectStore('cips_ree_q', { keyPath: 'offline_id' })
+            }
+            if (oldVersion < 14) {
+                if (db.objectStoreNames.contains('pruebas_lista_cache')) {
+                    db.deleteObjectStore('pruebas_lista_cache')
+                }
+                db.createObjectStore('pruebas_lista_cache', { keyPath: 'prueba_id' })
             }
         }
 

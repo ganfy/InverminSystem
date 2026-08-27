@@ -168,8 +168,10 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
         if not pruebas:
             lista.append(
                 LotePruebaList(
+                    prueba_id=0,  # Fake ID since there is no test yet
                     lote_id=lote.id,
                     ip=lote.ip,
+                    es_reensayo=False,
                     fecha_recepcion=fecha_recepcion,
                     fecha_ingreso=None,
                     fecha_salida=None,
@@ -218,8 +220,10 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
 
             lista.append(
                 LotePruebaList(
+                    prueba_id=prueba.id,
                     lote_id=lote.id,
                     ip=lote.ip,
+                    es_reensayo=(n > 0),
                     fecha_recepcion=fecha_recepcion,
                     fecha_ingreso=fecha_ingreso,
                     fecha_salida=fecha_salida,

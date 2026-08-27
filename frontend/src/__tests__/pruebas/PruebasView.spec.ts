@@ -57,9 +57,9 @@ describe('PruebasView', () => {
     let routerPushMock: any
 
     const mockLotesOnline = [
-        { ip: 'IP-001', fecha_recepcion: '2026-04-01T10:00:00Z', estado: 'PENDIENTE' },
-        { ip: 'IP-002', fecha_recepcion: '2026-04-01T11:00:00Z', estado: 'EN PROCESO' },
-        { ip: 'IP-003', fecha_recepcion: '2026-04-01T12:00:00Z', estado: 'COMPLETO' }
+        { prueba_id: 1, ip: 'IP-001', fecha_recepcion: '2026-04-01T10:00:00Z', estado: 'PENDIENTE' },
+        { prueba_id: 2, ip: 'IP-002', fecha_recepcion: '2026-04-01T11:00:00Z', estado: 'EN PROCESO' },
+        { prueba_id: 3, ip: 'IP-003', fecha_recepcion: '2026-04-01T12:00:00Z', estado: 'COMPLETO' }
     ]
 
     // Datos simulados (Offline / Local)

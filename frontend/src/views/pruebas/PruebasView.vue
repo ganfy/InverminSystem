@@ -131,7 +131,7 @@
         <tbody>
           <tr
             v-for="prueba in pruebasFiltradas"
-            :key="prueba.ip + (prueba.fecha_ingreso ?? '')"
+            :key="prueba.prueba_id"
             :class="{ 'fila-descartada': prueba.descartado, 'fila-seleccionada': ipsSeleccionados.includes(prueba.ip) }"
           >
             <!-- Checkbox de selección (solo para pruebas no descartadas) -->
@@ -143,7 +143,10 @@
                 v-model="ipsSeleccionados"
               />
             </td>
-            <td class="td-mono" style="color:var(--color-gold)">{{ prueba.ip }}</td>
+            <td class="td-mono" style="color:var(--color-gold)">
+              {{ prueba.ip }}
+              <span v-if="prueba.es_reensayo" class="badge-estado pendiente" style="margin-left:0.3rem; padding: 0.15rem 0.4rem; font-size: 0.6rem;" title="Reensayo">REE</span>
+            </td>
             <td class="td-fecha">{{ fmt(prueba.fecha_recepcion) }}</td>
             <td class="td-fecha">{{ fmt(prueba.fecha_ingreso) }}</td>
             <td class="td-mono" style="color:var(--color-gold-light)">
@@ -220,7 +223,7 @@
                   class="btn-secondary"
                   style="font-size:0.75rem;padding:0.3rem 0.75rem"
                   :disabled="etiquetando === prueba.ip"
-                  @click="etiquetar(prueba.ip)"
+                  @click="etiquetar(prueba)"
                   title="Generar CIP de recuperación para laboratorio"
                 >
                   <span v-if="etiquetando === prueba.ip" class="spinner" style="margin-right:0.3rem"></span>
@@ -926,8 +929,8 @@ async function adelantar24h(ip: string) {
   }
 }
 
-async function etiquetar(ip: string) {
-  const prueba = pruebas.value.find(p => p.ip === ip)
+async function etiquetar(prueba: LotePruebaList) {
+  const ip = prueba.ip
 
   if (!online.value) {
     // Offline: generar CIPs localmente
@@ -970,7 +973,7 @@ async function etiquetar(ip: string) {
       ui.toast(`Sin red: identificadores generados localmente (${cip1}). Se registrarán al reconectar.`, 'warning')
 
       // Actualizar la fila en memoria para que el botón cambie a "Ver Etiqueta"
-      const idx = pruebas.value.findIndex(p => p.ip === ip)
+      const idx = pruebas.value.findIndex(p => p.prueba_id === prueba.prueba_id)
       if (idx !== -1) {
         pruebas.value[idx] = {
           ...pruebas.value[idx],
