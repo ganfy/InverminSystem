@@ -16,12 +16,14 @@ class LotePreviewInput(BaseModel):
     rec_liq_override: Decimal | None = None
     gasto_acopio_override: Decimal | None = None
     gasto_consumo_override: Decimal | None = None
+    spot_usd_override: Decimal | None = None
+    spot_ag_usd_override: Decimal | None = None
 
 
 class LiquidacionPreviewRequest(BaseModel):
     provacop_id: int
     lotes: list[LotePreviewInput]
-    spot_usd: Decimal = Field(..., gt=0, description="Precio spot del oro en USD/Oz Troy")
+    spot_usd: Decimal | None = None
     spot_ag_usd: Decimal | None = Field(None, gt=0, description="Precio spot plata USD/Oz Troy")
     fecha_liquidacion: date | None = None
 
@@ -29,7 +31,7 @@ class LiquidacionPreviewRequest(BaseModel):
 class LiquidacionCreate(BaseModel):
     provacop_id: int
     lotes: list[LotePreviewInput]
-    spot_usd: Decimal = Field(..., gt=0)
+    spot_usd: Decimal | None = None
     spot_ag_usd: Decimal | None = Field(None, gt=0, description="Precio spot plata USD/Oz Troy")
     fecha_liquidacion: date | None = None
     numero_liquidacion: str | None = None  # si None: auto-generado
@@ -137,7 +139,7 @@ class LiquidacionPreviewOut(BaseModel):
     proveedor_razon_social: str
     proveedor_ruc: str | None
     acopiador_nombre: str
-    spot_usd: Decimal
+    spot_usd: Decimal | None = None
     lotes: list[LoteFinancieroOut]
 
     # Totales
@@ -168,7 +170,7 @@ class LiquidacionResumenOut(BaseModel):
     proveedor_razon_social: str
     proveedor_ruc: str | None
     acopiador_nombre: str
-    spot_usd: Decimal
+    spot_usd: Decimal | None = None
     total_usd: Decimal
     count_lotes: int
     fecha_creacion: datetime
@@ -200,3 +202,5 @@ class LiquidacionLoteParamsUpdate(BaseModel):
     maquila_override: Decimal | None = None
     gasto_acopio_override: Decimal | None = None
     gasto_consumo_override: Decimal | None = None
+    spot_usd_override: Decimal | None = None
+    spot_ag_usd_override: Decimal | None = None

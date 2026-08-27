@@ -49,28 +49,7 @@
               <AlertTriangle :size="18" />
               <span>Esta relación proveedor-acopiador no tiene parámetros comerciales. No se podrá liquidar hasta que se configuren en la pantalla de Terceros.</span>
             </div>
-            <div class="field">
-              <label class="field-label">PRECIO SPOT ORO (USD/Oz Troy)</label>
-              <input
-                type="number"
-                class="field-input"
-                v-model.number="spotUsd"
-                min="0"
-                step="0.01"
-                placeholder="ej: 3050.00"
-              />
-            </div>
-            <div class="field">
-              <label class="field-label">SPOT PLATA Ag (USD/Oz) <span style="color:var(--color-text-faint);font-size:var(--text-xs);font-weight:400;text-transform:none">(opcional)</span></label>
-              <input
-                type="number"
-                class="field-input"
-                v-model.number="spotAgUsd"
-                min="0"
-                step="0.01"
-                placeholder="ej: 32.00"
-              />
-            </div>
+
             <div class="field">
               <label class="field-label">FECHA LIQUIDACIÓN</label>
               <input type="date" class="field-input" v-model="fechaLiq" />
@@ -204,15 +183,7 @@
             <span class="resumen-lbl">ACOPIADOR</span>
             <span class="resumen-val">{{ store.preview.acopiador_nombre }}</span>
           </div>
-          <div class="resumen-col">
-            <span class="resumen-lbl">SPOT FALLBACK</span>
-            <span class="resumen-val" style="font-size:0.85rem">${{ fmtNum(store.preview.spot_usd, 2) }} /Oz</span>
-            <span class="resumen-sub" style="font-size:0.7rem">
-              <RouterLink :to="{ name: 'SpotHistorico' }" style="color:var(--color-primary)">
-                Ver histórico →
-              </RouterLink>
-            </span>
-          </div>
+
           <div class="resumen-col">
             <span class="resumen-lbl">TOTAL TMS</span>
             <span class="resumen-val">{{ fmtNum(store.preview.total_tms, 3) }} TMS</span>
@@ -387,6 +358,8 @@
               <thead>
                 <tr>
                   <th>LOTE</th>
+                  <th class="col-r">SPOT Au ($/Oz)</th>
+                  <th class="col-r" v-if="hayAg">SPOT Ag ($/Oz)</th>
                   <th class="col-r">GASTO ACOPIO</th>
                   <th class="col-r">GASTO CONSUMO</th>
                   <th class="col-r">BONO</th>
@@ -396,6 +369,22 @@
               <tbody>
                 <tr v-for="lote in store.preview.lotes" :key="lote.ip" class="tabla-row">
                   <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                  <td class="col-r">
+                    <input
+                      type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.spot_usd[lote.ip]"
+                      step="0.01" placeholder="—"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-r" v-if="hayAg">
+                    <input
+                      type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.spot_ag_usd[lote.ip]"
+                      step="0.01" placeholder="—"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
                   <td class="col-r">
                     <input
                       type="number" class="pinput pinput-sm"
@@ -527,8 +516,6 @@
   // ── State ──────────────────────────────────────────────────────────
   const paso             = ref(1)
   const provacopId       = ref<number | ''>('')
-  const spotUsd          = ref<number | null>(null)
-  const spotAgUsd        = ref<number | null>(null)
   const fechaLiq         = ref(new Date().toISOString().slice(0, 10))
   const lotesSeleccionados = ref<string[]>([])
   const errorPaso1       = ref('')
@@ -552,7 +539,6 @@
   const puedeCalcular = computed(() =>
     provacopId.value !== '' &&
     !provacopSeleccionado.value?.pendiente_parametros &&
-    (spotUsd.value ?? 0) > 0 &&
     lotesSeleccionados.value.length > 0
   )
 
@@ -568,16 +554,7 @@
   const hayAg = computed(() => store.preview?.hay_ag ?? false)
 
   const cargarPrecio = async () => {
-    try {
-      spotUsd.value = await obtenerPrecioOro()
-    } catch {
-      spotUsd.value = null
-    }
-    try {
-      spotAgUsd.value = await obtenerPrecioPlata()
-    } catch {
-      spotAgUsd.value = null
-    }
+    // No-op (se quitó spot global)
   }
 
   // ── Methods ─────────────────────────────────────────────────────────
@@ -617,7 +594,7 @@
   }
 
   //Editar
-  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {} })
+  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {}, spot_usd: {}, spot_ag_usd: {} })
 const pendienteRecalculo = ref(false)
 
 function initEditOverrides() {
@@ -628,15 +605,16 @@ function initEditOverrides() {
     editOv.value.gasto_consumo[l.ip] = Number(l.insumos_consumo) || null
     editOv.value.bono[l.ip]          = Number(l.bono)            || null
     editOv.value.rec_liq[l.ip]       = Number(l.pct_rec_liq)     || null
+    editOv.value.spot_usd[l.ip]      = Number(l.spot_usd)        || null
+    editOv.value.spot_ag_usd[l.ip]   = Number(l.spot_ag_usd)     || null
   }
   pendienteRecalculo.value = false
 }
 
 async function recalcularConOverrides() {
-  if (!provacopId.value || !spotUsd.value) return
+  if (!provacopId.value) return
   await store.calcularPreview({
     provacop_id: provacopId.value as number,
-    spot_usd: spotUsd.value,
     fecha_liquidacion: fechaLiq.value,
     lotes: lotesSeleccionados.value.map(ip => ({
       ip,
@@ -644,6 +622,8 @@ async function recalcularConOverrides() {
       rec_liq_override: editOv.value.rec_liq[ip] ?? null,
       gasto_acopio_override: editOv.value.gasto_acopio[ip] ?? null,
       gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
+      spot_usd_override: editOv.value.spot_usd[ip] ?? null,
+      spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
     })),
   })
   pendienteRecalculo.value = false
@@ -652,14 +632,11 @@ async function recalcularConOverrides() {
   async function calcularPreview() {
     errorPaso1.value = ''
     if (!provacopId.value) { errorPaso1.value = 'Seleccione un proveedor-acopiador'; return }
-    if (!spotUsd.value || spotUsd.value <= 0) { errorPaso1.value = 'Ingrese el precio spot del oro'; return }
     if (lotesSeleccionados.value.length === 0) { errorPaso1.value = 'Seleccione al menos un lote'; return }
 
     const result = await store.calcularPreview({
       provacop_id: provacopId.value as number,
       lotes: lotesSeleccionados.value.map(ip => ({ ip })),
-      spot_usd: spotUsd.value,
-      spot_ag_usd: spotAgUsd.value ?? null,
       fecha_liquidacion: fechaLiq.value || null,
     })
     initEditOverrides()
@@ -679,9 +656,14 @@ async function recalcularConOverrides() {
 
     const result = await store.crear({
       provacop_id: provacopId.value as number,
-      lotes: lotesSeleccionados.value.map(ip => ({ ip })),
-      spot_usd: spotUsd.value!,
-      spot_ag_usd: spotAgUsd.value ?? null,
+      lotes: lotesSeleccionados.value.map(ip => ({ ip,
+        bono: editOv.value.bono[ip] ?? null,
+        rec_liq_override: editOv.value.rec_liq[ip] ?? null,
+        gasto_acopio_override: editOv.value.gasto_acopio[ip] ?? null,
+        gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
+        spot_usd_override: editOv.value.spot_usd[ip] ?? null,
+        spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
+      })),
       fecha_liquidacion: fechaLiq.value || null,
     })
 
@@ -694,7 +676,7 @@ async function recalcularConOverrides() {
   }
 
   async function guardarBorrador() {
-    if (!provacopId.value || !spotUsd.value) return
+    if (!provacopId.value) return
     guardandoBorrador.value = true
     const result = await store.crear({
       provacop_id: provacopId.value as number,
@@ -704,9 +686,9 @@ async function recalcularConOverrides() {
         rec_liq_override: editOv.value.rec_liq[ip] ?? null,
         gasto_acopio_override: editOv.value.gasto_acopio[ip] ?? null,
         gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
+        spot_usd_override: editOv.value.spot_usd[ip] ?? null,
+        spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
       })),
-      spot_usd: spotUsd.value,
-      spot_ag_usd: spotAgUsd.value ?? null,
       fecha_liquidacion: fechaLiq.value || null,
       como_borrador: true,
     })

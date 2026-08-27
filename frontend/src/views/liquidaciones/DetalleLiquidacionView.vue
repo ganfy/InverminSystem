@@ -214,9 +214,21 @@
                   step="0.01" @input="pendienteGuardar = true" />
               </div>
               <div class="pfield" v-if="detailOv[lote.ip]">
-                <span class="plbl">{{ lote.ip }} — INSUMOS LIQ</span>
+                <span class="plbl">{{ lote.ip }} — GASTO CONSUMO</span>
                 <input type="number" class="pinput"
                   v-model.number="detailOv[lote.ip]!.gasto_consumo_override"
+                  step="0.01" @input="pendienteGuardar = true" />
+              </div>
+              <div class="pfield" v-if="detailOv[lote.ip]">
+                <span class="plbl">{{ lote.ip }} — SPOT Au</span>
+                <input type="number" class="pinput"
+                  v-model.number="detailOv[lote.ip]!.spot_usd_override"
+                  step="0.01" @input="pendienteGuardar = true" />
+              </div>
+              <div class="pfield" v-if="detailOv[lote.ip] && hayAg">
+                <span class="plbl">{{ lote.ip }} — SPOT Ag</span>
+                <input type="number" class="pinput"
+                  v-model.number="detailOv[lote.ip]!.spot_ag_usd_override"
                   step="0.01" @input="pendienteGuardar = true" />
               </div>
             </template>
@@ -292,6 +304,14 @@
           </div>
           <div class="modal-body">
             <div class="form-grid" style="grid-template-columns:1fr 1fr">
+              <div class="field">
+                <label class="field-label">SPOT Au (USD/Oz)</label>
+                <input type="number" class="field-input" v-model.number="editForm.spot_usd_override" step="0.01" />
+              </div>
+              <div class="field" v-if="hayAg">
+                <label class="field-label">SPOT Ag (USD/Oz)</label>
+                <input type="number" class="field-input" v-model.number="editForm.spot_ag_usd_override" step="0.01" />
+              </div>
               <div class="field">
                 <label class="field-label">BONO (USD)</label>
                 <input type="number" class="field-input" v-model.number="editForm.bono" step="0.01" />
@@ -412,6 +432,8 @@
       maquila_override: lote.maquila ?? null,
       gasto_acopio_override: lote.insumos_acopio ?? null,
       gasto_consumo_override: lote.insumos_consumo ?? null,
+      spot_usd_override: lote.spot_usd ?? null,
+      spot_ag_usd_override: lote.spot_ag_usd ?? null,
     }
   }
 
@@ -423,6 +445,8 @@
       rec_liq_override:     Number(l.pct_rec_liq)  || null,
       gasto_acopio_override: Number(l.insumos_acopio)  || null,
       gasto_consumo_override: Number(l.insumos_consumo) || null,
+      spot_usd_override: Number(l.spot_usd) || null,
+      spot_ag_usd_override: Number(l.spot_ag_usd) || null,
       rec_liq: Number(l.pct_rec_liq) || null,
     }
   }
@@ -440,6 +464,8 @@ async function guardarParamsDetalle() {
         rec_liq_override: ov.rec_liq,
         gasto_acopio_override: ov.gasto_acopio_override,
         gasto_consumo_override: ov.gasto_consumo_override,
+        spot_usd_override: ov.spot_usd_override,
+        spot_ag_usd_override: ov.spot_ag_usd_override,
       })
     }
     await store.cargarDetalle(id)

@@ -43,6 +43,7 @@ from app.models.models import (
     ProveedorAcopiador,
     PruebaMetalurgica,
     SesionDescarga,
+    SpotHistorico,
 )
 from app.schemas.liquidaciones import (
     AlertaLote,
@@ -271,8 +272,14 @@ def _rec_planta(db: Session, lote_id: int) -> Decimal | None:
 
 
 def _fecha_recepcion(lote: Lote) -> date | None:
+    """
+    Retorna la fecha de CREACIÓN del primer pesaje (fecha real de registro),
+    que es la que aplica para buscar el spot histórico LBMA.
+    Se usa `creado_en` (inmutable, de AuditMixin) para no verse afectada
+    por ediciones documentarias de fecha_fin (fecha documentaria editable).
+    """
     if lote.pesajes:
-        dt = lote.pesajes[0].fecha_fin
+        dt = lote.pesajes[0].creado_en
         return dt.date() if isinstance(dt, datetime) else dt
     return None
 
@@ -303,22 +310,20 @@ def _numero_liquidacion(db: Session) -> str:
 def _calcular_lote(
     db: Session,
     lote: Lote,
-    spot_usd: Decimal,
+    spot_usd_override: Decimal | None,
     bono: Decimal,
     rec_liq_override: Decimal | None,
     gasto_acopio_override: Decimal | None = None,
     gasto_consumo_override: Decimal | None = None,
-    spot_ag_usd: Decimal | None = None,
+    spot_ag_usd_override: Decimal | None = None,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
-    El precio spot (Au y Ag) se resuelve desde el histórico según la
-    fecha de recepción del lote, aplicando la regla de fin de semana:
-      - Sábado  → viernes anterior
-      - Domingo → lunes siguiente
-      - Lunes–Viernes → misma fecha
-    Si no existe registro en el histórico, se usa spot_usd como fallback
-    (warning, no crítico) y se emite AlertaLote(tipo="SIN_SPOT_HISTORICO").
+    El precio spot (Au y Ag) se resuelve según la siguiente prioridad:
+      1. spot override (ingresado manualmente para este IP)
+      2. spot histórico (según la fecha de creación del pesaje del lote)
+    Si no existe registro en el histórico y no hay override, se emite
+    AlertaLote(tipo="SIN_SPOT_HISTORICO") con critico=True.
 
     Retorna (snapshot_dict, alertas).
     alertas con critico=True bloquean la liquidacion.
@@ -349,33 +354,53 @@ def _calcular_lote(
     sacos = pesaje.sacos if pesaje else None
     fecha_rec = _fecha_recepcion(lote)
 
-    # ── Resolución del spot histórico por fecha de recepción ─────────────────
+    # ── Resolución del spot (histórico u override) ───────────────────────────
     spot_historico_registro = None
-    spot_historico_warning = False
     fecha_spot_efectiva = fecha_efectiva_spot(fecha_rec) if fecha_rec else None
+
+    spot_usd = Decimal("0")
+    spot_ag_usd = None
+    spot_desde_historico = False
 
     if fecha_rec:
         spot_historico_registro = get_spot_para_fecha(db, fecha_rec)
-        if spot_historico_registro:
-            # Usar precio del histórico; prioridad: Au del histórico, Ag del histórico
-            spot_usd = Decimal(str(spot_historico_registro.precio_au_usd))
-            if spot_ag_usd is None and spot_historico_registro.precio_ag_usd:
-                spot_ag_usd = Decimal(str(spot_historico_registro.precio_ag_usd))
-        else:
-            # Fallback al spot global ingresado por el usuario
-            spot_historico_warning = True
 
-    if spot_historico_warning:
+    # Resolución Au
+    if spot_usd_override and spot_usd_override > 0:
+        spot_usd = spot_usd_override
+    elif spot_historico_registro and spot_historico_registro.precio_au_usd:
+        spot_usd = Decimal(str(spot_historico_registro.precio_au_usd))
+        spot_desde_historico = True
+
+    # Resolución Ag
+    if spot_ag_usd_override and spot_ag_usd_override > 0:
+        spot_ag_usd = spot_ag_usd_override
+    elif spot_historico_registro and spot_historico_registro.precio_ag_usd:
+        spot_ag_usd = Decimal(str(spot_historico_registro.precio_ag_usd))
+
+    # Si después de intentar resolver, no hay spot de Au, obtenemos el último disponible como fallback
+    spot_fallback_usado = False
+    if spot_usd <= 0:
+        ultimo_spot = db.query(SpotHistorico).order_by(SpotHistorico.fecha.desc()).first()
+        if ultimo_spot:
+            spot_usd = Decimal(str(ultimo_spot.precio_au_usd))
+            spot_ag_usd = (
+                Decimal(str(ultimo_spot.precio_ag_usd)) if ultimo_spot.precio_ag_usd else None
+            )
+            spot_fallback_usado = True
+
+    if spot_fallback_usado or spot_usd <= 0:
         alertas.append(
             AlertaLote(
                 tipo="SIN_SPOT_HISTORICO",
                 mensaje=(
-                    f"{lote.ip}: no hay spot histórico para "
-                    f"{fecha_spot_efectiva.strftime('%d/%m/%Y') if fecha_spot_efectiva else '?'} "
-                    f"(fecha recepción: {fecha_rec.strftime('%d/%m/%Y') if fecha_rec else '?'}). "
-                    "Se usó el precio spot ingresado manualmente."
-                ),
-                critico=False,
+                    f"{lote.ip}: no hay spot histórico exacto para la fecha de pesaje "
+                    f"({fecha_spot_efectiva.strftime('%d/%m/%Y') if fecha_spot_efectiva else '?'}). "
+                    "Se usó el último spot disponible pero DEBE verificar y confirmar."
+                )
+                if spot_fallback_usado
+                else (f"{lote.ip}: no hay spot histórico y no hay registros en la base de datos."),
+                critico=(not spot_fallback_usado),
             )
         )
 
@@ -696,7 +721,7 @@ def _calcular_lote(
         "gasto_acopio_liquidacion": gasto_acopio,
         # Metadatos del spot (para mostrar en UI)
         "fecha_spot_efectiva": fecha_spot_efectiva,
-        "spot_desde_historico": spot_historico_registro is not None,
+        "spot_desde_historico": spot_desde_historico,
     }
 
     return snapshot, alertas
@@ -759,12 +784,12 @@ def preview_liquidacion(
         snap, alertas = _calcular_lote(
             db,
             lote,
-            spot,
-            item.bono or Decimal("0"),
-            item.rec_liq_override,
-            item.gasto_acopio_override,
-            item.gasto_consumo_override,
-            spot_ag_usd=req.spot_ag_usd,
+            spot_usd_override=item.spot_usd_override,
+            bono=item.bono or Decimal("0"),
+            rec_liq_override=item.rec_liq_override,
+            gasto_acopio_override=item.gasto_acopio_override,
+            gasto_consumo_override=item.gasto_consumo_override,
+            spot_ag_usd_override=item.spot_ag_usd_override,
         )
 
         if alertas:
@@ -856,12 +881,12 @@ def crear_liquidacion(
         snap, alertas = _calcular_lote(
             db,
             lote,
-            req.spot_usd,
-            item.bono or Decimal("0"),
-            item.rec_liq_override,
-            item.gasto_acopio_override,
-            item.gasto_consumo_override,
-            spot_ag_usd=req.spot_ag_usd,
+            spot_usd_override=item.spot_usd_override,
+            bono=item.bono or Decimal("0"),
+            rec_liq_override=item.rec_liq_override,
+            gasto_acopio_override=item.gasto_acopio_override,
+            gasto_consumo_override=item.gasto_consumo_override,
+            spot_ag_usd_override=item.spot_ag_usd_override,
         )
 
         if any(a.critico for a in alertas):
@@ -1337,6 +1362,10 @@ def editar_params_lote(
         ll.insumos_liquidacion = (
             ll.gasto_acopio_liquidacion or Decimal("0")
         ) + params.gasto_consumo_override
+    if params.spot_usd_override is not None:
+        ll.spot_usd_snapshot = params.spot_usd_override
+    if params.spot_ag_usd_override is not None:
+        ll.spot_ag_snapshot = params.spot_ag_usd_override
 
     # Recalcular con valores actualizados
     oz = ll.oz_tc_promedio or Decimal("0")
@@ -1351,6 +1380,17 @@ def editar_params_lote(
     ll.precio_x_tms = _calc_precio_x_tms(oz, rec_liq, spot, riesgo, maquila, insumos, bono)
     ll.total_usd = _calc_total(ll.precio_x_tms, tms)
     ll.fino_recuperable = _calc_fino_recuperable(tms, rec_liq, oz)
+
+    # Recalcular Ag si aplica
+    # if ll.valor_ag_usd and ll.spot_ag_snapshot:
+    #     # Se asume que los parametros Ag no cambiaron, podemos usar la ley_ag ya guardada
+    #     ley_ag_oz_tc = (
+    #         ll.ley_ag_gr_tm_snapshot / Decimal("31.1034768")
+    #         if ll.ley_ag_gr_tm_snapshot
+    #         else Decimal("0")
+    #     )
+    #     pass
+
     ll.modificado_por = usuario_id
 
     db.flush()
@@ -1467,7 +1507,7 @@ def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
             calc_dict, _ = _calcular_lote(
                 db,
                 lote,
-                spot_usd=ll.spot_usd_snapshot or Decimal("0"),
+                spot_usd_override=ll.spot_usd_snapshot or Decimal("0"),
                 bono=ll.bono or Decimal("0"),
                 rec_liq_override=ll.porcentaje_rec_liquido,
                 gasto_acopio_override=ll.gasto_acopio_liquidacion,

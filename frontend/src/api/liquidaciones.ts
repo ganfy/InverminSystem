@@ -9,12 +9,14 @@ export interface LotePreviewInput {
     rec_liq_override?: number | null
     gasto_acopio_override?: number | null
     gasto_consumo_override?: number | null
+    spot_usd_override?: number | null
+    spot_ag_usd_override?: number | null
 }
 
 export interface LiquidacionPreviewRequest {
     provacop_id: number
     lotes: LotePreviewInput[]
-    spot_usd: number
+    spot_usd?: number | null
     spot_ag_usd?: number | null
     fecha_liquidacion?: string | null
 }
@@ -22,7 +24,7 @@ export interface LiquidacionPreviewRequest {
 export interface LiquidacionCreate {
     provacop_id: number
     lotes: LotePreviewInput[]
-    spot_usd: number
+    spot_usd?: number | null
     spot_ag_usd?: number | null
     fecha_liquidacion?: string | null
     numero_liquidacion?: string | null
@@ -84,7 +86,7 @@ export interface LiquidacionPreviewOut {
     proveedor_razon_social: string
     proveedor_ruc: string | null
     acopiador_nombre: string
-    spot_usd: number
+    spot_usd?: number | null
     lotes: LoteFinancieroOut[]
     total_usd: number
     total_tms: number
@@ -141,7 +143,7 @@ export interface LiquidacionResumenOut {
     proveedor_razon_social: string
     proveedor_ruc: string | null
     acopiador_nombre: string
-    spot_usd: number
+    spot_usd?: number | null
     total_usd: number
     count_lotes: number
     fecha_creacion: string
@@ -162,6 +164,8 @@ export interface LiquidacionLoteParamsUpdate {
     maquila_override?: number | null
     gasto_acopio_override?: number | null
     gasto_consumo_override?: number | null
+    spot_usd_override?: number | null
+    spot_ag_usd_override?: number | null
 }
 
 // ── Edición de Parámetros de Lote ──────────────────────────────────────────────
@@ -171,6 +175,8 @@ export interface EditOverrides {
     gasto_consumo: Record<string, number | null>
     bono: Record<string, number | null>
     rec_liq: Record<string, number | null>
+    spot_usd: Record<string, number | null>
+    spot_ag_usd: Record<string, number | null>
 }
 
 // ── Spot Histórico ─────────────────────────────────────────────────────────────
