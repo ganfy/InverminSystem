@@ -27,7 +27,14 @@
       </div>
     </header>
 
-    <AlertasBanner modulo="LABORATORIO" con-observaciones />
+    <AlertasBanner 
+      modulo="LABORATORIO" 
+      con-observaciones 
+      :tipos-permitidos-override="!store.puedeVerIP ? tiposAlertaActuales : undefined"
+      :nombre-ventana="!store.puedeVerIP ? nombreVentanaActual : undefined"
+      :filtro-cips="!store.puedeVerIP ? cipsParaAlertas : undefined"
+      :forzar-mostrar-ip="store.puedeVerIP"
+    />
 
     <!-- ── [OFFLINE] Análisis pendientes de sincronizar (solo Laboratorista) ── -->
     <div
@@ -558,7 +565,7 @@ function mapearCIP(c: CIPAnalisisOut) {
   }
 }
 
-const filasMostrar = computed(() => {
+const cipsPorTab = computed(() => {
   // CIPs con análisis ya registrado offline → aparecen en la sección superior
   const cipsConAnalisisOffline = new Set(
     analisisOfflinePendientes.value.map(a => a.datos.cip)
@@ -606,11 +613,31 @@ const filasMostrar = computed(() => {
   })
 
   // map devuelve array de arrays, usamos flatMap
-  return cipsFiltrados.flatMap(mapearCIP).filter(f => {
+  return cipsFiltrados.flatMap(mapearCIP)
+})
+
+const filasMostrar = computed(() => {
+  return cipsPorTab.value.filter(f => {
     if (filtroEstado.value && f.estado !== filtroEstado.value) return false
     if (filtroBusqueda.value && !f.cip.toLowerCase().includes(filtroBusqueda.value.toLowerCase())) return false
     return true
   })
+})
+
+const cipsParaAlertas = computed(() => {
+  return cipsPorTab.value.map(f => f.cip)
+})
+
+const nombreVentanaActual = computed(() => {
+  if (tabActual.value === 'ley') return 'Newmont'
+  if (tabActual.value === 'solidos') return 'Sólidos'
+  if (tabActual.value === 'solucion') return 'Absorción Atómica'
+  return ''
+})
+
+const tiposAlertaActuales = computed(() => {
+  if (tabActual.value === 'ley') return ['RETRASO_LEY']
+  return ['RETRASO_RECUPERACION']
 })
 
 const lotesFiltrados = computed(() => {

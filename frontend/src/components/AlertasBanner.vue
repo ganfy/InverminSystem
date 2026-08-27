@@ -18,7 +18,7 @@
         :class="`ab-item--${alerta.severidad.toLowerCase()}`"
       >
         <div class="ab-item-meta">
-          <template v-if="modulo !== 'LABORATORIO'">
+          <template v-if="modulo !== 'LABORATORIO' || forzarMostrarIp">
             <span class="ab-item-ip">{{ alerta.ip }}</span>
           </template>
           <template v-else>
@@ -58,6 +58,14 @@ const props = defineProps<{
   modulo: string
   /** Si true, muestra campo de observación/justificación por alerta */
   conObservaciones?: boolean
+  /** Tipos de alerta a mostrar, sobrescribe el comportamiento por defecto del módulo */
+  tiposPermitidosOverride?: string[]
+  /** Nombre personalizado de la ventana/panel actual (ej: 'Newmont') */
+  nombreVentana?: string
+  /** Si se provee, filtra los CIPs de la alerta dejando solo los que estén en este array */
+  filtroCips?: string[]
+  /** Fuerza a mostrar el IP del lote en lugar del CIP, usado para roles de gerencia en Laboratorio */
+  forzarMostrarIp?: boolean
 }>()
 
 const TIPO_POR_MODULO: Record<string, string[]> = {
@@ -77,6 +85,9 @@ const TIPO_LABEL: Record<string, string> = {
 const SEV_ORDER: Record<string, number> = { CRITICA: 3, ALTA: 2, MEDIA: 1 }
 
 function getTipoLabel(alerta: any, modulo: string) {
+  if (props.nombreVentana) {
+    return `Retraso en ${props.nombreVentana}`
+  }
   if (modulo === 'LABORATORIO') {
     if (alerta.tipo === 'RETRASO_LEY') return 'Retraso en Newmont'
     if (alerta.tipo === 'RETRASO_RECUPERACION') return 'Retraso en Sólidos / Absorciones Atómicas'
@@ -93,11 +104,21 @@ const guardados      = ref<Record<string, boolean>>({})
 const ui = useUiStore()
 
 // ── Computed ──────────────────────────────────────────────────────────────────
-const tiposPermitidos = computed(() => TIPO_POR_MODULO[props.modulo] ?? [])
+const tiposPermitidos = computed(() => props.tiposPermitidosOverride ?? TIPO_POR_MODULO[props.modulo] ?? [])
 
-const alertasModulo = computed(() =>
-  todasAlertas.value.filter(a => tiposPermitidos.value.includes(a.tipo))
-)
+const alertasModulo = computed(() => {
+  let filtradas = todasAlertas.value.filter(a => tiposPermitidos.value.includes(a.tipo))
+
+  if (props.filtroCips) {
+    filtradas = filtradas.map(a => {
+      if (!a.cips || a.cips.length === 0) return { ...a, cips: [] }
+      const cipsIntersectados = a.cips.filter(cip => props.filtroCips!.includes(cip))
+      return { ...a, cips: cipsIntersectados }
+    }).filter(a => a.cips && a.cips.length > 0)
+  }
+
+  return filtradas
+})
 
 const maxSeveridad = computed(() => {
   if (!alertasModulo.value.length) return 'MEDIA'
