@@ -213,6 +213,7 @@ class AnalisisRecuperacionOut(BaseModel):
     ley_liquido: Decimal | None = None  # solución Au
     recuperacion: Decimal | None = None
     solucion_ag_g_m3: Decimal | None = None  # Ag en solución (g/m³)
+    origen_datos: str | None = None
     # ── Detalles por muestra (solo se incluyen cuando se piden explícitamente) ─
     detalles: list[AnalisisDetalleOut] = []
     # ── Sub-tipo Reconocimiento ────────────────────────────────────────

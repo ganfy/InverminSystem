@@ -552,6 +552,7 @@ function mapearCIP(c: CIPAnalisisOut) {
       leyColaAg: a.ley_cola_ag ?? null,
       leyLiquido: a.ley_liquido ?? null,
       solucionAg: a.solucion_ag_g_m3 ?? null,
+      origen_datos: a.origen_datos ?? null,
       certificadoUrl: a.certificado_url ?? null,
     }))
   }
@@ -585,6 +586,17 @@ const filasMostrar = computed(() => {
       return true
     }
     // For solidos/solucion tab: show Recuperacion types, or PROCESO/LABORATORIO if it has recuperacion analysis
+    
+    // Ocultar completados si el origen de datos es 'certificado' (llenado externo)
+    if (c.estado_recuperacion === 'COMPLETADO' || c.estado_recuperacion === 'CERT_COMERCIAL') {
+      const vigente = c.analisis_recuperacion.find(x => x.vigente)
+      const ultimo = c.analisis_recuperacion[c.analisis_recuperacion.length - 1]
+      const a = vigente ?? ultimo
+      if (a && a.origen_datos === 'certificado') {
+        return false // Vino de certificado (externo), no se muestra en el dashboard del laboratorista
+      }
+    }
+    
     if (tm === 'RECUPERACIONINTERNO' || tm === 'RECUPERACIONEXTERNO') return true
     if ((tm === 'PROCESO' || tm === 'LABORATORIO') && c.analisis_recuperacion.length > 0) {
       if (mostrarSoloCIPs.value) return false

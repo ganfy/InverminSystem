@@ -83,6 +83,7 @@ export interface AnalisisRecuperacionOut {
     ley_liquido?: number | null
     solucion_ag_g_m3?: number | null
     recuperacion?: number | null
+    origen_datos?: OrigenDatos | null
     estado: EstadoRecuperacion
     vigente: boolean
     fecha_analisis?: string | null

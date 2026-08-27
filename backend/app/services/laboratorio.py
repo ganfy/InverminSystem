@@ -237,6 +237,7 @@ def _rec_out(
         recuperacion=a.recuperacion,
         sub_tipo=a.sub_tipo,
         estado=a.estado,
+        origen_datos=a.origen_datos,
         vigente=a.vigente,
         fecha_analisis=a.fecha_analisis,
         certificado_url=a.certificado_url,
@@ -789,6 +790,15 @@ def registrar_analisis_recuperacion(
     # Actualizar laboratorio destino en el mapeo
     if datos.laboratorio:
         mapeo.laboratorio = datos.laboratorio or "Paititi"
+
+    # Siempre invalidar análisis pendientes previos (para que al subir certificado, no quede como pendiente)
+    db.query(AnalisisRecuperacion).filter(
+        AnalisisRecuperacion.cip == datos.cip,
+        AnalisisRecuperacion.sub_tipo == (datos.sub_tipo or None),
+        AnalisisRecuperacion.vigente,
+        ~AnalisisRecuperacion.eliminado,
+        AnalisisRecuperacion.estado == EstadoRecuperacion.PENDIENTE,
+    ).update({"vigente": False}, synchronize_session="fetch")
 
     if datos.es_edicion:
         db.query(AnalisisRecuperacion).filter(
