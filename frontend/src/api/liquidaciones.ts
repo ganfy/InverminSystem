@@ -121,6 +121,7 @@ export interface LoteDisponible {
     provacop_id: number
     proveedor: string
     acopiador: string
+    guia_remision?: string | null
 }
 
 export interface LiquidacionesKPI {

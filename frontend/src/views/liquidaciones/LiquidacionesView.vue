@@ -226,54 +226,71 @@
               </button>
             </div>
 
-            <!-- Tabla de lotes del grupo (Reemplaza grid) -->
-            <div class="tabla-wrapper">
-              <table class="tabla">
-                <thead>
-                  <tr>
-                    <th>IP</th>
-                    <th>PROVEEDOR</th>
-                    <th>MATERIAL</th>
-                    <th>RECEPCIÓN</th>
-                    <th class="col-r">TMS</th>
-                    <th class="col-r">LEY PLANTA</th>
-                    <th class="col-r">LEY MINERO</th>
-                    <th class="col-r">LEY COMERC.</th>
-                    <th class="col-r">% REC</th>
-                    <th>ESTADO</th>
-                    <th class="col-r">DÍAS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="lote in grupo.lotes"
-                    :key="lote.ip"
-                    class="tabla-row"
-                    :class="{ 'fila-volado': lote.volado, 'fila-vencimiento': lote.alerta_vencimiento && !lote.volado }"
-                  >
-                    <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
-                    <td class="td-muted">{{ lote.proveedor || grupo.proveedor || '—' }}</td>
-                    <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
-                    <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
-                    <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
-                    <td class="col-r td-mono td-muted">{{ fmtLey(lote.oz_tc_planta) }}</td>
-                    <td class="col-r td-mono td-muted">{{ fmtLey(lote.oz_tc_minero) }}</td>
-                    <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtLey(lote.ley_comercial) }}</td>
-                    <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
-                    <td>
-                      <span v-if="lote.liquidacion_id" class="alerta-tag" style="background:var(--color-gold);color:black;border:none;" :title="'En liquidación: ' + (lote.numero_liquidacion || 'Borrador')">LIQ</span>
-                      <span v-else-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
-                      <span v-else-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
-                      <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D</span>
-                    </td>
-                    <td class="col-r">
-                      <span class="dias-badge" :class="{'dias-warn':lote.alerta_vencimiento,'dias-danger':lote.dias_almacen>=30}">
-                        {{ lote.dias_almacen }}d
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- Subgrupos por guía de remisión -->
+            <div
+              v-for="sub in subgruposPorGuia(grupo)"
+              :key="sub.guia"
+              class="subgrupo-guia"
+            >
+              <!-- Cabecera del subgrupo -->
+              <div class="subgrupo-header">
+                <span class="subgrupo-guia-label">{{ sub.guia }}</span>
+                <span class="subgrupo-meta">
+                  {{ sub.lotes.length }} lote{{ sub.lotes.length > 1 ? 's' : '' }} ·
+                  {{ fmtNum(sub.tms_total, 3) }} TMS
+                  <template v-if="sub.fecha_ref"> · {{ fmtDate(sub.fecha_ref) }}</template>
+                </span>
+              </div>
+
+              <!-- Tabla de lotes del subgrupo -->
+              <div class="tabla-wrapper">
+                <table class="tabla">
+                  <thead>
+                    <tr>
+                      <th>IP</th>
+                      <th>PROVEEDOR</th>
+                      <th>MATERIAL</th>
+                      <th>RECEPCIÓN</th>
+                      <th class="col-r">TMS</th>
+                      <th class="col-r">LEY PLANTA</th>
+                      <th class="col-r">LEY MINERO</th>
+                      <th class="col-r">LEY COMERC.</th>
+                      <th class="col-r">% REC</th>
+                      <th>ESTADO</th>
+                      <th class="col-r">DÍAS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="lote in sub.lotes"
+                      :key="lote.ip"
+                      class="tabla-row"
+                      :class="{ 'fila-volado': lote.volado, 'fila-vencimiento': lote.alerta_vencimiento && !lote.volado }"
+                    >
+                      <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                      <td class="td-muted">{{ lote.proveedor || grupo.proveedor || '—' }}</td>
+                      <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
+                      <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>
+                      <td class="col-r td-mono">{{ fmtNum(lote.tms, 3) }}</td>
+                      <td class="col-r td-mono td-muted">{{ fmtLey(lote.oz_tc_planta) }}</td>
+                      <td class="col-r td-mono td-muted">{{ fmtLey(lote.oz_tc_minero) }}</td>
+                      <td class="col-r td-mono" style="color:var(--color-gold)">{{ fmtLey(lote.ley_comercial) }}</td>
+                      <td class="col-r td-mono">{{ fmtNum(lote.porcentaje_rec, 1) }}%</td>
+                      <td>
+                        <span v-if="lote.liquidacion_id" class="alerta-tag" style="background:var(--color-gold);color:black;border:none;" :title="'En liquidación: ' + (lote.numero_liquidacion || 'Borrador')">LIQ</span>
+                        <span v-else-if="lote.usa_dirimencia" class="alerta-tag alerta-dirim">DIRIM</span>
+                        <span v-else-if="lote.volado" class="alerta-tag alerta-volado">VOLADO</span>
+                        <span v-else-if="lote.alerta_vencimiento" class="alerta-tag alerta-venc">{{ lote.dias_almacen }}D</span>
+                      </td>
+                      <td class="col-r">
+                        <span class="dias-badge" :class="{'dias-warn':lote.alerta_vencimiento,'dias-danger':lote.dias_almacen>=30}">
+                          {{ lote.dias_almacen }}d
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <!-- ── Tabla de Prevalencia de Leyes (Promedio vs Dirimencia) ───────────────── -->
@@ -371,6 +388,13 @@ interface GrupoProvacop {
   tms_total: number
   ley_prom: number
 }
+
+interface SubgrupoGuia {
+  guia: string           // label a mostrar, ej: "GRR-0042" o "Sin guía"
+  lotes: LoteDisponible[]
+  tms_total: number
+  fecha_ref: string | null  // fecha_recepcion del primer lote del subgrupo
+}
 const lotesLiquidables = ref<LoteDisponible[]>([])
 
 const precioOro = ref<number | null>(null)
@@ -397,7 +421,7 @@ const countLotesLiquidables = computed(() => {
 })
 
 const lotesAgrupados = computed<GrupoProvacop[]>(() => {
-  const map = new Map<number, GrupoProvacop>()  // keyed por provacop_id
+  const map = new Map<number, GrupoProvacop>()
   for (const lote of lotesLiquidables.value) {
     if (!map.has(lote.provacop_id)) {
       map.set(lote.provacop_id, {
@@ -418,10 +442,7 @@ const lotesAgrupados = computed<GrupoProvacop[]>(() => {
     if (totalTms > 0) {
       g.ley_prom = g.lotes.reduce((s, l) => s + (l.ley_comercial ?? 0) * (l.tms ?? 0), 0) / totalTms
     }
-    g.lotes.sort((a, b) => {
-      // Sort lotes by IP descending (e.g. L-100 before L-99)
-      return b.ip.localeCompare(a.ip)
-    })
+    g.lotes.sort((a, b) => b.ip.localeCompare(a.ip))
   }
   const grupos = [...map.values()]
   grupos.sort((a, b) => {
@@ -431,6 +452,31 @@ const lotesAgrupados = computed<GrupoProvacop[]>(() => {
   })
   return grupos
 })
+
+// Agrupa los lotes de un GrupoProvacop por guía de remisión
+// Se usa en el template para el segundo nivel de agrupación
+function subgruposPorGuia(grupo: GrupoProvacop): SubgrupoGuia[] {
+  const map = new Map<string, SubgrupoGuia>()
+  for (const lote of grupo.lotes) {
+    const key = lote.guia_remision?.trim() || '__sin_guia__'
+    if (!map.has(key)) {
+      map.set(key, {
+        guia: lote.guia_remision?.trim() || 'Sin guía',
+        lotes: [],
+        tms_total: 0,
+        fecha_ref: lote.fecha_recepcion,
+      })
+    }
+    map.get(key)!.lotes.push(lote)
+    map.get(key)!.tms_total += lote.tms ?? 0
+  }
+  // Ordenar subgrupos: los que tienen guía primero (alfabético), sin guía al final
+  return [...map.values()].sort((a, b) => {
+    if (a.guia === 'Sin guía') return 1
+    if (b.guia === 'Sin guía') return -1
+    return a.guia.localeCompare(b.guia)
+  })
+}
 
 const cargarPrecioOro = async () => {
   cargandoPrecio.value = true
@@ -955,4 +1001,32 @@ th.col-r, td.col-r { text-align: right !important; }
 .clap-diff-alert { color: #f87171; font-weight: 600; }
 .clap-diff-ok    { color: var(--color-text-muted); }
 
+/* Subgrupos de guía de remisión dentro de un grupo provacop */
+.subgrupo-guia {
+  margin-bottom: 0.5rem;
+}
+
+.subgrupo-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--color-surface-2, rgba(255,255,255,0.04));
+  border-left: 3px solid var(--color-gold-muted, #7a6318);
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 0.25rem;
+}
+
+.subgrupo-guia-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  color: var(--color-gold);
+  letter-spacing: 0.03em;
+}
+
+.subgrupo-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
 </style>

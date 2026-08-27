@@ -1309,6 +1309,7 @@ def lotes_disponibles_para_liquidar(
                 "acopiador": _nombre_entidad(lote.sesion.provacop.acopiador)
                 if lote.sesion and lote.sesion.provacop
                 else "—",
+                "guia_remision": lote.sesion.guia_remision if lote.sesion else None,
             }
         )
 

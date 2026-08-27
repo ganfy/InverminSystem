@@ -76,6 +76,7 @@
                 <tr>
                   <th><input type="checkbox" :checked="todosSeleccionados" @change="toggleTodos" class="check" /></th>
                   <th>IP</th>
+                  <th>GUÍA</th>
                   <th>PROVEEDOR</th>
                   <th>MATERIAL</th>
                   <th>RECEPCIÓN</th>
@@ -101,6 +102,7 @@
                     <input type="checkbox" :checked="lotesSeleccionados.includes(lote.ip)" @change="toggleLote(lote.ip)" class="check" />
                   </td>
                   <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                  <td class="td-mono td-muted">{{ lote.guia_remision || '—' }}</td>
                   <td class="td-muted">{{ lote.proveedor || '—' }}</td>
                   <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
                   <td class="td-fecha">{{ fmtDate(lote.fecha_recepcion) }}</td>

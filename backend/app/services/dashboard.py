@@ -542,6 +542,7 @@ def generar_excel_dashboard(data: DashboardResponse, tipo: str, clave: str):
                 ]
             )
     else:
+        # ── Hoja 1: TMH por mes ────────────────────────────────────────────
         ws = wb.active
         ws.title = "Acopiadores TMH"
         _header_row(
@@ -582,10 +583,99 @@ def generar_excel_dashboard(data: DashboardResponse, tipo: str, clave: str):
                     a.total,
                 ]
             )
+
+        # ── Hoja 2: Stats por acopiador ───────────────────────────────────
         ws2 = wb.create_sheet("Stats por Acopiador")
         _header_row(ws2, ["Acopiador", "Lotes", "TMS", "Oz en Stock", "Ley Prom gr/TM"])
         for s in data.acopiadores_stats:
             ws2.append([s.acopiador, s.lotes, s.tms, s.oz, s.ley_prom])
+
+        # ── Hojas por acopiador: detalle de lotes ─────────────────────────
+        # Agrupar lotes de data.lotes por acopiador
+        from collections import defaultdict
+
+        lotes_por_acop: dict[str, list] = defaultdict(list)
+        for lt in data.lotes:
+            key = lt.acopiador or "Sin acopiador"
+            lotes_por_acop[key].append(lt)
+
+        # Columnas del detalle
+        cols_detalle = [
+            "IP",
+            "Proveedor",
+            "Estado",
+            "TMH",
+            "TMS",
+            "%H₂O",
+            "Ley gr/TM",
+            "% Rec",
+            "Días Almacén",
+            "Volado",
+        ]
+
+        for acop_name in sorted(lotes_por_acop.keys()):
+            lotes = lotes_por_acop[acop_name]
+
+            # Nombre de hoja: máx 31 chars (límite Excel), sin caracteres inválidos
+            nombre_hoja = acop_name[:28].strip()
+            for ch in r"\/*?:[]\x00":
+                nombre_hoja = nombre_hoja.replace(ch, "_")
+            # Si ya existe una hoja con ese nombre (colisión por truncado), agregar sufijo
+            nombres_existentes = {sh.title for sh in wb.worksheets}
+            if nombre_hoja in nombres_existentes:
+                nombre_hoja = nombre_hoja[:25] + "_(2)"
+
+            ws_acop = wb.create_sheet(nombre_hoja)
+            _header_row(ws_acop, cols_detalle)
+
+            tms_acum = 0.0
+            tmh_acum = 0.0
+            ley_tms_acum = 0.0  # para ley promedio ponderada
+            rec_tms_acum = 0.0  # para rec promedio ponderada
+
+            for lt in lotes:
+                tms = lt.tms or 0.0
+                tmh = lt.tmh or 0.0
+                ley = lt.ley_avg or 0.0
+                rec = lt.rec_porc or 0.0
+
+                ws_acop.append(
+                    [
+                        lt.ip,
+                        lt.proveedor or "—",
+                        lt.estado or "—",
+                        round(tmh, 3),
+                        round(tms, 3) if lt.tms is not None else None,
+                        round(lt.h2o_porc, 2) if lt.h2o_porc is not None else None,
+                        round(ley, 3) if lt.ley_avg is not None else None,
+                        round(rec, 1) if lt.rec_porc is not None else None,
+                        lt.dias_almacen,
+                        "Sí" if lt.volado else "No",
+                    ]
+                )
+
+                tmh_acum += tmh
+                tms_acum += tms
+                ley_tms_acum += ley * tms
+                rec_tms_acum += rec * tms
+
+            # Fila de totales
+            ley_prom_pond = round(ley_tms_acum / tms_acum, 3) if tms_acum > 0 else None
+            rec_prom_pond = round(rec_tms_acum / tms_acum, 1) if tms_acum > 0 else None
+
+            total_row = ws_acop.max_row + 1
+            ws_acop.cell(row=total_row, column=1, value="TOTAL")
+            ws_acop.cell(row=total_row, column=4, value=round(tmh_acum, 3))  # TMH
+            ws_acop.cell(row=total_row, column=5, value=round(tms_acum, 3))  # TMS
+            ws_acop.cell(row=total_row, column=7, value=ley_prom_pond)  # Ley prom pond.
+            ws_acop.cell(row=total_row, column=8, value=rec_prom_pond)  # Rec prom pond.
+
+            # Estilo de la fila de totales
+            for col_idx in range(1, len(cols_detalle) + 1):
+                cell = ws_acop.cell(row=total_row, column=col_idx)
+                cell.fill = gold_fill
+                cell.font = gold_font
+                cell.alignment = center
 
     _autowidth(wb.active)
 
