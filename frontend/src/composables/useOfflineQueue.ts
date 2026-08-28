@@ -20,7 +20,7 @@ import type { LoteMuestreo } from '@/api/muestreo'
 import type { TipoAnalisis, OrigenDatos } from '@/types/laboratorio'
 
 const DB_NAME = 'invermin_offline'
-const DB_VERSION = 14
+const DB_VERSION = 15
 
 // ── Tipos ──────────────────────────────────────────────────
 
@@ -294,6 +294,12 @@ async function openDB(): Promise<IDBDatabase> {
                     db.deleteObjectStore('pruebas_lista_cache')
                 }
                 db.createObjectStore('pruebas_lista_cache', { keyPath: 'prueba_id' })
+            }
+            if (oldVersion < 15) {
+                if (db.objectStoreNames.contains('pruebas_lista_cache')) {
+                    db.deleteObjectStore('pruebas_lista_cache')
+                }
+                db.createObjectStore('pruebas_lista_cache', { keyPath: 'lote_id' })
             }
         }
 
