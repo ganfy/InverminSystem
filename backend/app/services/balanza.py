@@ -361,12 +361,11 @@ def agregar_lote(
     )
     db.add(lote)
     db.flush()
-
     pesaje = Pesaje(
         lote_id=lote.id,
         peso_inicial=p.peso_inicial,
         peso_final=p.peso_final,
-        # peso_neto es GENERATED ALWAYS → no enviar
+        peso_neto=p.peso_inicial - p.peso_final,
         sacos=p.sacos,
         granel=p.granel,
         numero_ticket=None,
@@ -379,7 +378,7 @@ def agregar_lote(
     )
     db.add(pesaje)
     db.flush()  # obtiene pesaje.id de la secuencia
-    db.refresh(pesaje)  # carga peso_neto calculado por la BD
+    db.refresh(pesaje)
 
     # Número de ticket: "TK-XXXXX" con padding 5 dígitos, basado en el PK
     pesaje.numero_ticket = f"TK-{pesaje.id:05d}"

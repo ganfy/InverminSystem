@@ -427,11 +427,7 @@ class Pesaje(Base, AuditMixin):
     sacos = Column(Integer)
     peso_inicial = Column(Numeric(10, 3), nullable=False)  # TM
     peso_final = Column(Numeric(10, 3), nullable=False)  # TM
-    peso_neto = Column(
-        Numeric(10, 3),
-        Computed("peso_inicial - peso_final", persisted=True),
-        nullable=False,
-    )  # TO DO: calcular en servicio y guardar aquí, porque no es solo peso_final - peso_inicial (puede haber ajustes manuales por tara, humedad, etc.)
+    peso_neto = Column(Numeric(10, 3), nullable=False)
     numero_ticket = Column(String(50), unique=True)
     fecha_inicio = Column(DateTime)
     fecha_fin = Column(DateTime, server_default=func.now())

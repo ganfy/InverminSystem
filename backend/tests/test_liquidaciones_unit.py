@@ -99,7 +99,7 @@ class TestCalcPrecioXTms:
         # Manual: val_1 = 0.335 * 88/100 * (2400-10) = 0.335*0.88*2390
         val_1 = oz * rec / 100 * (spot - riesgo)
         val = val_1 - maquila - insumos + bono
-        expected = (val * FACTOR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        expected = (val * FACTOR).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
         result = _calc_precio_x_tms(oz, rec, spot, riesgo, maquila, insumos, bono)
         assert result == expected
@@ -146,8 +146,8 @@ class TestCalcPrecioXTms:
 
         # El resultado debe ser sin_factor * 1.1023 (con precisión Decimal)
         assert abs(
-            result - (sin_factor * FACTOR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        ) < Decimal("0.001")
+            result - (sin_factor * FACTOR).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        ) < Decimal("0.00001")
 
     def test_precio_puede_ser_negativo_en_ley_muy_baja(self):
         # oz=0.05, rec=80, spot=2400, riesgo=400, maquila=95, insumos=8

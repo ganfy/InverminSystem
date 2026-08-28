@@ -97,7 +97,7 @@ def _calc_precio_x_tms(
     """col AB del Excel: ((oz*rec/100*(spot-riesgo)) - maquila - insumos + bono) * factor"""
     val_1 = oz_promedio * rec_liq / 100 * (spot - riesgo)
     val = val_1 - maquila - insumos + bono
-    return (val * FACTOR).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return (val * FACTOR).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
 def _calc_total(precio_x_tms: Decimal, tms: Decimal) -> Decimal:
@@ -346,11 +346,7 @@ def _calcular_lote(
         return {}, alertas
 
     humedad, tms = datos_muestreo
-    tmh = (
-        (tms / (1 - humedad / 100)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
-        if humedad < 100
-        else tms
-    )
+    tmh = Decimal(str(pesaje.peso_neto)) if pesaje and pesaje.peso_neto else Decimal("0")
     sacos = pesaje.sacos if pesaje else None
     fecha_rec = _fecha_recepcion(lote)
 

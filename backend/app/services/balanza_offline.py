@@ -294,6 +294,9 @@ def _sync_lote(
             lote_id=lote.id,
             peso_inicial=peso_ini_dec,
             peso_final=peso_fin_dec,
+            peso_neto=peso_ini_dec - peso_fin_dec
+            if peso_ini_dec is not None and peso_fin_dec is not None
+            else Decimal("0.0"),
             sacos=p.sacos,
             granel=p.granel,
             numero_ticket=None,
