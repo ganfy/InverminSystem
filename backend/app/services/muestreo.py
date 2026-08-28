@@ -260,7 +260,11 @@ def generar_cips_para_lote(db: Session, ip_lote: str, cantidad: int = 5) -> list
     if not lote:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado.")
 
-    cips_existentes = db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote.id).count()
+    cips_existentes = (
+        db.query(MapeoCIP)
+        .filter(MapeoCIP.lote_id == lote.id, MapeoCIP.codigo_cip.like("%-A%"))
+        .count()
+    )
 
     nuevos_cips = []
 

@@ -48,7 +48,7 @@
           </div>
           <div class="control-impresion no-print">
             <p class="instruccion">
-              Muestras generadas: <strong>{{ codigosExistentes.length }}</strong> de un máximo de {{ MAX_CIPS }}.
+              Muestras generadas: <strong>{{ cantidadEtiquetasAx }}</strong> de un máximo de {{ MAX_CIPS }}.
             </p>
             <div class="formato-selector">
               <span class="formato-label">Formato de Rollo:</span>
@@ -114,7 +114,7 @@
         <div class="spacer"></div>
 
         <button
-          v-if="codigosExistentes.length > 0 && codigosExistentes.length < MAX_CIPS"
+          v-if="codigosExistentes.length > 0 && cantidadEtiquetasAx < MAX_CIPS"
           class="btn-secondary"
           :disabled="cargando"
           @click="generarExtra"
@@ -160,6 +160,10 @@ const cargando = ref(true)
 const mensajeCarga = ref('Consultando historial de etiquetas...')
 const codigosExistentes = ref<MapeoCIPOut[]>([])
 const error = ref<string | null>(null)
+
+const cantidadEtiquetasAx = computed(() => {
+  return codigosExistentes.value.filter(c => /-A\d+$/.test(c.codigo_cip)).length
+})
 
 type FormatoRollo = '1col' | '2col'
 const formatoRollo = ref<FormatoRollo>(
@@ -287,7 +291,7 @@ const inicializarEtiquetas = async () => {
 }
 
 const generarExtra = async () => {
-  if (codigosExistentes.value.length >= MAX_CIPS.value) return
+  if (cantidadEtiquetasAx.value >= MAX_CIPS.value) return
 
   mensajeCarga.value = 'Generando etiqueta extra...'
   cargando.value = true
