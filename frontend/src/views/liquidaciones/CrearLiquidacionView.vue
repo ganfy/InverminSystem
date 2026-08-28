@@ -366,6 +366,7 @@
                   <th class="col-r">GASTO CONSUMO</th>
                   <th class="col-r">BONO</th>
                   <th class="col-r">% REC LIQ</th>
+                  <th class="col-c">VAL. VOLADO</th>
                 </tr>
               </thead>
               <tbody>
@@ -417,6 +418,14 @@
                       v-model.number="editOv.rec_liq[lote.ip]"
                       step="0.1" min="0" max="100" placeholder="—"
                       @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-c">
+                    <input
+                      v-if="lote.volado"
+                      type="checkbox" class="check"
+                      v-model="editOv.valorizar_volado[lote.ip]"
+                      @change="pendienteRecalculo = true"
                     />
                   </td>
                 </tr>
@@ -596,7 +605,7 @@
   }
 
   //Editar
-  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {}, spot_usd: {}, spot_ag_usd: {} })
+  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {}, spot_usd: {}, spot_ag_usd: {}, valorizar_volado: {} })
 const pendienteRecalculo = ref(false)
 
 function initEditOverrides() {
@@ -609,6 +618,7 @@ function initEditOverrides() {
     editOv.value.rec_liq[l.ip]       = Number(l.pct_rec_liq)     || null
     editOv.value.spot_usd[l.ip]      = Number(l.spot_usd)        || null
     editOv.value.spot_ag_usd[l.ip]   = Number(l.spot_ag_usd)     || null
+    editOv.value.valorizar_volado[l.ip] = false
   }
   pendienteRecalculo.value = false
 }
@@ -626,6 +636,7 @@ async function recalcularConOverrides() {
       gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
       spot_usd_override: editOv.value.spot_usd[ip] ?? null,
       spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
+      valorizar_volado: editOv.value.valorizar_volado[ip] ?? false
     })),
   })
   pendienteRecalculo.value = false

@@ -1791,6 +1791,7 @@ def calcular_ley_comercial(
     umbral_volado: Decimal | None = None,
     q_comercial: Decimal = Decimal("0.001"),
     rounding: str = ROUND_HALF_UP,
+    valorizar_volado: bool = False,
 ) -> dict:
     """
     Aplica las reglas de parametros_comerciales sobre ley_planta.
@@ -1845,13 +1846,13 @@ def calcular_ley_comercial(
             f"Factor {float(factor):.3f}: {float(ley_antes):.3f} x {float(factor):.3f} = {float(ley):.3f}"
         )
 
-    # Check volado:
     _umbral = umbral_volado if umbral_volado is not None else Decimal("0.100")
     if ley < _umbral:
         detalle_pasos.append(
             f"Resultado {float(ley):.3f} < umbral volado {float(_umbral):.4f}: se marca como volado"
         )
-        ley = Decimal("0")
+        if not valorizar_volado:
+            ley = Decimal("0")
 
     return {
         "ley_planta": float(ley_planta),

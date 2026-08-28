@@ -316,6 +316,7 @@ def _calcular_lote(
     gasto_acopio_override: Decimal | None = None,
     gasto_consumo_override: Decimal | None = None,
     spot_ag_usd_override: Decimal | None = None,
+    valorizar_volado: bool = False,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
@@ -471,6 +472,7 @@ def _calcular_lote(
         params,
         q_comercial=q_comercial,
         rounding=constantes.redondeo_ley_comercial,
+        valorizar_volado=valorizar_volado,
     )
     oz_tc_comercial = max(
         Decimal("0"),
@@ -482,7 +484,7 @@ def _calcular_lote(
     # ── Auto-set volado + regla: volado → ley comercial = 0 ──────────────────
     if not lote.volado and oz_tc_comercial < constantes.umbral_volado_oz_tc:
         lote.volado = True  # se persiste al commit de crear_liquidacion
-    if lote.volado:
+    if lote.volado and not valorizar_volado:
         oz_tc_comercial = Decimal("0")
 
     # ── Ley Minero ────────────────────────────────────────────────────────────
@@ -666,6 +668,7 @@ def _calcular_lote(
             and lote.sesion.provacop.proveedor.razon_social
             else (lote.sesion.razon_social if lote.sesion and lote.sesion.razon_social else "—")
         ),
+        "volado": lote.volado,
         "fecha_recepcion": fecha_rec,
         "tmh": tmh,
         "pct_humedad": humedad,
@@ -786,6 +789,7 @@ def preview_liquidacion(
             gasto_acopio_override=item.gasto_acopio_override,
             gasto_consumo_override=item.gasto_consumo_override,
             spot_ag_usd_override=item.spot_ag_usd_override,
+            valorizar_volado=item.valorizar_volado,
         )
 
         if alertas:
@@ -883,6 +887,7 @@ def crear_liquidacion(
             gasto_acopio_override=item.gasto_acopio_override,
             gasto_consumo_override=item.gasto_consumo_override,
             spot_ag_usd_override=item.spot_ag_usd_override,
+            valorizar_volado=item.valorizar_volado,
         )
 
         if any(a.critico for a in alertas):
@@ -1122,6 +1127,7 @@ def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
         spot_ag_usd=ll.spot_ag_snapshot,
         valor_ag_usd=ll.valor_ag_usd,
         aplica_ag=bool(ll.valor_ag_usd and ll.valor_ag_usd > 0),
+        volado=bool(ll.lote.volado) if ll.lote else False,
     )
 
 

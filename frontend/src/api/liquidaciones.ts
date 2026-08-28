@@ -11,6 +11,7 @@ export interface LotePreviewInput {
     gasto_consumo_override?: number | null
     spot_usd_override?: number | null
     spot_ag_usd_override?: number | null
+    valorizar_volado?: boolean
 }
 
 export interface LiquidacionPreviewRequest {
@@ -178,6 +179,7 @@ export interface EditOverrides {
     rec_liq: Record<string, number | null>
     spot_usd: Record<string, number | null>
     spot_ag_usd: Record<string, number | null>
+    valorizar_volado: Record<string, boolean>
 }
 
 // ── Spot Histórico ─────────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ class LotePreviewInput(BaseModel):
     gasto_consumo_override: Decimal | None = None
     spot_usd_override: Decimal | None = None
     spot_ag_usd_override: Decimal | None = None
+    valorizar_volado: bool = False
 
 
 class LiquidacionPreviewRequest(BaseModel):
@@ -131,6 +132,7 @@ class LoteFinancieroOut(BaseModel):
     # Spot histórico por fecha de recepción
     fecha_spot_efectiva: date | None = None  # fecha del LBMA Fix usado
     spot_desde_historico: bool = False  # True si vino de spot_historico, False si fue fallback
+    volado: bool = False
 
     model_config = {"from_attributes": True}
 

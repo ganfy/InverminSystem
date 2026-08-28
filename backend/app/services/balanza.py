@@ -365,7 +365,6 @@ def agregar_lote(
         lote_id=lote.id,
         peso_inicial=p.peso_inicial,
         peso_final=p.peso_final,
-        peso_neto=p.peso_inicial - p.peso_final,
         sacos=p.sacos,
         granel=p.granel,
         numero_ticket=None,
