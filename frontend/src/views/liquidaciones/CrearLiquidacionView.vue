@@ -714,9 +714,15 @@ async function recalcularConOverrides() {
     if (isNaN(n)) return '-'
     return n.toString()
   }
-  function fmtDate(s: string | null) {
+  function fmtDate(s: string | null | undefined) {
     if (!s) return '-'
-    return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    if (s.length === 10 && s.includes('-')) {
+      const parts = s.split('-')
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    }
+    const d = new Date(s)
+    if (isNaN(d.getTime())) return s
+    return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
   onMounted(async () => {

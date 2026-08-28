@@ -1447,10 +1447,10 @@ async function recargarLeyComercial() {
   }
 }
 
-//actualizar value de ley cabeza con ley comercial
+// Actualizar value de ley cabeza con ley planta (sin factores comerciales)
 watch(leyComercialCalc, (nuevaLey) => {
-  if (nuevaLey?.ley_comercial != null) {
-    ley_cabeza.value = nuevaLey.ley_comercial
+  if (nuevaLey?.ley_planta != null) {
+    ley_cabeza.value = nuevaLey.ley_planta
   }
 })
 
