@@ -122,7 +122,7 @@
                   <th>BONO</th>
                   <th>FACTOR</th>
                   <th>PRECIO/TMS</th>
-                  <th>FINO OZ</th>
+
                   <!-- Columnas Ag (opcionales) -->
                   <th v-if="hayAg" class="col-ag">Ag Gr/TM</th>
                   <th v-if="hayAg" class="col-ag">Ag Oz/TC</th>
@@ -132,7 +132,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="lote in store.detalle.lotes" :key="lote.ip" class="tabla-row">
+                <template v-for="lote in store.detalle.lotes" :key="lote.ip">
+                <tr class="tabla-row" @click="toggleProfit(lote.ip)" style="cursor:pointer" title="Clic para ver detalle de Profit">
                   <td>
                     <span class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</span>
                     <span v-if="lote.usa_dirimencia" class="badge-dirimencia" title="Usó dirimencia">D</span>
@@ -154,7 +155,7 @@
                   <td class="td-mono td-right td-muted">{{ lote.bono ? '$' + fmtNum(lote.bono, 2) : '-' }}</td>
                   <td class="td-mono td-right td-muted">{{ fmtNum(lote.factor, 4) }}</td>
                   <td class="td-mono td-right">${{ fmtNum(lote.precio_x_tms, 2) }}</td>
-                  <td class="td-mono td-right td-muted">{{ fmtNum(lote.fino_recuperable, 4) }}</td>
+
                   <!-- Ag (opcionales) -->
                   <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_gr_tm, 2) }}</td>
                   <td v-if="hayAg" class="td-mono td-right col-ag">{{ fmtNum(lote.ley_ag_oz_tc, 4) }}</td>
@@ -164,13 +165,76 @@
                     <button
                       class="btn-icon"
                       title="Editar parámetros"
-                      @click="abrirEditParams(lote)"
+                      @click.stop="abrirEditParams(lote)"
                       :disabled="store.detalle?.estado === 'PAGADA'"
                     >
                       <Pencil :size="14" />
                     </button>
                   </td>
                                   </tr>
+                  <!-- Fila Desplegable de Profit -->
+                  <tr v-if="expandedLots.includes(lote.ip)" class="fila-profit">
+                    <td :colspan="hayAg ? 21 : 18" style="padding: 0;">
+                      <div class="profit-container">
+                        <div class="profit-header">DESGLOSE DE PROFIT</div>
+                        <div class="profit-grid">
+                          <div class="profit-item">
+                            <span class="p-label">BRUTO (Au)</span>
+                            <span class="p-val font-mono">${{ fmtNum(Number(lote.precio_x_tms) * Number(lote.tms), 2) }}</span>
+                          </div>
+                          <div class="profit-item" v-if="hayAg">
+                            <span class="p-label">BRUTO (Ag)</span>
+                            <span class="p-val font-mono">${{ fmtNum(lote.valor_ag_usd, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">BONO</span>
+                            <span class="p-val font-mono text-success">+${{ fmtNum(lote.bono, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">RIESGO</span>
+                            <span class="p-val font-mono text-danger">-${{ fmtNum(lote.riesgo, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">MAQUILA</span>
+                            <span class="p-val font-mono text-danger">-${{ fmtNum(lote.maquila, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">INSUMOS</span>
+                            <span class="p-val font-mono text-danger">-${{ fmtNum(lote.insumos_total, 2) }}</span>
+                          </div>
+                          <div class="profit-item profit-net">
+                            <span class="p-label">TOTAL PAGO AL MINERO</span>
+                            <span class="p-val font-mono text-gold">${{ fmtNum(Number(lote.total_usd) + (hayAg ? Number(lote.valor_ag_usd) : 0), 2) }}</span>
+                          </div>
+                        </div>
+
+                        <div class="profit-header" style="margin-top: 1rem;">PROFITS OPERATIVOS</div>
+                        <div class="profit-grid" style="margin-top: 0.5rem;">
+                          <div class="profit-item">
+                            <span class="p-label">MAQUILA</span>
+                            <span class="p-val font-mono" :class="lote.profit_maquila >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_maquila >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_maquila, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">RECUPERACIÓN</span>
+                            <span class="p-val font-mono" :class="lote.profit_rec >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_rec >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_rec, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">CONSUMO</span>
+                            <span class="p-val font-mono" :class="lote.profit_consumo >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_consumo >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_consumo, 2) }}</span>
+                          </div>
+                          <div class="profit-item">
+                            <span class="p-label">LEYES</span>
+                            <span class="p-val font-mono" :class="lote.profit_leyes >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_leyes >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_leyes, 2) }}</span>
+                          </div>
+                          <div class="profit-item profit-net">
+                            <span class="p-label">TOTAL OPERATIVO</span>
+                            <span class="p-val font-mono text-gold">${{ fmtNum(lote.profit_total, 2) }}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
                 <!-- Fila total -->
                 <tr class="fila-total">
                   <td colspan="4" style="text-align:right;padding-right:1rem">TOTALES</td>
@@ -369,6 +433,15 @@
   const descargandoPdf = ref(false)
   const modalEstado    = ref(false)
   const nuevoEstado    = ref('')
+
+  const expandedLots = ref<string[]>([])
+  function toggleProfit(ip: string) {
+    if (expandedLots.value.includes(ip)) {
+      expandedLots.value = expandedLots.value.filter(i => i !== ip)
+    } else {
+      expandedLots.value.push(ip)
+    }
+  }
 
   const id = Number(route.params.id)
 
@@ -599,6 +672,51 @@ async function guardarEditParams() {
   width:15px; height:15px; background:var(--color-gold); color:var(--color-bg);
   border-radius:50%; font-size:0.6rem; font-weight:700; margin-left:0.3rem; vertical-align:middle;
 }
+
+/* Profit desplegable */
+.fila-profit > td {
+  background: rgba(179, 144, 40, 0.04) !important;
+  border-bottom: 2px solid var(--color-gold) !important;
+}
+.profit-container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+.profit-header {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.15em;
+  color: var(--color-gold);
+  margin-bottom: 1rem;
+}
+.profit-grid {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+}
+.profit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.profit-item .p-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.profit-item .p-val {
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.profit-net {
+  margin-left: auto;
+  border-left: 1px solid var(--color-border);
+  padding-left: 2rem;
+}
+.profit-net .p-val { font-size: var(--text-lg); }
+.text-success { color: #4ade80 !important; }
+.text-danger { color: #f87171 !important; }
 
 /* Notas */
 .notas-card { background:rgba(179,144,40,0.03); }
