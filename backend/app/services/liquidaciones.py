@@ -153,9 +153,10 @@ def _datos_muestreo_promedio(db: Session, lote_id: int) -> tuple[Decimal, Decima
 
         humedad_dec = Decimal(str(h2o_porc))
 
-        tmh = float(pesaje.peso_neto)
-        tms_val = round(tmh * (1 - (h2o_porc / 100)), 3)
-        tms_dec = Decimal(str(tms_val))
+        tmh_dec = Decimal(str(pesaje.peso_neto))
+        tms_dec = tmh_dec * (Decimal("1") - (humedad_dec / Decimal("100")))
+        tms_dec = tms_dec.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+
         return (humedad_dec, tms_dec)
 
     return None

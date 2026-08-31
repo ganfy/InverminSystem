@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from app.models.enums import EstadoSesion
 from app.models.models import (
@@ -22,8 +22,9 @@ def calcular_humedad(peso_humedo: Decimal, peso_seco: Decimal) -> Decimal:
 
 
 def calcular_tms(peso_neto: Decimal, porcentaje_humedad: Decimal) -> Decimal:
-    """Calcula Toneladas Métricas Secas (TMS)."""
-    return peso_neto * (Decimal("1") - (porcentaje_humedad / Decimal("100.00")))
+    """Calcula Toneladas Métricas Secas (TMS) redondeado a 3 decimales (hacia arriba, igual que Excel)."""
+    tms = peso_neto * (Decimal("1") - (porcentaje_humedad / Decimal("100.00")))
+    return tms.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
 
 
 def registrar_muestreo(

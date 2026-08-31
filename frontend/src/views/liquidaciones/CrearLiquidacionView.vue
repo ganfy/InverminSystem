@@ -676,6 +676,7 @@ async function recalcularConOverrides() {
         gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
         spot_usd_override: editOv.value.spot_usd[ip] ?? null,
         spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
+        valorizar_volado: editOv.value.valorizar_volado[ip] ?? false,
       })),
       fecha_liquidacion: fechaLiq.value || null,
     })
@@ -701,6 +702,7 @@ async function recalcularConOverrides() {
         gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
         spot_usd_override: editOv.value.spot_usd[ip] ?? null,
         spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
+        valorizar_volado: editOv.value.valorizar_volado[ip] ?? false,
       })),
       fecha_liquidacion: fechaLiq.value || null,
       como_borrador: true,

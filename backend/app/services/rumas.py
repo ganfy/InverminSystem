@@ -111,7 +111,12 @@ def _calcular_tms_lote(lote: Lote, db: Session) -> float | None:
     if ph <= 0:
         return None
     h2o = ((ph - float(muestreo.peso_seco)) / ph) * 100
-    return round(tmh * (1 - h2o / 100), 3)
+    from decimal import ROUND_HALF_UP, Decimal
+
+    h2o_dec = Decimal(str(h2o))
+    tmh_dec = Decimal(str(tmh))
+    tms_dec = tmh_dec * (Decimal("1") - (h2o_dec / Decimal("100")))
+    return float(tms_dec.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
 
 
 def _calcular_tmh_lote(lote: Lote, db: Session) -> float:
