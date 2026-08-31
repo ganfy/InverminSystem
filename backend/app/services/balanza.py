@@ -48,7 +48,7 @@ ESTADOS_LOTE_ELIMINABLES = frozenset(
 
 
 def _ahora() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _peso_neto(peso_inicial: Decimal, peso_final: Decimal) -> Decimal:
