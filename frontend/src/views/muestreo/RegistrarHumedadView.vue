@@ -162,7 +162,8 @@ const humedadCalculadaRaw = computed(() => {
   ensayosValidos.value.forEach(seco => {
     totalHumedad += store.calcularHumedad(pesoHumedo.value!, seco)
   })
-  return totalHumedad / ensayosValidos.value.length
+  const avg = totalHumedad / ensayosValidos.value.length
+  return Math.round((avg + Number.EPSILON) * 100) / 100
 })
 
 const esAjustadoPorParametro = computed(() => {

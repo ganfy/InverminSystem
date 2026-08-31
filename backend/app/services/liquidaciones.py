@@ -128,17 +128,21 @@ def _datos_muestreo_promedio(db: Session, lote_id: int) -> tuple[Decimal, Decima
     if not pesaje or not pesaje.peso_neto:
         return None
 
-    total_h2o = 0.0
+    total_h2o = Decimal("0")
     valid_count = 0
     for m in muestreos:
-        ph = float(m.peso_humedo) if m.peso_humedo else 0.0
-        ps = float(m.peso_seco) if m.peso_seco else 0.0
+        ph = Decimal(str(m.peso_humedo)) if m.peso_humedo else Decimal("0")
+        ps = Decimal(str(m.peso_seco)) if m.peso_seco else Decimal("0")
         if ph > 0 and ps > 0 and ps < ph:
-            total_h2o += ((ph - ps) / ph) * 100
+            val = (((ph - ps) / ph) * Decimal("100")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            total_h2o += val
             valid_count += 1
 
     if valid_count > 0:
-        h2o_porc = round(total_h2o / valid_count, 2)
+        avg_h2o = total_h2o / Decimal(str(valid_count))
+        h2o_porc = float(avg_h2o.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
         lote_obj = db.query(Lote).filter(Lote.id == lote_id).first()
         if (
             lote_obj

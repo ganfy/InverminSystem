@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 from app.models.enums import EstadoLote, TipoAnalisis
 from app.models.models import (
@@ -238,18 +239,25 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         muestreos = db.query(Muestreo).filter(Muestreo.lote_id == lote.id).all()
 
         if muestreos:
-            total_h2o = 0.0
+            total_h2o = Decimal("0")
             valid_count = 0
             for m in muestreos:
-                ph = float(m.peso_humedo) if m.peso_humedo else 0.0
-                ps = float(m.peso_seco) if m.peso_seco else 0.0
+                ph = Decimal(str(m.peso_humedo)) if m.peso_humedo else Decimal("0")
+                ps = Decimal(str(m.peso_seco)) if m.peso_seco else Decimal("0")
                 if ph > 0 and ps > 0 and ps < ph:
-                    total_h2o += ((ph - ps) / ph) * 100
+                    val = (((ph - ps) / ph) * Decimal("100")).quantize(
+                        Decimal("0.01"), rounding=ROUND_HALF_UP
+                    )
+                    total_h2o += val
                     valid_count += 1
 
             if valid_count > 0:
-                h2o_porc = round(total_h2o / valid_count, 2)
-                tms = round(tmh * (1 - (h2o_porc / 100)), 3)
+                avg_h2o = total_h2o / Decimal(str(valid_count))
+                h2o_porc = float(avg_h2o.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                tms_dec = Decimal(str(tmh)) * (
+                    Decimal("1") - (Decimal(str(h2o_porc)) / Decimal("100"))
+                )
+                tms = float(tms_dec.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
                 kpis.tms_stock += tms
 
         # tiene_humedad DEBE evaluarse después del bloque de muestreo
