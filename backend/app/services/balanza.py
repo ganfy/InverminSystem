@@ -522,6 +522,7 @@ def editar_lote(
     lote_id: int,
     datos: LoteEditar,
     usuario_id: int,
+    tiene_edit_params: bool = True,
 ) -> LoteDetalle:
     """
     Admin: edita tipo_material y/o datos de pesaje de un lote existente.
@@ -543,6 +544,22 @@ def editar_lote(
         raise ValueError("No se puede editar un lote eliminado")
 
     pesaje_actual = lote.pesajes[0] if lote.pesajes else None
+
+    # VALIDACIÓN RBAC: Si no tiene permisos completos, solo puede editar dentro de 1 hora
+    if not tiene_edit_params:
+        from datetime import timedelta
+
+        # Validar si tiene creado_en y si ya expiró el tiempo
+        if lote.creado_en and _ahora() > lote.creado_en + timedelta(hours=1):
+            raise ValueError("El tiempo permitido para editar este lote (1 hora) ha expirado.")
+
+        if pesaje_actual:
+            if datos.peso_inicial is not None and datos.peso_inicial != pesaje_actual.peso_inicial:
+                raise ValueError("No tiene permisos para modificar el peso bruto.")
+            if datos.peso_final is not None and datos.peso_final != pesaje_actual.peso_final:
+                raise ValueError("No tiene permisos para modificar la tara.")
+            if datos.es_manual is not None and datos.es_manual != pesaje_actual.es_manual:
+                raise ValueError("No tiene permisos para modificar la marca de pesaje manual.")
 
     # VALIDACIÓN: Bloquear edición de datos sensibles si ya pasó a muestreo o tiene pruebas
     # Solo bloquear si REALMENTE se están alterando los pesos o el material

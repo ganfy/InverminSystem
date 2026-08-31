@@ -243,6 +243,14 @@ export interface TrazabilidadAuditoria {
     cambio_estado: AccionRegistro
 }
 
+export interface TrazabilidadMapeoCIP {
+    id: number
+    codigo_cip: string
+    laboratorio: string | null
+    fecha_envio: string | null
+    tipo_muestra: string | null
+}
+
 export interface TrazabilidadLoteResponse {
     ip: string
     estado: string
@@ -262,4 +270,5 @@ export interface TrazabilidadLoteResponse {
     ruma: TrazabilidadRuma | null
     liquidacion: TrazabilidadLiquidacion | null
     auditoria: TrazabilidadAuditoria
+    mapeos_cip: TrazabilidadMapeoCIP[]
 }

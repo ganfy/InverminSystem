@@ -146,6 +146,7 @@ class LoteResumen(BaseModel):
     peso_neto: Decimal | None = None
     fecha_pesaje: datetime | None = None
     eliminado: bool
+    creado_en: datetime | None = None
 
     model_config = {"from_attributes": True}
 

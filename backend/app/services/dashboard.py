@@ -942,6 +942,7 @@ from app.schemas.dashboard import (  # noqa: E402
     TrazabilidadAuditoria,
     TrazabilidadLiquidacion,
     TrazabilidadLoteResponse,
+    TrazabilidadMapeoCIP,
     TrazabilidadMuestreo,
     TrazabilidadPesaje,
     TrazabilidadPrueba,
@@ -998,6 +999,8 @@ def obtener_trazabilidad_lote(db: Session, ip: str) -> TrazabilidadLoteResponse:
             selectinload(Lote.analisis_ley)
             .joinedload(AnalisisLey.descartador)
             .joinedload(Usuario.rol),
+            # Mapeo CIP
+            selectinload(Lote.mapeo_cip),
             # Análisis recuperación + descartador
             selectinload(Lote.analisis_recuperacion)
             .joinedload(AnalisisRecuperacion.descartador)
@@ -1259,6 +1262,18 @@ def obtener_trazabilidad_lote(db: Session, ip: str) -> TrazabilidadLoteResponse:
         ),
     )
 
+    # ── Mapeos CIP ──
+    mapeos_cip_out = [
+        TrazabilidadMapeoCIP(
+            id=m.id,
+            codigo_cip=m.codigo_cip,
+            laboratorio=m.laboratorio,
+            fecha_envio=m.fecha_envio,
+            tipo_muestra=m.tipo_muestra,
+        )
+        for m in sorted(lote.mapeo_cip, key=lambda x: x.id)
+    ]
+
     return TrazabilidadLoteResponse(
         ip=lote.ip,
         estado=lote.estado or "RECEPCIONADO",
@@ -1278,4 +1293,5 @@ def obtener_trazabilidad_lote(db: Session, ip: str) -> TrazabilidadLoteResponse:
         ruma=ruma_out,
         liquidacion=liquidacion_out,
         auditoria=auditoria_out,
+        mapeos_cip=mapeos_cip_out,
     )

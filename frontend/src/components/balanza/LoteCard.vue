@@ -6,14 +6,14 @@
         <span v-else class="lote-ip">{{ lote.ip }} | Lote {{ lote.numero_lote }}</span>
         <div class="lote-acciones">
           <button
-            v-if="isAdmin || lote.id === -1"
+            v-if="canEdit || lote.id === -1"
             class="btn-icon btn-secondary"
             title="Editar lote"
             :disabled="!isOnline && lote.id !== -1"
             @click="$emit('editar', lote)"
           ><Pencil :size="14" /></button>
           <button
-            v-if="isAdmin || lote.id === -1"
+            v-if="canEdit || lote.id === -1"
             class="btn-icon btn-icon-danger btn-secondary"
             title="Eliminar lote"
             :disabled="!isOnline && lote.id !== -1"
@@ -74,7 +74,7 @@
 
   defineProps<{
     lote: LoteDetalle
-    isAdmin: boolean
+    canEdit: boolean
     canRegularizar: boolean
     isOnline: boolean
     modoOtro?: boolean  // true para tipo 'Otro': oculta IP/Lote, muestra observaciones

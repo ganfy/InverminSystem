@@ -10,7 +10,7 @@ Permisos (RBAC del documento):
 """
 
 from app.core.database import get_db
-from app.core.deps import check_permiso, get_current_user
+from app.core.deps import check_any_permiso, check_permiso, get_current_user, tiene_permiso
 from app.models.models import Usuario
 from app.schemas.balanza import (
     DatosExtraidos,
@@ -255,15 +255,19 @@ def editar_lote(
     sesion_id: int,
     lote_id: int,
     datos: LoteEditar,
-    current_user=Depends(check_permiso("BALANZA", "EDIT_PARAMS")),
+    current_user=Depends(check_any_permiso([("BALANZA", "EDIT_PARAMS"), ("BALANZA", "UPDATE")])),
     db: Session = Depends(get_db),
 ):
     """
-    Admin: edita tipo_material y/o datos de pesaje de un lote.
-    peso_neto se recalcula automáticamente (columna GENERATED en PG).
+    Edita tipo_material y/o datos de pesaje de un lote.
+    Los roles con EDIT_PARAMS tienen control total. Los roles con solo UPDATE
+    tienen restricciones de tiempo (1h) y no pueden modificar pesos.
     """
+    tiene_edit = tiene_permiso(current_user, "BALANZA", "EDIT_PARAMS", db)
     try:
-        lote = svc.editar_lote(db, sesion_id, lote_id, datos, usuario_id=current_user.id)
+        lote = svc.editar_lote(
+            db, sesion_id, lote_id, datos, usuario_id=current_user.id, tiene_edit_params=tiene_edit
+        )
         db.commit()
         return lote
     except ValueError as e:

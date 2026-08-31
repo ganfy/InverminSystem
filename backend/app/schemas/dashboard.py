@@ -237,6 +237,14 @@ class TrazabilidadAuditoria(BaseModel):
     cambio_estado: AccionRegistro
 
 
+class TrazabilidadMapeoCIP(BaseModel):
+    id: int
+    codigo_cip: str
+    laboratorio: str | None
+    fecha_envio: date | None
+    tipo_muestra: str | None
+
+
 class TrazabilidadLoteResponse(BaseModel):
     ip: str
     estado: str
@@ -256,3 +264,4 @@ class TrazabilidadLoteResponse(BaseModel):
     ruma: TrazabilidadRuma | None
     liquidacion: TrazabilidadLiquidacion | None
     auditoria: TrazabilidadAuditoria
+    mapeos_cip: list[TrazabilidadMapeoCIP] = []

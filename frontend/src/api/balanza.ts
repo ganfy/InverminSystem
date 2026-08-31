@@ -70,6 +70,7 @@ export interface LoteDetalle {
   fecha_habilitacion: string | null
   pesaje: PesajeDetalle | null
   local_only?: boolean  // Indica que el lote solo existe localmente (offline) y no tiene ID/IP asignados por el servidor
+  creado_en?: string | null
 }
 
 export interface SesionCrear {

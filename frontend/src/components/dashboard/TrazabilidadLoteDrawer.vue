@@ -471,6 +471,28 @@
                       </span>
                     </div>
                   </div>
+                  
+                  <!-- Mapeos CIP -->
+                  <template v-if="data.mapeos_cip && data.mapeos_cip.length">
+                    <div class="hist-header" style="margin-top: 1.5rem;">
+                      <span>Etiquetado CIP ({{ data.mapeos_cip.length }})</span>
+                    </div>
+                    <div
+                      v-for="cip in data.mapeos_cip"
+                      :key="cip.id"
+                      class="sub-card sub-card--dim"
+                      style="margin-bottom: 0.5rem"
+                    >
+                      <div class="sub-header">
+                        <span class="pill pill-tipo">{{ cip.tipo_muestra || '—' }}</span>
+                        <b class="gold mono">{{ cip.codigo_cip }}</b>
+                      </div>
+                      <div class="g2">
+                        <Field label="Laboratorio" :val="cip.laboratorio || '—'" />
+                        <Field label="Fecha envío" :val="cip.fecha_envio ? fmtDt(cip.fecha_envio) : '—'" mono />
+                      </div>
+                    </div>
+                  </template>
                 </template>
                 <div v-else class="empty-state-row">
                   <AlertCircle :size="12" />

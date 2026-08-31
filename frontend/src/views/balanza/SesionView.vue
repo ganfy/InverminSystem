@@ -252,7 +252,7 @@
           v-for="lote in sesion?.lotes.filter(l => !l.eliminado)"
           :key="lote.ip"
           :lote="lote"
-          :is-admin="authStore.puede('BALANZA', 'EDIT_PARAMS')"
+          :can-edit="puedeEditarLote(lote)"
           :can-regularizar="authStore.puede('BALANZA', 'REGULARIZAR')"
           :is-online="online"
           :modo-otro="lote.tipo_material === 'Otro'"
@@ -642,6 +642,17 @@ async function ejecutarRegularizar(todos: boolean) {
   if (success) {
     regularizarModal.visible = false
   }
+}
+
+function puedeEditarLote(lote: LoteDetalle): boolean {
+  if (authStore.puede('BALANZA', 'EDIT_PARAMS')) return true
+  if (!authStore.puede('BALANZA', 'UPDATE')) return false
+  
+  // Para roles que solo tienen UPDATE (ej. OperadorBalanza)
+  if (!lote.creado_en) return true // si no tiene fecha aún (creado offline), permitimos
+  const creado = new Date(lote.creado_en)
+  const limite = new Date(creado.getTime() + 60 * 60 * 1000) // 1 hora extra
+  return new Date() <= limite
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────

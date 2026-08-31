@@ -34,7 +34,30 @@
     </section>
 
     <section class="card">
-      <h2 class="card-titulo">CARGAR CERTIFICADO</h2>
+      <h2 class="card-titulo">PASO 1 - LABORATORIO</h2>
+      <p style="font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:1rem">
+        Ingrese el nombre del laboratorio que emitió el certificado antes de extraer los datos.
+      </p>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">NOMBRE DEL LABORATORIO:</label>
+          <input
+            class="field-input"
+            v-model="laboratorio"
+            placeholder="Ej: Minares South S.R.L."
+            list="labs-sugeridos"
+          />
+          <datalist id="labs-sugeridos">
+            <option value="Minares South S.R.L." />
+            <option value="El Dorado - Invermin Paititi" />
+            <option value="Otro" />
+          </datalist>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-titulo">PASO 2 - CARGAR CERTIFICADO</h2>
       <div
         class="upload-zone"
         :class="{ 'upload-zone--over': dragOver, 'upload-zone--done': !!archivo }"
@@ -52,17 +75,33 @@
       </div>
       <input ref="fileInput" type="file" accept="application/pdf" style="display:none" @change="onFileChange" />
       <div style="display:flex;justify-content:center;margin-top:1rem">
-        <button class="btn-primary" @click="extraer" :disabled="!archivo || extrayendo" style="min-width:160px">
+        <button class="btn-primary" @click="extraer" :disabled="!archivo || !laboratorio || extrayendo" style="min-width:160px">
           <span v-if="extrayendo" class="spinner" style="margin-right:0.4rem"></span>
           {{ extrayendo ? 'Extrayendo...' : 'Extraer datos' }}
         </button>
       </div>
+      <p v-if="!laboratorio && archivo" class="error-msg" style="margin-top:0.5rem;text-align:center">
+        Ingrese el nombre del laboratorio antes de extraer
+      </p>
       <p v-if="errExtraccion" class="error-msg" style="margin-top:0.75rem;text-align:center">{{ errExtraccion }}</p>
+
+      <div style="text-align:center;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--color-border)">
+        <p style="font-size:0.78rem;color:var(--color-text-faint);margin-bottom:0.5rem">
+          ¿No tiene el certificado disponible o el OCR falla?
+        </p>
+        <button
+          class="btn-secondary"
+          style="font-size:0.82rem"
+          @click="saltarOcr"
+        >
+          Ingresar datos manualmente →
+        </button>
+      </div>
     </section>
 
     <template v-if="fase === 'form'">
       <section class="card">
-        <h2 class="card-titulo">VERIFICAR DATA EXTRAÍDA</h2>
+        <h2 class="card-titulo">PASO 3 - VERIFICAR DATA EXTRAÍDA</h2>
 
         <div v-if="errCip" class="alerta-warning" style="margin-bottom:1rem"><AlertTriangle :size="16" /> {{ errCip }}</div>
 
@@ -71,10 +110,6 @@
             <label class="field-label">CIP DEL CERTIFICADO:</label>
             <input class="field-input" v-model="cipExtraido"
               :class="{ 'field-error': errCip }" @input="validarCip" />
-          </div>
-          <div class="field">
-            <label class="field-label">LABORATORIO:</label>
-            <input class="field-input" v-model="form.laboratorio" />
           </div>
           <div class="field">
             <label class="field-label">N° INFORME:</label>
@@ -145,6 +180,7 @@ const archivo     = ref<File | null>(null)
 const fileInput   = ref<HTMLInputElement | null>(null)
 const loteIp = ref<string>((route.query.ip as string) ?? '')
 
+const laboratorio   = ref('')
 const cipExtraido   = ref('')
 const nInforme      = ref('')
 const material      = ref('Au')
@@ -190,12 +226,12 @@ function onDrop(e: DragEvent) {
 }
 
 async function extraer() {
-  if (!archivo.value) return
+  if (!archivo.value || !laboratorio.value) return
   extrayendo.value = true
   errExtraccion.value = ''
   try {
     const datos = await laboratorioApi.extraerCertificadoRecuperacion(archivo.value)
-    if (datos.laboratorio) form.value.laboratorio = datos.laboratorio
+    form.value.laboratorio = laboratorio.value
     if (datos.fecha_analisis) form.value.fecha_analisis = datos.fecha_analisis
     if (datos.n_informe) nInforme.value = datos.n_informe
     if (datos.ley_cabeza != null) form.value.ley_cabeza = datos.ley_cabeza
@@ -208,8 +244,17 @@ async function extraer() {
     errExtraccion.value = 'No se pudo extraer datos del certificado. Complete los campos manualmente.'
     fase.value = 'form'
   } finally {
+    form.value.laboratorio = laboratorio.value
     extrayendo.value = false
   }
+}
+
+function saltarOcr() {
+  form.value.origen_datos  = 'manual'
+  form.value.laboratorio   = laboratorio.value
+  archivo.value            = null
+  cipExtraido.value        = cipActual
+  fase.value               = 'form'
 }
 
 async function guardar() {
