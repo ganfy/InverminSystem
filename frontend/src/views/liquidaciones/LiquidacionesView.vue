@@ -126,7 +126,6 @@
                 <th>PROVEEDOR</th>
                 <th>ACOPIADOR</th>
                 <th class="col-r">LOTES</th>
-                <th class="col-r">SPOT</th>
                 <th class="col-r">TOTAL USD</th>
                 <th>ESTADO</th>
                 <th>FECHA</th>
@@ -145,7 +144,6 @@
                 <td class="td-truncate">{{ liq.proveedor_razon_social }}</td>
                 <td class="td-muted td-truncate">{{ liq.acopiador_nombre }}</td>
                 <td class="col-r td-mono td-muted">{{ liq.count_lotes }}</td>
-                <td class="col-r td-mono td-muted">${{ fmtNum(liq.spot_usd, 2) }}</td>
                 <td class="col-r td-mono td-bold">${{ fmtNum(liq.total_usd, 2) }}</td>
                 <td><span class="badge-estado" :class="badgeClass(liq.estado)">{{ liq.estado }}</span></td>
                 <td class="td-fecha td-muted">{{ fmtDate(liq.fecha_creacion) }}</td>

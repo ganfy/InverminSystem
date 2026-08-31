@@ -356,7 +356,6 @@
               <th>PROVEEDOR</th>
               <th>ACOPIADOR</th>
               <th class="align-center">LOTES</th>
-              <th class="align-right">SPOT USD</th>
               <th class="align-right">TOTAL USD</th>
               <th class="align-center">ESTADO</th>
               <th>FECHA</th>
@@ -382,7 +381,6 @@
               <td class="align-center">
                 <span class="badge-count-sm">{{ liq.count_lotes }}</span>
               </td>
-              <td class="align-right td-mono">${{ fmtNum(liq.spot_usd) }}</td>
               <td class="align-right td-mono" style="color:var(--color-gold);font-weight:700">
                 ${{ fmtNum(liq.total_usd) }}
               </td>

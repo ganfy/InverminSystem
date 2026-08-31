@@ -75,10 +75,7 @@
               <span class="dato-lbl">ACOPIADOR</span>
               <span class="dato-val">{{ store.detalle.acopiador_nombre }}</span>
             </div>
-            <div class="dato-col">
-              <span class="dato-lbl">PRECIO ORO SPOT</span>
-              <span class="dato-val mono">${{ fmtNum(store.detalle.spot_usd, 2) }} /Oz</span>
-            </div>
+
             <div class="dato-col">
               <span class="dato-lbl">LOTES</span>
               <span class="dato-val">{{ store.detalle.count_lotes }}</span>
