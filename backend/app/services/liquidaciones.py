@@ -26,6 +26,7 @@ import tempfile
 from datetime import date, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import msoffcrypto
 
@@ -285,7 +286,11 @@ def _fecha_recepcion(lote: Lote) -> date | None:
     """
     if lote.pesajes:
         dt = lote.pesajes[0].creado_en
-        return dt.date() if isinstance(dt, datetime) else dt
+        if isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+            return dt.astimezone(ZoneInfo("America/Lima")).date()
+        return dt
     return None
 
 
