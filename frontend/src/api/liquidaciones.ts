@@ -71,6 +71,12 @@ export interface LoteFinancieroOut {
     fino_recuperable: number
     usa_dirimencia: boolean
     alertas: AlertaLote[]
+    profit_maquila?: number | null
+    profit_rec?: number | null
+    profit_consumo?: number | null
+    profit_leyes?: number | null
+    profit_total?: number | null
+    volado?: boolean
     // Plata (Ag) — opcionales
     ley_ag_gr_tm?: number | null
     ley_ag_oz_tc?: number | null
@@ -179,7 +185,9 @@ export interface EditOverrides {
     rec_liq: Record<string, number | null>
     spot_usd: Record<string, number | null>
     spot_ag_usd: Record<string, number | null>
+    maquila: Record<string, number | null>
     valorizar_volado: Record<string, boolean>
+    usar_ley_cruda: Record<string, boolean>
 }
 
 // ── Spot Histórico ─────────────────────────────────────────────────────────────

@@ -523,6 +523,9 @@ async def extraer_certificado_recuperacion(
 def preview_ley_comercial(
     ip: str,
     excluidos: str | None = Query(None, description="IDs excluidos separados por comas"),
+    usar_ley_cruda: bool = Query(
+        False, description="Saltar parámetros comerciales al calcular ley comercial"
+    ),
     current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
@@ -553,11 +556,13 @@ def preview_ley_comercial(
             status_code=422, detail="Sin análisis de ley vigentes para calcular ley planta"
         )
 
-    try:
-        provacop = lote.sesion.provacop
-        params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
-    except AttributeError:
-        params = None
+    params = None
+    if not usar_ley_cruda:
+        try:
+            provacop = lote.sesion.provacop
+            params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
+        except AttributeError:
+            pass
 
     from app.services.config_calculo import get_constantes, get_quantize_decimal
 
@@ -573,6 +578,10 @@ def preview_ley_comercial(
         q_comercial=q_comercial,
         rounding=constantes.redondeo_ley_comercial,
     )
+
+    if usar_ley_cruda:
+        result["sin_parametros"] = False
+        result["detalle"] = "Cálculo de ley cruda (parámetros ignorados)"
 
     ley_solo_planta = svc._ley_solo_planta(db, lote.id, excluidos=excluidos_list)
     ley_externo = svc._ley_solo_externo(db, lote.id, excluidos=excluidos_list)
@@ -641,6 +650,7 @@ def ver_certificado_ley_comercial(
     ip: str,
     inline: bool = True,
     columnas: list[str] = Query(None),
+    usar_ley_cruda: bool = Query(False),
     current_user=Depends(check_permiso("LABORATORIO", "VIEW")),
     db: Session = Depends(get_db),
 ):
@@ -651,7 +661,9 @@ def ver_certificado_ley_comercial(
     from app.services import certificado_ley_pdf as cert_svc
 
     try:
-        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip, columnas=columnas)
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(
+            db, ip, columnas=columnas, usar_ley_cruda=usar_ley_cruda
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
@@ -670,12 +682,15 @@ def ver_certificado_ley_comercial(
 def guardar_certificado_ley(
     ip: str,
     columnas: list[str] = Query(None),
+    usar_ley_cruda: bool = Query(False),
     current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
     db: Session = Depends(get_db),
 ):
     """Genera y persiste el certificado de ley en storage. Retorna ruta relativa."""
     try:
-        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(db, ip, columnas=columnas)
+        pdf_bytes = cert_svc.generar_certificado_ley_comercial_pdf(
+            db, ip, columnas=columnas, usar_ley_cruda=usar_ley_cruda
+        )
         ruta = cert_svc._guardar_cert_storage(pdf_bytes, ip, "ley")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -687,10 +702,15 @@ def guardar_certificado_ley(
         # Recalcular ley_comercial para persistirla (misma lógica que el PDF)
         ley_planta = calcular_ley_planta(db, lote_obj.id)
         if ley_planta is not None:
-            try:
-                provacop = lote_obj.sesion.provacop
-                params = db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
-            except AttributeError:
+            if not usar_ley_cruda:
+                try:
+                    provacop = lote_obj.sesion.provacop
+                    params = (
+                        db.query(ParametrosComerciales).filter_by(provacop_id=provacop.id).first()
+                    )
+                except AttributeError:
+                    params = None
+            else:
                 params = None
             from app.services.config_calculo import get_constantes, get_quantize_decimal
 

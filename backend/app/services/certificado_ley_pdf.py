@@ -160,7 +160,7 @@ def _n_lq(lote_id: int, extra: str = "") -> str:
 
 
 def generar_certificado_ley_comercial_pdf(
-    db: Session, ip_lote: str, columnas: list[str] = None
+    db: Session, ip_lote: str, columnas: list[str] = None, usar_ley_cruda: bool = False
 ) -> bytes:
     """
     Genera el PDF de certificado de ley comercial (formato Paititi) para un lote.
@@ -246,7 +246,7 @@ def generar_certificado_ley_comercial_pdf(
     dec_com = int(constantes_pdf.decimales_ley_comercial)
     calc = calcular_ley_comercial(
         ley_planta,
-        params,
+        params if not usar_ley_cruda else None,
         q_comercial=q_com_pdf,
         rounding=constantes_pdf.redondeo_ley_comercial,
     )

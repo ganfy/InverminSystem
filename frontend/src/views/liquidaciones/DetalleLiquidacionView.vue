@@ -212,19 +212,19 @@
                         <div class="profit-grid" style="margin-top: 0.5rem;">
                           <div class="profit-item">
                             <span class="p-label">MAQUILA</span>
-                            <span class="p-val font-mono" :class="lote.profit_maquila >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_maquila >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_maquila, 2) }}</span>
+                            <span class="p-val font-mono" :class="(lote.profit_maquila ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_maquila ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_maquila, 2) }}</span>
                           </div>
                           <div class="profit-item">
                             <span class="p-label">RECUPERACIÓN</span>
-                            <span class="p-val font-mono" :class="lote.profit_rec >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_rec >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_rec, 2) }}</span>
+                            <span class="p-val font-mono" :class="(lote.profit_rec ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_rec ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_rec, 2) }}</span>
                           </div>
                           <div class="profit-item">
                             <span class="p-label">CONSUMO</span>
-                            <span class="p-val font-mono" :class="lote.profit_consumo >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_consumo >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_consumo, 2) }}</span>
+                            <span class="p-val font-mono" :class="(lote.profit_consumo ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_consumo ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_consumo, 2) }}</span>
                           </div>
                           <div class="profit-item">
                             <span class="p-label">LEYES</span>
-                            <span class="p-val font-mono" :class="lote.profit_leyes >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_leyes >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_leyes, 2) }}</span>
+                            <span class="p-val font-mono" :class="(lote.profit_leyes ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_leyes ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_leyes, 2) }}</span>
                           </div>
                           <div class="profit-item profit-net">
                             <span class="p-label">TOTAL OPERATIVO</span>

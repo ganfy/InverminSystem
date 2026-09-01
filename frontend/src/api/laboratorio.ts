@@ -240,8 +240,10 @@ export const laboratorioApi = {
         return data
     },
 
-    async getLeyComercial(ip: string, excluidos?: string): Promise<LeyComercialCalc> {
-        const params = excluidos ? { excluidos } : undefined
+    async getLeyComercial(ip: string, excluidos?: string, usarLeyCruda: boolean = false): Promise<LeyComercialCalc> {
+        const params: any = {}
+        if (excluidos) params.excluidos = excluidos
+        if (usarLeyCruda) params.usar_ley_cruda = true
         const { data } = await api.get(`/laboratorio/lotes/${ip}/ley-comercial`, { params })
         return data
     },
@@ -249,9 +251,9 @@ export const laboratorioApi = {
     // ── Certificado LEY ───────────────────────────────────────────────────────
 
     /** Abre el cert de ley en nueva pestaña para previsualizar */
-    async previewCertificadoLeyPdf(ip: string, columnas?: string[]): Promise<void> {
+    async previewCertificadoLeyPdf(ip: string, columnas?: string[], usarLeyCruda: boolean = false): Promise<void> {
         const response = await api.get(`/laboratorio/lotes/${ip}/certificado-pdf`, {
-            params: { inline: true, columnas },
+            params: { inline: true, columnas, usar_ley_cruda: usarLeyCruda ? true : undefined },
             responseType: 'blob',
         })
         const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
@@ -274,8 +276,10 @@ export const laboratorioApi = {
     },
 
     /** Genera y guarda el cert de ley en storage del servidor */
-    async guardarCertificadoLey(ip: string, columnas?: string[]): Promise<GuardarCertResult> {
-        const params = columnas ? { columnas } : undefined
+    async guardarCertificadoLey(ip: string, columnas?: string[], usarLeyCruda: boolean = false): Promise<GuardarCertResult> {
+        const params: any = {}
+        if (columnas) params.columnas = columnas
+        if (usarLeyCruda) params.usar_ley_cruda = true
         const { data } = await api.post(`/laboratorio/lotes/${ip}/guardar-certificado-ley`, null, { params })
         return data
     },

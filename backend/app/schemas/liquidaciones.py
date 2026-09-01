@@ -18,7 +18,9 @@ class LotePreviewInput(BaseModel):
     gasto_consumo_override: Decimal | None = None
     spot_usd_override: Decimal | None = None
     spot_ag_usd_override: Decimal | None = None
+    maquila_override: Decimal | None = None
     valorizar_volado: bool = False
+    usar_ley_cruda: bool = False
 
 
 class LiquidacionPreviewRequest(BaseModel):

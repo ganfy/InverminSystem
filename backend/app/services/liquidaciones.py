@@ -326,7 +326,9 @@ def _calcular_lote(
     gasto_acopio_override: Decimal | None = None,
     gasto_consumo_override: Decimal | None = None,
     spot_ag_usd_override: Decimal | None = None,
+    maquila_override: Decimal | None = None,
     valorizar_volado: bool = False,
+    usar_ley_cruda: bool = False,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
@@ -479,7 +481,7 @@ def _calcular_lote(
     # ── Ley Comercial (parámetros aplicados a ley paititi) ───────────────────
     lc_result = calcular_ley_comercial(
         ley_planta,
-        params,
+        params if not usar_ley_cruda else None,
         q_comercial=q_comercial,
         rounding=constantes.redondeo_ley_comercial,
         valorizar_volado=valorizar_volado,
@@ -518,7 +520,7 @@ def _calcular_lote(
     if ley_dirim_raw is not None and oz_tc_minero:
         lc_dir = calcular_ley_comercial(
             ley_dirim_raw,
-            params,
+            params if not usar_ley_cruda else None,
             q_comercial=q_comercial,
             rounding=constantes.redondeo_ley_comercial,
         )
@@ -561,7 +563,10 @@ def _calcular_lote(
     rec_planta_val = _rec_planta(db, lote.id) or original_rec_liq
 
     # ── Maquila y precio ──────────────────────────────────────────────────────
-    maquila = _calc_maquila(oz_promedio, maquila_base)
+    if maquila_override is not None:
+        maquila = maquila_override
+    else:
+        maquila = _calc_maquila(oz_promedio, maquila_base)
     precio_x_tms = _calc_precio_x_tms(
         oz_promedio, rec_liq, spot_usd, riesgo, maquila, insumos, bono
     )
@@ -800,7 +805,9 @@ def preview_liquidacion(
             gasto_acopio_override=item.gasto_acopio_override,
             gasto_consumo_override=item.gasto_consumo_override,
             spot_ag_usd_override=item.spot_ag_usd_override,
+            maquila_override=item.maquila_override,
             valorizar_volado=item.valorizar_volado,
+            usar_ley_cruda=item.usar_ley_cruda,
         )
 
         if alertas:
@@ -898,7 +905,9 @@ def crear_liquidacion(
             gasto_acopio_override=item.gasto_acopio_override,
             gasto_consumo_override=item.gasto_consumo_override,
             spot_ag_usd_override=item.spot_ag_usd_override,
+            maquila_override=item.maquila_override,
             valorizar_volado=item.valorizar_volado,
+            usar_ley_cruda=item.usar_ley_cruda,
         )
 
         if any(a.critico for a in alertas):
@@ -1125,6 +1134,7 @@ def _to_lote_out(db: Session, ll: LiquidacionLote) -> LiquidacionLoteOut:
                 gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
                 - (ll.gasto_acopio_liquidacion or Decimal("0")),
                 spot_ag_usd_override=ll.spot_ag_snapshot,
+                maquila_override=ll.maquila_aplicada,
                 valorizar_volado=bool(ll.lote.volado),
             )
             p_maquila = calc_dict.get("profit_maquila")
@@ -1563,6 +1573,7 @@ def generar_excel_pl(db: Session, clave: str) -> io.BytesIO:
                 gasto_acopio_override=ll.gasto_acopio_liquidacion,
                 gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
                 - (ll.gasto_acopio_liquidacion or Decimal("0")),
+                maquila_override=ll.maquila_aplicada,
             )
         except Exception:
             calc_dict = {}

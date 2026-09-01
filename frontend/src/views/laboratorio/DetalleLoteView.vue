@@ -246,6 +246,13 @@
               </div>
             </div>
           </h2>
+          
+          <div style="display:flex; justify-content:flex-end; margin-bottom: 0.5rem; margin-top: -0.5rem;">
+            <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; cursor:pointer; color:var(--color-text);">
+              <input type="checkbox" v-model="usarLeyCruda" />
+              Usar ley cruda (saltar parámetros)
+            </label>
+          </div>
 
           <div v-if="cargandoLeyComercial" class="estado-tabla">
             <span class="spinner" style="margin-right:0.5rem"></span> Calculando...
@@ -1307,7 +1314,7 @@ function abrirConfirmarGenerar() {
 async function previsualizarCertLey() {
   previsualizandoLey.value = true
   try {
-    await laboratorioApi.previewCertificadoLeyPdf(ipActual, columnasCertLey.value)
+    await laboratorioApi.previewCertificadoLeyPdf(ipActual, columnasCertLey.value, usarLeyCruda.value)
   } catch {
     ui.toast('Error al generar previsualización', 'error')
   } finally {
@@ -1340,7 +1347,7 @@ async function confirmarYGuardar() {
 
   generando.value = true
   try {
-    const res = await laboratorioApi.guardarCertificadoLey(ipActual, columnasCertLey.value)
+    const res = await laboratorioApi.guardarCertificadoLey(ipActual, columnasCertLey.value, usarLeyCruda.value)
     certLeyGuardado.value = res.ruta
     ui.toast('Certificado guardado correctamente', 'success')
   } catch {
@@ -1464,13 +1471,14 @@ async function confirmarDescartarRec() {
 // ── Ley comercial ─────────────────────────────────────────────────────────────
 const cargandoLeyComercial = ref(false)
 const leyComercialCalc     = ref<LeyComercialCalc | null>(null)
+const usarLeyCruda         = ref(false)
 
 watch(lote, async (l: LoteLabOut | null) => {
   if (l != null && tieneAnalisisLeyVigente.value && !leyComercialCalc.value) {
     cargandoLeyComercial.value = true
     try {
       const excParam = excluidos.value.size > 0 ? Array.from(excluidos.value).join(',') : undefined
-      leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual, excParam)
+      leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual, excParam, usarLeyCruda.value)
     } catch {
       leyComercialCalc.value = null
     } finally {
@@ -1478,6 +1486,13 @@ watch(lote, async (l: LoteLabOut | null) => {
     }
   }
 }, { immediate: true })
+
+watch(usarLeyCruda, () => {
+  if (leyComercialCalc.value) {
+    leyComercialCalc.value = null // clear to show loading
+  }
+  recargarLeyComercial()
+})
 
 async function recargarLeyComercial() {
   if (!tieneAnalisisLeyVigente.value) {
@@ -1493,7 +1508,7 @@ async function recargarLeyComercial() {
   cargandoLeyComercial.value = true
   try {
     const excParam = excluidos.value.size > 0 ? Array.from(excluidos.value).join(',') : undefined
-    leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual, excParam)
+    leyComercialCalc.value = await laboratorioApi.getLeyComercial(ipActual, excParam, usarLeyCruda.value)
   } catch {
     leyComercialCalc.value = null
   } finally {

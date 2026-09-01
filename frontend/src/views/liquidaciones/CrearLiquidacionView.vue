@@ -314,19 +314,19 @@
                     <div class="profit-grid" style="margin-top: 0.5rem;">
                       <div class="profit-item">
                         <span class="p-label">MAQUILA</span>
-                        <span class="p-val font-mono" :class="lote.profit_maquila >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_maquila >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_maquila, 2) }}</span>
+                        <span class="p-val font-mono" :class="(lote.profit_maquila ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_maquila ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_maquila, 2) }}</span>
                       </div>
                       <div class="profit-item">
                         <span class="p-label">RECUPERACIÓN</span>
-                        <span class="p-val font-mono" :class="lote.profit_rec >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_rec >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_rec, 2) }}</span>
+                        <span class="p-val font-mono" :class="(lote.profit_rec ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_rec ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_rec, 2) }}</span>
                       </div>
                       <div class="profit-item">
                         <span class="p-label">CONSUMO</span>
-                        <span class="p-val font-mono" :class="lote.profit_consumo >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_consumo >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_consumo, 2) }}</span>
+                        <span class="p-val font-mono" :class="(lote.profit_consumo ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_consumo ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_consumo, 2) }}</span>
                       </div>
                       <div class="profit-item">
                         <span class="p-label">LEYES</span>
-                        <span class="p-val font-mono" :class="lote.profit_leyes >= 0 ? 'text-success' : 'text-danger'">{{ lote.profit_leyes >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_leyes, 2) }}</span>
+                        <span class="p-val font-mono" :class="(lote.profit_leyes ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (lote.profit_leyes ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(lote.profit_leyes, 2) }}</span>
                       </div>
                       <div class="profit-item profit-net">
                         <span class="p-label">TOTAL OPERATIVO</span>
@@ -364,9 +364,11 @@
                   <th class="col-r" v-if="hayAg">SPOT Ag ($/Oz)</th>
                   <th class="col-r">GASTO ACOPIO</th>
                   <th class="col-r">GASTO CONSUMO</th>
+                  <th class="col-r">MAQUILA</th>
                   <th class="col-r">BONO</th>
                   <th class="col-r">% REC LIQ</th>
                   <th class="col-c">VAL. VOLADO</th>
+                  <th class="col-c">LEY CRUDA</th>
                 </tr>
               </thead>
               <tbody>
@@ -407,6 +409,14 @@
                   <td class="col-r">
                     <input
                       type="number" class="pinput pinput-sm"
+                      v-model.number="editOv.maquila[lote.ip]"
+                      step="0.01" placeholder="—"
+                      @input="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-r">
+                    <input
+                      type="number" class="pinput pinput-sm"
                       v-model.number="editOv.bono[lote.ip]"
                       step="0.01" placeholder="0"
                       @input="pendienteRecalculo = true"
@@ -425,6 +435,13 @@
                       v-if="lote.volado"
                       type="checkbox" class="check"
                       v-model="editOv.valorizar_volado[lote.ip]"
+                      @change="pendienteRecalculo = true"
+                    />
+                  </td>
+                  <td class="col-c">
+                    <input
+                      type="checkbox" class="check"
+                      v-model="editOv.usar_ley_cruda[lote.ip]"
                       @change="pendienteRecalculo = true"
                     />
                   </td>
@@ -527,7 +544,7 @@
   // ── State ──────────────────────────────────────────────────────────
   const paso             = ref(1)
   const provacopId       = ref<number | ''>('')
-  const fechaLiq         = ref(new Date().toISOString().slice(0, 10))
+  const fechaLiq = ref(new Date().toISOString().substring(0, 10))
   const lotesSeleccionados = ref<string[]>([])
   const errorPaso1       = ref('')
   const provacops        = ref<{ id: number; proveedor: string; acopiador: string; pendiente_parametros?: boolean }[]>([])
@@ -605,7 +622,7 @@
   }
 
   //Editar
-  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {}, spot_usd: {}, spot_ag_usd: {}, valorizar_volado: {} })
+  const editOv = ref<EditOverrides>({ gasto_acopio: {}, gasto_consumo: {}, bono: {}, rec_liq: {}, spot_usd: {}, spot_ag_usd: {}, maquila: {}, valorizar_volado: {}, usar_ley_cruda: {} })
 const pendienteRecalculo = ref(false)
 
 function initEditOverrides() {
@@ -614,11 +631,13 @@ function initEditOverrides() {
   for (const l of lotes) {
     editOv.value.gasto_acopio[l.ip]  = Number(l.insumos_acopio)  || null
     editOv.value.gasto_consumo[l.ip] = Number(l.insumos_consumo) || null
+    editOv.value.maquila[l.ip]       = Number(l.maquila)         || null
     editOv.value.bono[l.ip]          = Number(l.bono)            || null
     editOv.value.rec_liq[l.ip]       = Number(l.pct_rec_liq)     || null
     editOv.value.spot_usd[l.ip]      = Number(l.spot_usd)        || null
     editOv.value.spot_ag_usd[l.ip]   = Number(l.spot_ag_usd)     || null
     editOv.value.valorizar_volado[l.ip] = false
+    editOv.value.usar_ley_cruda[l.ip] = false
   }
   pendienteRecalculo.value = false
 }
@@ -636,7 +655,9 @@ async function recalcularConOverrides() {
       gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
       spot_usd_override: editOv.value.spot_usd[ip] ?? null,
       spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
-      valorizar_volado: editOv.value.valorizar_volado[ip] ?? false
+      maquila_override: editOv.value.maquila[ip] ?? null,
+      valorizar_volado: editOv.value.valorizar_volado[ip] ?? false,
+      usar_ley_cruda: editOv.value.usar_ley_cruda[ip] ?? false
     })),
   })
   pendienteRecalculo.value = false
@@ -676,7 +697,9 @@ async function recalcularConOverrides() {
         gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
         spot_usd_override: editOv.value.spot_usd[ip] ?? null,
         spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
+        maquila_override: editOv.value.maquila[ip] ?? null,
         valorizar_volado: editOv.value.valorizar_volado[ip] ?? false,
+        usar_ley_cruda: editOv.value.usar_ley_cruda[ip] ?? false,
       })),
       fecha_liquidacion: fechaLiq.value || null,
     })
@@ -702,7 +725,9 @@ async function recalcularConOverrides() {
         gasto_consumo_override: editOv.value.gasto_consumo[ip] ?? null,
         spot_usd_override: editOv.value.spot_usd[ip] ?? null,
         spot_ag_usd_override: editOv.value.spot_ag_usd[ip] ?? null,
+        maquila_override: editOv.value.maquila[ip] ?? null,
         valorizar_volado: editOv.value.valorizar_volado[ip] ?? false,
+        usar_ley_cruda: editOv.value.usar_ley_cruda[ip] ?? false,
       })),
       fecha_liquidacion: fechaLiq.value || null,
       como_borrador: true,
