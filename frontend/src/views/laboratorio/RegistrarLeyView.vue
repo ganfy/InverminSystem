@@ -496,7 +496,12 @@ async function guardar() {
       es_edicion: route.query.edit === '1',
     }
 
-    const result = await store.registrarLey(payload)
+    let result;
+    if (route.query.edit === '1' && analisisCompletadoId.value) {
+      result = await store.editarLey(analisisCompletadoId.value, payload)
+    } else {
+      result = await store.registrarLey(payload)
+    }
     if (result) {
       yaGuardado.value           = true
       analisisCompletadoId.value = result.id

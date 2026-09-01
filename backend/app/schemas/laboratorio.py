@@ -70,6 +70,21 @@ class AnalisisLeyCreate(BaseModel):
         return self
 
 
+class AnalisisLeyUpdate(BaseModel):
+    ley_fino: float = Field(..., ge=0, description="Oz/TC fracción -140 (Au) o ley Ag")
+    ley_grueso: float = Field(0.0, ge=0, description="Oz/TC fracción +140 (Au). 0 para Ag")
+    muestras_detalle: list[NewmontMuestraIn] | None = None
+    fecha_analisis: date | None = None
+    descripcion_pdf: str | None = Field(
+        None,
+        description="Descripción para el certificado PDF. Si no se envía, no se actualiza.",
+    )
+    regenerar_certificado: bool = Field(
+        False,
+        description="Si es True, fuerza la regeneración del certificado si el usuario tiene permiso.",
+    )
+
+
 class AnalisisLeyPorIPCreate(BaseModel):
     tipo_analisis: TipoAnalisis = Field(..., description="minero | dirimencia")
     laboratorio: str = Field(..., description="Nombre del laboratorio o minero")
@@ -275,6 +290,16 @@ class CompletarRecuperacionRequest(BaseModel):
         default=None, description="Concentración Ag en solución (g/m³)."
     )
     fecha_analisis: date | None = None
+
+
+class AnalisisRecuperacionUpdate(CompletarRecuperacionRequest):
+    regenerar_certificado: bool = Field(
+        False,
+        description="Si es True, fuerza la regeneración del certificado si el usuario tiene permiso.",
+    )
+    descripcion_pdf: str | None = Field(
+        None, description="Descripción para el certificado PDF. Si no se envía, no se actualiza."
+    )
 
 
 # ── Acciones de Comercial ─────────────────────────────────────────────────────

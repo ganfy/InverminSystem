@@ -244,6 +244,7 @@ const router  = useRouter()
 const route   = useRoute()
 const store   = useLaboratorioStore()
 const ui      = useUiStore()
+import axiosApi from '@/api/axios'
 
 const cipActual      = route.params.cip as string
 const analisisIdParam = route.query.id ? Number(route.query.id) : null
@@ -370,6 +371,40 @@ onMounted(async () => {
         analisisCompletadoId.value = completado.id
         certificadoGenerado.value = route.query.edit === '1' ? false : !!completado.certificado_url
         if (!pending) analisisPendiente.value = completado
+        if (completado.fecha_analisis) fechaAnalisis.value = completado.fecha_analisis
+        if (completado.ley_liquido != null) solucionAu.value = parseFloat((completado.ley_liquido * OZ_TC_TO_GR_TM).toFixed(4))
+        if (completado.solucion_ag_g_m3 != null) solucionAg.value = parseFloat(String(completado.solucion_ag_g_m3))
+
+        // Cargar muestras del backend para que el usuario pueda verlas/editarlas
+        try {
+          const res = await axiosApi.get(`/laboratorio/recuperacion/${completado.id}`)
+          if (res.data && res.data.detalles && res.data.detalles.length) {
+            const agrupado = new Map<number, any>()
+            for (const d of res.data.detalles) {
+              const num = d.numero_ensayo || 1
+              if (!agrupado.has(num)) {
+                agrupado.set(num, {
+                  peso_g: parseFloat(d.peso || d.peso_g || 0),
+                  au1_mg: null,
+                  au2_mg: null,
+                  au_ag_mg: 0,
+                  numero_ensayo: num,
+                  _leyAu: null,
+                  _leyAg: null
+                })
+              }
+              const obj = agrupado.get(num)
+              const val = d.mineral_mg != null ? parseFloat(d.mineral_mg) : null
+              if (d.origen === 'AU1') obj.au1_mg = val
+              else if (d.origen === 'AU2') obj.au2_mg = val
+              else if (d.origen === 'AU_AG') obj.au_ag_mg = val
+            }
+            muestras.value = Array.from(agrupado.values())
+            muestras.value.forEach((_, i) => recalcMuestra(i))
+          }
+        } catch (e) {
+          console.warn('No se pudieron cargar los detalles del análisis', e)
+        }
       }
       
       if (pending) analisisPendiente.value = pending
@@ -402,15 +437,11 @@ async function guardar() {
   guardando.value = true
   let result;
   
-  if (route.query.edit === '1') {
-    const payloadFull = {
-      cip: cipActual,
-      laboratorio: analisisPendiente.value?.laboratorio || 'Paititi',
-      ley_cabeza: analisisPendiente.value?.ley_cabeza,
+  if (route.query.edit === '1' && analisisCompletadoId.value) {
+    const payload = {
       ley_cola: resumen.value.leyColaAuOzTc,
       ley_liquido: solucionAu.value != null ? parseFloat((solucionAu.value / OZ_TC_TO_GR_TM).toFixed(4)) : null,
       solucion_ag_g_m3: solucionAg.value,
-      sub_tipo: analisisPendiente.value?.sub_tipo,
       fecha_analisis: fechaAnalisis.value,
       muestras: muestras.value.map(m => ({
         peso_g:        m.peso_g,
@@ -419,9 +450,9 @@ async function guardar() {
         au_ag_mg:      m.au_ag_mg,
         numero_ensayo: m.numero_ensayo,
       })),
-      es_edicion: true
+      ley_cola_ag: resumen.value.leyColaAgGrTm,
     }
-    result = await store.registrarRecuperacion(payloadFull)
+    result = await store.editarRecuperacion(analisisCompletadoId.value, payload)
   } else {
     const payload = {
       muestras: muestras.value.map(m => ({

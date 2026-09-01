@@ -349,8 +349,9 @@ onMounted(async () => {
       if (completado) {
         yaGuardado.value = true
         analisisCompletadoId.value = completado.id
-        certificadoGenerado.value = !!completado.certificado_url
+        certificadoGenerado.value = route.query.edit === '1' ? false : !!completado.certificado_url
         if (!analisisPendiente.value) analisisPendiente.value = completado
+        if (completado.fecha_analisis) fechaAnalisis.value = completado.fecha_analisis
 
         // Cargar muestras del backend para que el usuario pueda verlas/editarlas
         try {
@@ -433,6 +434,24 @@ async function guardar() {
       ui.toast('Datos guardados. Puede guardar el certificado.', 'success')
     } else if (result) {
       ui.toast('Datos guardados.', 'success')
+    }
+  } else if (route.query.edit === '1' && analisisCompletadoId.value) {
+    const payload = {
+      muestras: muestras.value.map(m => ({
+        peso_g: m.peso_g, au1_mg: m.au1_mg, au2_mg: m.au2_mg,
+        au_ag_mg: m.au_ag_mg, numero_ensayo: m.numero_ensayo,
+      })),
+      ley_cola: resumen.value.leyColaAuOzTc,
+      ley_liquido: null,
+      solucion_ag_g_m3: null,
+      fecha_analisis: fechaAnalisis.value,
+      ley_cola_ag: resumen.value.leyColaAgGrTm,
+    }
+    const result = await store.editarRecuperacion(analisisCompletadoId.value, payload)
+    if (result) {
+      yaGuardado.value = true
+      certificadoGenerado.value = !!result.certificado_url
+      ui.toast('Datos guardados exitosamente.', 'success')
     }
   } else {
     // Completar PENDIENTE o Actualizar COMPLETADO

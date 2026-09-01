@@ -109,7 +109,8 @@
               <label class="field-label">Fecha</label>
               <input type="date" class="field-input" v-model="form.fecha" />
               <p v-if="form.fecha && esFindeSemana(form.fecha)" class="field-hint warning">
-                ⚠️ Esta fecha es fin de semana. El LBMA no publica Fix en fines de semana.
+                <AlertTriangle :size="16" style="flex-shrink:0;margin-top:1px" />
+                 Esta fecha es fin de semana. El LBMA no publica Fix en fines de semana.
                 Para sábado, el sistema usará automáticamente el viernes anterior;
                 para domingo, el lunes siguiente.
               </p>
@@ -142,7 +143,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronLeft, TrendingUp, Plus, RefreshCw, Trash2, X, Info, Zap, PenLine } from 'lucide-vue-next'
+import { ChevronLeft, TrendingUp, Plus, RefreshCw, Trash2, X, Info, Zap, PenLine, AlertTriangle } from 'lucide-vue-next'
 import { useUiStore } from '@/stores/ui'
 import {
   getSpotHistorico,

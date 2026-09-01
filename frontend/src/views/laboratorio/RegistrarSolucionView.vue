@@ -172,11 +172,12 @@ onMounted(async () => {
       if (completado) {
         yaGuardado.value = true
         analisisCompletadoId.value = completado.id
-        certificadoGenerado.value = !!completado.certificado_url
+        certificadoGenerado.value = route.query.edit === '1' ? false : !!completado.certificado_url
         if (completado.ley_liquido != null)
           solucionAu.value = parseFloat(Number(completado.ley_liquido).toFixed(4))
         if (completado.solucion_ag_g_m3 != null)
           solucionAg.value = parseFloat(String(completado.solucion_ag_g_m3))
+        if (completado.fecha_analisis) fechaAnalisis.value = completado.fecha_analisis
         if (!analisisPendiente.value) analisisPendiente.value = completado
       }
     }
@@ -215,6 +216,18 @@ async function guardar() {
       analisisCompletadoId.value = result.id
       certificadoGenerado.value = !!result.certificado_url
       ui.toast('Datos de solución guardados. Puede guardar el certificado.', 'success')
+    }
+  } else if (route.query.edit === '1' && analisisCompletadoId.value) {
+    const payload = {
+      ley_liquido: solucionAu.value,
+      solucion_ag_g_m3: solucionAg.value,
+      fecha_analisis: fechaAnalisis.value,
+    }
+    const result = await store.editarRecuperacion(analisisCompletadoId.value, payload)
+    if (result) {
+      yaGuardado.value = true
+      certificadoGenerado.value = !!result.certificado_url
+      ui.toast('Datos de solución guardados. Puede generar el certificado.', 'success')
     }
   } else {
     const payload = {

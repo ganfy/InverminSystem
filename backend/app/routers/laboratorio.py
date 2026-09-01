@@ -30,8 +30,10 @@ from app.schemas.laboratorio import (
     AnalisisLeyCreate,
     AnalisisLeyOut,
     AnalisisLeyPorIPCreate,
+    AnalisisLeyUpdate,
     AnalisisRecuperacionCreate,
     AnalisisRecuperacionOut,
+    AnalisisRecuperacionUpdate,
     CIPAnalisisOut,
     CompletarRecuperacionRequest,
     DescartarRequest,
@@ -99,6 +101,30 @@ def registrar_ley(
         lote = db.query(Lote).filter(Lote.id == nuevo.lote_id).first()
         ip = lote.ip if lote else None
         return svc._ley_out(nuevo, ip)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.put("/ley/{analisis_id}", response_model=AnalisisLeyOut)
+def editar_ley(
+    analisis_id: int,
+    datos: AnalisisLeyUpdate,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Edita un análisis de ley (Newmont/Au) existente.
+    Si el usuario es Laboratorista, solo puede editar si NO hay certificado.
+    Comercial/Admin pueden editar en cualquier momento (regenera certificado).
+    """
+    try:
+        tiene_permiso_update = tiene_permiso(current_user, "LABORATORIO", "UPDATE", db)
+        editado = svc.editar_analisis_ley(db, analisis_id, datos, tiene_permiso_update)
+        db.commit()
+        lote = db.query(Lote).filter(Lote.id == editado.lote_id).first()
+        ip = lote.ip if lote else None
+        return svc._ley_out(editado, ip)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -307,6 +333,30 @@ def completar_recuperacion(
         resultado = svc.completar_recuperacion(db, analisis_id, datos, current_user.id)
         db.commit()
         return svc._rec_out(resultado)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.put("/recuperacion/{analisis_id}", response_model=AnalisisRecuperacionOut)
+def editar_recuperacion(
+    analisis_id: int,
+    datos: AnalisisRecuperacionUpdate,
+    current_user=Depends(check_permiso("LABORATORIO", "CREATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Edita un análisis de recuperación (Absorciones Atómicas) existente.
+    Si el usuario es Laboratorista, solo puede editar si NO hay certificado.
+    Comercial/Admin pueden editar en cualquier momento (regenera certificado).
+    """
+    try:
+        tiene_permiso_update = tiene_permiso(current_user, "LABORATORIO", "UPDATE", db)
+        editado = svc.editar_analisis_recuperacion(
+            db, analisis_id, datos, tiene_permiso_update, current_user.id
+        )
+        db.commit()
+        return svc._rec_out(editado)
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e)) from e

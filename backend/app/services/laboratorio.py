@@ -31,8 +31,10 @@ from app.schemas.laboratorio import (
     AnalisisDetalleOut,
     AnalisisLeyCreate,
     AnalisisLeyOut,
+    AnalisisLeyUpdate,
     AnalisisRecuperacionCreate,
     AnalisisRecuperacionOut,
+    AnalisisRecuperacionUpdate,
     CIPAnalisisOut,
     CIPResumen,
     CompletarRecuperacionRequest,
@@ -1980,3 +1982,134 @@ def obtener_ley_ag_vigente(db: Session, lote_id: int) -> tuple[Decimal, Decimal]
     gr_tm = Decimal(str(a.ley_gr_tm)) if a.ley_gr_tm else Decimal("0")
     oz_tc = Decimal(str(a.ley_final)) if a.ley_final else Decimal("0")
     return gr_tm, oz_tc
+
+
+def editar_analisis_ley(
+    db: Session, analisis_id: int, datos: "AnalisisLeyUpdate", tiene_permiso_update: bool
+) -> "AnalisisLey":
+    from app.models.enums import EstadoLote
+    from app.models.models import AnalisisDetalle, AnalisisLey, Lote
+
+    analisis = db.query(AnalisisLey).filter(AnalisisLey.id == analisis_id).first()
+    if not analisis:
+        raise ValueError("Análisis no encontrado")
+    if not analisis.vigente or analisis.eliminado:
+        raise ValueError("No se puede editar un análisis descartado o eliminado")
+
+    # Validar lote
+    if analisis.lote_id:
+        lote = db.query(Lote).filter(Lote.id == analisis.lote_id).first()
+        if lote and lote.estado in (
+            EstadoLote.LIQUIDADO,
+            EstadoLote.FACTURADO,
+            EstadoLote.PAGADO,
+            EstadoLote.ASIGNADO_RUMA,
+        ):
+            raise ValueError(
+                f"No se puede editar el análisis porque el Lote está en estado {lote.estado}"
+            )
+
+    # Validar permisos vs certificado
+    if analisis.certificado_url and not tiene_permiso_update:
+        raise ValueError("No se puede editar un análisis que ya tiene certificado emitido")
+
+    # Actualizar campos
+    analisis.ley_fino = datos.ley_fino
+    analisis.ley_grueso = datos.ley_grueso
+    if datos.fecha_analisis:
+        analisis.fecha_analisis = datos.fecha_analisis
+
+    analisis.ley_final = _calcular_ley_final(datos.ley_fino, datos.ley_grueso)
+    constantes = get_constantes(db)
+    analisis.ley_gr_tm = _calcular_ley_gr_tm(analisis.ley_final, constantes.factor_oz_tc)
+
+    # Actualizar detalles si los enviaron
+    if datos.muestras_detalle is not None:
+        db.query(AnalisisDetalle).filter(AnalisisDetalle.analisis_id == analisis.id).delete()
+        _crear_detalles_newmont(db, analisis.id, datos)
+
+    # Regenerar certificado
+    if (analisis.certificado_url or datos.regenerar_certificado) and tiene_permiso_update:
+        generar_y_guardar_certificado_interno(
+            db, analisis.id, "ley", descripcion_pdf=datos.descripcion_pdf
+        )
+
+    db.flush()
+    return analisis
+
+
+def editar_analisis_recuperacion(
+    db: Session,
+    analisis_id: int,
+    datos: "AnalisisRecuperacionUpdate",
+    tiene_permiso_update: bool,
+    usuario_id: int,
+) -> "AnalisisRecuperacion":
+    from app.models.enums import EstadoLote
+    from app.models.models import AnalisisDetalle, AnalisisRecuperacion, Lote
+
+    analisis = db.query(AnalisisRecuperacion).filter(AnalisisRecuperacion.id == analisis_id).first()
+    if not analisis:
+        raise ValueError("Análisis de recuperación no encontrado")
+    if not analisis.vigente or analisis.eliminado:
+        raise ValueError("No se puede editar un análisis descartado o eliminado")
+
+    # Validar lote
+    if analisis.lote_id:
+        lote = db.query(Lote).filter(Lote.id == analisis.lote_id).first()
+        if lote and lote.estado in (
+            EstadoLote.LIQUIDADO,
+            EstadoLote.FACTURADO,
+            EstadoLote.PAGADO,
+            EstadoLote.ASIGNADO_RUMA,
+        ):
+            raise ValueError(
+                f"No se puede editar el análisis porque el Lote está en estado {lote.estado}"
+            )
+
+    # Validar permisos vs certificado
+    if analisis.certificado_url and not tiene_permiso_update:
+        raise ValueError("No se puede editar un análisis que ya tiene certificado emitido")
+
+    if datos.fecha_analisis:
+        analisis.fecha_analisis = datos.fecha_analisis
+
+    if datos.ley_liquido is not None:
+        analisis.ley_liquido = datos.ley_liquido
+    if datos.solucion_ag_g_m3 is not None:
+        analisis.solucion_ag_g_m3 = datos.solucion_ag_g_m3
+
+    # Actualizar ley_cola
+    if datos.muestras:
+        # Flujo A: calcular a partir de muestras de reconocimiento
+        db.query(AnalisisDetalle).filter(AnalisisDetalle.recuperacion_id == analisis.id).delete()
+        ley_cola, ley_cola_ag = _procesar_muestras_reconocimiento(
+            db, analisis.id, datos.muestras, usuario_id
+        )
+        # Recalcular la ley_cola promedio
+        detalles_au = (
+            db.query(AnalisisDetalle)
+            .filter(
+                AnalisisDetalle.recuperacion_id == analisis.id,
+                AnalisisDetalle.origen.in_(["AU1", "AU2"]),
+            )
+            .all()
+        )
+        if detalles_au:
+            avg_au = sum(d.ley for d in detalles_au) / len(detalles_au)
+            analisis.ley_cola = Decimal(str(avg_au)) / get_constantes(db).factor_oz_tc
+    elif datos.ley_cola is not None:
+        analisis.ley_cola = datos.ley_cola
+
+    # Recalcular recuperacion %
+    # El campo 'recuperacion' es Computed en la base de datos,
+    # por lo que Postgres lo actualizará automáticamente cuando se modifique ley_cola.
+
+    # Regenerar certificado
+    if (analisis.certificado_url or datos.regenerar_certificado) and tiene_permiso_update:
+        generar_y_guardar_certificado_interno(
+            db, analisis.id, "recuperacion", descripcion_pdf=datos.descripcion_pdf
+        )
+
+    db.flush()
+    return analisis

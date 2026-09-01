@@ -286,7 +286,7 @@
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem;opacity:0.7" @click="generarCertLey(fila)" title="Regenerar certificado (e.g. tras agregar ley Ag)">↺ Regen.</button>
                     <button
-                      v-if="fila.estado === 'COMPLETADO' && auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')"
+                      v-if="fila.estado === 'COMPLETADO' && (auth.puede('LABORATORIO', 'UPDATE') || (!fila.certificadoUrl && auth.puede('LABORATORIO', 'CREATE')))"
                       class="btn-secondary"
                       style="font-size:0.75rem;padding:0.3rem 0.75rem;border-color:var(--color-warning);color:var(--color-warning)"
                       @click="editarLey(fila.cip)"
@@ -339,7 +339,7 @@
                     <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                     <button
-                      v-if="fila.estado === 'COMPLETADO' && auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')"
+                      v-if="fila.estado === 'COMPLETADO' && (auth.puede('LABORATORIO', 'UPDATE') || (!fila.certificadoUrl && auth.puede('LABORATORIO', 'CREATE')))"
                       class="btn-secondary"
                       style="font-size:0.75rem;padding:0.3rem 0.75rem;border-color:var(--color-warning);color:var(--color-warning)"
                       @click="editarRecuperacion(fila)"
@@ -371,7 +371,7 @@
                     <button v-if="fila.estado === 'COMPLETADO' && !fila.certificadoUrl" class="btn-primary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="irARegistrarRecuperacion(fila)">Generar cert.</button>
                     <button v-if="fila.certificadoUrl" class="btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.75rem" @click="verCertificado(fila.certificadoUrl)">Ver cert.</button>
                     <button
-                      v-if="fila.estado === 'COMPLETADO' && auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL')"
+                      v-if="fila.estado === 'COMPLETADO' && (auth.puede('LABORATORIO', 'UPDATE') || (!fila.certificadoUrl && auth.puede('LABORATORIO', 'CREATE')))"
                       class="btn-secondary"
                       style="font-size:0.75rem;padding:0.3rem 0.75rem;border-color:var(--color-warning);color:var(--color-warning)"
                       @click="editarRecuperacion(fila)"

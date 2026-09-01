@@ -161,12 +161,23 @@
                 </button>
 
               </template>
+              <template v-if="a.vigente">
+                <button
+                  v-if="puedeRegenerarCerts"
+                  class="btn-danger-sm"
+                  style="margin-left:auto;opacity:0.8"
+                  @click="toggleDescartarLey(a.id)"
+                  title="Descartar del promedio comercial"
+                >
+                  Descartar
+                </button>
+              </template>
               <button
-                v-if="puedeRegenerarCerts"
+                v-if="puedeEliminarRegistros"
                 class="btn-danger-sm"
-                style="margin-left:auto;opacity:0.7"
+                style="margin-left:0.5rem;opacity:0.7"
                 @click="eliminarLey(a.id)"
-                title="Eliminar registro permanentemente de la vista"
+                title="Eliminar registro permanentemente (Admin)"
               >
                 Eliminar
               </button>
@@ -704,11 +715,11 @@
                 </label>
               </template>
               <button
-                v-if="puedeRegenerarCerts"
+                v-if="puedeEliminarRegistros"
                 class="btn-danger-sm"
                 style="margin-left:auto;opacity:0.7"
                 @click="eliminarRecuperacion(a.id)"
-                title="Eliminar registro permanentemente de la vista"
+                title="Eliminar registro permanentemente (Admin)"
               >
                 Eliminar
               </button>
@@ -997,6 +1008,29 @@
           >
             <span v-if="agGuardando" class="spinner" style="margin-right:0.4rem"></span>
             Guardar Ley Ag
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: descartar análisis de ley -->
+    <div v-if="modalDescartarLey !== null" class="modal-overlay" @click.self="modalDescartarLey = null">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h2>Descartar análisis de ley</h2>
+          <button class="btn-cerrar" @click="modalDescartarLey = null"><X :size="18" /></button>
+        </div>
+        <div class="modal-body">
+          <div class="field">
+            <label class="field-label">Justificación (obligatoria):</label>
+            <textarea class="field-input" v-model="justificacionLey" rows="3"
+              placeholder="Ej: Resultado discordante"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="modalDescartarLey = null">Cancelar</button>
+          <button class="btn-danger" @click="confirmarDescartarLey" :disabled="!justificacionLey.trim()">
+            Confirmar
           </button>
         </div>
       </div>
@@ -1366,6 +1400,26 @@ async function guardarAg() {
   }
 }
 
+// ── Flujo ley: descartar ──────────────────────────────────────────────────────
+const modalDescartarLey = ref<number | null>(null)
+const justificacionLey = ref('')
+
+function toggleDescartarLey(id: number) {
+  justificacionLey.value = ''
+  modalDescartarLey.value = id
+}
+
+async function confirmarDescartarLey() {
+  if (modalDescartarLey.value === null) return
+  const j = justificacionLey.value.trim()
+  if (!j) return
+  const ok = await store.descartarLey(modalDescartarLey.value, j)
+  if (ok) {
+    modalDescartarLey.value = null
+    lote.value = await store.cargarDetalleLote(ipActual)
+  }
+}
+
 // ── Flujo rec: descartar + certificado ───────────────────────────────────────
 const modalDescartarRec  = ref<number | null>(null)
 const justificacionRec   = ref('')
@@ -1455,6 +1509,9 @@ watch(leyComercialCalc, (nuevaLey) => {
 })
 
 const puedeRegenerarCerts = computed(() => auth.puede('LABORATORIO', 'VIEW_CONFIDENTIAL'))
+const puedeEliminarRegistros = computed(() => 
+  auth.user?.rol === 'Admin' || auth.user?.rol === 'Gerencia' || auth.puede('LABORATORIO', 'DELETE')
+)
 
 //watch para certificados
 watch(lote, (l) => {
@@ -1755,7 +1812,8 @@ async function descartarOutlier() {
     danger: true,
   })
   if (!ok) return
-  await eliminarLey(a.id)
+  const success = await store.descartarLey(a.id, 'Descarte automático/manual por valor atípico (Outlier)')
+  if (success) lote.value = await store.cargarDetalleLote(ipActual)
 }
 
 // ── Ley minero ────────────────────────────────────────────────────────────────

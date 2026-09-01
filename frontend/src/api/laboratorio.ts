@@ -129,6 +129,11 @@ export const laboratorioApi = {
         return data
     },
 
+    async editarLey(analisisId: number, datos: any): Promise<AnalisisLeyOut> {
+        const { data } = await api.put(`/laboratorio/ley/${analisisId}`, datos)
+        return data
+    },
+
     async descartarLey(analisisId: number, req: DescartarRequest): Promise<AnalisisLeyOut> {
         const { data } = await api.patch(`/laboratorio/ley/${analisisId}/descartar`, req)
         return data
@@ -165,6 +170,11 @@ export const laboratorioApi = {
     // ── Registro directo (externo via certificado) ────────────────────────────
     async registrarRecuperacion(datos: AnalisisRecuperacionCreate): Promise<AnalisisRecuperacionOut> {
         const { data } = await api.post('/laboratorio/recuperacion', datos)
+        return data
+    },
+
+    async editarRecuperacion(analisisId: number, datos: any): Promise<AnalisisRecuperacionOut> {
+        const { data } = await api.put(`/laboratorio/recuperacion/${analisisId}`, datos)
         return data
     },
 

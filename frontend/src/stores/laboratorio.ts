@@ -204,6 +204,28 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         }
     }
 
+    async function editarLey(analisisId: number, datos: any): Promise<AnalisisLeyOut | null> {
+        try {
+            const result = await laboratorioApi.editarLey(analisisId, datos)
+            ui.toast('Análisis editado correctamente', 'success')
+            return result
+        } catch (e: any) {
+            ui.toast(e?.response?.data?.detail ?? 'Error al editar análisis', 'error')
+            return null
+        }
+    }
+
+    async function editarRecuperacion(analisisId: number, datos: any): Promise<AnalisisRecuperacionOut | null> {
+        try {
+            const result = await laboratorioApi.editarRecuperacion(analisisId, datos)
+            ui.toast('Análisis de recuperación editado correctamente', 'success')
+            return result
+        } catch (e: any) {
+            ui.toast(e?.response?.data?.detail ?? 'Error al editar análisis', 'error')
+            return null
+        }
+    }
+
     // ── Descartar ─────────────────────────────────────────────────────────────
     async function descartarLey(analisisId: number, justificacion: string): Promise<boolean> {
         const ok = await ui.showConfirm({
@@ -329,8 +351,8 @@ export const useLaboratorioStore = defineStore('laboratorio', () => {
         cips, lotes, cargando,
         puedeVerIP, esLaboratorista, modoLaboratorioForzado,
         cargarCips, cargarLotes, cargarDetalleLote,
-        registrarLey,
-        enviarRecuperacion, completarRecuperacion, registrarRecuperacion,
+        registrarLey, editarLey,
+        enviarRecuperacion, completarRecuperacion, registrarRecuperacion, editarRecuperacion,
         descartarLey, descartarRecuperacion,
         eliminarLey, eliminarRecuperacion,
         subirCertificadoLey, subirCertificadoRecuperacion,
