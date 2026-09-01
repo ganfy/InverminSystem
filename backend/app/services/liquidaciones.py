@@ -538,10 +538,11 @@ def _calcular_lote(
         )
 
     # ── Recuperacion ──────────────────────────────────────────────────────────
+    original_rec_liq = _determinar_rec_liq(oz_promedio, params, db, lote.id)
     if rec_liq_override is not None:
         rec_liq = rec_liq_override
     else:
-        rec_liq = _determinar_rec_liq(oz_promedio, params, db, lote.id)
+        rec_liq = original_rec_liq
 
     if rec_liq is None:
         alertas.append(
@@ -552,7 +553,7 @@ def _calcular_lote(
             )
         )
         return {}, alertas
-    rec_planta_val = _rec_planta(db, lote.id) or rec_liq
+    rec_planta_val = _rec_planta(db, lote.id) or original_rec_liq
 
     # ── Maquila y precio ──────────────────────────────────────────────────────
     maquila = _calc_maquila(oz_promedio, maquila_base)
@@ -981,13 +982,21 @@ def obtener_liquidacion(db: Session, liquidacion_id: int) -> LiquidacionDetalleO
             joinedload(Liquidacion.liquidacion_lotes)
             .joinedload(LiquidacionLote.lote)
             .joinedload(Lote.pesajes),
+            joinedload(Liquidacion.liquidacion_lotes)
+            .joinedload(LiquidacionLote.lote)
+            .joinedload(Lote.muestreos),
+            joinedload(Liquidacion.liquidacion_lotes)
+            .joinedload(LiquidacionLote.lote)
+            .joinedload(Lote.sesion)
+            .joinedload(SesionDescarga.provacop)
+            .joinedload(ProveedorAcopiador.parametros),
         )
         .filter(Liquidacion.id == liquidacion_id)
         .first()
     )
     if not liq:
         return None
-    return _to_detalle(liq)
+    return _to_detalle(db, liq)
 
 
 def cambiar_estado(
@@ -1086,7 +1095,7 @@ def _to_resumen(liq: Liquidacion) -> LiquidacionResumenOut:
     )
 
 
-def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
+def _to_lote_out(db: Session, ll: LiquidacionLote) -> LiquidacionLoteOut:
     prov_nombre = "—"
     if ll.lote and ll.lote.sesion:
         if (
@@ -1097,6 +1106,29 @@ def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
             prov_nombre = ll.lote.sesion.provacop.proveedor.razon_social
         elif ll.lote.sesion.razon_social:
             prov_nombre = ll.lote.sesion.razon_social
+
+    p_maquila, p_rec, p_consumo, p_leyes, p_total = None, None, None, None, None
+    if ll.lote:
+        try:
+            calc_dict, _ = _calcular_lote(
+                db,
+                ll.lote,
+                spot_usd_override=ll.spot_usd_snapshot or Decimal("0"),
+                bono=ll.bono or Decimal("0"),
+                rec_liq_override=ll.porcentaje_rec_liquido,
+                gasto_acopio_override=ll.gasto_acopio_liquidacion,
+                gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
+                - (ll.gasto_acopio_liquidacion or Decimal("0")),
+                spot_ag_usd_override=ll.spot_ag_snapshot,
+                valorizar_volado=bool(ll.lote.volado),
+            )
+            p_maquila = calc_dict.get("profit_maquila")
+            p_rec = calc_dict.get("profit_rec")
+            p_consumo = calc_dict.get("profit_consumo")
+            p_leyes = calc_dict.get("profit_leyes")
+            p_total = calc_dict.get("profit_total")
+        except Exception:
+            pass
 
     return LiquidacionLoteOut(
         liquidacion_id=ll.liquidacion_id,
@@ -1133,12 +1165,17 @@ def _to_lote_out(ll: LiquidacionLote) -> LiquidacionLoteOut:
         valor_ag_usd=ll.valor_ag_usd,
         aplica_ag=bool(ll.valor_ag_usd and ll.valor_ag_usd > 0),
         volado=bool(ll.lote.volado) if ll.lote else False,
+        profit_maquila=p_maquila,
+        profit_rec=p_rec,
+        profit_consumo=p_consumo,
+        profit_leyes=p_leyes,
+        profit_total=p_total,
     )
 
 
-def _to_detalle(liq: Liquidacion) -> LiquidacionDetalleOut:
+def _to_detalle(db: Session, liq: Liquidacion) -> LiquidacionDetalleOut:
     resumen = _to_resumen(liq)
-    lotes = [_to_lote_out(ll) for ll in liq.liquidacion_lotes]
+    lotes = [_to_lote_out(db, ll) for ll in liq.liquidacion_lotes]
     return LiquidacionDetalleOut(
         **resumen.model_dump(),
         lotes=lotes,
