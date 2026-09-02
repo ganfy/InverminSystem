@@ -54,7 +54,7 @@ _TEMPLATE = """
 <style>
   @page {{
       size: A4;
-      margin: 20mm 18mm;
+      margin: 22mm 22mm;
       background-size: cover;
   }}
   body {{ font-family: Arial, sans-serif; font-size: 11px; color: #222; }}
@@ -66,38 +66,60 @@ _TEMPLATE = """
       width: 200%;
       height: 200%;
       z-index: -50;
-
-      /*
-         1. linear-gradient es una capa blanca al 95% de opacidad (rgba = 0.95).
-         2. url() es la capa de tu logo que va debajo de esa capa blanca. */
       background-image:
           linear-gradient(rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0.50)),
           url('{logo_b64}');
-
       background-repeat: repeat;
-      background-size: 100px;         /* TAMAÑO DEL LOGO: baja este número para hacerlos más chiquitos (ej. 80px) */
+      background-size: 100px;
       background-position: center;
-      transform: rotate(-30deg);      /* Inclinación */
+      transform: rotate(-30deg);
   }}
 
-  .logo-header {{ width: 220px; margin-bottom: 10px; }}
+  .logo-header {{ width: 240px; margin-bottom: 14px; }}
   .empresa-nombre {{ font-size: 16px; font-weight: bold; color: #c8a84b; }}
   .empresa-sub {{ font-size: 10px; color: #555; font-style: italic; }}
-  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 8px 0; }}
-  .titulo-cert {{ text-align: center; font-size: 14px; font-weight: bold; letter-spacing: 1px; margin: 10px 0 2px; }}
-  .n-cert {{ text-align: center; color: #c8a84b; font-size: 11px; font-weight: bold; margin-bottom: 12px; }}
-  .seccion {{ margin-bottom: 10px; }}
-  .kv-row {{ display: table; width: 100%; margin-bottom: 4px; }}
-  .kv-label {{ display: table-cell; width: 160px; color: #555; }}
-  .kv-val {{ display: table-cell; font-weight: bold; }}
+  .linea-gold {{ border: none; border-top: 3px solid #c8a84b; margin: 12px 0; }}
+  .linea-gold-thin {{ border: none; border-top: 1.5px solid #c8a84b; margin: 10px 0; }}
 
-  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-  table.detalle th {{ background: #e8e0cc; font-size: 10px; padding: 6px; border: 1px solid #bbb; }}
-  table.detalle td {{ padding: 8px; border: 1px solid #ccc; text-align: center; font-family: monospace; font-size: 12px; }}
+  .titulo-cert {{ text-align: center; font-size: 15px; font-weight: bold; letter-spacing: 1px; margin: 16px 0 4px; }}
+  .n-cert {{ text-align: center; color: #c8a84b; font-size: 12px; font-weight: bold; margin-bottom: 20px; }}
 
-  .firma-bloque {{ margin-top: 60px; text-align: center; }}
-  .firma-linea {{ display: inline-block; width: 220px; border-top: 1px solid #333; padding-top: 4px; font-weight: bold; font-size: 10px; }}
-  .pie {{ font-size: 9px; color: #555; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 8px; }}
+  .seccion {{ margin-bottom: 14px; }}
+  .seccion-titulo {{
+      font-size: 10px; font-weight: bold; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 8px; color: #333;
+  }}
+
+  .kv-row {{ display: table; width: 100%; margin-bottom: 6px; }}
+  .kv-label {{ display: table-cell; width: 175px; color: #555; font-size: 11px; }}
+  .kv-val {{ display: table-cell; font-weight: bold; font-size: 11px; }}
+
+  table.detalle {{ width: 100%; border-collapse: collapse; margin-top: 14px; margin-bottom: 14px; }}
+  table.detalle th {{
+      background: #e8e0cc; font-size: 10.5px; padding: 8px 10px;
+      border: 1px solid #bbb; text-align: center;
+  }}
+  table.detalle td {{
+      padding: 10px; border: 1px solid #ccc; text-align: center;
+      font-family: monospace; font-size: 13px;
+  }}
+
+  .nota-box {{
+      background: #fffde7; border: 1px solid #e0d58a;
+      padding: 10px 14px; margin-top: 24px; margin-bottom: 6px;
+      font-size: 10px; line-height: 1.6;
+  }}
+  .nota-titulo {{ font-weight: bold; text-decoration: underline; margin-bottom: 4px; display: block; }}
+
+  .firma-bloque {{ margin-top: 70px; text-align: center; }}
+  .firma-linea {{
+      display: inline-block; width: 240px; border-top: 1px solid #333;
+      padding-top: 5px; font-weight: bold; font-size: 10px;
+  }}
+
+  .pie-separador {{ border: none; border-top: 1px solid #ccc; margin-top: 30px; margin-bottom: 6px; }}
+  .pie {{ font-size: 9px; color: #555; line-height: 1.5; }}
+  .pie-empresa {{ font-size: 9px; color: #555; margin-top: 4px; }}
 </style>
 </head>
 <body>
@@ -112,17 +134,29 @@ _TEMPLATE = """
 <div class="titulo-cert">INFORME DE ENSAYO</div>
 <div class="n-cert">N&deg; LQ {n_lq}</div>
 
+<!-- DATOS DEL CLIENTE -->
 <div class="seccion">
   <div class="kv-row"><span class="kv-label">Cliente</span><span class="kv-val">: {cliente}</span></div>
   <div class="kv-row"><span class="kv-label">Referencia</span><span class="kv-val">: {referencia}</span></div>
-  <div class="kv-row"><span class="kv-label">Solicitud de Ensayo</span><span class="kv-val">: Análisis por Au</span></div>
-</div>
-<hr class="linea-gold"/>
-<div class="seccion">
-  <div class="kv-row"><span class="kv-label">Fecha de Recepcion</span><span class="kv-val">: {fecha_recepcion}</span></div>
-  <div class="kv-row"><span class="kv-label">Termino de Analisis</span><span class="kv-val">: {fecha_termino}</span></div>
+  <div class="kv-row"><span class="kv-label">Solicitud de Ensayo</span><span class="kv-val">: ANÁLISIS POR AU</span></div>
 </div>
 
+<hr class="linea-gold"/>
+
+<!-- RECEPCIÓN DE MUESTRAS -->
+<div class="seccion">
+  <div class="seccion-titulo">Recepci&oacute;n de Muestras</div>
+  <div class="kv-row"><span class="kv-label">Descripci&oacute;n</span><span class="kv-val">: POLVEADO</span></div>
+  <div class="kv-row"><span class="kv-label">Envase</span><span class="kv-val">: BOLSA DE PLÁSTICO</span></div>
+  <div class="kv-row"><span class="kv-label">Fecha de Recepci&oacute;n</span><span class="kv-val">: {fecha_recepcion}</span></div>
+  <div class="kv-row"><span class="kv-label">T&eacute;rmino de An&aacute;lisis</span><span class="kv-val">: {fecha_termino}</span></div>
+  <div class="kv-row"><span class="kv-label">M&eacute;todo de Ensayo</span><span class="kv-val">: NEWMONT</span></div>
+</div>
+
+<hr class="linea-gold"/>
+
+<!-- DETALLE DEL INFORME -->
+<div class="seccion-titulo" style="margin-top:4px;">Detalle del Informe</div>
 <table class="detalle">
   <thead><tr>{cabecera_detalle}</tr></thead>
   <tbody>{filas_detalle}</tbody>
@@ -130,9 +164,23 @@ _TEMPLATE = """
 
 {bloque_notas}
 
+<!-- NOTA IMPORTANTE -->
+<div class="nota-box">
+  <span class="nota-titulo">NOTA IMPORTANTE:</span>
+  El cliente cuenta con un plazo de tres (3) d&iacute;as, contados a partir de la recepci&oacute;n del
+  certificado, para presentar el resultado de su contramuestra o solicitar un remuestreo. Vencido
+  dicho plazo sin que se formulen observaciones, se considerar&aacute; aceptada la ley reportada y
+  se proceder&aacute; a emitir la liquidaci&oacute;n correspondiente.
+</div>
+
+<!-- PIE DE PÁGINA -->
+<hr class="pie-separador"/>
 <div class="pie">
-    Los resultados obtenidos corresponden a FIRE ASSAY (análisis gravimétrico).<br/>
-    <strong>{empresa_nombre}</strong> - {empresa_direccion}
+  Los resultados obtenidos y que se consigna en el presente informe corresponde FIRE ASSAY o an&aacute;lisis
+  gravim&eacute;trico en las muestras recepcionadas por el cliente.
+</div>
+<div class="pie-empresa" style="margin-top:6px;">
+  <strong>{empresa_nombre}</strong> &mdash; {empresa_direccion}
 </div>
 
 </body>
@@ -217,7 +265,7 @@ def generar_certificado_ley_comercial_pdf(
     try:
         proveedor = lote.sesion.provacop.proveedor
         cliente_nombre = proveedor.razon_social or "-"
-        referencia = proveedor.referencia or f"IP-{lote.ip}"
+        referencia = proveedor.referencia or f"{lote.ip}"
     except AttributeError:
         cliente_nombre = "-"
         referencia = lote.ip
