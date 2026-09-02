@@ -161,7 +161,7 @@
             </td>
             <td class="td-mono">
               <span v-if="prueba.adicion_nacn != null && prueba.gasto_agno3 != null" class="adicion-badge" style="background-color: var(--color-bg-alt); color: var(--color-text-highlight);">
-                {{ Math.max(0, ((prueba.adicion_nacn / 30) - prueba.gasto_agno3) * 30).toFixed(2) }}g
+                {{ Math.max(0, ((prueba.adicion_nacn / 30) - prueba.gasto_agno3 *0.025*0.98) * 30).toFixed(2) }}g
               </span>
               <span v-else class="td-mono" style="color:var(--color-text-faint)" title="Falta titulación (gasto AgNO3)">—</span>
             </td>
