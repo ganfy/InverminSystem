@@ -101,7 +101,13 @@
                   <td @click.stop>
                     <input type="checkbox" :checked="lotesSeleccionados.includes(lote.ip)" @change="toggleLote(lote.ip)" class="check" />
                   </td>
-                  <td class="td-mono" style="color:var(--color-gold)">{{ lote.ip }}</td>
+                  <td class="td-mono" style="color:var(--color-gold)">
+                    <span
+                      v-if="lote.ip_hermanos?.length"
+                      class="hermano-ico"
+                      :title="`Partición documentaria — hermano(s): ${lote.ip_hermanos.join(', ')}`"
+                    >⧡</span>{{ lote.ip }}
+                  </td>
                   <td class="td-mono td-muted">{{ lote.guia_remision || '—' }}</td>
                   <td class="td-muted">{{ lote.proveedor || '—' }}</td>
                   <td class="td-muted">{{ lote.tipo_material || '—' }}</td>
@@ -555,9 +561,17 @@
   const provacopSeleccionado = computed(() => provacops.value.find(p => p.id === provacopId.value))
   const tituloPaso = computed(() => ['Selección de lotes', 'Revisión de valores', 'Confirmar'][paso.value - 1])
 
-  const lotesListos = computed(() =>
-    store.lotesDisponibles.filter(l => l.listo_para_liquidar)
-  )
+  const lotesListos = computed(() => {
+    const filtrados = store.lotesDisponibles.filter(l => l.listo_para_liquidar)
+    filtrados.sort((a, b) => {
+      // Agrupar hermanos contiguos: usar el primer hermano como clave de grupo
+      const claveA = (a.ip_hermanos?.length ? [...a.ip_hermanos, a.ip].sort()[0] : a.ip)
+      const claveB = (b.ip_hermanos?.length ? [...b.ip_hermanos, b.ip].sort()[0] : b.ip)
+      if (claveA !== claveB) return claveA.localeCompare(claveB)
+      return a.ip.localeCompare(b.ip)
+    })
+    return filtrados
+  })
 
   const todosSeleccionados = computed(() =>
     lotesListos.value.length > 0 &&
@@ -1001,5 +1015,14 @@ async function recalcularConOverrides() {
     background: rgba(234,179,8,0.12); border: 1px solid rgba(234,179,8,0.35);
     color: #92400e; border-radius: 4px; padding: 1px 5px;
     font-size: 0.8rem; font-weight: 700; white-space: nowrap;
+  }
+  .hermano-ico {
+    font-size: 9px;
+    color: var(--color-text-muted);
+    opacity: 0.5;
+    margin-right: 3px;
+    vertical-align: middle;
+    cursor: default;
+    user-select: none;
   }
   </style>

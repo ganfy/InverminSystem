@@ -5,6 +5,7 @@ import type {
     AnalisisRecuperacionCreate,
     AnalisisRecuperacionOut,
     CIPAnalisisOut,
+    CompletarPorReferenciaResponse,
     CompletarRecuperacionRequest,
     DescartarRequest,
     EnviarRecuperacionInternaRequest,
@@ -408,6 +409,31 @@ export const laboratorioApi = {
         }
     ): Promise<AnalisisLeyOut> {
         const { data } = await api.post(`/laboratorio/lotes/${ip}/ley`, datos)
+        return data
+    },
+
+    // ── Hermanos ───────────────────────────────────────────────────────────────
+    async vincularHermanos(ipA: string, ipB: string, notas?: string): Promise<{ ok: boolean }> {
+        const { data } = await api.post('/laboratorio/hermanos/vincular', {
+            ip_a: ipA,
+            ip_b: ipB,
+            notas: notas ?? null,
+        })
+        return data
+    },
+
+    async desvincularHermano(ip: string): Promise<{ ok: boolean }> {
+        const { data } = await api.delete(`/laboratorio/hermanos/${ip}`)
+        return data
+    },
+
+    async completarPorReferencia(
+        ip: string,
+        ipFuente: string
+    ): Promise<CompletarPorReferenciaResponse> {
+        const { data } = await api.post(`/laboratorio/lotes/${ip}/completar-por-referencia`, {
+            ip_fuente: ipFuente,
+        })
         return data
     },
 }

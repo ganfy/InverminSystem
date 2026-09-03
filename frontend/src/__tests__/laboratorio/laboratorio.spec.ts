@@ -312,6 +312,56 @@ describe('LaboratorioDashboardView - rol Laboratorista', () => {
         // El IP real NO debe aparecer (confidencialidad)
         expect(wrapper.text()).not.toContain('IP-0001')
     })
+
+    it('excluye registros con origen_datos = "referencia"', async () => {
+        const cipNormalLey = {
+            ...cipFake,
+            cip: 'CIP-LEY-MANUAL',
+            tipo_muestra: 'Laboratorio',
+            analisis_ley: [{ id: 1, vigente: true, material: 'Au', origen_datos: 'manual', ley_fino: 0.5, ley_grueso: 0.2, ley_final: 0.7, ley_gr_tm: 24.0, tipo_analisis: 'planta' }]
+        }
+        const cipRefLey = {
+            ...cipFake,
+            cip: 'CIP-LEY-REF',
+            tipo_muestra: 'Laboratorio',
+            analisis_ley: [{ id: 2, vigente: true, material: 'Au', origen_datos: 'referencia', ley_fino: 0.5, ley_grueso: 0.2, ley_final: 0.7, ley_gr_tm: 24.0, tipo_analisis: 'planta' }]
+        }
+        const cipRefSolidos = {
+            ...cipFake,
+            cip: 'CIP-REC-REF',
+            tipo_muestra: 'RecuperacionInterno',
+            analisis_recuperacion: [{ id: 3, vigente: true, sub_tipo: 'SOLIDOS', origen_datos: 'referencia', ley_cola: 0.1, estado: 'COMPLETADO' }]
+        }
+
+        vi.mocked(laboratorioApi.listarCips).mockResolvedValue([cipNormalLey, cipRefLey, cipRefSolidos] as any)
+        vi.mocked(laboratorioApi.listarLotes).mockResolvedValue([])
+
+        const wrapper = mount(LaboratorioDashboardView, {
+            global: {
+                plugins: [
+                    createTestingPinia({
+                        createSpy: vi.fn,
+                        initialState: {
+                            auth: { user: { rol: 'Laboratorista', nombre_completo: 'Lab User' } },
+                            laboratorio: { cips: [cipNormalLey, cipRefLey, cipRefSolidos], lotes: [] },
+                        },
+                    }),
+                ],
+                stubs: { RouterLink: true, RouterView: true },
+            },
+        })
+
+        await flushPromises()
+        // Tab Ley (Newmont)
+        expect(wrapper.text()).toContain('CIP-LEY-MANUAL')
+        expect(wrapper.text()).not.toContain('CIP-LEY-REF')
+
+        // Cambiar a pestaña Sólidos
+        const buttons = wrapper.findAll('.tab-lab-btn')
+        await buttons[1].trigger('click')
+        await flushPromises()
+        expect(wrapper.text()).not.toContain('CIP-REC-REF')
+    })
 })
 
 // ============================================================

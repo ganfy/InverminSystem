@@ -58,7 +58,11 @@ from app.schemas.liquidaciones import (
     LoteFinancieroOut,
 )
 from app.services.config_calculo import get_constantes
-from app.services.laboratorio import calcular_ley_comercial, obtener_ley_ag_vigente
+from app.services.laboratorio import (
+    _get_ip_hermanos,
+    calcular_ley_comercial,
+    obtener_ley_ag_vigente,
+)
 from app.services.spot_historico import fecha_efectiva_spot, get_spot_para_fecha
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -619,7 +623,17 @@ def _calcular_lote(
         .first()
     )
     soda_w = Decimal(str(pm.adicion_naoh)) if pm and pm.adicion_naoh else Decimal("3.0")
-    cianuro_x = Decimal(str(pm.adicion_nacn)) if pm and pm.adicion_nacn else Decimal("3.0")
+    if pm and pm.adicion_nacn:
+        if pm.gasto_agno3 is not None:
+            adicion = Decimal(str(pm.adicion_nacn))
+            gasto = Decimal(str(pm.gasto_agno3))
+            cianuro_x = ((adicion / Decimal("30")) - gasto * 0.025 * 0.98) * Decimal("30")
+            if cianuro_x < Decimal("0"):
+                cianuro_x = Decimal("0")
+        else:
+            cianuro_x = Decimal(str(pm.adicion_nacn))
+    else:
+        cianuro_x = Decimal("3.0")
 
     # Evaluacion de proveedor para formula de consumo
     proveedor_nombre = (
@@ -648,11 +662,18 @@ def _calcular_lote(
 
     profit_maquila = (maquila - bono) * FACTOR - costo_fijo_planta
     profit_rec = (rec_planta_val - rec_liq) * (spot_usd - riesgo) * ley_planta * FACTOR / 100
-    profit_consumo = (gasto_acopio * FACTOR - Decimal("70")) + FACTOR * (
+    profit_consumo = (gasto_acopio * FACTOR - constantes.gasto_fijo_planta_admin) + FACTOR * (
         gasto_consumo - descuento_consumo
     )
     profit_leyes = (ley_planta - oz_promedio) * (spot_usd - riesgo) * rec_planta_val * FACTOR / 100
-    profit_total = profit_maquila + profit_rec + profit_consumo + profit_leyes
+    profit_total = (
+        profit_maquila
+        + profit_rec
+        + profit_consumo
+        + profit_leyes
+        + constantes.gasto_fijo_planta_admin
+        - constantes.gasto_fijo_acopio_admin
+    )
 
     # ── Alertas no criticas ───────────────────────────────────────────────────
     if lote.volado:
@@ -1369,6 +1390,7 @@ def lotes_disponibles_para_liquidar(
                 if lote.sesion and lote.sesion.provacop
                 else "—",
                 "guia_remision": lote.sesion.guia_remision if lote.sesion else None,
+                "ip_hermanos": _get_ip_hermanos(db, lote.id),
             }
         )
 

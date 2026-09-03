@@ -21,6 +21,7 @@ from app.models.models import (
     Configuracion,
     Lote,
     MapeoCIP,
+    Muestreo,
     ProveedorAcopiador,
     PruebaMetalurgica,
     SesionDescarga,
@@ -46,7 +47,7 @@ from app.schemas.laboratorio import (
 )
 from app.services.config_calculo import DEFAULTS, get_constantes, get_quantize_decimal
 from app.services.pruebas import calcular_ley_planta
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 STORAGE_PATH = Path(os.getenv("STORAGE_PATH", "storage"))
@@ -212,6 +213,7 @@ def _ley_out(
         if (a.material == "Ag" and not a.ley_final)
         else (a.ley_final or Decimal("0")),
         ley_gr_tm=a.ley_gr_tm or Decimal("0"),
+        origen_datos=a.origen_datos,
         vigente=a.vigente,
         fecha_analisis=a.fecha_analisis,
         certificado_url=a.certificado_url,
@@ -352,6 +354,26 @@ def obtener_cips_laboratorio(
 # ── Vista Comercial: lista por Lote/IP ────────────────────────────────────────
 
 
+def _get_ip_hermanos(db: Session, lote_id: int) -> list[str]:
+    """Devuelve los IPs de los demás lotes del mismo grupo hermano, excluido el lote dado."""
+    from app.models.models import LoteHermano
+
+    entry = db.query(LoteHermano).filter(LoteHermano.lote_id == lote_id).first()
+    if not entry:
+        return []
+    otros = (
+        db.query(LoteHermano)
+        .filter(LoteHermano.grupo_id == entry.grupo_id, LoteHermano.lote_id != lote_id)
+        .all()
+    )
+    result = []
+    for o in otros:
+        lote = db.query(Lote).filter(Lote.id == o.lote_id).first()
+        if lote:
+            result.append(lote.ip)
+    return result
+
+
 def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) -> LoteLabOut:
     try:
         proveedor = lote.sesion.provacop.proveedor.razon_social
@@ -486,6 +508,13 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         elif diff_labs > umbral_ree:
             alerta_diferencia_ree = diff_labs
 
+    # ── Hermanos ───────────────────────────────────────────────────────────────────
+    ip_hermanos = _get_ip_hermanos(db, lote.id)
+    completado_por_referencia = any(
+        getattr(a, "origen_datos", None) == OrigenDatos.REFERENCIA
+        for a in analisis_ley + analisis_rec
+    )
+
     return LoteLabOut(
         ip=lote.ip,
         lote_id=lote.id,
@@ -511,6 +540,8 @@ def _build_lote_lab_out(db: Session, lote: Lote, material: str | None = None) ->
         else None,
         alerta_diferencia_analisis=alerta_diferencia_analisis,
         alerta_diferencia_ree=alerta_diferencia_ree,
+        ip_hermanos=ip_hermanos,
+        completado_por_referencia=completado_por_referencia,
     )
 
 
@@ -552,6 +583,359 @@ def obtener_detalle_lote(db: Session, ip: str, material: str | None = None) -> L
     if not lote:
         return None
     return _build_lote_lab_out(db, lote, material=material)
+
+
+# ── Hermanos ───────────────────────────────────────────────────────────────
+
+
+def vincular_hermanos(
+    db: Session, ip_a: str, ip_b: str, usuario_id: int, notas: str | None = None
+) -> None:
+    from app.models.models import GrupoHermanos, LoteHermano
+
+    if ip_a == ip_b:
+        raise HTTPException(status_code=400, detail="Un lote no puede ser hermano de sí mismo")
+
+    lote_a = db.query(Lote).filter(Lote.ip == ip_a, ~Lote.eliminado).first()
+    lote_b = db.query(Lote).filter(Lote.ip == ip_b, ~Lote.eliminado).first()
+    if not lote_a:
+        raise HTTPException(status_code=404, detail=f"Lote {ip_a} no encontrado")
+    if not lote_b:
+        raise HTTPException(status_code=404, detail=f"Lote {ip_b} no encontrado")
+
+    entry_a = db.query(LoteHermano).filter(LoteHermano.lote_id == lote_a.id).first()
+    entry_b = db.query(LoteHermano).filter(LoteHermano.lote_id == lote_b.id).first()
+
+    # Ya en el mismo grupo — noop
+    if entry_a and entry_b and entry_a.grupo_id == entry_b.grupo_id:
+        return
+
+    now = datetime.utcnow()
+
+    # A tiene grupo, B se une
+    if entry_a and not entry_b:
+        db.add(
+            LoteHermano(
+                grupo_id=entry_a.grupo_id,
+                lote_id=lote_b.id,
+                creado_por=usuario_id,
+                creado_en=now,
+            )
+        )
+        db.commit()
+        return
+
+    # B tiene grupo, A se une
+    if entry_b and not entry_a:
+        db.add(
+            LoteHermano(
+                grupo_id=entry_b.grupo_id,
+                lote_id=lote_a.id,
+                creado_por=usuario_id,
+                creado_en=now,
+            )
+        )
+        db.commit()
+        return
+
+    # Ninguno tiene grupo — crear grupo nuevo con ambos
+    grupo = GrupoHermanos(notas=notas, creado_por=usuario_id, creado_en=now)
+    db.add(grupo)
+    db.flush()
+    db.add_all(
+        [
+            LoteHermano(grupo_id=grupo.id, lote_id=lote_a.id, creado_por=usuario_id, creado_en=now),
+            LoteHermano(grupo_id=grupo.id, lote_id=lote_b.id, creado_por=usuario_id, creado_en=now),
+        ]
+    )
+    db.commit()
+
+
+def desvincular_hermano(db: Session, ip: str, usuario_id: int) -> None:
+    from app.models.models import GrupoHermanos, LoteHermano
+
+    lote = db.query(Lote).filter(Lote.ip == ip, ~Lote.eliminado).first()
+    if not lote:
+        raise HTTPException(status_code=404, detail=f"Lote {ip} no encontrado")
+
+    entry = db.query(LoteHermano).filter(LoteHermano.lote_id == lote.id).first()
+    if not entry:
+        return  # noop
+
+    grupo_id = entry.grupo_id
+    db.delete(entry)
+    db.flush()
+
+    restantes = db.query(LoteHermano).filter(LoteHermano.grupo_id == grupo_id).count()
+    if restantes < 2:
+        # Grupo quedó con 0 o 1 miembro — disolver
+        db.query(LoteHermano).filter(LoteHermano.grupo_id == grupo_id).delete()
+        db.query(GrupoHermanos).filter(GrupoHermanos.id == grupo_id).delete()
+    db.commit()
+
+
+def completar_por_referencia(db: Session, ip_destino: str, ip_fuente: str, usuario_id: int) -> dict:
+    from app.models.enums import EstadoRecuperacion, TipoAnalisis
+    from app.models.models import LoteHermano
+    from app.services.muestreo import generar_base_cip
+
+    lote_dst = db.query(Lote).filter(Lote.ip == ip_destino, ~Lote.eliminado).first()
+    lote_src = db.query(Lote).filter(Lote.ip == ip_fuente, ~Lote.eliminado).first()
+    if not lote_dst:
+        raise HTTPException(status_code=404, detail=f"Lote {ip_destino} no encontrado")
+    if not lote_src:
+        raise HTTPException(status_code=404, detail=f"Lote {ip_fuente} no encontrado")
+
+    # Guardia: deben ser hermanos vinculados
+    entry_dst = db.query(LoteHermano).filter(LoteHermano.lote_id == lote_dst.id).first()
+    entry_src = db.query(LoteHermano).filter(LoteHermano.lote_id == lote_src.id).first()
+    if not (entry_dst and entry_src and entry_dst.grupo_id == entry_src.grupo_id):
+        raise HTTPException(status_code=400, detail="Los lotes no están vinculados como hermanos")
+
+    # Guardia: ya fue completado por referencia
+    ya_completado = (
+        db.query(AnalisisLey)
+        .filter(
+            AnalisisLey.lote_id == lote_dst.id,
+            AnalisisLey.origen_datos == OrigenDatos.REFERENCIA,
+            AnalisisLey.vigente == True,  # noqa: E712
+            AnalisisLey.eliminado == False,  # noqa: E712
+        )
+        .first()
+    )
+    if ya_completado:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{ip_destino} ya tiene análisis REFERENCIA vigentes. "
+                "Descártalos primero si necesitas rehacerlo."
+            ),
+        )
+
+    # Guardia: fuente debe tener muestreo
+    muestreo_src = (
+        db.query(Muestreo)
+        .filter(Muestreo.lote_id == lote_src.id)
+        .order_by(Muestreo.intento.desc())
+        .first()
+    )
+    if not muestreo_src:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{ip_fuente} no tiene muestreo; no hay datos de humedad para copiar",
+        )
+
+    # Guardia: fuente debe tener CIPs
+    cips_src = (
+        db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote_src.id).order_by(MapeoCIP.id).all()
+    )
+    if not cips_src:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{ip_fuente} no tiene CIPs registrados; no hay análisis para copiar",
+        )
+
+    now = datetime.utcnow()
+
+    # ── 1. Muestreo: copiar humedad y recalcular TMS con peso propio del destino ─────
+    #    Solo si el destino aún no tiene su propio muestreo.
+    tms_dst: float | None = None
+    if not db.query(Muestreo).filter(Muestreo.lote_id == lote_dst.id).first():
+        pesaje_dst = lote_dst.pesajes[0] if lote_dst.pesajes else None
+        if pesaje_dst and pesaje_dst.peso_neto:
+            tmh_dst = float(pesaje_dst.peso_neto)
+            humedad = float(muestreo_src.porcentaje_humedad)
+            tms_dst = round(tmh_dst * (1 - humedad / 100), 4)
+            db.add(
+                Muestreo(
+                    lote_id=lote_dst.id,
+                    intento=1,
+                    peso_humedo=muestreo_src.peso_humedo,
+                    peso_seco=muestreo_src.peso_seco,
+                    tms_calculado=tms_dst,
+                    # porcentaje_humedad: NO asignar — columna Computed
+                    observaciones=f"Completado por referencia desde {ip_fuente}",
+                    creado_por=usuario_id,
+                    creado_en=now,
+                )
+            )
+
+    # ── 2. CIPs y análisis: un CIP destino por cada CIP fuente ───────────────────────
+    #    Si el destino ya tiene CIPs propios los reutiliza (por posición).
+    #    Para los CIPs faltantes genera códigos nuevos preservando el sufijo (A1, REE…).
+    cips_dst_existentes = (
+        db.query(MapeoCIP).filter(MapeoCIP.lote_id == lote_dst.id).order_by(MapeoCIP.id).all()
+    )
+
+    cips_generados: list[str] = []
+    ley_copiados = 0
+    rec_copiados = 0
+
+    for pos, cip_src in enumerate(cips_src):
+        # Determinar código CIP destino para esta posición
+        if pos < len(cips_dst_existentes):
+            codigo_cip_dst = cips_dst_existentes[pos].codigo_cip
+        else:
+            # Preservar el sufijo (A1, A2, REE, etc.) del CIP fuente
+            partes = cip_src.codigo_cip.rsplit("-", 1)
+            sufijo = partes[-1] if len(partes) == 2 else f"A{pos + 1}"
+            base_ofuscada = generar_base_cip(lote_dst.id, salt=pos + 1)
+            codigo_cip_dst = f"CIP-{base_ofuscada}-{sufijo}"
+            db.add(
+                MapeoCIP(
+                    lote_id=lote_dst.id,
+                    codigo_cip=codigo_cip_dst,
+                    laboratorio=cip_src.laboratorio,
+                    tipo_muestra=cip_src.tipo_muestra,
+                    fecha_envio=cip_src.fecha_envio or now.date(),
+                )
+            )
+            db.flush()
+
+        cips_generados.append(codigo_cip_dst)
+
+        # ── Análisis de Ley para este CIP ─────────────────────────────────────────
+        analisis_ley_src = (
+            db.query(AnalisisLey)
+            .filter(
+                AnalisisLey.cip == cip_src.codigo_cip,
+                AnalisisLey.vigente == True,  # noqa: E712
+                AnalisisLey.eliminado == False,  # noqa: E712
+                AnalisisLey.tipo_analisis != TipoAnalisis.COMERCIAL,
+            )
+            .all()
+        )
+        for a in analisis_ley_src:
+            nuevo_a = AnalisisLey(
+                lote_id=lote_dst.id,
+                cip=codigo_cip_dst,
+                laboratorio=a.laboratorio,
+                tipo_analisis=a.tipo_analisis,
+                material=a.material,
+                ley_fino=a.ley_fino,
+                ley_grueso=a.ley_grueso,
+                ley_final=a.ley_final,  # campo normal (no Computed) — se copia explícitamente
+                ley_gr_tm=a.ley_gr_tm,
+                origen_datos=OrigenDatos.REFERENCIA,
+                fecha_analisis=a.fecha_analisis,
+                vigente=True,
+                creado_por=usuario_id,
+                creado_en=now,
+            )
+            db.add(nuevo_a)
+            db.flush()
+            for d in a.detalles:
+                db.add(
+                    AnalisisDetalle(
+                        analisis_id=nuevo_a.id,
+                        origen=d.origen,
+                        peso=d.peso,
+                        ley=d.ley,
+                        numero_ensayo=d.numero_ensayo,
+                        mineral_mg=d.mineral_mg,
+                    )
+                )
+            ley_copiados += 1
+
+        # ── Análisis de Recuperación para este CIP ────────────────────────────────
+        rec_src_list = (
+            db.query(AnalisisRecuperacion)
+            .filter(
+                AnalisisRecuperacion.cip == cip_src.codigo_cip,
+                AnalisisRecuperacion.vigente == True,  # noqa: E712
+                AnalisisRecuperacion.eliminado == False,  # noqa: E712
+                AnalisisRecuperacion.estado.notin_(
+                    [
+                        EstadoRecuperacion.CERT_COMERCIAL,
+                        EstadoRecuperacion.CERT_RECONOCIMIENTO,
+                    ]
+                ),
+            )
+            .all()
+        )
+        for r in rec_src_list:
+            nuevo_r = AnalisisRecuperacion(
+                lote_id=lote_dst.id,
+                cip=codigo_cip_dst,
+                laboratorio=r.laboratorio,
+                ley_cabeza=r.ley_cabeza,
+                ley_cola=r.ley_cola,
+                ley_liquido=r.ley_liquido,
+                solucion_ag_g_m3=r.solucion_ag_g_m3,
+                sub_tipo=r.sub_tipo,
+                estado=EstadoRecuperacion.COMPLETADO,
+                origen_datos=OrigenDatos.REFERENCIA,
+                fecha_analisis=r.fecha_analisis,
+                vigente=True,
+                creado_por=usuario_id,
+                creado_en=now,
+                # recuperacion: NO asignar — columna Computed
+            )
+            db.add(nuevo_r)
+            db.flush()
+            for d in r.detalles:
+                db.add(
+                    AnalisisDetalle(
+                        recuperacion_id=nuevo_r.id,
+                        origen=d.origen,
+                        peso=d.peso,
+                        ley=d.ley,
+                        numero_ensayo=d.numero_ensayo,
+                        mineral_mg=d.mineral_mg,
+                    )
+                )
+            rec_copiados += 1
+
+    # ── 3. PruebaMetalurgica de referencia ───────────────────────────────────────────
+    #    Solo si el destino aún no tiene prueba propia.
+    #    Se copia fecha_ingreso y malla_porcentaje del fuente;
+    #    NO se copian insumos (adicion_nacn, adicion_naoh, gasto_agno3)
+    #    porque no se consumieron reactivos en el segundo lote.
+    #    Se asigna el primer CIP de recuperación del destino para que
+    #    Pruebas lo muestre como etiquetado/completado en lugar de pendiente.
+    prueba_dst_existente = (
+        db.query(PruebaMetalurgica)
+        .filter(PruebaMetalurgica.lote_id == lote_dst.id, ~PruebaMetalurgica.descartado)
+        .first()
+    )
+    if not prueba_dst_existente:
+        prueba_src = (
+            db.query(PruebaMetalurgica)
+            .filter(PruebaMetalurgica.lote_id == lote_src.id, ~PruebaMetalurgica.descartado)
+            .order_by(PruebaMetalurgica.id)
+            .first()
+        )
+        if prueba_src:
+            # CIP de recuperación del destino para el campo `cip` de la prueba
+            primer_cip_rec_dst = next(
+                (
+                    c.codigo_cip
+                    for c in cips_dst_existentes
+                    if c.tipo_muestra in ("RecuperacionInterno", "RecuperacionExterno")
+                ),
+                None,
+            )
+            db.add(
+                PruebaMetalurgica(
+                    lote_id=lote_dst.id,
+                    fecha_ingreso=prueba_src.fecha_ingreso,
+                    malla_porcentaje=prueba_src.malla_porcentaje,
+                    # adicion_nacn / adicion_naoh / gasto_agno3: None — no se usaron reactivos
+                    cip=primer_cip_rec_dst,
+                    creado_por=usuario_id,
+                    creado_en=now,
+                )
+            )
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "cips_generados": cips_generados,
+        "tms_calculado": tms_dst,
+        "analisis_ley_copiados": ley_copiados,
+        "analisis_rec_copiados": rec_copiados,
+    }
 
 
 # ── Registro de análisis ──────────────────────────────────────────────────────

@@ -26,6 +26,8 @@ DEFAULTS: dict[str, str] = {
     "unidad_liquidaciones": "TMC",
     "unidad_default": "TM",
     "costo_fijo_planta_maquila": "80",
+    "gasto_fijo_planta_admin": "70",
+    "gasto_fijo_acopio_admin": "53",
     # Muestreo
     "MUESTREO_MAX_INTENTOS": "3",
     "MUESTREO_HUMEDAD_MAX_PCT": "50",
@@ -84,6 +86,8 @@ DESCRIPCIONES: dict[str, str] = {
     "unidad_liquidaciones": "Unidad de peso para el módulo de Liquidaciones (TM, TMC, KG)",
     "unidad_default": "Unidad de peso por defecto en el sistema (TM, TMC, KG)",
     "costo_fijo_planta_maquila": "Costo base operativo de la planta por TM para el cálculo de profit de maquila",
+    "gasto_fijo_planta_admin": "Gasto administrativo fijo de planta para el cálculo de profit (históricamente $70)",
+    "gasto_fijo_acopio_admin": "Gasto administrativo fijo de acopio para el cálculo de profit (históricamente $53)",
     "MUESTREO_MAX_INTENTOS": "Máximo de intentos de muestreo permitidos por lote",
     "MUESTREO_HUMEDAD_MAX_PCT": "Porcentaje de humedad máximo antes de generar un error",
     "MUESTREO_MALLA_MIN_PCT": "Porcentaje de malla mínimo aceptable para muestreo",
@@ -143,6 +147,8 @@ class ConstantesCalculo:
     umbral_volado_oz_tc: Decimal
     blank_correction_ag: Decimal
     costo_fijo_planta_maquila: Decimal
+    gasto_fijo_planta_admin: Decimal
+    gasto_fijo_acopio_admin: Decimal
     decimales_ley_laboratorio: int
     decimales_ley_planta: int
     decimales_ley_comercial: int
@@ -160,6 +166,8 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         "umbral_volado_oz_tc",
         "blank_correction_ag",
         "costo_fijo_planta_maquila",
+        "gasto_fijo_planta_admin",
+        "gasto_fijo_acopio_admin",
         "decimales_ley_laboratorio",
         "decimales_ley_planta",
         "decimales_ley_comercial",
@@ -180,6 +188,8 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         umbral_volado_oz_tc=Decimal(cfg["umbral_volado_oz_tc"]),
         blank_correction_ag=Decimal(cfg["blank_correction_ag"]),
         costo_fijo_planta_maquila=Decimal(cfg["costo_fijo_planta_maquila"]),
+        gasto_fijo_planta_admin=Decimal(cfg["gasto_fijo_planta_admin"]),
+        gasto_fijo_acopio_admin=Decimal(cfg["gasto_fijo_acopio_admin"]),
         decimales_ley_laboratorio=int(cfg["decimales_ley_laboratorio"]),
         decimales_ley_planta=int(cfg["decimales_ley_planta"]),
         decimales_ley_comercial=int(cfg["decimales_ley_comercial"]),

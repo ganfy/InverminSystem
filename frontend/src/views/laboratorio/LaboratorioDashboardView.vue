@@ -494,14 +494,24 @@ watch(pendientesSync, () => {
 })
 
 const pendientesLey = computed(() =>
-  store.cips.filter(c => c.tipo_muestra === 'Laboratorio' && c.estado_ley === 'PENDIENTE').length
+  store.cips.filter(c => {
+    if (c.tipo_muestra !== 'Laboratorio' || c.estado_ley !== 'PENDIENTE') return false
+    const vigente = c.analisis_ley.find(x => x.vigente)
+    const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
+    const a = vigente ?? ultimo
+    return a?.origen_datos?.toLowerCase() !== 'referencia'
+  }).length
 )
 
 const pendientesSolidos = computed(() => {
   let count = 0
   for (const c of store.cips) {
     if (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') {
-      const hasPending = c.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.sub_tipo === 'SOLIDOS')
+      const hasPending = c.analisis_recuperacion.some(a => 
+        a.estado === 'PENDIENTE' && 
+        a.sub_tipo === 'SOLIDOS' && 
+        a.origen_datos?.toLowerCase() !== 'referencia'
+      )
       if (hasPending) count++
     }
   }
@@ -512,7 +522,11 @@ const pendientesSolucion = computed(() => {
   let count = 0
   for (const c of store.cips) {
     if (c.tipo_muestra === 'RecuperacionInterno' || c.tipo_muestra === 'RecuperacionExterno') {
-      const hasPending = c.analisis_recuperacion.some(a => a.estado === 'PENDIENTE' && a.sub_tipo === 'SOLUCION')
+      const hasPending = c.analisis_recuperacion.some(a => 
+        a.estado === 'PENDIENTE' && 
+        a.sub_tipo === 'SOLUCION' && 
+        a.origen_datos?.toLowerCase() !== 'referencia'
+      )
       if (hasPending) count++
     }
   }
@@ -524,6 +538,9 @@ function mapearCIP(c: CIPAnalisisOut) {
     const vigente = c.analisis_ley.find(x => x.vigente && x.material === 'Au')
     const ultimo = c.analisis_ley.filter(x => x.material === 'Au').pop()
     const a = vigente ?? ultimo
+    if (a && a.origen_datos?.toLowerCase() === 'referencia') {
+      return []
+    }
     const tieneAg = c.analisis_ley.some(x => x.material === 'Ag' && x.vigente)
     return [{
       id: a?.id,
@@ -541,9 +558,12 @@ function mapearCIP(c: CIPAnalisisOut) {
     // Solidos o Solucion
     const subTipoDeseado = tabActual.value === 'solidos' ? 'SOLIDOS' : 'SOLUCION'
     
-    // Filtrar vigentes por el sub_tipo deseado.
-    // Si queremos incluir 'LEGACY' en sólidos (opcional), podríamos hacerlo. Asumiremos que legacy va a sólidos.
-    const vigentes = c.analisis_recuperacion.filter(x => x.vigente && (x.sub_tipo === subTipoDeseado || (!x.sub_tipo && tabActual.value === 'solidos')))
+    // Filtrar vigentes por el sub_tipo deseado y excluir origen_datos === 'referencia'
+    const vigentes = c.analisis_recuperacion.filter(x => 
+      x.vigente && 
+      (x.sub_tipo === subTipoDeseado || (!x.sub_tipo && tabActual.value === 'solidos')) &&
+      x.origen_datos?.toLowerCase() !== 'referencia'
+    )
     
     if (vigentes.length === 0) {
       return []
@@ -579,12 +599,18 @@ const cipsPorTab = computed(() => {
       if (cipsConAnalisisOffline.has(c.cip)) return false  // excluir si ya está en sección offline
       
       if (tm === 'PROCESO' && mostrarSoloCIPs.value) return false
+
+      const vigente = c.analisis_ley.find(x => x.vigente)
+      const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
+      const a = vigente ?? ultimo
+
+      // Ocultar si el origen de datos es 'referencia'
+      if (a && a.origen_datos?.toLowerCase() === 'referencia') {
+        return false
+      }
       
       // Ocultar completados si el tipo de análisis es externo (ej. llenado desde Comercial)
       if (c.estado_ley === 'COMPLETADO') {
-        const vigente = c.analisis_ley.find(x => x.vigente)
-        const ultimo = c.analisis_ley[c.analisis_ley.length - 1]
-        const a = vigente ?? ultimo
         if (a && a.tipo_analisis === 'externo') {
           return false // Es externo, se oculta del dashboard de laboratorio
         }
@@ -594,14 +620,20 @@ const cipsPorTab = computed(() => {
     }
     // For solidos/solucion tab: show Recuperacion types, or PROCESO/LABORATORIO if it has recuperacion analysis
     
-    // Ocultar completados si el origen de datos es 'certificado' (llenado externo)
+    // Ocultar si el origen de datos es 'certificado' (llenado externo) o 'referencia'
     if (c.estado_recuperacion === 'COMPLETADO' || c.estado_recuperacion === 'CERT_COMERCIAL') {
-      const vigente = c.analisis_recuperacion.find(x => x.vigente)
-      const ultimo = c.analisis_recuperacion[c.analisis_recuperacion.length - 1]
-      const a = vigente ?? ultimo
-      if (a && a.origen_datos === 'certificado') {
-        return false // Vino de certificado (externo), no se muestra en el dashboard del laboratorista
+      const subTipoDeseado = tabActual.value === 'solidos' ? 'SOLIDOS' : 'SOLUCION'
+      const vigentesSubtipo = c.analisis_recuperacion.filter(x => x.vigente && (x.sub_tipo === subTipoDeseado || (!x.sub_tipo && tabActual.value === 'solidos')))
+      const a = vigentesSubtipo.find(x => x.vigente) ?? vigentesSubtipo[vigentesSubtipo.length - 1]
+      if (a && (a.origen_datos?.toLowerCase() === 'certificado' || a.origen_datos?.toLowerCase() === 'referencia')) {
+        return false // Vino de certificado (externo) o referencia, no se muestra en el dashboard del laboratorista
       }
+    }
+
+    const subTipoDeseado = tabActual.value === 'solidos' ? 'SOLIDOS' : 'SOLUCION'
+    const vigentesRec = c.analisis_recuperacion.filter(x => x.vigente && (x.sub_tipo === subTipoDeseado || (!x.sub_tipo && tabActual.value === 'solidos')))
+    if (vigentesRec.length > 0 && vigentesRec.every(x => x.origen_datos?.toLowerCase() === 'referencia')) {
+      return false
     }
     
     if (tm === 'RECUPERACIONINTERNO' || tm === 'RECUPERACIONEXTERNO') return true

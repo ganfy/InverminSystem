@@ -129,6 +129,7 @@ export interface LoteDisponible {
     proveedor: string
     acopiador: string
     guia_remision?: string | null
+    ip_hermanos: string[]
 }
 
 export interface LiquidacionesKPI {

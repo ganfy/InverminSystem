@@ -78,6 +78,7 @@ class LoteDisponible(BaseModel):
     liquidacion_id: int | None = None
     numero_liquidacion: str | None = None
     guia_remision: str | None = None
+    ip_hermanos: list[str] = []
 
 
 class LoteFinancieroOut(BaseModel):

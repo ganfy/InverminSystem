@@ -196,6 +196,7 @@ class OrigenDatos(str, Enum):
 
     MANUAL = "manual"  # Ingreso directo por laboratorista
     CERTIFICADO = "certificado"  # Extraído de PDF por OCR
+    REFERENCIA = "referencia"  # Copiado desde IP hermano via "completar por referencia"
 
 
 class OrigenMuestra(str, Enum):

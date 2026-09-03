@@ -1,5 +1,5 @@
 export type TipoAnalisis = 'planta' | 'externo' | 'minero' | 'dirimencia' | 'comercial'
-export type OrigenDatos = 'manual' | 'certificado'
+export type OrigenDatos = 'manual' | 'certificado' | 'referencia'
 export type EstadoRecuperacion = 'PENDIENTE' | 'COMPLETADO' | 'CERT_COMERCIAL' | 'CERT_RECONOCIMIENTO'
 export type TipoMuestra = 'Laboratorio' | 'RecuperacionInterno' | 'RecuperacionExterno' | 'PROCESO'
 
@@ -27,6 +27,7 @@ export interface AnalisisLeyOut {
     ley_grueso: number
     ley_final: number
     ley_gr_tm: number
+    origen_datos?: OrigenDatos | string | null
     vigente: boolean
     fecha_analisis?: string | null
     certificado_url?: string | null
@@ -138,6 +139,12 @@ export interface LoteLabOut {
     // Plata
     ley_ag_gr_tm?: number | null
     ley_ag_oz_tc?: number | null
+    // Alertas
+    alerta_diferencia_analisis?: number | null
+    alerta_diferencia_ree?: number | null
+    // Hermanos
+    ip_hermanos: string[]
+    completado_por_referencia: boolean
 }
 
 // ── Acciones ──────────────────────────────────────────────────────────────────
@@ -171,4 +178,23 @@ export interface SyncResultado {
 export interface SyncLaboratorioResponse {
     resultados_ley: SyncResultado[]
     resultados_recuperacion: SyncResultado[]
+}
+
+// ── Hermanos ───────────────────────────────────────────────────────────────
+export interface VincularHermanosRequest {
+    ip_a: string
+    ip_b: string
+    notas?: string | null
+}
+
+export interface CompletarPorReferenciaRequest {
+    ip_fuente: string
+}
+
+export interface CompletarPorReferenciaResponse {
+    ok: boolean
+    cips_generados: string[]
+    tms_calculado: number | null
+    analisis_ley_copiados: number
+    analisis_rec_copiados: number
 }

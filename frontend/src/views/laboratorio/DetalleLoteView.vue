@@ -48,6 +48,38 @@
         <div v-if="lote.tiene_dirimencia" class="dirimencia-alert" style="margin-top:0.75rem">
           <AlertTriangle :size="16" /> Este lote tiene análisis de dirimencia - prevalece sobre todos los demás
         </div>
+
+        <!-- Hermanos vinculados -->
+        <div v-if="lote.ip_hermanos?.length" class="hermanos-row">
+          <span class="hermanos-label">Partición documentaria:</span>
+          <span
+            v-for="h in lote.ip_hermanos"
+            :key="h"
+            class="chip-hermano"
+          >{{ h }}</span>
+        </div>
+        <div v-if="lote.completado_por_referencia" class="referencia-badge">
+          Análisis completados por referencia
+        </div>
+
+        <!-- Botón gestión hermanos (solo Comercial/Admin) -->
+        <div style="margin-top: 0.75rem">
+          <button
+            class="btn-secondary btn-sm"
+            @click="modalHermanosAbierto = true"
+          >
+            {{ lote.ip_hermanos?.length ? 'Gestionar hermanos' : 'Vincular hermano' }}
+          </button>
+        </div>
+
+        <!-- Modal -->
+        <ModalHermanos
+          v-if="modalHermanosAbierto"
+          :ip="lote.ip"
+          :hermanos="lote.ip_hermanos ?? []"
+          @close="modalHermanosAbierto = false"
+          @actualizar="recargarLote"
+        />
       </section>
 
       <!-- ═══════════════════════════════════════ TAB LEY ═══════════════════════════════════════ -->
@@ -1148,6 +1180,7 @@ import type { LoteLabOut } from '@/types/laboratorio'
 import { laboratorioApi, crearEnsayoREE, type LeyComercialCalc } from '@/api/laboratorio'
 import { muestreoApi } from '@/api/muestreo'
 import { pruebasApi } from '@/api/pruebas'
+import ModalHermanos from '@/components/laboratorio/ModalHermanos.vue'
 
 const router = useRouter()
 const route  = useRoute()
@@ -1166,6 +1199,14 @@ const cargandoAg      = ref(false)
 
 // ── Re-ensayo (REE) ──────────────────────────────────────────────────────────
 const cargandoREE = ref<string | null>(null)
+
+// ── Hermanos ─────────────────────────────────────────────────────────────────
+const modalHermanosAbierto = ref(false)
+
+async function recargarLote() {
+  if (!ipActual) return
+  lote.value = await laboratorioApi.detalleLote(ipActual)
+}
 
 /**
  * Crea un CIP de re-ensayo para el análisis indicado y recarga el lote.
@@ -2343,5 +2384,37 @@ onMounted(async () => {
   padding: 0.6rem 0.9rem;
   color: #ffa000;
   font-size: var(--text-sm);
+}
+</style>
+
+<style scoped>
+/* ── Hermanos ──────────────────────────────────────────────────────────────── */
+.hermanos-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+.hermanos-label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.chip-hermano {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-gold);
+  background: var(--color-surface-2, rgba(255,255,255,0.05));
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.1));
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.referencia-badge {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-top: 0.4rem;
+  opacity: 0.7;
 }
 </style>

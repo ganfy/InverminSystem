@@ -408,6 +408,7 @@ class Lote(AuditMixin, SoftDeleteMixin, Base):
         back_populates="lote",
     )
     modificador_estado = relationship("Usuario", foreign_keys=[estado_modificado_por])
+    hermano_entry = relationship("LoteHermano", back_populates="lote", uselist=False)
 
     __table_args__ = (
         UniqueConstraint("sesion_id", "numero_lote", name="uq_lote_sesion_numero"),
@@ -1047,3 +1048,39 @@ class Configuracion(AuditMixin, Base):
 #     sincronizado_en       = Column(DateTime, server_default=func.now())
 #
 #     comprobante_externo = relationship("ComprobanteExterno")
+
+
+# =============================================================================
+# LOTES HERMANOS — partición documentaria del mismo camión físico
+# =============================================================================
+
+
+class GrupoHermanos(Base):
+    """
+    Agrupa IPs que son partición documentaria del mismo camión físico.
+    Relación simétrica: ningún lote es el original.
+    """
+
+    __tablename__ = "grupos_hermanos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    notas = Column(Text, nullable=True)
+    creado_por = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    creado_en = Column(DateTime, nullable=False)
+
+    miembros = relationship("LoteHermano", back_populates="grupo", cascade="all, delete-orphan")
+
+
+class LoteHermano(Base):
+    """Membership de un lote en un GrupoHermanos. Un lote pertenece a máximo un grupo."""
+
+    __tablename__ = "lotes_hermanos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    grupo_id = Column(Integer, ForeignKey("grupos_hermanos.id", ondelete="CASCADE"), nullable=False)
+    lote_id = Column(Integer, ForeignKey("lotes.id", ondelete="CASCADE"), nullable=False)
+    creado_por = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    creado_en = Column(DateTime, nullable=False)
+
+    grupo = relationship("GrupoHermanos", back_populates="miembros")
+    lote = relationship("Lote", back_populates="hermano_entry")

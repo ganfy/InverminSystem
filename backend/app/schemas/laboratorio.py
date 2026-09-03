@@ -116,6 +116,7 @@ class AnalisisLeyOut(BaseModel):
     ley_grueso: Decimal
     ley_final: Decimal
     ley_gr_tm: Decimal
+    origen_datos: str | None = None
     vigente: bool
     fecha_analisis: date | None
     certificado_url: str | None
@@ -358,6 +359,22 @@ class LoteLabOut(BaseModel):
     # Alerta: diferencia entre análisis de lab > umbral → recomendar enviar otra muestra
     alerta_diferencia_analisis: float | None = None  # valor de la diferencia; None = sin alerta
     alerta_diferencia_ree: float | None = None  # valor de la diferencia para el umbral REE
+    # Lotes hermanos (partición documentaria del mismo camión)
+    ip_hermanos: list[str] = []
+    completado_por_referencia: bool = False
+
+
+# ── Hermanos ───────────────────────────────────────────────────────────────
+
+
+class VincularHermanosRequest(BaseModel):
+    ip_a: str
+    ip_b: str
+    notas: str | None = None
+
+
+class CompletarPorReferenciaRequest(BaseModel):
+    ip_fuente: str
 
 
 # ── Sync Offline ──────────────────────────────────────────────────────────────

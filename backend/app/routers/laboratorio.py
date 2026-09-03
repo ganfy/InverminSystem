@@ -35,6 +35,7 @@ from app.schemas.laboratorio import (
     AnalisisRecuperacionOut,
     AnalisisRecuperacionUpdate,
     CIPAnalisisOut,
+    CompletarPorReferenciaRequest,
     CompletarRecuperacionRequest,
     DescartarRequest,
     EnviarRecuperacionInternaRequest,
@@ -43,6 +44,7 @@ from app.schemas.laboratorio import (
     RecalcularLeyColaRequest,
     SyncLaboratorioRequest,
     SyncLaboratorioResponse,
+    VincularHermanosRequest,
 )
 from app.services import certificado_ley_pdf as cert_svc
 from app.services import laboratorio as svc
@@ -1074,7 +1076,65 @@ def detalle_lote(
     return result
 
 
-# ── Sync Offline ─────────────────────────────────────────────────────────────
+# ── Hermanos (IPs vinculados documentariamente) ────────────────────────────────────
+
+
+@router.post("/hermanos/vincular", response_model=dict)
+def vincular_hermanos_endpoint(
+    payload: VincularHermanosRequest,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Vincula dos IPs como hermanos (partición documentaria del mismo camión).
+    Requiere permiso LABORATORIO UPDATE (Comercial, Admin).
+    """
+    if not _puede_ver_ip(current_user, db):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden vincular hermanos",
+        )
+    svc.vincular_hermanos(db, payload.ip_a, payload.ip_b, current_user.id, payload.notas)
+    return {"ok": True}
+
+
+@router.delete("/hermanos/{ip}", response_model=dict)
+def desvincular_hermano_endpoint(
+    ip: str,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """Quita un lote de su grupo de hermanos. Si el grupo queda con 1 miembro, se disuelve."""
+    if not _puede_ver_ip(current_user, db):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden desvincular hermanos",
+        )
+    svc.desvincular_hermano(db, ip, current_user.id)
+    return {"ok": True}
+
+
+@router.post("/lotes/{ip}/completar-por-referencia", response_model=dict)
+def completar_por_referencia_endpoint(
+    ip: str,
+    payload: CompletarPorReferenciaRequest,
+    current_user=Depends(check_permiso("LABORATORIO", "UPDATE")),
+    db: Session = Depends(get_db),
+):
+    """
+    Clona muestreo (humedad), genera CIP propio y copia análisis de ley y recuperación
+    del ip_fuente al lote indicado.
+    Solo ejecutable si: el destino no tiene muestreo propio, ambos IPs son hermanos vinculados.
+    """
+    if not _puede_ver_ip(current_user, db):
+        raise HTTPException(
+            status_code=403,
+            detail="Solo Comercial, Gerencia y Admin pueden completar por referencia",
+        )
+    return svc.completar_por_referencia(db, ip, payload.ip_fuente, current_user.id)
+
+
+# ── Sync Offline ───────────────────────────────────────────────────────────────────
 
 
 @router.post("/sync", response_model=SyncLaboratorioResponse)
