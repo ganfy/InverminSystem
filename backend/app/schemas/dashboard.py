@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime
 
-from pydantic import BaseModel, field_validator
+from app.schemas.liquidaciones import LiquidacionResumenOut
+from pydantic import BaseModel, Field, field_validator
 
 
 def naive_to_utc(v: datetime | None) -> datetime | None:
@@ -11,11 +12,21 @@ def naive_to_utc(v: datetime | None) -> datetime | None:
 
 class DashboardKPIs(BaseModel):
     au_real_100: float = 0.0  # gr: Σ(TMS × ley_gr_tm)
-    au_real_rec: float = 0.0  # gr: Σ(TMS × ley_gr_tm × rec%)
+    au_real_rec: float = Field(
+        0.0, description="Post-recuperación"
+    )  # gr: Σ(TMS × ley_gr_tm × rec%)
     tmh_stock: float = 0.0
     tms_stock: float = 0.0
-    oz_stock: float = 0.0  # oz totales: au_real_100 / 31.1035
+    oz_stock: float = Field(
+        0.0, description="Post-recuperación"
+    )  # oz totales: au_real_100 / 31.1035
     oz_habilitados: float = 0.0  # oz de lotes habilitados_ruma sin asignar a ruma
+    valor_compra_total: float = 0.0
+    valor_compra_promedio: float | None = Field(None, description="Post-recuperación")
+    rec_liq_promedio: float | None = Field(None, description="Post-recuperación")
+    rec_planta_promedio: float | None = Field(None, description="Post-recuperación")
+    inter_usd_promedio: float | None = Field(None, description="Post-recuperación")
+    au_comprado: float = 0.0
 
 
 class LoteDashboard(BaseModel):
@@ -71,12 +82,39 @@ class AcopiadorStats(BaseModel):
     ley_prom: float | None = None
 
 
+class ResumenPagosBloque(BaseModel):
+    tms_total: float = 0.0
+    tms_pagado: float = 0.0
+    tms_sin_pagar: float = 0.0
+    gr_recuperable_total: float = 0.0
+    gr_recuperable_pagado: float = 0.0
+    gr_recuperable_sin_pagar: float = 0.0
+    total_usd_total: float = 0.0
+    total_usd_pagado: float = 0.0
+    total_usd_sin_pagar: float = 0.0
+
+
+class ProfitAgregado(BaseModel):
+    profit_maquila: float = 0.0
+    profit_rec: float = 0.0
+    profit_consumo: float = 0.0
+    profit_leyes: float = 0.0
+    profit_total: float = 0.0
+    profit_rc: float = 0.0
+    profit_terminos: float | None = None
+    au_comprado: float = 0.0
+    valor_compra_total: float = 0.0
+
+
 class DashboardResponse(BaseModel):
     kpis: DashboardKPIs
     lotes: list[LoteDashboard]
     acopiadores_tmh: list[AcopiadorTMH]
     analisis_conteo: AnalisisConteo = AnalisisConteo()
     acopiadores_stats: list[AcopiadorStats] = []
+    resumen_pagos: ResumenPagosBloque = ResumenPagosBloque()
+    profit: ProfitAgregado = ProfitAgregado()
+    liquidaciones: list[LiquidacionResumenOut] = []
 
 
 class AlertaItem(BaseModel):

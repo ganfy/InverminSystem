@@ -188,6 +188,9 @@
                 <span class="badge-estado" :class="estadoClase(prueba.estado)">
                   {{ prueba.estado }}
                 </span>
+                <div v-if="prueba.es_referencia" style="margin-top:0.3rem; font-size:0.65rem; color:var(--color-gold); font-weight:bold;">
+                  POR REFERENCIA
+                </div>
               </template>
             </td>
             <!-- Columna ACCIONES: registrar, adición, etiquetar -->

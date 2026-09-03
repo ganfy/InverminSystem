@@ -16,12 +16,34 @@
             <button
               class="btn-desvincular"
               :disabled="cargando"
-              :title="`Quitar vínculo con ${h}`"
-              @click="confirmarDesvincular"
+              :title="`Quitar a ${h} del grupo`"
+              @click="confirmarDesvincular(h)"
             >✕</button>
           </div>
         </div>
+        <div v-if="hermanos.length" style="margin-top: 0.5rem; text-align: right;">
+          <button
+            class="btn-desvincular-propio"
+            :disabled="cargando"
+            @click="confirmarDesvincular(ip)"
+          >
+            Salir del grupo (desvincular {{ ip }})
+          </button>
+        </div>
         <p v-else class="texto-muted">Sin hermanos vinculados.</p>
+
+        <!-- Confirmación de desvincular -->
+        <div v-if="confirmarDesv" class="confirm-inline" style="margin-top:0.75rem">
+          <p class="confirm-inline-msg">
+            ¿Desvincular <strong>{{ ipADesvincular }}</strong> del grupo?
+          </p>
+          <div class="confirm-inline-btns">
+            <button class="btn-secondary btn-sm" :disabled="cargando" @click="confirmarDesv = false">Cancelar</button>
+            <button class="btn-danger btn-sm" :disabled="cargando" @click="desvincular">
+              {{ cargando ? 'Procesando…' : 'Sí, desvincular' }}
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- Vincular nuevo -->
@@ -110,6 +132,7 @@ const error      = ref('')
 const cargando   = ref(false)
 const confirmarRef   = ref(false)  // paso de confirmación inline para Completar
 const confirmarDesv  = ref(false)  // paso de confirmación inline para Desvincular
+const ipADesvincular = ref('')
 
 function cerrarSiSeguro() {
   if (!cargando.value) emit('close')
@@ -130,17 +153,23 @@ async function vincular() {
   }
 }
 
-function confirmarDesvincular() {
+function confirmarDesvincular(ipHermano: string) {
+  ipADesvincular.value = ipHermano
   confirmarDesv.value = true
 }
 
 async function desvincular() {
+  if (!ipADesvincular.value) return
   error.value = ''
   cargando.value = true
   try {
-    await laboratorioApi.desvincularHermano(props.ip)
+    await laboratorioApi.desvincularHermano(ipADesvincular.value)
     emit('actualizar')
-    emit('close')
+    confirmarDesv.value = false
+    ipADesvincular.value = ''
+    if (props.hermanos.length === 0) {
+      emit('close')
+    }
   } catch (e: any) {
     error.value = e?.response?.data?.detail ?? 'Error al desvincular'
     confirmarDesv.value = false
@@ -240,6 +269,15 @@ async function completarPorReferencia() {
   line-height: 1;
 }
 .btn-desvincular:hover { color: var(--color-danger, #e05); }
+.btn-desvincular-propio {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  text-decoration: underline;
+}
+.btn-desvincular-propio:hover { color: var(--color-danger, #e05); }
 .btn-icon {
   background: none;
   border: none;

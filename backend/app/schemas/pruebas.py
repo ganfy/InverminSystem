@@ -64,6 +64,7 @@ class LotePruebaList(BaseModel):
     malla_porcentaje: float | None = None
     gasto_agno3: float | None = None
     estado: str  # PENDIENTE | EN PROCESO | COMPLETADO
+    es_referencia: bool = False  # True si el análisis de recuperación fue copiado de un hermano
     cip_asignado: str | None = None  # primer CIP de recuperación (si fue etiquetado)
     cips_asignados: list[str] = []
     etiquetado: bool = False

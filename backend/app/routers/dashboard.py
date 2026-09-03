@@ -1,3 +1,5 @@
+from datetime import date
+
 from app.core.deps import check_permiso, get_db
 from app.schemas.dashboard import (
     AlertasConfig,
@@ -13,7 +15,7 @@ from app.services.dashboard import (
     obtener_trazabilidad_lote,
 )
 from app.services.telegram_alertas import guardar_observacion_alerta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -28,11 +30,19 @@ class ExportarPayload(BaseModel):
         description="Tipo de datos a exportar: 'lotes' o 'acopiadores'",
     )
     clave: str = Field(..., min_length=4, description="Contraseña para proteger el archivo Excel")
+    desde: date | None = None
+    hasta: date | None = None
+    filtro_estado: str = "todo"
 
 
 @router.get("/resumen", response_model=DashboardResponse)
-def get_dashboard_resumen(db: Session = Depends(get_db)):
-    return obtener_resumen_dashboard(db)
+def get_dashboard_resumen(
+    desde: date | None = Query(None),
+    hasta: date | None = Query(None),
+    filtro_estado: str = Query("todo"),
+    db: Session = Depends(get_db),
+):
+    return obtener_resumen_dashboard(db, desde=desde, hasta=hasta, filtro_estado=filtro_estado)
 
 
 @router.post("/exportar")
@@ -40,7 +50,9 @@ def exportar_excel(
     payload: ExportarPayload,
     db: Session = Depends(get_db),
 ):
-    data = obtener_resumen_dashboard(db)
+    data = obtener_resumen_dashboard(
+        db, desde=payload.desde, hasta=payload.hasta, filtro_estado=payload.filtro_estado
+    )
     buf = generar_excel_dashboard(data, tipo=payload.tipo, clave=payload.clave)
     nombre = f"{'lotes' if payload.tipo == 'lotes' else 'acopiadores'}_paititi.xlsx"
     return Response(

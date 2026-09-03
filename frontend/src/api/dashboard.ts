@@ -1,4 +1,5 @@
 import api from './axios'
+import type { LiquidacionResumenOut } from './liquidaciones'
 
 export interface DashboardKPIs {
     au_real_100: number
@@ -7,6 +8,12 @@ export interface DashboardKPIs {
     tms_stock: number
     oz_stock: number
     oz_habilitados: number
+    valor_compra_total: number
+    valor_compra_promedio: number
+    rec_liq_promedio: number
+    rec_planta_promedio: number
+    inter_usd_promedio: number
+    au_comprado: number
 }
 
 interface AcopiadorTMH {
@@ -53,12 +60,39 @@ export interface AcopiadorStats {
     acopiador: string; lotes: number; tms: number; oz: number; ley_prom: number | null
 }
 
+export interface ResumenPagosBloque {
+    tms_total: number
+    tms_pagado: number
+    tms_sin_pagar: number
+    gr_recuperable_total: number
+    gr_recuperable_pagado: number
+    gr_recuperable_sin_pagar: number
+    total_usd_total: number
+    total_usd_pagado: number
+    total_usd_sin_pagar: number
+}
+
+export interface ProfitAgregado {
+    profit_maquila: number
+    profit_rec: number
+    profit_consumo: number
+    profit_leyes: number
+    profit_total: number
+    profit_rc: number
+    profit_terminos: number
+    au_comprado: number
+    valor_compra_total: number
+}
+
 export interface DashboardResponse {
     kpis: DashboardKPIs
+    resumen_pagos: ResumenPagosBloque
+    profit: ProfitAgregado
     lotes: LoteDashboard[]
     acopiadores_tmh: AcopiadorTMH[]
     analisis_conteo: AnalisisConteo
     acopiadores_stats: AcopiadorStats[]
+    liquidaciones: LiquidacionResumenOut[]
 }
 
 //Alertas
@@ -89,12 +123,22 @@ export interface AlertasResponse {
 }
 
 export const dashboardApi = {
-    getResumen: () => api.get<DashboardResponse>('/dashboard/resumen').then(r => r.data),
+    getResumen: (desde?: string, hasta?: string, filtro_estado?: string) => {
+        const params: Record<string, string> = {}
+        if (desde) params.desde = desde
+        if (hasta) params.hasta = hasta
+        if (filtro_estado) params.filtro_estado = filtro_estado
+        return api.get<DashboardResponse>('/dashboard/resumen', { params }).then(r => r.data)
+    },
 
-    async exportar(tipo: 'lotes' | 'acopiadores', clave: string): Promise<void> {
+    async exportar(tipo: 'lotes' | 'acopiadores', clave: string, desde?: string, hasta?: string, filtro_estado?: string): Promise<void> {
+        const payload: Record<string, any> = { tipo, clave }
+        if (desde) payload.desde = desde
+        if (hasta) payload.hasta = hasta
+        if (filtro_estado) payload.filtro_estado = filtro_estado
         const res = await api.post(
             '/dashboard/exportar',
-            { tipo, clave },
+            payload,
             { responseType: 'blob' },
         )
         const url = URL.createObjectURL(res.data)

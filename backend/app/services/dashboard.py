@@ -2,16 +2,22 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
-from app.models.enums import EstadoLote, TipoAnalisis
+from app.models.enums import EstadoLiquidacion, EstadoLote, TipoAnalisis
 from app.models.models import (
     AnalisisLey,
     AnalisisRecuperacion,
+    Campana,
     Configuracion,
+    Liquidacion,
+    LiquidacionLote,
     Lote,
     MapeoCIP,
     Muestreo,
     Pesaje,
+    ProveedorAcopiador,
     PruebaMetalurgica,
+    Ruma,
+    RumaCampana,
     SesionDescarga,
 )
 from app.schemas.dashboard import (
@@ -24,8 +30,13 @@ from app.schemas.dashboard import (
     DashboardKPIs,
     DashboardResponse,
     LoteDashboard,
+    ProfitAgregado,
+    ResumenPagosBloque,
 )
-from sqlalchemy.orm import Session
+from app.services.dashboard_financiero import obtener_snapshot_financiero_lote
+from app.services.liquidaciones import _to_resumen
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 dias_habilitado = 30  # días de almacén para considerar lote "habilitado"
 
@@ -129,13 +140,46 @@ def _cargar_config_alertas(db: Session) -> AlertasConfig:
     )
 
 
-def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
-    lotes_db = (
+def obtener_resumen_dashboard(
+    db: Session, desde: date | None = None, hasta: date | None = None, filtro_estado: str = "todo"
+) -> DashboardResponse:
+    lotes_db_query = (
         db.query(Lote)
+        .options(
+            selectinload(Lote.pesajes),
+            selectinload(Lote.muestreos),
+            selectinload(Lote.sesion)
+            .joinedload(SesionDescarga.provacop)
+            .joinedload(ProveedorAcopiador.parametros),
+            selectinload(Lote.liquidaciones_lotes).joinedload(LiquidacionLote.liquidacion),
+        )
         .filter(~Lote.eliminado, Lote.tipo_material.in_(["Mineral", "Llampo", "M.Llampo"]))
         .filter(Lote.ip.like("IP-%"))
-        .all()
     )
+
+    if desde or hasta:
+        lotes_db_query = lotes_db_query.join(Pesaje, Lote.id == Pesaje.lote_id)
+        if desde:
+            lotes_db_query = lotes_db_query.filter(func.date(Pesaje.fecha_fin) >= desde)
+        if hasta:
+            lotes_db_query = lotes_db_query.filter(func.date(Pesaje.fecha_fin) <= hasta)
+
+    if filtro_estado == "stock":
+        lotes_db_query = (
+            lotes_db_query.outerjoin(Ruma, Lote.ruma_id == Ruma.id)
+            .outerjoin(RumaCampana, Ruma.id == RumaCampana.id_ruma)
+            .filter(RumaCampana.id_campana.is_(None))
+        )
+    elif filtro_estado.startswith("campana_"):
+        campana_codigo = filtro_estado.replace("campana_", "")
+        lotes_db_query = (
+            lotes_db_query.join(Ruma, Lote.ruma_id == Ruma.id)
+            .join(RumaCampana, Ruma.id == RumaCampana.id_ruma)
+            .join(Campana, RumaCampana.id_campana == Campana.id)
+            .filter(Campana.codigo == campana_codigo)
+        )
+
+    lotes_db = lotes_db_query.all()
 
     # Pre-cargar sets en queries únicas (evita N+1)
     ids_con_cip: set[int] = {row[0] for row in db.query(MapeoCIP.lote_id).distinct().all()}
@@ -220,6 +264,19 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     lotes_resumen = []
     analisis_counts: dict[str, int] = {}
     stats_acop: dict[str, dict] = {}
+
+    resumen_pagos = ResumenPagosBloque()
+    profit_agg = ProfitAgregado()
+
+    liquidaciones_dict = {}
+
+    # Acumuladores para promedios financieros de KPIs y Profit
+    suma_tms_fin = 0.0
+    suma_valor_compra = 0.0
+    suma_rec_liq_tms = 0.0
+    suma_rec_planta_tms = 0.0
+    suma_inter_usd_tms = 0.0
+    suma_profit_total_tms = 0.0
 
     # Estructura para almacenar sumatorias: { acopiador: { mes_num: sum_tmh } }
     tmh_por_acopiador_mes = defaultdict(lambda: defaultdict(float))
@@ -390,6 +447,70 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         if lote.ruma_id and getattr(lote, "ruma", None):
             ruma_codigo = lote.ruma.codigo
 
+        # --- OBTENER SNAPSHOT FINANCIERO Y AGREGACIONES ---
+        snap = obtener_snapshot_financiero_lote(db, lote)
+        if snap and tms is not None:
+            tms_snap = float(snap.get("tms", tms))
+            valor_usd = float(snap.get("total_usd", 0.0))
+            rec_liq = float(snap.get("pct_rec_liq", 0.0))
+            rec_planta = float(snap.get("pct_rec_planta", 0.0))
+
+            # inter_usd uses spot_usd by default based on the logic we implemented
+            inter_usd = float(snap.get("spot_usd", 0.0))
+
+            # au_comprado = 31.1035 * 1.1023 * TMS * %RecLiq * Oz/tc / 100
+            # Wait, snap["fino_recuperable"] already calculates exactly this
+            fino_oz = float(snap.get("fino_recuperable", 0.0))
+            au_comprado_lote = fino_oz * 31.1035
+            kpis.au_comprado += au_comprado_lote
+            kpis.valor_compra_total += valor_usd
+
+            suma_tms_fin += tms_snap
+            suma_valor_compra += valor_usd
+            suma_rec_liq_tms += rec_liq * tms_snap
+            suma_rec_planta_tms += rec_planta * tms_snap
+            suma_inter_usd_tms += inter_usd * tms_snap
+
+            profit_agg.profit_maquila += float(snap.get("profit_maquila", 0.0)) * tms_snap
+            profit_agg.profit_rec += float(snap.get("profit_rec", 0.0)) * tms_snap
+            profit_agg.profit_consumo += float(snap.get("profit_consumo", 0.0)) * tms_snap
+            profit_agg.profit_leyes += float(snap.get("profit_leyes", 0.0)) * tms_snap
+            profit_agg.profit_rc += float(snap.get("profit_rc", 0.0)) * tms_snap
+
+            p_tot = float(snap.get("profit_total", 0.0))
+            suma_profit_total_tms += p_tot * tms_snap
+
+        # --- RESUMEN PAGOS ---
+        es_pagado = False
+        for ll in lote.liquidaciones_lotes:
+            est = getattr(ll.liquidacion, "estado", "")
+            if est in (EstadoLiquidacion.PAGADA, "PAGADA"):
+                es_pagado = True
+
+            liq = ll.liquidacion
+            if liq and liq.id not in liquidaciones_dict:
+                liquidaciones_dict[liq.id] = _to_resumen(liq)
+
+        tms_val = tms if tms is not None else 0.0
+        gr_rec_val = 0.0
+        if tms is not None and ley_gr_tm_prom is not None and rec_prom is not None:
+            gr_rec_val = (tms * ley_gr_tm_prom) * rec_prom / 100.0
+
+        usd_val = float(snap.get("total_usd", 0.0)) if snap else 0.0
+
+        resumen_pagos.tms_total += tms_val
+        resumen_pagos.gr_recuperable_total += gr_rec_val
+        resumen_pagos.total_usd_total += usd_val
+
+        if es_pagado:
+            resumen_pagos.tms_pagado += tms_val
+            resumen_pagos.gr_recuperable_pagado += gr_rec_val
+            resumen_pagos.total_usd_pagado += usd_val
+        else:
+            resumen_pagos.tms_sin_pagar += tms_val
+            resumen_pagos.gr_recuperable_sin_pagar += gr_rec_val
+            resumen_pagos.total_usd_sin_pagar += usd_val
+
         lotes_resumen.append(
             LoteDashboard(
                 ip=lote.ip,
@@ -418,6 +539,31 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
     kpis.au_real_rec = round(kpis.au_real_rec, 2)
     kpis.oz_stock = round(kpis.au_real_100 / 31.1035, 3)
     kpis.oz_habilitados = round(kpis.oz_habilitados, 3)
+
+    if suma_tms_fin > 0:
+        kpis.valor_compra_promedio = round(suma_valor_compra / suma_tms_fin, 2)
+        kpis.rec_liq_promedio = round(suma_rec_liq_tms / suma_tms_fin, 2)
+        kpis.rec_planta_promedio = round(suma_rec_planta_tms / suma_tms_fin, 2)
+        kpis.inter_usd_promedio = round(suma_inter_usd_tms / suma_tms_fin, 2)
+
+        profit_agg.profit_maquila = round(profit_agg.profit_maquila / suma_tms_fin, 2)
+        profit_agg.profit_rec = round(profit_agg.profit_rec / suma_tms_fin, 2)
+        profit_agg.profit_consumo = round(profit_agg.profit_consumo / suma_tms_fin, 2)
+        profit_agg.profit_leyes = round(profit_agg.profit_leyes / suma_tms_fin, 2)
+        profit_agg.profit_rc = round(profit_agg.profit_rc / suma_tms_fin, 2)
+        profit_agg.profit_terminos = round(suma_profit_total_tms / suma_tms_fin, 2)
+
+        # profit_total es la suma de los 4 componentes por TMS
+        profit_agg.profit_total = round(
+            profit_agg.profit_maquila
+            + profit_agg.profit_rec
+            + profit_agg.profit_consumo
+            + profit_agg.profit_leyes,
+            2,
+        )
+
+    profit_agg.au_comprado = kpis.au_comprado
+    profit_agg.valor_compra_total = kpis.valor_compra_total
 
     lotes_resumen.sort(key=lambda x: x.ip, reverse=True)
 
@@ -471,6 +617,9 @@ def obtener_resumen_dashboard(db: Session) -> DashboardResponse:
         acopiadores_tmh=acopiadores_tmh_list,
         analisis_conteo=conteo,
         acopiadores_stats=acopiadores_stats_list,
+        resumen_pagos=resumen_pagos,
+        profit=profit_agg,
+        liquidaciones=list(liquidaciones_dict.values()),
     )
 
 
@@ -936,11 +1085,6 @@ def actualizar_config_alertas(db: Session, config: AlertasConfig) -> None:
 # =============================================================================
 
 from app.models.models import (  # noqa: E402
-    Liquidacion,
-    LiquidacionLote,
-    ProveedorAcopiador,
-    Ruma,
-    RumaCampana,
     Usuario,
 )
 from app.schemas.dashboard import (  # noqa: E402
@@ -959,7 +1103,6 @@ from app.schemas.dashboard import (  # noqa: E402
     UsuarioResumen,
 )
 from fastapi import HTTPException  # noqa: E402
-from sqlalchemy.orm import joinedload, selectinload  # noqa: E402
 
 
 def _usuario_res(u: "Usuario | None") -> "UsuarioResumen | None":

@@ -29,6 +29,7 @@ export interface LotePruebaList {
     malla_porcentaje: number | null
     gasto_agno3: number | null
     estado: 'PENDIENTE' | 'EN PROCESO' | 'COMPLETADO'
+    es_referencia: boolean
     // Etiquetado (nuevo)
     cip_asignado: string | null
     cips_asignados: string[]

@@ -333,6 +333,7 @@ def _calcular_lote(
     maquila_override: Decimal | None = None,
     valorizar_volado: bool = False,
     usar_ley_cruda: bool = False,
+    inter_usd_override: Decimal | None = None,
 ) -> tuple[dict[str, Any], list[AlertaLote]]:
     """
     Calcula todos los valores financieros para un lote.
@@ -341,6 +342,9 @@ def _calcular_lote(
       2. spot histórico (según la fecha de creación del pesaje del lote)
     Si no existe registro en el histórico y no hay override, se emite
     AlertaLote(tipo="SIN_SPOT_HISTORICO") con critico=True.
+
+    El parametro inter_usd_override permite calcular el Profit RC con un valor fijo
+    (como se hacía en Excel); si es None, usa el spot_usd real dinámico.
 
     Retorna (snapshot_dict, alertas).
     alertas con critico=True bloquean la liquidacion.
@@ -627,7 +631,9 @@ def _calcular_lote(
         if pm.gasto_agno3 is not None:
             adicion = Decimal(str(pm.adicion_nacn))
             gasto = Decimal(str(pm.gasto_agno3))
-            cianuro_x = ((adicion / Decimal("30")) - gasto * 0.025 * 0.98) * Decimal("30")
+            cianuro_x = (
+                (adicion / Decimal("30")) - gasto * Decimal("0.025") * Decimal("0.98")
+            ) * Decimal("30")
             if cianuro_x < Decimal("0"):
                 cianuro_x = Decimal("0")
         else:
@@ -673,6 +679,11 @@ def _calcular_lote(
         + profit_leyes
         + constantes.gasto_fijo_planta_admin
         - constantes.gasto_fijo_acopio_admin
+    )
+
+    inter_usd = inter_usd_override if inter_usd_override is not None else spot_usd
+    profit_rc = ((spot_usd - inter_usd + riesgo) * ley_planta * rec_planta_val * FACTOR) / Decimal(
+        "100"
     )
 
     # ── Alertas no criticas ───────────────────────────────────────────────────
@@ -743,6 +754,7 @@ def _calcular_lote(
         "profit_consumo": profit_consumo,
         "profit_leyes": profit_leyes,
         "profit_total": profit_total,
+        "profit_rc": profit_rc,
         # campos para el modelo LiquidacionLote
         "tms_snapshot": tms,
         "tmh_snapshot": tmh,
@@ -1130,6 +1142,23 @@ def _to_resumen(liq: Liquidacion) -> LiquidacionResumenOut:
     )
 
 
+def resolver_overrides_desde_snapshot(ll: LiquidacionLote) -> dict[str, Any]:
+    """Reconstruye los kwargs de override para _calcular_lote a partir de un
+    snapshot congelado en LiquidacionLote. Usado tanto por _to_lote_out como
+    por el servicio de reporting del dashboard."""
+    return dict(
+        spot_usd_override=ll.spot_usd_snapshot or Decimal("0"),
+        bono=ll.bono or Decimal("0"),
+        rec_liq_override=ll.porcentaje_rec_liquido,
+        gasto_acopio_override=ll.gasto_acopio_liquidacion,
+        gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
+        - (ll.gasto_acopio_liquidacion or Decimal("0")),
+        spot_ag_usd_override=ll.spot_ag_snapshot,
+        maquila_override=ll.maquila_aplicada,
+        valorizar_volado=bool(ll.lote.volado) if ll.lote else False,
+    )
+
+
 def _to_lote_out(db: Session, ll: LiquidacionLote) -> LiquidacionLoteOut:
     prov_nombre = "—"
     if ll.lote and ll.lote.sesion:
@@ -1142,27 +1171,16 @@ def _to_lote_out(db: Session, ll: LiquidacionLote) -> LiquidacionLoteOut:
         elif ll.lote.sesion.razon_social:
             prov_nombre = ll.lote.sesion.razon_social
 
-    p_maquila, p_rec, p_consumo, p_leyes, p_total = None, None, None, None, None
+    p_maquila, p_rec, p_consumo, p_leyes, p_total, p_rc = None, None, None, None, None, None
     if ll.lote:
         try:
-            calc_dict, _ = _calcular_lote(
-                db,
-                ll.lote,
-                spot_usd_override=ll.spot_usd_snapshot or Decimal("0"),
-                bono=ll.bono or Decimal("0"),
-                rec_liq_override=ll.porcentaje_rec_liquido,
-                gasto_acopio_override=ll.gasto_acopio_liquidacion,
-                gasto_consumo_override=(ll.insumos_liquidacion or Decimal("0"))
-                - (ll.gasto_acopio_liquidacion or Decimal("0")),
-                spot_ag_usd_override=ll.spot_ag_snapshot,
-                maquila_override=ll.maquila_aplicada,
-                valorizar_volado=bool(ll.lote.volado),
-            )
+            calc_dict, _ = _calcular_lote(db, ll.lote, **resolver_overrides_desde_snapshot(ll))
             p_maquila = calc_dict.get("profit_maquila")
             p_rec = calc_dict.get("profit_rec")
             p_consumo = calc_dict.get("profit_consumo")
             p_leyes = calc_dict.get("profit_leyes")
             p_total = calc_dict.get("profit_total")
+            p_rc = calc_dict.get("profit_rc")
         except Exception:
             pass
 
@@ -1206,6 +1224,7 @@ def _to_lote_out(db: Session, ll: LiquidacionLote) -> LiquidacionLoteOut:
         profit_consumo=p_consumo,
         profit_leyes=p_leyes,
         profit_total=p_total,
+        profit_rc=p_rc,
     )
 
 

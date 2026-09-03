@@ -9,13 +9,44 @@
           <span class="last-sync" v-if="lastUpdate">Actualizado {{ lastUpdate }}</span>
         </div>
       </div>
-      <button class="btn-secondary btn-refresh" @click="recargar" :disabled="cargando">
-        <RefreshCw :size="16" :class="{ spinner: cargando }" style="margin-right:0.4rem" />
-        ACTUALIZAR
-      </button>
+      <div style="display:flex; align-items:center; gap: 1rem;">
+        <div class="field" style="margin: 0; min-width: 180px;">
+          <select class="field-input field-select" v-model="selectedFilter">
+            <option value="stock">Cancha / Stock (Sin campaña)</option>
+            <option value="campana_activa" v-if="rumasStore.campanaActiva">
+              Campaña Activa ({{ rumasStore.campanaActiva.codigo }})
+            </option>
+            <optgroup label="Campañas Cerradas" v-if="rumasStore.historialCampanas.filter(x => x.estado === 'CERRADA').length">
+              <option v-for="c in rumasStore.historialCampanas.filter(x => x.estado === 'CERRADA')" :key="c.codigo" :value="'campana_' + c.codigo">
+                {{ c.codigo }}
+              </option>
+            </optgroup>
+            <option value="mes">Este mes</option>
+            <option value="todo">Todo el historial</option>
+            <option value="custom">Rango personalizado...</option>
+          </select>
+        </div>
+        <div v-if="periodoTipo === 'custom'" style="display:flex; gap: 0.5rem;">
+          <input type="date" class="field-input" v-model="desdeFiltro" />
+          <input type="date" class="field-input" v-model="hastaFiltro" />
+        </div>
+        <button class="btn-secondary btn-refresh" @click="recargar" :disabled="cargando">
+          <RefreshCw :size="16" :class="{ spinner: cargando }" style="margin-right:0.4rem" />
+          ACTUALIZAR
+        </button>
+      </div>
     </header>
 
-    <section class="kpi-grid">
+    <section 
+      class="kpi-carousel-wrapper" 
+      @mouseenter="pauseCarousel" 
+      @mouseleave="resumeCarousel"
+    >
+      <button class="carousel-btn btn-left" @click="scrollCarousel(-1)">
+        <ChevronLeft :size="24" />
+      </button>
+
+      <div class="kpi-grid" ref="kpiGridRef">
       <div 
         class="kpi-card gold-accent kpi-card-interactive" 
         :class="{ active: filtroKpi === 'au_real_100' }"
@@ -89,6 +120,78 @@
         </div>
         <Layers class="kpi-icon" :size="32" />
       </div>
+      
+      <!-- Nuevos KPIs -->
+      <div 
+        class="kpi-card"
+        title="Valor Compra: Monto total pagado o a pagar por las compras (USD)."
+      >
+        <div class="kpi-info">
+          <span class="kpi-label">Valor Compra Total</span>
+          <span class="kpi-value">${{ data?.kpis.valor_compra_total ? fmtNum(data.kpis.valor_compra_total) : '0.00' }}</span>
+        </div>
+        <DollarSign class="kpi-icon" :size="32" />
+      </div>
+      
+      <div 
+        class="kpi-card"
+        title="Valor Compra Promedio: Promedio ponderado por TMS del valor de compra (USD/TMS)."
+      >
+        <div class="kpi-info">
+          <span class="kpi-label">Valor Compra Prom.</span>
+          <span class="kpi-value">${{ data?.kpis.valor_compra_promedio ? fmtNum(data.kpis.valor_compra_promedio) : '0.00' }}/t</span>
+        </div>
+        <DollarSign class="kpi-icon" :size="32" />
+      </div>
+
+      <div 
+        class="kpi-card"
+        title="% Rec. Líquido Promedio: Promedio ponderado por TMS de la recuperación comercial."
+      >
+        <div class="kpi-info">
+          <span class="kpi-label">% Rec. Líq. Prom.</span>
+          <span class="kpi-value">{{ data?.kpis.rec_liq_promedio ? fmtNum(data.kpis.rec_liq_promedio) : '0.00' }}%</span>
+        </div>
+        <TrendingUp class="kpi-icon" :size="32" />
+      </div>
+      
+      <div 
+        class="kpi-card"
+        title="% Rec. Planta Promedio: Promedio ponderado por TMS de la recuperación real de planta."
+      >
+        <div class="kpi-info">
+          <span class="kpi-label">% Rec. Planta Prom.</span>
+          <span class="kpi-value">{{ data?.kpis.rec_planta_promedio ? fmtNum(data.kpis.rec_planta_promedio) : '0.00' }}%</span>
+        </div>
+        <TrendingUp class="kpi-icon" :size="32" />
+      </div>
+      
+      <div 
+        class="kpi-card"
+        title="Inter US$ Promedio: Promedio ponderado por TMS del precio internacional del oro aplicado."
+      >
+        <div class="kpi-info">
+          <span class="kpi-label">Inter US$ Prom.</span>
+          <span class="kpi-value">${{ data?.kpis.inter_usd_promedio ? fmtNum(data.kpis.inter_usd_promedio) : '0.00' }}</span>
+        </div>
+        <DollarSign class="kpi-icon" :size="32" />
+      </div>
+      
+      <div 
+        class="kpi-card"
+        title="Au Comprado: Onzas de oro compradas. Fórmula: (Au Real Rec. / 31.1035). Con recuperación."
+      >
+        <div class="kpi-info">
+          <span class="kpi-label">Au Comprado</span>
+          <span class="kpi-value highlight">{{ data?.kpis.au_comprado ? fmtNum(data.kpis.au_comprado, 3) : '0.000' }} oz</span>
+        </div>
+        <Coins class="kpi-icon" :size="32" />
+      </div>
+      </div>
+      
+      <button class="carousel-btn btn-right" @click="scrollCarousel(1)">
+        <ChevronRight :size="24" />
+      </button>
     </section>
 
     <div class="tabs-bar">
@@ -108,6 +211,64 @@
     <div v-if="cargando" class="estado-tabla">
       <span class="spinner" style="margin-right:0.5rem" /> Cargando…
     </div>
+
+    <template v-else-if="tabActual === 'profit' && data?.profit">
+      <div class="profit-container">
+        <div class="profit-header" style="font-size: var(--text-md); border-bottom: 1px solid var(--color-border); padding-bottom: 0.5rem; margin-bottom: 1.5rem;">PROFIT AGREGADO</div>
+        
+        <!-- Bloque Profit Operativo -->
+        <div class="profit-header">PROFITS OPERATIVOS</div>
+        <div class="profit-grid" style="margin-top: 0.5rem;">
+          <div class="profit-item">
+            <span class="p-label">MAQUILA</span>
+            <span class="p-val font-mono" :class="(data.profit.profit_maquila ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (data.profit.profit_maquila ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(data.profit.profit_maquila, 2) }}</span>
+          </div>
+          <div class="profit-item">
+            <span class="p-label">RECUPERACIÓN</span>
+            <span class="p-val font-mono" :class="(data.profit.profit_rec ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (data.profit.profit_rec ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(data.profit.profit_rec, 2) }}</span>
+          </div>
+          <div class="profit-item">
+            <span class="p-label">CONSUMO</span>
+            <span class="p-val font-mono" :class="(data.profit.profit_consumo ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (data.profit.profit_consumo ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(data.profit.profit_consumo, 2) }}</span>
+          </div>
+          <div class="profit-item">
+            <span class="p-label">LEYES</span>
+            <span class="p-val font-mono" :class="(data.profit.profit_leyes ?? 0) >= 0 ? 'text-success' : 'text-danger'">{{ (data.profit.profit_leyes ?? 0) >= 0 ? '+' : '' }}${{ fmtNum(data.profit.profit_leyes, 2) }}</span>
+          </div>
+          <div class="profit-item profit-net">
+            <span class="p-label">TOTAL OPERATIVO</span>
+            <span class="p-val font-mono text-gold">${{ fmtNum(data.profit.profit_total, 2) }}</span>
+          </div>
+        </div>
+
+        <div style="height: 1px; background: var(--color-border); margin: 2rem 0;"></div>
+        
+        <!-- Bloque Profit RC y Términos -->
+        <div class="profit-header">OTROS INDICADORES FINANCIEROS</div>
+        <div class="profit-grid" style="margin-top: 0.5rem;">
+          <div class="profit-item" title="Precio actual del oro (London Fix PM)">
+            <span class="p-label">SPOT ORO (ACTUAL)</span>
+            <span class="p-val font-mono">${{ spotActual ? fmtNum(spotActual, 2) : '---' }}</span>
+          </div>
+          <div class="profit-item" title="Profit ajustado considerando Spot USD y costos por riesgo">
+            <span class="p-label">PROFIT RC</span>
+            <span class="p-val font-mono text-gold">${{ fmtNum(data.profit.profit_rc, 2) }}</span>
+          </div>
+          <div class="profit-item" title="Diferencial total entre comercial y real">
+            <span class="p-label">PROFIT TÉRMINOS</span>
+            <span class="p-val font-mono text-gold">${{ fmtNum(data.profit.profit_terminos, 2) }}</span>
+          </div>
+          <div class="profit-item" style="border-left: 1px dashed var(--color-border); padding-left: 1.5rem; margin-left: 1rem;">
+            <span class="p-label">VALOR COMPRA TOTAL</span>
+            <span class="p-val font-mono">${{ fmtNum(data.profit.valor_compra_total, 2) }}</span>
+          </div>
+          <div class="profit-item">
+            <span class="p-label">AU COMPRADO (Oz)</span>
+            <span class="p-val font-mono highlight">{{ fmtNum(data.profit.au_comprado, 3) }}</span>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <template v-else-if="tabActual === 'lotes'">
       <div class="filtros-bar">
@@ -402,7 +563,7 @@
         </table>
       </div>
       <div class="table-footer">
-        <span class="table-count">{{ liquidacionesFiltradas.length }} de {{ liqStore.lista.length }} liquidaciones</span>
+        <span class="table-count">{{ liquidacionesFiltradas.length }} liquidaciones</span>
       </div>
     </template>
 
@@ -550,6 +711,46 @@
       </div>
 
       <div class="charts-grid">
+        
+        <!-- Tabla: Resumen de Pagos por Stock -->
+        <div class="analytics-card analytics-card--wide" v-if="data?.resumen_pagos">
+          <div class="card-header-mini">
+            <h3>Resumen de Pagos por Stock</h3>
+            <span class="font-mono text-muted-badge">Distribución de liquidaciones</span>
+          </div>
+          <div class="table-premium-wrapper">
+            <table class="data-table-premium" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th class="text-left">ESTADO</th>
+                  <th class="align-right">TMS</th>
+                  <th class="align-right">GR. RECUPERABLE</th>
+                  <th class="align-right">TOTAL USD</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="tabla-row-premium">
+                  <td class="font-bold">Total</td>
+                  <td class="align-right td-mono">{{ fmtNum(data.resumen_pagos.tms_total, 3) }}</td>
+                  <td class="align-right td-mono">{{ fmtNum(data.resumen_pagos.gr_recuperable_total, 2) }}</td>
+                  <td class="align-right td-mono highlight-gold">${{ fmtNum(data.resumen_pagos.total_usd_total, 2) }}</td>
+                </tr>
+                <tr class="tabla-row-premium">
+                  <td class="font-bold text-success">Pagado</td>
+                  <td class="align-right td-mono text-success">{{ fmtNum(data.resumen_pagos.tms_pagado, 3) }}</td>
+                  <td class="align-right td-mono text-success">{{ fmtNum(data.resumen_pagos.gr_recuperable_pagado, 2) }}</td>
+                  <td class="align-right td-mono text-success">${{ fmtNum(data.resumen_pagos.total_usd_pagado, 2) }}</td>
+                </tr>
+                <tr class="tabla-row-premium">
+                  <td class="font-bold text-danger">Sin pagar</td>
+                  <td class="align-right td-mono text-danger">{{ fmtNum(data.resumen_pagos.tms_sin_pagar, 3) }}</td>
+                  <td class="align-right td-mono text-danger">{{ fmtNum(data.resumen_pagos.gr_recuperable_sin_pagar, 2) }}</td>
+                  <td class="align-right td-mono text-danger">${{ fmtNum(data.resumen_pagos.total_usd_sin_pagar, 2) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         <!-- Donut: Pipeline de Análisis -->
         <div class="analytics-card">
@@ -672,28 +873,74 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, markRaw, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, markRaw, watch } from 'vue'
 import {
   Zap, TrendingUp, Scale, Database, Coins, Search,
   RefreshCw, Layers, FileText, PlusCircle, Download, LayoutDashboard,
   Hourglass, Printer, Package, Droplets, FlaskConical, Timer,
-  Settings, AlertTriangle, HelpCircle, CheckCircle2,
+  Settings, AlertTriangle, HelpCircle, CheckCircle2, DollarSign,
+  ChevronLeft, ChevronRight
 } from 'lucide-vue-next'
 import { dashboardApi, type DashboardResponse,
   type LoteDashboard,
  } from '@/api/dashboard'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
+import { useRumasStore } from '@/stores/rumas'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { descargarPDF } from '@/api/liquidaciones'
+import { useRoute, useRouter } from 'vue-router'
+import { descargarPDF, obtenerPrecioOro } from '@/api/liquidaciones'
 import type { AlertaItem, AlertasConfig, AlertasResponse} from '@/api/dashboard'
 import TrazabilidadLoteDrawer from '@/components/dashboard/TrazabilidadLoteDrawer.vue'
 
+const route    = useRoute()
 const router   = useRouter()
 const liqStore = useLiquidacionesStore()
+const rumasStore = useRumasStore()
 const ui       = useUiStore()
 const auth     = useAuthStore()
+
+type PeriodoTipo = 'todo' | 'campana_activa' | 'campana' | 'mes' | 'custom' | 'stock'
+const periodoTipo = ref<PeriodoTipo>('stock')
+const campanaSeleccionada = ref<string | null>(null)
+const desdeFiltro = ref<string | null>(null)
+const hastaFiltro = ref<string | null>(null)
+
+const selectedFilter = computed({
+  get() {
+    if (periodoTipo.value === 'campana') return `campana_${campanaSeleccionada.value}`
+    return periodoTipo.value
+  },
+  set(val: string) {
+    if (val.startsWith('campana_') && val !== 'campana_activa') {
+      periodoTipo.value = 'campana'
+      campanaSeleccionada.value = val.replace('campana_', '')
+    } else {
+      periodoTipo.value = val as PeriodoTipo
+    }
+  }
+})
+
+const rangoActivo = computed<{ desde: string | null; hasta: string | null; filtro_estado?: string }>(() => {
+  if (periodoTipo.value === 'todo') return { desde: null, hasta: null, filtro_estado: 'todo' }
+  if (periodoTipo.value === 'stock') return { desde: null, hasta: null, filtro_estado: 'stock' }
+  if (periodoTipo.value === 'campana_activa' && rumasStore.campanaActiva) {
+    return { desde: null, hasta: null, filtro_estado: 'campana_' + rumasStore.campanaActiva.codigo }
+  }
+  if (periodoTipo.value === 'campana' && campanaSeleccionada.value) {
+    return { desde: null, hasta: null, filtro_estado: 'campana_' + campanaSeleccionada.value }
+  }
+  if (periodoTipo.value === 'mes') {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    return { desde: firstDay.toISOString().split('T')[0], hasta: null, filtro_estado: 'todo' }
+  }
+  return { desde: desdeFiltro.value, hasta: hastaFiltro.value, filtro_estado: 'todo' }
+})
+
+watch(rangoActivo, (val) => {
+  cargarDashboard(val.desde, val.hasta, val.filtro_estado)
+}, { deep: true })
 
 // ── Trazabilidad drawer ───────────────────────────────────────────────
 const drawerOpen       = ref(false)
@@ -709,15 +956,17 @@ function abrirTrazabilidad(ip: string) {
 const data       = ref<DashboardResponse | null>(null)
 const cargando   = ref(true)
 const lastUpdate = ref<string | null>(null)
+const spotActual = ref<number | null>(null)
 
 // ── Tabs ──────────────────────────────────────────────────────────────
-type TabKey = 'resumen' | 'lotes' | 'liquidaciones' | 'acopiadores' | 'alertas'
+type TabKey = 'resumen' | 'profit' | 'lotes' | 'liquidaciones' | 'acopiadores' | 'alertas'
 const tabActual = ref<TabKey>('resumen')
 
 const tabs = computed(() => [
   { key: 'resumen'        as TabKey, label: 'Resumen',       icon: markRaw(LayoutDashboard), count: null },
+  { key: 'profit'         as TabKey, label: 'Profit',        icon: markRaw(DollarSign),      count: null },
   { key: 'lotes'          as TabKey, label: 'Lotes',         icon: markRaw(Layers),           count: lotesFiltrados.value.length || null },
-  { key: 'liquidaciones'  as TabKey, label: 'Liquidaciones', icon: markRaw(FileText),          count: liqStore.lista.length || null },
+  { key: 'liquidaciones'  as TabKey, label: 'Liquidaciones', icon: markRaw(FileText),          count: data.value?.liquidaciones?.length || null },
   { key: 'acopiadores'    as TabKey, label: 'Acopiadores',   icon: markRaw(Scale),            count: data.value?.acopiadores_tmh?.length || null },
   { key: 'alertas'        as TabKey, label: 'Alertas',       icon: markRaw(FileText),         count: totalAlertas.value || null },
 ])
@@ -821,7 +1070,8 @@ const lotesFiltrados = computed(() => {
 
 const liquidacionesFiltradas = computed(() => {
   const q = busquedaLiq.value.trim().toLowerCase()
-  return liqStore.lista.filter(l => {
+  const source = data.value?.liquidaciones || []
+  return source.filter(l => {
     if (filtroEstadoLiq.value && l.estado !== filtroEstadoLiq.value) return false
     if (!q) return true
     return (
@@ -876,10 +1126,10 @@ const distribucionAnalisis = computed(() => {
 })
 
 // ── Actions ───────────────────────────────────────────────────────────
-async function cargarDashboard() {
+async function cargarDashboard(desde?: string | null, hasta?: string | null, filtro_estado?: string) {
   cargando.value = true
   try {
-    data.value   = await dashboardApi.getResumen()
+    data.value   = await dashboardApi.getResumen(desde ?? undefined, hasta ?? undefined, filtro_estado ?? undefined)
     lastUpdate.value = new Date().toLocaleTimeString('es-PE')
   } catch (e) {
     console.error('Error cargando dashboard', e)
@@ -890,6 +1140,7 @@ async function cargarDashboard() {
 
 async function recargar() {
   await Promise.all([cargarDashboard(), liqStore.cargarLista()])
+  spotActual.value = await obtenerPrecioOro()
 }
 
 // ── Formatters ────────────────────────────────────────────────────────
@@ -1025,7 +1276,8 @@ async function exportarExcel(tipo: 'lotes' | 'acopiadores') {
   })
   if (!clave) return
   try {
-    await dashboardApi.exportar(tipo, clave)
+    ui.toast('Generando Excel...', 'info')
+    await dashboardApi.exportar(tipo, clave, rangoActivo.value.desde ?? undefined, rangoActivo.value.hasta ?? undefined, rangoActivo.value.filtro_estado ?? undefined)
     ui.toast('Excel generado y protegido', 'success')
   } catch {
     ui.toast('Error al generar el Excel', 'error')
@@ -1133,10 +1385,53 @@ function labelAnalisis(lote: LoteDashboard): string {
   }[lote.estado_analisis] ?? lote.estado_analisis
 }
 
-onMounted(() => {
-  cargarDashboard()
+const kpiGridRef = ref<HTMLElement | null>(null)
+let carouselInterval: number | undefined
+
+function scrollCarousel(dir: number) {
+  if (kpiGridRef.value) {
+    kpiGridRef.value.scrollBy({ left: dir * 300, behavior: 'smooth' })
+  }
+}
+
+function autoScrollCarousel() {
+  if (kpiGridRef.value) {
+    const maxScroll = kpiGridRef.value.scrollWidth - kpiGridRef.value.clientWidth
+    if (kpiGridRef.value.scrollLeft >= maxScroll - 10) {
+      kpiGridRef.value.scrollTo({ left: 0, behavior: 'smooth' })
+    } else {
+      kpiGridRef.value.scrollBy({ left: 300, behavior: 'smooth' })
+    }
+  }
+}
+
+function pauseCarousel() {
+  clearInterval(carouselInterval)
+}
+
+function resumeCarousel() {
+  clearInterval(carouselInterval)
+  carouselInterval = setInterval(autoScrollCarousel, 4000) as unknown as number
+}
+
+onMounted(async () => {
+  resumeCarousel()
+  if (!rumasStore.campanaActiva) await rumasStore.cargarCampanaActiva()
+  if (rumasStore.historialCampanas.length === 0) await rumasStore.cargarHistorial()
+  
+  if (route.query.campana) {
+    periodoTipo.value = 'campana'
+    campanaSeleccionada.value = route.query.campana as string
+  }
+  
+  await cargarDashboard(rangoActivo.value.desde, rangoActivo.value.hasta, rangoActivo.value.filtro_estado)
   liqStore.cargarLista()
   cargarAlertas()
+  spotActual.value = await obtenerPrecioOro()
+})
+
+onUnmounted(() => {
+  pauseCarousel()
 })
 </script>
 
@@ -1155,13 +1450,55 @@ onMounted(() => {
 .last-sync { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
 .btn-refresh { display: flex; align-items: center; }
 
-/* KPIs */
+/* KPIs Carousel */
+.kpi-carousel-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.carousel-btn {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: absolute;
+  z-index: 10;
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.carousel-btn:hover {
+  background: var(--color-bg-card-hover);
+  color: var(--color-gold);
+  border-color: var(--color-gold);
+}
+.btn-left {
+  left: -20px;
+}
+.btn-right {
+  right: -20px;
+}
+
 .kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  display: flex;
+  overflow-x: auto;
   gap: 1rem;
+  padding-bottom: 0.5rem;
+  padding-top: 0.5rem;
+  scrollbar-width: none;
+  width: 100%;
+}
+.kpi-grid::-webkit-scrollbar {
+  display: none;
 }
 .kpi-card {
+  min-width: 200px;
+  flex-shrink: 0;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1569,6 +1906,50 @@ onMounted(() => {
 }
 .badge-critica { background: #ef4444; color: #fff; }
 .badge-alta    { background: #f59e0b; color: #000; }
+
+/* Profit Styles */
+.profit-container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+.profit-header {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.15em;
+  color: var(--color-gold);
+  margin-bottom: 1rem;
+}
+.profit-grid {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+}
+.profit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.profit-item .p-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.profit-item .p-val {
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.profit-net {
+  margin-left: auto;
+  border-left: 1px solid var(--color-border);
+  padding-left: 2rem;
+}
+.profit-net .p-val { font-size: var(--text-lg); }
+.text-success { color: #4ade80 !important; }
+.text-danger { color: #f87171 !important; }
 
 /* Severity pills */
 .alertas-header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }

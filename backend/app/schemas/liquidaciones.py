@@ -121,6 +121,7 @@ class LoteFinancieroOut(BaseModel):
     profit_consumo: Decimal | None = None
     profit_leyes: Decimal | None = None
     profit_total: Decimal | None = None
+    profit_rc: Decimal | None = None
 
     usa_dirimencia: bool
     alertas: list[AlertaLote]

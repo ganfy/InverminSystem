@@ -169,7 +169,8 @@
           <div
             v-for="c in campanasCerradas"
             :key="c.id"
-            class="hist-card"
+            class="hist-card clickable"
+            @click="irADashboard(c.codigo)"
           >
             <div class="hist-card-top">
               <span class="hist-codigo">{{ c.codigo }}</span>
@@ -337,11 +338,13 @@
   import { useRumasStore } from '@/stores/rumas'
   import { useAuthStore } from '@/stores/auth'
   import { useUiStore } from '@/stores/ui'
+  import { useRouter } from 'vue-router'
   import * as api from '@/api/rumas'
 
   const store    = useRumasStore()
   const auth     = useAuthStore()
   const ui       = useUiStore()
+  const router   = useRouter()
 
   const modalMeta   = ref(false)
   const modalCerrar = ref(false)
@@ -363,6 +366,10 @@
   function fmtDate(s: string | null | undefined) {
     if (!s) return '—'
     return new Date(s + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  function irADashboard(codigo: string) {
+    router.push({ path: '/dashboard', query: { campana: codigo } })
   }
 
   function abrirModalEditarMeta() {
@@ -612,6 +619,14 @@ async function vincularRuma(rumaId: number) {
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
+  }
+  .hist-card.clickable {
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .hist-card.clickable:hover {
+    border-color: var(--color-gold);
+    background: rgba(179,144,40,0.1);
   }
   .hist-card-top { display: flex; align-items: center; gap: 1rem; }
   .hist-codigo {

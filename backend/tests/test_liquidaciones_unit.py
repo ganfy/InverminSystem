@@ -352,6 +352,20 @@ class TestProfitCalculosPaititi:
         profit_leyes_rounded = profit_leyes.quantize(Decimal("0.01"))
         assert profit_leyes_rounded == dec("95.79")
 
+    def test_profit_rc_ip_3600(self):
+        spot_usd = dec("4106")
+        inter_usd = dec("4576.8")
+        riesgo = dec("120")
+        rec_planta_val = dec("96.36")
+        ley_planta = dec("0.22")
+        factor = dec("1.1023")
+
+        profit_rc = (
+            (spot_usd - inter_usd + riesgo) * ley_planta * rec_planta_val * factor / dec("100")
+        )
+        profit_rc_rounded = profit_rc.quantize(Decimal("0.01"))
+        assert profit_rc_rounded == dec("-81.97")
+
 
 # ==============================================================================
 # Verificación de columnas exportadas en generar_excel_pl

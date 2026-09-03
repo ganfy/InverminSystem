@@ -221,6 +221,7 @@
                 <th>LEY COMERC.</th>
                 <th>LEY MINERO</th>
                 <th>PROMEDIO</th>
+                <th>%REC PLANTA</th>
                 <th>%REC LIQ</th>
                 <th>SPOT (Au)</th>
                 <th>MAQUILA</th>
@@ -254,7 +255,8 @@
                 <td class="td-mono td-right">{{ fmtLey(lote.oz_tc_comercial) }}</td>
                 <td class="td-mono td-right">{{ fmtLey(lote.oz_tc_minero) }}</td>
                 <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtLey(lote.oz_tc_promedio) }}</td>
-                <td class="td-mono td-right">{{ fmtNum(lote.pct_rec_liq, 1) }}%</td>
+                <td class="td-mono td-right td-muted">{{ fmtNum(lote.pct_rec_planta, 1) }}%</td>
+                <td class="td-mono td-right" style="color:var(--color-gold)">{{ fmtNum(lote.pct_rec_liq, 1) }}%</td>
                 <td class="td-mono td-right td-spot">
                   <span
                     :class="lote.spot_desde_historico ? 'badge-spot-ok' : 'badge-spot-warn'"

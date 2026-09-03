@@ -164,6 +164,19 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
         # CIPs de recuperación asignados a este lote
         cips_rec = _get_cips_recuperacion(db, lote.id)
 
+        # Check if the lot has tests completed by reference
+        es_referencia_lote = (
+            db.query(AnalisisRecuperacion)
+            .filter(
+                AnalisisRecuperacion.lote_id == lote.id,
+                AnalisisRecuperacion.origen_datos == "referencia",
+                AnalisisRecuperacion.vigente,
+                ~AnalisisRecuperacion.eliminado,
+            )
+            .first()
+            is not None
+        )
+
         # Caso 1: NO hay pruebas → PENDIENTE
         if not pruebas:
             lista.append(
@@ -178,6 +191,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                     malla_porcentaje=None,
                     gasto_agno3=None,
                     estado="PENDIENTE",
+                    es_referencia=False,
                     cip_asignado=None,
                     etiquetado=False,
                 )
@@ -234,6 +248,7 @@ def obtener_lista_pruebas(db: Session) -> list[LotePruebaList]:
                     if prueba.gasto_agno3 is not None
                     else None,
                     estado=estado,
+                    es_referencia=es_referencia_lote,
                     cip_asignado=cip_asignado,
                     cips_asignados=cips_asignados,
                     etiquetado=bool(cips_asignados),
