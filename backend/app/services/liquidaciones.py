@@ -650,34 +650,38 @@ def _calcular_lote(
 
     es_untuca = "UNTUCA" in proveedor_nombre
 
-    cond_untuca = ((soda_w - 3) * Decimal("2.5") + (cianuro_x - 3) * Decimal("3.1")) > 0
-    cond_normal = ((soda_w - 3) * Decimal("1.5") + (cianuro_x - 3) * Decimal("3.1")) > 0
+    lim_soda = constantes.lim_consumo_soda
+    lim_cianuro = constantes.lim_consumo_cianuro
+
+    cond_untuca = (
+        (soda_w - lim_soda) * Decimal("2.5") + (cianuro_x - lim_cianuro) * Decimal("3.1")
+    ) > 0
+    cond_normal = (
+        (soda_w - lim_soda) * Decimal("1.5") + (cianuro_x - lim_cianuro) * Decimal("3.1")
+    ) > 0
 
     if es_untuca:
         descuento_consumo = (
-            ((soda_w - 3) * Decimal("1.5") + (cianuro_x - 3) * Decimal("3.1"))
+            ((soda_w - lim_soda) * Decimal("1.5") + (cianuro_x - lim_cianuro) * Decimal("3.1"))
             if cond_untuca
             else Decimal("0")
         )
     else:
         descuento_consumo = (
-            ((soda_w - 3) * Decimal("1.5") + (cianuro_x - 3) * Decimal("3.1"))
+            ((soda_w - lim_soda) * Decimal("1.5") + (cianuro_x - lim_cianuro) * Decimal("3.1"))
             if cond_normal
             else Decimal("0")
         )
 
     profit_maquila = (maquila - bono) * FACTOR - costo_fijo_planta
     profit_rec = (rec_planta_val - rec_liq) * (spot_usd - riesgo) * ley_planta * FACTOR / 100
-    profit_consumo = (gasto_acopio * FACTOR - constantes.gasto_fijo_planta_admin) + FACTOR * (
-        gasto_consumo - descuento_consumo
-    )
+    profit_consumo = gasto_acopio * FACTOR + FACTOR * (gasto_consumo - descuento_consumo)
     profit_leyes = (ley_planta - oz_promedio) * (spot_usd - riesgo) * rec_planta_val * FACTOR / 100
     profit_total = (
         profit_maquila
         + profit_rec
         + profit_consumo
         + profit_leyes
-        + constantes.gasto_fijo_planta_admin
         - constantes.gasto_fijo_acopio_admin
     )
 
@@ -707,6 +711,12 @@ def _calcular_lote(
         )
 
     snapshot = {
+        "params_profit": {
+            "costo_fijo_planta_maquila": float(costo_fijo_planta),
+            "gasto_fijo_acopio_admin": float(constantes.gasto_fijo_acopio_admin),
+            "lim_consumo_soda": float(lim_soda),
+            "lim_consumo_cianuro": float(lim_cianuro),
+        },
         "ip": lote.ip,
         "proveedor": (
             lote.sesion.provacop.proveedor.razon_social
@@ -977,6 +987,7 @@ def crear_liquidacion(
             ley_ag_gr_tm_snapshot=snap.get("ley_ag_gr_tm"),
             spot_ag_snapshot=snap.get("spot_ag_usd"),
             valor_ag_usd=snap.get("valor_ag_usd"),
+            params_profit=snap.get("params_profit"),
             creado_por=usuario_id,
         )
         db.add(ll)

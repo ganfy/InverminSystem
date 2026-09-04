@@ -532,6 +532,10 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
   unidad_default: 'Unidad por Defecto',
 
   // Cálculo
+  gasto_fijo_planta_admin: 'Gasto Fijo Planta (Admin)',
+  gasto_fijo_acopio_admin: 'Gasto Fijo Acopio (Admin)',
+  lim_consumo_soda: 'Límite Base Consumo Soda',
+  lim_consumo_cianuro: 'Límite Base Consumo Cianuro',
   factor_oz_tc: 'Factor de Conversión (Oz/TC → Gr/TM)',
   blank_correction_ag: 'Corrección en Blanco de Plata (Ag)',
   umbral_volado_oz_tc: 'Umbral de Ley para Lote Volado',
@@ -556,6 +560,7 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
 
   // Laboratorio
   LAB_DIFERENCIA_PLANTA_MINERO: 'Diferencia Máxima entre Labs / Planta vs Minero',
+  LAB_DIFERENCIA_REE: 'Umbral Diferencia Lab (REE)',
 
   // Pruebas
   CAMPANA_META_ORO_FINO_DEFAULT: 'Meta de Oro Fino por Campaña',
@@ -579,6 +584,10 @@ const NOMBRES_AMIGABLES: Record<string, string> = {
 }
 
 const UNIDADES: Record<string, string> = {
+  gasto_fijo_planta_admin: 'USD/TM',
+  gasto_fijo_acopio_admin: 'USD/TM',
+  lim_consumo_soda: 'kg/TM',
+  lim_consumo_cianuro: 'kg/TM',
   factor_oz_tc: 'Gr/TM',
   blank_correction_ag: 'mg',
   umbral_volado_oz_tc: 'Oz/TC',
@@ -587,6 +596,7 @@ const UNIDADES: Record<string, string> = {
   MUESTREO_MALLA_MIN_PCT: '%',
   MUESTREO_MALLA_MAX_PCT: '%',
   LAB_DIFERENCIA_PLANTA_MINERO: 'Oz/TC',
+  LAB_DIFERENCIA_REE: 'Oz/TC',
   CAMPANA_META_ORO_FINO_DEFAULT: 'g',
   sla_metalurgia_horas: 'horas',
   sla_limite_plazo_horas: 'horas',
@@ -615,7 +625,7 @@ const PARAM_CATEGORIES = [
     id: 'calculo',
     name: 'Constantes de Cálculo Metalúrgico',
     icon: Database,
-    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila', 'decimales_ley_laboratorio', 'decimales_ley_planta', 'decimales_ley_comercial', 'decimales_ley_final', 'redondeo_ley_laboratorio', 'redondeo_ley_planta', 'redondeo_ley_comercial', 'redondeo_ley_final']
+    keys: ['factor_oz_tc', 'blank_correction_ag', 'umbral_volado_oz_tc', 'costo_fijo_planta_maquila', 'gasto_fijo_planta_admin', 'gasto_fijo_acopio_admin', 'lim_consumo_soda', 'lim_consumo_cianuro', 'decimales_ley_laboratorio', 'decimales_ley_planta', 'decimales_ley_comercial', 'decimales_ley_final', 'redondeo_ley_laboratorio', 'redondeo_ley_planta', 'redondeo_ley_comercial', 'redondeo_ley_final']
   },
   {
     id: 'muestreo',
@@ -627,7 +637,7 @@ const PARAM_CATEGORIES = [
     id: 'laboratorio',
     name: 'Laboratorio y Calidad',
     icon: Microscope,
-    keys: ['LAB_DIFERENCIA_PLANTA_MINERO']
+    keys: ['LAB_DIFERENCIA_PLANTA_MINERO', 'LAB_DIFERENCIA_REE']
   },
   {
     id: 'pruebas',

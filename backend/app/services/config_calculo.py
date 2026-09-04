@@ -28,6 +28,8 @@ DEFAULTS: dict[str, str] = {
     "costo_fijo_planta_maquila": "80",
     "gasto_fijo_planta_admin": "70",
     "gasto_fijo_acopio_admin": "53",
+    "lim_consumo_soda": "3.0",
+    "lim_consumo_cianuro": "3.0",
     # Muestreo
     "MUESTREO_MAX_INTENTOS": "3",
     "MUESTREO_HUMEDAD_MAX_PCT": "50",
@@ -88,6 +90,8 @@ DESCRIPCIONES: dict[str, str] = {
     "costo_fijo_planta_maquila": "Costo base operativo de la planta por TM para el cálculo de profit de maquila",
     "gasto_fijo_planta_admin": "Gasto administrativo fijo de planta para el cálculo de profit (históricamente $70)",
     "gasto_fijo_acopio_admin": "Gasto administrativo fijo de acopio para el cálculo de profit (históricamente $53)",
+    "lim_consumo_soda": "Consumo base de soda (NaOH) en kg/TM. Por encima de este valor se aplica descuento en profit de consumo.",
+    "lim_consumo_cianuro": "Consumo base de cianuro (NaCN) en kg/TM. Por encima de este valor se aplica descuento en profit de consumo.",
     "MUESTREO_MAX_INTENTOS": "Máximo de intentos de muestreo permitidos por lote",
     "MUESTREO_HUMEDAD_MAX_PCT": "Porcentaje de humedad máximo antes de generar un error",
     "MUESTREO_MALLA_MIN_PCT": "Porcentaje de malla mínimo aceptable para muestreo",
@@ -149,6 +153,8 @@ class ConstantesCalculo:
     costo_fijo_planta_maquila: Decimal
     gasto_fijo_planta_admin: Decimal
     gasto_fijo_acopio_admin: Decimal
+    lim_consumo_soda: Decimal
+    lim_consumo_cianuro: Decimal
     decimales_ley_laboratorio: int
     decimales_ley_planta: int
     decimales_ley_comercial: int
@@ -168,6 +174,8 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         "costo_fijo_planta_maquila",
         "gasto_fijo_planta_admin",
         "gasto_fijo_acopio_admin",
+        "lim_consumo_soda",
+        "lim_consumo_cianuro",
         "decimales_ley_laboratorio",
         "decimales_ley_planta",
         "decimales_ley_comercial",
@@ -190,6 +198,8 @@ def get_constantes(db: Session) -> ConstantesCalculo:
         costo_fijo_planta_maquila=Decimal(cfg["costo_fijo_planta_maquila"]),
         gasto_fijo_planta_admin=Decimal(cfg["gasto_fijo_planta_admin"]),
         gasto_fijo_acopio_admin=Decimal(cfg["gasto_fijo_acopio_admin"]),
+        lim_consumo_soda=Decimal(cfg["lim_consumo_soda"]),
+        lim_consumo_cianuro=Decimal(cfg["lim_consumo_cianuro"]),
         decimales_ley_laboratorio=int(cfg["decimales_ley_laboratorio"]),
         decimales_ley_planta=int(cfg["decimales_ley_planta"]),
         decimales_ley_comercial=int(cfg["decimales_ley_comercial"]),
