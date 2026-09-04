@@ -11,7 +11,6 @@ from typing import Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision: str = "38fdbf885962"
@@ -24,7 +23,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.add_column(
         "liquidaciones_lotes",
-        sa.Column("params_profit", JSONB, nullable=True),
+        sa.Column("params_profit", sa.JSON, nullable=True),
     )
 
 

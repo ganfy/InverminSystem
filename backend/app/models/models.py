@@ -32,6 +32,7 @@ from app.models.enums import (
     OrigenDatos,
 )
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     Computed,
@@ -44,7 +45,6 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -926,7 +926,7 @@ class LiquidacionLote(AuditMixin, Base):
     ley_ag_gr_tm_snapshot = Column(Numeric(10, 3), nullable=True)
     spot_ag_snapshot = Column(Numeric(10, 2), nullable=True)
     valor_ag_usd = Column(Numeric(12, 2), nullable=True)
-    params_profit = Column(JSONB, nullable=True)
+    params_profit = Column(JSON, nullable=True)
 
     liquidacion = relationship("Liquidacion", back_populates="liquidacion_lotes")
     lote = relationship("Lote", back_populates="liquidaciones_lotes")
