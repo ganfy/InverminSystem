@@ -1398,6 +1398,7 @@ def lotes_disponibles_para_liquidar(
                 "ley_comercial": ley_comercial,
                 "oz_tc_planta": oz_tc_planta,
                 "oz_tc_minero": oz_tc_minero,
+                "oz_tc_dirimencia": float(ley_dirim_r) if ley_dirim_r is not None else None,
                 "porcentaje_rec": porcentaje_rec,
                 "usa_dirimencia": usa_dir,
                 "listo_para_liquidar": listo,

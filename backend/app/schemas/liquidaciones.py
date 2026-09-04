@@ -72,6 +72,7 @@ class LoteDisponible(BaseModel):
     ley_comercial: float | None = None
     oz_tc_planta: float | None = None
     oz_tc_minero: float | None = None
+    oz_tc_dirimencia: float | None = None
     porcentaje_rec: float | None = None
     usa_dirimencia: bool = False
     listo_para_liquidar: bool = False

@@ -379,7 +379,7 @@ watch(() => online.value, (isOnline) => {
     background: transparent;
     border-bottom: none;
     padding: 1rem 1.5rem 0 1.5rem;
-    position: static;
+    position: sticky;
   }
   .topbar-title {
     display: none;

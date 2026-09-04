@@ -119,6 +119,7 @@ export interface LoteDisponible {
     ley_comercial: number | null
     oz_tc_planta: number | null
     oz_tc_minero: number | null
+    oz_tc_dirimencia: number | null
     porcentaje_rec: number | null
     usa_dirimencia: boolean
     listo_para_liquidar: boolean

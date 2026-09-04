@@ -90,6 +90,13 @@
           Lotes liquidables
           <span class="tab-count tab-count-ok">{{ countLotesLiquidables }}</span>
         </button>
+        <button
+          class="tab-btn"
+          :class="{ active: tab === 'prevalencia' }"
+          @click="tab = 'prevalencia'; cargarLotesLiquidables()"
+        >
+          Prevalencia de Leyes
+        </button>
       </div>
 
       <!-- ── TAB: Liquidaciones ─────────────────────────────────── -->
@@ -290,8 +297,45 @@
                 </table>
               </div>
             </div>
+          </div>
+        </template>
+      </template>
 
-            <!-- ── Tabla de Prevalencia de Leyes (Promedio vs Dirimencia) ───────────────── -->
+      <!-- ── TAB: Prevalencia de Leyes ─────────────────────────────────── -->
+      <template v-else-if="tab === 'prevalencia'">
+        <div v-if="cargandoLotes" class="estado-cargando">
+          <span class="spinner-sm" /> Cargando lotes…
+        </div>
+        <div v-else-if="!lotesLiquidables.length" class="estado-vacio">
+          No hay lotes liquidables
+        </div>
+        <template v-else>
+          <div style="padding: 1rem; border-bottom: 1px solid var(--color-border); display: flex; gap: 2rem; align-items: center; justify-content: flex-start;">
+             <div>
+               <label style="display: flex; gap: 0.5rem; align-items: center; cursor: pointer;">
+                 <input type="checkbox" v-model="seleccionarTodosPrevalencia" @change="toggleTodosPrevalencia" />
+                 <span style="font-size: var(--text-sm); font-weight: 500;">Seleccionar todos los proveedores</span>
+               </label>
+             </div>
+             <button class="filtro-btn btn-con-icono" style="padding: 0.35rem 0.75rem;" @click="exportarPrevalenciaExcel" :disabled="proveedoresSeleccionados.length === 0">
+               <Download :size="14" /> Exportar a Excel
+             </button>
+          </div>
+          
+          <div
+            v-for="grupo in lotesAgrupados"
+            :key="'prev-' + grupo.provacop_label"
+            class="grupo-provacop"
+          >
+            <div class="grupo-header">
+              <label style="display: flex; gap: 0.5rem; align-items: center; cursor: pointer;">
+                <input type="checkbox" :value="grupo.provacop_id" v-model="proveedoresSeleccionados" />
+                <span class="grupo-nombre">{{ grupo.proveedor }}</span>
+                <span class="grupo-sep">→</span>
+                <span class="grupo-acop">{{ grupo.acopiador }}</span>
+              </label>
+            </div>
+            
             <template v-if="grupo.lotes.some(l => l.oz_tc_minero != null)">
               <div class="clapeo-section">
                 <div class="clapeo-header">
@@ -301,7 +345,7 @@
                 <table class="tabla clapeo-tabla">
                   <thead>
                     <tr>
-                      <th></th>
+                      <th>IP</th>
                       <th class="col-r">LEY PAITITI</th>
                       <th class="col-r">LEY MINERO</th>
                       <th class="col-r">DIFERENCIA</th>
@@ -333,7 +377,7 @@
                         <span
                           v-else
                           class="clap-badge clap-promedio"
-                          title="Diferencia dentro del límite — se liquidará por promedio"
+                          title="Diferencia dentro del límite (<= 0.10) — se liquidará por promedio"
                         >PROMEDIO</span>
                       </td>
                     </tr>
@@ -341,9 +385,11 @@
                 </table>
               </div>
             </template>
+            <div v-else class="estado-vacio" style="padding: 1rem; border: 1px dashed var(--color-border); margin-bottom: 1rem;">
+              Sin datos de ley minero para mostrar prevalencia.
+            </div>
           </div>
         </template>
-
       </template>
 
     </div>
@@ -352,7 +398,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { FileText, Download, Plus, TrendingUp } from 'lucide-vue-next'
 import { useLiquidacionesStore } from '@/stores/liquidaciones'
@@ -360,6 +406,9 @@ import { useUiStore } from '@/stores/ui'
 import api from '@/api/axios'
 import type { LoteDisponible, LiquidacionResumenOut } from '@/api/liquidaciones'
 import { obtenerPrecioOro, exportarPL } from '@/api/liquidaciones'
+// @ts-ignore
+import * as ExcelJS from 'exceljs/dist/exceljs.min.js'
+import saveAs from 'file-saver'
 
 const router = useRouter()
 const store  = useLiquidacionesStore()
@@ -367,11 +416,30 @@ const ui     = useUiStore()
 
 // ── Estado ──────────────────────────────────────────────────────────────────
 
-const tab           = ref<'liquidaciones' | 'lotes'>('liquidaciones')
+const tab           = ref<'liquidaciones' | 'lotes' | 'prevalencia'>('liquidaciones')
 const filtroTexto   = ref('')
 const filtroEstado  = ref('')
 const cargandoLotes = ref(false)
 const cargandoPrecio = ref(false)
+
+const proveedoresSeleccionados = ref<number[]>([])
+const seleccionarTodosPrevalencia = ref(false)
+
+function toggleTodosPrevalencia() {
+  if (seleccionarTodosPrevalencia.value) {
+    proveedoresSeleccionados.value = lotesAgrupados.value.map(g => g.provacop_id)
+  } else {
+    proveedoresSeleccionados.value = []
+  }
+}
+
+watch(proveedoresSeleccionados, (val) => {
+  if (val.length === lotesAgrupados.value.length && val.length > 0) {
+    seleccionarTodosPrevalencia.value = true
+  } else {
+    seleccionarTodosPrevalencia.value = false
+  }
+})
 
 // En la sección de Estado
 const yaCargoLotes = ref(false)
@@ -642,6 +710,138 @@ async function handleExportarPL() {
   } catch (err: any) {
     console.error(err)
     ui.toast(err?.response?.data?.detail || 'Error al exportar', 'error')
+  }
+}
+
+async function exportarPrevalenciaExcel() {
+  try {
+    const wb = new ExcelJS.Workbook()
+    wb.creator = 'Invermin'
+    
+    for (const provId of proveedoresSeleccionados.value) {
+      const grupo = lotesAgrupados.value.find(g => g.provacop_id === provId)
+      if (!grupo) continue
+      
+      let sheetName = grupo.proveedor.replace(/[\\\/\?\*\[\]]/g, '').substring(0, 31)
+      if (!sheetName) sheetName = `Prov_${provId}`
+      
+      let finalSheetName = sheetName
+      let counter = 1
+      while (wb.getWorksheet(finalSheetName)) {
+        const suffix = `_${counter}`
+        finalSheetName = sheetName.substring(0, 31 - suffix.length) + suffix
+        counter++
+      }
+      
+      const ws = wb.addWorksheet(finalSheetName)
+      
+      // 1. Títulos en negrita
+      const titleCell = ws.getCell('A1')
+      titleCell.value = `PROVEEDOR: ${grupo.proveedor}`
+      titleCell.font = { bold: true, size: 12 }
+      
+      const subtitleCell = ws.getCell('A2')
+      subtitleCell.value = 'REPORTE: PREVALENCIA DE LEYES'
+      subtitleCell.font = { bold: true, size: 12 }
+      
+      // 2. Encabezados de tabla (Fila 4)
+      ws.getRow(4).values = ['IP', 'LEY PAITITI', 'LEY MINERO', 'DIFERENCIA', 'DIRIMENCIA', 'LEY FINAL', 'MODO']
+      const headerRow = ws.getRow(4)
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF4F46E5' } // Indigo 600
+        }
+        cell.alignment = { horizontal: 'center' }
+      })
+      
+      // Ajustar anchos
+      ws.columns = [
+        { key: 'ip', width: 15 },
+        { key: 'paititi', width: 15 },
+        { key: 'minero', width: 15 },
+        { key: 'dif', width: 15 },
+        { key: 'dirimencia', width: 15 },
+        { key: 'final', width: 15 },
+        { key: 'modo', width: 20 }
+      ]
+      
+      const lotes = grupo.lotes.filter(l => l.oz_tc_minero != null)
+      let rowIndex = 5
+      for (const lote of lotes) {
+        const row = ws.getRow(rowIndex)
+        const p = lote.oz_tc_planta
+        const m = lote.oz_tc_minero
+        const d = lote.oz_tc_dirimencia
+        const f = lote.ley_comercial // Ley final que se aplicó (o null si falta dirimencia)
+        
+        row.getCell(1).value = lote.ip
+        row.getCell(2).value = p != null ? p : ''
+        row.getCell(3).value = m != null ? m : ''
+        
+        row.getCell(4).value = { formula: `B${rowIndex}-C${rowIndex}`, result: (p||0)-(m||0) }
+        row.getCell(4).numFmt = '0.0000'
+        
+        row.getCell(5).value = d != null ? d : ''
+        row.getCell(5).numFmt = '0.0000'
+        
+        row.getCell(6).value = f != null ? f : ''
+        row.getCell(6).numFmt = '0.0000'
+        
+        // Fórmula de Modo Aplicado
+        const formulaModo = `IF(ISBLANK(F${rowIndex}), IF(ABS(D${rowIndex})>0.10, "PENDIENTE DIRIM.", "PENDIENTE PROM."), IF(ABS(F${rowIndex}-B${rowIndex})<=0.005, "LEY PAITITI", IF(ABS(F${rowIndex}-C${rowIndex})<=0.005, "LEY MINERO", IF(ABS(F${rowIndex}-(B${rowIndex}+C${rowIndex})/2)<=0.005, "PROMEDIO", "DIRIMENCIA"))))`
+        row.getCell(7).value = { formula: formulaModo }
+        row.getCell(7).alignment = { horizontal: 'center' }
+        
+        rowIndex++
+      }
+      
+      // 3. Formato condicional dinámico para MODO (Columna G)
+      if (lotes.length > 0) {
+        ws.addConditionalFormatting({
+          ref: `G5:G${rowIndex > 5 ? rowIndex - 1 : 5}`,
+          rules: [
+            {
+              type: 'cellIs', priority: 1, operator: 'equal', formulae: ['"DIRIMENCIA"'],
+              style: { font: { color: { argb: 'FF9333EA' }, bold: true }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFF3E8FF' } } }
+            } as any,
+            {
+              type: 'cellIs', priority: 2, operator: 'equal', formulae: ['"PROMEDIO"'],
+              style: { font: { color: { argb: 'FFD97706' }, bold: true }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFEF3C7' } } }
+            } as any,
+            {
+              type: 'cellIs', priority: 3, operator: 'equal', formulae: ['"LEY PAITITI"'],
+              style: { font: { color: { argb: 'FF16A34A' }, bold: true }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } } } // Green
+            } as any,
+            {
+              type: 'cellIs', priority: 4, operator: 'equal', formulae: ['"LEY MINERO"'],
+              style: { font: { color: { argb: 'FF2563EB' }, bold: true }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDBEAFE' } } } // Blue
+            } as any,
+            {
+              type: 'cellIs', priority: 5, operator: 'equal', formulae: ['"PENDIENTE DIRIM."'],
+              style: { font: { color: { argb: 'FF6B7280' }, italic: true } }
+            } as any,
+            {
+              type: 'cellIs', priority: 6, operator: 'equal', formulae: ['"PENDIENTE PROM."'],
+              style: { font: { color: { argb: 'FF6B7280' }, italic: true } }
+            } as any
+          ]
+        })
+      }
+    }
+    
+    if (wb.worksheets.length > 0) {
+      const buffer = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      saveAs(blob, 'Prevalencia_Leyes.xlsx')
+    } else {
+      ui.toast('No hay datos de prevalencia válidos para exportar en los proveedores seleccionados', 'error')
+    }
+  } catch (err) {
+    console.error('Error al generar Excel:', err)
+    ui.toast('Ocurrió un error inesperado al generar el archivo Excel.', 'error')
   }
 }
 </script>
@@ -984,7 +1184,7 @@ th.col-r, td.col-r { text-align: right !important; }
   font-size: 0.65rem;
   letter-spacing: 0.07em;
 }
-.col-c { text-align: center; }
+th.col-c, td.col-c { text-align: center !important; }
 
 /* Badges PROMEDIO / DIRIMENCIA en la tabla de clapeo */
 .clap-badge {
